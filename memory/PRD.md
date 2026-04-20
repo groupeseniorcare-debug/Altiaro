@@ -58,9 +58,12 @@ Les 50 étapes du playbook sont regroupées en 4 blocs :
 | 22 | Mega-Block Execute (4 mega-prompts) | ✅ |
 | 23 | AI Copilot conversationnel (function calling) | ✅ |
 | 24 | Paiement Mollie (checkout + webhook) | ✅ |
-| 25 | TVA multi-pays + split 50/50 runtime | ⏳ (P1) |
-| 26 | Resend (emails transactionnels) | ⏳ (attente clé) |
-| 27 | Google Ads Center | ⏳ (attente clé) |
+| 25 | Facturation Concepteurs (CB mandate + IBAN + cron) | ✅ |
+| 26 | **Virements Admin = 50% × marge brute HT** (par Concepteur, 1er/15) | ✅ |
+| 27 | `cost_price_ht` tracké sur produits + snapshot à la commande | ✅ |
+| 28 | TVA multi-pays auto (FR 20 / DE 19 / BE·NL 21 / UK 20 / CH 7.7) | ✅ |
+| 29 | Resend (emails transactionnels) | ⏳ (attente clé) |
+| 30 | Google Ads Center READ-ONLY sync | ⏳ (attente clé) |
 
 ## Règles critiques
 - Pas de Shopify — tout custom React/FastAPI.

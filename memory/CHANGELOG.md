@@ -3,6 +3,26 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-20 · Sprint 13 : Virements Concepteurs sur marge brute HT 💸
+- **🎯 Nouvelle règle métier** : la part Concepteur = **50% × marge brute HT** (CA HT − Prix d'achat HT) et non plus 50% du total TTC.
+- **📦 Produit** : ajout du champ `cost_price_ht` (prix d'achat HT fournisseur) sur `ProductCreateInput` / `ProductUpdateInput`. Input dédié + preview live de la marge dans l'éditeur UI.
+- **🏷️ Site** : ajout du champ optionnel `vat_rate` (sinon taux déduit du 1er pays ciblé : FR=20%, DE=19%, BE/NL=21%, UK=20%, CH=7.7% — mapping dans `tax_utils.VAT_BY_COUNTRY`).
+- **🧾 Order snapshot** : à la création de commande publique, chaque item fige `cost_price_ht` depuis le produit et l'order enregistre `subtotal_ht`, `cost_ht`, `gross_margin_ht`, `vat_rate`.
+- **💰 Ledger** : `log_order_share_on_paid` calcule désormais `amount = 50% × gross_margin_ht` (avec fallback recalcul si snapshot manquant). Nouveaux champs `revenue_ht`, `cost_ht`, `gross_margin_ht` dans l'entrée ledger.
+- **🆕 Page Admin `/admin/payouts`** (`AdminPayouts.jsx`) avec 3 onglets :
+  - **À effectuer** : liste des virements pending avec IBAN complet + bouton "Copier IBAN", "Marquer payé", "Annuler".
+  - **Aperçu prochain cycle** : ventilation par Concepteur avec CA HT / Achats HT / Marge HT + détail par site.
+  - **Historique** : tous les virements marqués payés.
+  - 4 KPI cards : À virer maintenant / Aperçu / Prochain cycle / Déjà versé.
+- **📅 Cron auto** : le 1er et 15 de chaque mois à 03h UTC → appelle `admin_run_payouts` qui fige automatiquement les entrées `payout pending` dans le ledger + crée une `admin_notifications` entry.
+- **🔁 Endpoints backend** :
+  - `GET /api/admin/billing/payouts-preview` enrichi : `site_breakdown[]`, `next_cycle_date`, IBAN en clair pour copier-coller.
+  - `GET /api/admin/billing/payouts-history` : tous les payouts avec nom/email Concepteur.
+  - `POST /api/admin/billing/payouts/{id}/cancel` : annule un pending.
+  - `GET/POST /api/admin/notifications` : toast admin payouts ready.
+- **🧮 Netting** : le calcul `net_due` ne déduit PLUS les `ad_debits` (ils sont collectés séparément via CB mandate) — conforme à la demande utilisateur.
+- Tests : **17/17 pytest Sprint 13** + régression **21/21 iter11** = 100%. Frontend E2E validé (3 onglets, KPIs, nav, accès contrôlé admin-only, éditeur produit).
+
 ## 2026-04-20 · Sprint 12 : Facturation Concepteurs (CB + IBAN + payouts) 💳
 - **🗂️ Espace Concepteur "Mon compte"** (`/billing`) :
   - **Carte bancaire** via Mollie mandate (first payment 0.01€ en sequenceType=first → mandate_id stocké). CB affichée en carte noire gradient avec last4/brand + mode test/live.
