@@ -290,6 +290,14 @@ export default function SiteDetail() {
                   <Package size={16} weight="bold" /> Gérer les produits
                 </button>
                 <button
+                  onClick={() => navigate(`/sites/${id}/design`)}
+                  data-testid="nav-design"
+                  className="h-10 px-4 rounded-xl text-white text-sm font-medium flex items-center gap-2 transition"
+                  style={{ background: "linear-gradient(135deg, #B84B31 0%, #DC2626 100%)" }}
+                >
+                  <Sparkle size={16} weight="fill" /> Design IA
+                </button>
+                <button
                   onClick={() => navigate(`/sites/${id}/ads-copy`)}
                   data-testid="ads-copy-link"
                   className="h-10 px-4 rounded-xl bg-white border border-[#E7E5E4] hover:border-[#B84B31] text-[#1C1917] text-sm font-medium flex items-center gap-2 transition"

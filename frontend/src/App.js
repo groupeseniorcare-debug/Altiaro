@@ -18,6 +18,7 @@ import Empire from "./pages/Empire";
 import Billing from "./pages/Billing";
 import Orders from "./pages/Orders";
 import AdminPayouts from "./pages/AdminPayouts";
+import SiteDesign from "./pages/SiteDesign";
 import {
   StorefrontHome,
   StorefrontProduct,
@@ -25,6 +26,14 @@ import {
   StorefrontCheckout,
   StorefrontConfirmation,
 } from "./pages/Storefront";
+import {
+  StorefrontAbout,
+  StorefrontFAQ,
+  StorefrontContact,
+  StorefrontCGV,
+  StorefrontMentions,
+  StorefrontConfidentialite,
+} from "./pages/StorefrontPages";
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user } = useAuth();
@@ -118,6 +127,14 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/sites/:id/design"
+            element={
+              <ProtectedRoute>
+                <SiteDesign />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Public Storefront (no auth) */}
           <Route path="/shop/:siteId" element={<StorefrontHome />} />
@@ -126,6 +143,12 @@ function App() {
           <Route path="/shop/:siteId/checkout" element={<StorefrontCheckout />} />
           <Route path="/shop/:siteId/confirmation" element={<StorefrontConfirmation />} />
           <Route path="/shop/:siteId/checkout/success" element={<StorefrontConfirmation />} />
+          <Route path="/shop/:siteId/about" element={<StorefrontAbout />} />
+          <Route path="/shop/:siteId/faq" element={<StorefrontFAQ />} />
+          <Route path="/shop/:siteId/contact" element={<StorefrontContact />} />
+          <Route path="/shop/:siteId/cgv" element={<StorefrontCGV />} />
+          <Route path="/shop/:siteId/mentions" element={<StorefrontMentions />} />
+          <Route path="/shop/:siteId/confidentialite" element={<StorefrontConfidentialite />} />
           <Route
             path="/validations"
             element={

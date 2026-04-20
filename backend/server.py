@@ -42,6 +42,7 @@ from routes import blocks_execute as blocks_execute_routes
 from routes import copilot as copilot_routes
 from routes import payments as payments_routes
 from routes import billing as billing_routes
+from routes import design as design_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,6 +71,7 @@ api.include_router(blocks_execute_routes.router)
 api.include_router(copilot_routes.router)
 api.include_router(payments_routes.router)
 api.include_router(billing_routes.router)
+api.include_router(design_routes.router)
 api.include_router(niches_routes.router)
 api.include_router(dashboard_routes.router)
 api.include_router(meta_routes.router)

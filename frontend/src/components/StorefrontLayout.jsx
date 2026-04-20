@@ -7,7 +7,7 @@ import { ShoppingBag, Phone, ShieldCheck, Truck } from "@phosphor-icons/react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
-export default function StorefrontLayout({ children, lang, setLang, site }) {
+export default function StorefrontLayout({ children, lang, setLang, site, design }) {
   const { siteId } = useParams();
   const [cartCount, setCartCount] = useState(0);
 
@@ -19,11 +19,42 @@ export default function StorefrontLayout({ children, lang, setLang, site }) {
   }, [siteId]);
 
   const shopRoot = `/shop/${siteId}`;
+  const brand = design?.brand || {};
+  const primary = brand.primary_color || "#B84B31";
+  const accent = brand.accent_color || "#F5F2EB";
+  const bg = brand.background_color || "#FDFBF7";
+  const textCol = brand.text_color || "#1C1917";
+  const fontHeading = brand.font_heading || "Fraunces";
+  const fontBody = brand.font_body || "Inter";
+  const logoUrl = brand.logo_url ? `${BACKEND_URL}${brand.logo_url}` : null;
+  const logoText = brand.logo_text || site?.name || "…";
+  const tagline = (design?.brand?.tagline?.[lang]) || (design?.brand?.tagline?.fr) || site?.niche_data?.tagline;
+
+  const footer = design?.footer;
+  const footerTagline = (footer?.tagline?.[lang]) || (footer?.tagline?.fr);
+  const footerCols = footer?.columns || [];
+
+  const cssVars = {
+    "--cf-primary": primary,
+    "--cf-accent": accent,
+    "--cf-bg": bg,
+    "--cf-text": textCol,
+    "--cf-font-heading": `"${fontHeading}", serif`,
+    "--cf-font-body": `"${fontBody}", system-ui, sans-serif`,
+  };
+
+  // Google Fonts link for the chosen fonts (loaded once per page)
+  const fontsQuery = encodeURIComponent(`${fontHeading}:wght@400;500;600;700|${fontBody}:wght@400;500;600`);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FDFBF7]" data-testid="storefront-layout">
+    <div
+      className="min-h-screen flex flex-col"
+      style={{ ...cssVars, background: bg, color: textCol, fontFamily: `"${fontBody}", system-ui, sans-serif` }}
+      data-testid="storefront-layout"
+    >
+      <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${fontsQuery}&display=swap`} />
       {/* Trust bar */}
-      <div className="bg-[#1C1917] text-white text-[13px]">
+      <div className="text-white text-[13px]" style={{ background: textCol }}>
         <div className="max-w-6xl mx-auto px-6 py-2 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-5">
             <span className="flex items-center gap-1.5">
@@ -43,7 +74,7 @@ export default function StorefrontLayout({ children, lang, setLang, site }) {
             className="bg-transparent border border-white/20 rounded px-2 py-0.5 text-[12px] hover:bg-white/10 cursor-pointer outline-none"
           >
             {LANGUAGES.map((l) => (
-              <option key={l.code} value={l.code} className="text-[#1C1917]">
+              <option key={l.code} value={l.code} style={{ color: textCol }}>
                 {l.flag} {l.label}
               </option>
             ))}
@@ -52,30 +83,45 @@ export default function StorefrontLayout({ children, lang, setLang, site }) {
       </div>
 
       {/* Header */}
-      <header className="bg-white border-b border-[#E7E5E4] sticky top-0 z-10">
+      <header className="bg-white border-b sticky top-0 z-10" style={{ borderColor: "#E7E5E4" }}>
         <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
-          <Link to={shopRoot} className="group" data-testid="shop-logo">
-            <div className="font-heading text-2xl font-semibold text-[#1C1917] group-hover:text-[#B84B31] transition">
-              {site?.name || "…"}
-            </div>
-            {site?.niche_data?.tagline && (
-              <div className="text-xs text-[#78716C] mt-0.5 hidden md:block">
-                {site.niche_data.tagline}
-              </div>
+          <Link to={shopRoot} className="group flex items-center gap-3" data-testid="shop-logo">
+            {logoUrl && (
+              <img
+                src={logoUrl}
+                alt={logoText}
+                className="w-11 h-11 rounded-lg object-cover border"
+                style={{ borderColor: "#E7E5E4" }}
+              />
             )}
+            <div>
+              <div
+                className="font-semibold text-2xl leading-tight transition"
+                style={{ fontFamily: `"${fontHeading}", serif`, color: textCol }}
+              >
+                <span className="group-hover:text-[var(--cf-primary)]">{logoText}</span>
+              </div>
+              {tagline && (
+                <div className="text-xs mt-0.5 hidden md:block" style={{ color: "#78716C" }}>
+                  {tagline}
+                </div>
+              )}
+            </div>
           </Link>
 
           <Link
             to={`${shopRoot}/cart`}
             data-testid="cart-button"
-            className="relative flex items-center gap-2 h-11 px-4 rounded-full bg-[#FDFBF7] hover:bg-[#F5F2EB] border border-[#E7E5E4] transition group"
+            className="relative flex items-center gap-2 h-11 px-4 rounded-full border transition group"
+            style={{ background: accent, borderColor: "#E7E5E4" }}
           >
-            <ShoppingBag size={20} weight="regular" className="text-[#1C1917]" />
-            <span className="text-sm font-medium text-[#1C1917]">{t(lang, "cart")}</span>
+            <ShoppingBag size={20} weight="regular" style={{ color: textCol }} />
+            <span className="text-sm font-medium" style={{ color: textCol }}>{t(lang, "cart")}</span>
             {cartCount > 0 && (
               <span
                 data-testid="cart-count"
-                className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] rounded-full bg-[#B84B31] text-white text-[11px] font-semibold flex items-center justify-center px-1.5"
+                className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] rounded-full text-white text-[11px] font-semibold flex items-center justify-center px-1.5"
+                style={{ background: primary }}
               >
                 {cartCount}
               </span>
@@ -86,13 +132,50 @@ export default function StorefrontLayout({ children, lang, setLang, site }) {
 
       <main className="flex-1">{children}</main>
 
-      <footer className="border-t border-[#E7E5E4] bg-white mt-20">
-        <div className="max-w-6xl mx-auto px-6 py-8 text-center text-sm text-[#78716C]">
-          <div className="font-heading text-lg text-[#1C1917] mb-2">{site?.name}</div>
-          <div>
-            © {new Date().getFullYear()} · {t(lang, "secure_checkout")} ·{" "}
-            {t(lang, "support_seniors")}
+      <footer className="border-t bg-white mt-20" style={{ borderColor: "#E7E5E4" }}>
+        <div className="max-w-6xl mx-auto px-6 py-10 grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div className="md:col-span-1">
+            <div
+              className="font-semibold text-xl mb-1"
+              style={{ fontFamily: `"${fontHeading}", serif`, color: textCol }}
+            >
+              {logoText}
+            </div>
+            {footerTagline && (
+              <p className="text-sm mt-1" style={{ color: "#78716C" }}>
+                {footerTagline}
+              </p>
+            )}
           </div>
+          {footerCols.slice(0, 3).map((col, idx) => {
+            const colTitle = col?.title?.[lang] || col?.title?.fr || "";
+            return (
+              <div key={idx}>
+                <div className="text-[11px] uppercase tracking-widest mb-3" style={{ color: "#78716C" }}>
+                  {colTitle}
+                </div>
+                <ul className="space-y-1.5">
+                  {(col.links || []).map((lnk, i) => {
+                    const label = lnk?.label?.[lang] || lnk?.label?.fr || "";
+                    const href = lnk?.href?.startsWith("/shop") ? lnk.href : `${shopRoot}${lnk.href || ""}`;
+                    return (
+                      <li key={i}>
+                        <Link to={href} className="text-sm hover:underline" style={{ color: textCol }}>
+                          {label}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+        <div className="border-t py-6 text-center text-xs" style={{ borderColor: "#E7E5E4", color: "#78716C" }}>
+          © {new Date().getFullYear()} {logoText} ·{" "}
+          <Link to={`${shopRoot}/cgv`} className="hover:underline">CGV</Link> ·{" "}
+          <Link to={`${shopRoot}/mentions`} className="hover:underline">Mentions légales</Link> ·{" "}
+          <Link to={`${shopRoot}/confidentialite`} className="hover:underline">Confidentialité</Link>
         </div>
       </footer>
     </div>

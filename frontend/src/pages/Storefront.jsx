@@ -18,6 +18,7 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 function useSiteAndLang() {
   const { siteId } = useParams();
   const [site, setSite] = useState(null);
+  const [design, setDesign] = useState(null);
   const storageKey = `cf_lang_${siteId}`;
   const [lang, setLangState] = useState(() => localStorage.getItem(storageKey) || "fr");
   const setLang = (l) => {
@@ -26,8 +27,26 @@ function useSiteAndLang() {
   };
   useEffect(() => {
     fetchPublicSite(siteId).then(setSite).catch(() => setSite({ error: true }));
+    axios
+      .get(`${BACKEND_URL}/api/public/sites/${siteId}/design`)
+      .then(({ data }) => setDesign(data?.published ? data.design : null))
+      .catch(() => setDesign(null));
   }, [siteId]);
-  return { siteId, site, lang, setLang };
+  return { siteId, site, design, lang, setLang };
+}
+
+function designText(design, path, lang) {
+  // path: ex "hero.title" → design.hero.title[lang] || .fr
+  if (!design) return null;
+  const parts = path.split(".");
+  let node = design;
+  for (const p of parts) {
+    node = node?.[p];
+    if (node === undefined || node === null) return null;
+  }
+  if (typeof node === "string") return node;
+  if (typeof node === "object") return node[lang] || node.fr || Object.values(node)[0] || null;
+  return null;
 }
 
 function formatPrice(price, currency = "EUR", lang = "fr") {
@@ -42,10 +61,10 @@ function formatPrice(price, currency = "EUR", lang = "fr") {
 }
 
 /* =========================================================
- * STOREFRONT HOME — grille produits
+ * STOREFRONT HOME — grille produits (+ sections IA)
  * ========================================================= */
 export function StorefrontHome() {
-  const { siteId, site, lang, setLang } = useSiteAndLang();
+  const { siteId, site, design, lang, setLang } = useSiteAndLang();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -64,21 +83,74 @@ export function StorefrontHome() {
     );
   }
 
+  const heroTitle = designText(design, "hero.title", lang) || t(lang, "shop_title");
+  const heroSub = designText(design, "hero.subtitle", lang) || t(lang, "shop_subtitle");
+  const heroCta = designText(design, "hero.cta_label", lang);
+  const heroTrust = designText(design, "hero.trust_line", lang);
+  const primary = design?.brand?.primary_color || "#B84B31";
+  const fontHeading = design?.brand?.font_heading || "Fraunces";
+
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site}>
+    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
       <section className="max-w-6xl mx-auto px-6 pt-12 pb-6">
         <div className="max-w-2xl">
-          <div className="text-[11px] uppercase tracking-widest text-[#B84B31] mb-3 flex items-center gap-2">
+          <div className="text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2" style={{ color: primary }}>
             <Sparkle size={12} weight="fill" /> {site?.niche_data?.category || t(lang, "featured")}
           </div>
-          <h1 className="font-heading text-4xl md:text-5xl font-semibold text-[#1C1917] leading-[1.05]">
-            {t(lang, "shop_title")}
+          <h1
+            className="text-4xl md:text-5xl font-semibold leading-[1.05]"
+            style={{ fontFamily: `"${fontHeading}", serif` }}
+          >
+            {heroTitle}
           </h1>
-          <p className="text-[17px] text-[#57534E] mt-3">{t(lang, "shop_subtitle")}</p>
+          <p className="text-[17px] mt-3" style={{ color: "#57534E" }}>{heroSub}</p>
+          {heroTrust && (
+            <div className="text-sm mt-3 flex items-center gap-1.5" style={{ color: "#78716C" }}>
+              <ShieldCheck size={14} /> {heroTrust}
+            </div>
+          )}
+          {heroCta && (
+            <a
+              href="#products"
+              className="inline-flex items-center gap-2 mt-6 h-12 px-6 rounded-full text-white font-medium transition hover:opacity-90"
+              style={{ background: primary }}
+            >
+              {heroCta} <ArrowRight size={16} />
+            </a>
+          )}
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-6 pb-16">
+      {/* Benefits */}
+      {design?.benefits?.length > 0 && (
+        <section className="max-w-6xl mx-auto px-6 py-10">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {design.benefits.map((b, i) => {
+              const title = b.title?.[lang] || b.title?.fr || "";
+              const desc = b.desc?.[lang] || b.desc?.fr || "";
+              return (
+                <div
+                  key={i}
+                  className="bg-white rounded-2xl border p-5"
+                  style={{ borderColor: "#E7E5E4" }}
+                  data-testid={`benefit-${i}`}
+                >
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center mb-3"
+                    style={{ background: `${primary}18`, color: primary }}
+                  >
+                    <ShieldCheck size={20} weight="fill" />
+                  </div>
+                  <div className="font-semibold" style={{ fontFamily: `"${fontHeading}", serif` }}>{title}</div>
+                  <div className="text-sm mt-1" style={{ color: "#78716C" }}>{desc}</div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      <section id="products" className="max-w-6xl mx-auto px-6 pb-16">
         {loading ? (
           <div className="py-20 text-center text-[#78716C]">…</div>
         ) : products.length === 0 ? (
@@ -92,7 +164,10 @@ export function StorefrontHome() {
                 key={p.id}
                 to={`/shop/${siteId}/product/${p.id}`}
                 data-testid={`product-card-${p.id}`}
-                className="group bg-white rounded-2xl border border-[#E7E5E4] overflow-hidden hover:border-[#B84B31] hover:shadow-lg transition-all duration-300"
+                className="group bg-white rounded-2xl border overflow-hidden hover:shadow-lg transition-all duration-300"
+                style={{ borderColor: "#E7E5E4" }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = primary)}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#E7E5E4")}
               >
                 <div className="aspect-square bg-[#F5F2EB] overflow-hidden relative">
                   {p.images?.[0] ? (
@@ -107,27 +182,28 @@ export function StorefrontHome() {
                     </div>
                   )}
                   {p.featured && (
-                    <div className="absolute top-3 left-3 bg-[#B84B31] text-white text-[10px] uppercase tracking-widest font-semibold px-2.5 py-1 rounded-full">
+                    <div
+                      className="absolute top-3 left-3 text-white text-[10px] uppercase tracking-widest font-semibold px-2.5 py-1 rounded-full"
+                      style={{ background: primary }}
+                    >
                       ★ {t(lang, "featured")}
                     </div>
                   )}
                 </div>
                 <div className="p-5">
-                  <div className="font-heading text-lg font-semibold text-[#1C1917] group-hover:text-[#B84B31] transition">
+                  <div
+                    className="text-lg font-semibold transition"
+                    style={{ fontFamily: `"${fontHeading}", serif` }}
+                  >
                     {pickLang(p.name, lang)}
                   </div>
                   <div className="flex items-baseline gap-2 mt-2">
-                    <span className="text-xl font-semibold text-[#1C1917]">
-                      {formatPrice(p.price, p.currency, lang)}
-                    </span>
-                    {p.compare_at_price && p.compare_at_price > p.price && (
-                      <span className="text-sm text-[#A8A29E] line-through">
+                    <span className="text-xl font-semibold">{formatPrice(p.price, p.currency, lang)}</span>
+                    {p.compare_at_price && (
+                      <span className="text-sm line-through text-[#78716C]">
                         {formatPrice(p.compare_at_price, p.currency, lang)}
                       </span>
                     )}
-                  </div>
-                  <div className="mt-3 flex items-center gap-1.5 text-[13px] font-medium text-[#B84B31]">
-                    {t(lang, "view_product")} <ArrowRight size={14} />
                   </div>
                 </div>
               </Link>
@@ -135,6 +211,71 @@ export function StorefrontHome() {
           </div>
         )}
       </section>
+
+      {/* Testimonials */}
+      {design?.testimonials?.length > 0 && (
+        <section className="max-w-6xl mx-auto px-6 pb-16">
+          <h2
+            className="text-2xl font-semibold mb-6"
+            style={{ fontFamily: `"${fontHeading}", serif` }}
+          >
+            Ils nous font confiance
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {design.testimonials.slice(0, 3).map((tt, i) => {
+              const quote = tt.quote?.[lang] || tt.quote?.fr || "";
+              return (
+                <div
+                  key={i}
+                  className="bg-white rounded-2xl border p-5"
+                  style={{ borderColor: "#E7E5E4" }}
+                  data-testid={`testimonial-${i}`}
+                >
+                  <div className="flex gap-1 mb-2" style={{ color: primary }}>
+                    {"★".repeat(tt.rating || 5)}
+                  </div>
+                  <p className="text-[15px] italic" style={{ color: "#44403C" }}>« {quote} »</p>
+                  <div className="text-xs mt-3" style={{ color: "#78716C" }}>
+                    — {tt.name}, {tt.age} ans, {tt.city}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* FAQ */}
+      {design?.faq?.length > 0 && (
+        <section className="max-w-3xl mx-auto px-6 pb-20">
+          <h2
+            className="text-2xl font-semibold mb-6"
+            style={{ fontFamily: `"${fontHeading}", serif` }}
+          >
+            Questions fréquentes
+          </h2>
+          <div className="space-y-2">
+            {design.faq.map((it, i) => {
+              const q = it.q?.[lang] || it.q?.fr;
+              const a = it.a?.[lang] || it.a?.fr;
+              return (
+                <details
+                  key={i}
+                  className="bg-white rounded-xl border p-4 group"
+                  style={{ borderColor: "#E7E5E4" }}
+                  data-testid={`faq-${i}`}
+                >
+                  <summary className="cursor-pointer font-medium list-none flex items-center justify-between">
+                    <span>{q}</span>
+                    <span className="text-xs opacity-50 group-open:rotate-180 transition">▼</span>
+                  </summary>
+                  <p className="text-sm mt-3" style={{ color: "#57534E" }}>{a}</p>
+                </details>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </StorefrontLayout>
   );
 }
@@ -144,7 +285,7 @@ export function StorefrontHome() {
  * ========================================================= */
 export function StorefrontProduct() {
   const { siteId, productId } = useParams();
-  const { site, lang, setLang } = useSiteAndLang();
+  const { site, design, lang, setLang } = useSiteAndLang();
   const navigate = useNavigate();
   const [p, setP] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -167,14 +308,14 @@ export function StorefrontProduct() {
 
   if (loading) {
     return (
-      <StorefrontLayout lang={lang} setLang={setLang} site={site}>
+      <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
         <div className="max-w-6xl mx-auto px-6 py-12 text-[#78716C]">…</div>
       </StorefrontLayout>
     );
   }
   if (!p) {
     return (
-      <StorefrontLayout lang={lang} setLang={setLang} site={site}>
+      <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
         <div className="max-w-6xl mx-auto px-6 py-12">
           <div className="text-[#9F1239]">404 · Produit introuvable.</div>
           <button onClick={() => navigate(`/shop/${siteId}`)} className="mt-4 text-[#B84B31]">
@@ -186,7 +327,7 @@ export function StorefrontProduct() {
   }
 
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site}>
+    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
       <div className="max-w-6xl mx-auto px-6 py-8 md:py-12">
         <button
           onClick={() => navigate(`/shop/${siteId}`)}
@@ -308,7 +449,7 @@ export function StorefrontCart() {
   const totals = cartTotals(items);
 
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site}>
+    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
       <div className="max-w-4xl mx-auto px-6 py-12">
         <h1 className="font-heading text-4xl font-semibold text-[#1C1917] mb-8">{t(lang, "cart")}</h1>
 
@@ -507,7 +648,7 @@ export function StorefrontCheckout() {
   };
 
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site}>
+    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
       <div className="max-w-5xl mx-auto px-6 py-12">
         <h1 className="font-heading text-4xl font-semibold text-[#1C1917] mb-8">{t(lang, "checkout")}</h1>
 
@@ -652,7 +793,7 @@ export function StorefrontConfirmation() {
   const failed = order?.status === "failed" || order?.status === "expired" || order?.status === "cancelled";
 
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site}>
+    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
       <div className="max-w-2xl mx-auto px-6 py-16 text-center">
         <div className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-6 ${
           paid ? "bg-[#D1FAE5]" : failed ? "bg-[#FFE4E6]" : "bg-[#FEF3C7]"

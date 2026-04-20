@@ -3,6 +3,28 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-20 · Sprint 14 : Site Designer IA-first 🎨
+- **Vision** : UN template unique (celui de Concept Factory), 100% personnalisé par l'IA. Le Concepteur clique sur « Générer mon site » et Claude Sonnet 4.5 produit le site de A à Z — aucun drag-and-drop, aucune édition manuelle.
+- **Backend nouveau module `routes/design.py`** :
+  - `GET /api/sites/{id}/design` — récupère le design courant
+  - `POST /api/sites/{id}/design/generate` — Claude génère en 1 shot **brand** (couleurs, polices, tagline), **hero** (titre/sous-titre/CTA/trust_line), **4 bénéfices**, **3 témoignages**, **10 FAQ**, **page À propos** (4 paragraphes), **page Contact**, **SEO meta**, **footer** — tout en FR/EN/DE/NL
+  - `POST /api/sites/{id}/design/regenerate/{section}` — régénération section-par-section (brand, hero, benefits, testimonials, faq, about, contact, footer, seo, logo) avec `tweak` textuel optionnel
+  - `POST /api/sites/{id}/design/publish` — toggle publication
+  - `GET /api/public/sites/{id}/design` — lu par le storefront (renvoie uniquement si `published=true`)
+  - `POST /api/public/sites/{id}/contact` — formulaire contact stocké en `leads`
+  - `GET /api/sites/{id}/leads` — liste des messages reçus par le Concepteur
+- **Logo graphique IA** via **Gemini Nano Banana** (`gemini-3.1-flash-image-preview`) — fallback silencieux si timeout (le logo texte fonctionne toujours)
+- **Pages légales sûres** : CGV / Mentions légales / Confidentialité basées sur des **templates juridiques français standards** (`legal_templates.py`), variables remplies par Claude (site_name, niche, email)
+- **Storefront 100% dynamique** (`Storefront.jsx` + `StorefrontLayout.jsx`) :
+  - Lit `design.brand` → applique couleurs/polices via CSS custom properties + Google Fonts chargées dynamiquement
+  - Hero, bénéfices, témoignages, FAQ rendus depuis le JSON du design
+  - Footer structuré multi-colonnes + liens légaux auto
+  - Fallback propre si design non publié (utilise les valeurs par défaut terracotta)
+- **Nouvelles routes publiques** : `/shop/{id}/about`, `/faq`, `/contact`, `/cgv`, `/mentions`, `/confidentialite` — tous dans `StorefrontPages.jsx` avec rendu MarkdownLite
+- **Nouvelle page Concepteur `/sites/{id}/design`** (`SiteDesign.jsx`) : sidebar gauche avec contrôles IA + preview iframe droite en temps réel + rechargement au clic « Régénérer »
+- **CTA « Design IA » dégradé terracotta** ajouté dans `SiteDetail.jsx`
+- Validé : injection d'un design mock complet, rendu correct sur toutes les pages (Home, About, FAQ, Contact, CGV) avec couleurs bleu médical `#0E7490` + police Fraunces. Page Design Concepteur fonctionnelle avec preview live.
+
 ## 2026-04-20 · Sprint 13 : Virements Concepteurs sur marge brute HT 💸
 - **🎯 Nouvelle règle métier** : la part Concepteur = **50% × marge brute HT** (CA HT − Prix d'achat HT) et non plus 50% du total TTC.
 - **📦 Produit** : ajout du champ `cost_price_ht` (prix d'achat HT fournisseur) sur `ProductCreateInput` / `ProductUpdateInput`. Input dédié + preview live de la marge dans l'éditeur UI.
