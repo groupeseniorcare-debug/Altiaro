@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Playbook V2 — E-commerce Dropshipping Premium Seniors FR/EU</title>
+<meta name="description" content="Playbook complet A→Z avec 50 prompts séquentiels pour lancer une boutique e-commerce premium dropshipping seniors FR/EU, de la première étude marché à la première vente.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..800;1,9..144,400..700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+<style>
+  :root {
+    --bg: #faf7f2;
+    --bg-alt: #f2ece3;
+    --text: #1f1a14;
+    --text-soft: #4a4238;
+    --accent: #8b5a2b;
+    --accent-soft: #c89968;
+    --border: #e6dfd1;
+    --code-bg: #2a241c;
+    --code-text: #f3e8d4;
+    --max: 820px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 17px;
+    line-height: 1.7;
+  }
+  .shell {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    max-width: 1280px;
+    margin: 0 auto;
+    min-height: 100vh;
+  }
+  aside {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 32px 20px 32px 32px;
+    border-right: 1px solid var(--border);
+    background: var(--bg-alt);
+  }
+  aside h3 {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    margin: 0 0 16px 0;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  #toc { list-style: none; padding: 0; margin: 0; font-size: 14px; }
+  #toc li { margin: 6px 0; }
+  #toc a {
+    color: var(--text-soft);
+    text-decoration: none;
+    display: block;
+    padding: 6px 10px;
+    border-radius: 6px;
+    transition: all 0.15s;
+    border-left: 2px solid transparent;
+  }
+  #toc a:hover {
+    background: rgba(139, 90, 43, 0.08);
+    color: var(--accent);
+    border-left-color: var(--accent);
+  }
+  #toc .toc-h2 { padding-left: 10px; font-weight: 600; }
+  #toc .toc-h3 { padding-left: 22px; font-size: 13px; color: var(--text-soft); }
+  main {
+    padding: 60px 60px 120px;
+    max-width: var(--max);
+    margin: 0 auto;
+  }
+  .banner {
+    background: linear-gradient(135deg, #8b5a2b 0%, #c89968 100%);
+    color: white;
+    padding: 24px 28px;
+    border-radius: 14px;
+    margin-bottom: 48px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .banner strong { font-family: 'Fraunces', serif; font-size: 19px; }
+  .banner a {
+    background: white;
+    color: var(--accent);
+    padding: 10px 20px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+  }
+  h1, h2, h3, h4 { font-family: 'Fraunces', serif; font-weight: 700; letter-spacing: -0.015em; }
+  h1 { font-size: 42px; line-height: 1.15; margin: 0 0 24px; color: var(--text); }
+  h2 { font-size: 30px; margin: 56px 0 20px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--accent); }
+  h3 { font-size: 22px; margin: 36px 0 14px; color: var(--text); }
+  h4 { font-size: 18px; margin: 24px 0 10px; }
+  p { margin: 14px 0; }
+  ul, ol { margin: 14px 0; padding-left: 28px; }
+  li { margin: 6px 0; }
+  blockquote {
+    border-left: 4px solid var(--accent);
+    background: var(--bg-alt);
+    padding: 18px 24px;
+    margin: 24px 0;
+    border-radius: 0 10px 10px 0;
+    color: var(--text-soft);
+    font-style: italic;
+  }
+  blockquote p:first-child { margin-top: 0; }
+  blockquote p:last-child { margin-bottom: 0; }
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg-alt);
+    color: var(--accent);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 20px 24px;
+    border-radius: 10px;
+    overflow-x: auto;
+    margin: 20px 0;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    font-size: 14px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    font-size: 14.5px;
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  th {
+    background: var(--bg-alt);
+    text-align: left;
+    padding: 12px 14px;
+    font-weight: 600;
+    font-family: 'Fraunces', serif;
+    font-size: 15px;
+    border-bottom: 2px solid var(--border);
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fdfbf7; }
+  a { color: var(--accent); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+  .toggle-aside {
+    display: none;
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 100;
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; }
+    aside {
+      position: fixed;
+      left: -300px;
+      transition: left 0.3s;
+      z-index: 50;
+      width: 280px;
+      box-shadow: 2px 0 12px rgba(0,0,0,0.15);
+    }
+    aside.open { left: 0; }
+    main { padding: 70px 20px 80px; }
+    .toggle-aside { display: block; }
+    h1 { font-size: 32px; }
+    h2 { font-size: 25px; }
+    .banner { flex-direction: column; align-items: flex-start; }
+  }
+  #loading { text-align: center; padding: 80px; color: var(--text-soft); }
+</style>
+</head>
+<body>
+<button class="toggle-aside" onclick="document.querySelector('aside').classList.toggle('open')">☰ Sommaire</button>
+<div class="shell">
+  <aside>
+    <h3>Sommaire</h3>
+    <ul id="toc"></ul>
+  </aside>
+  <main>
+    <div class="banner">
+      <div><strong>📄 Playbook V2 — E-commerce Premium Seniors FR/EU</strong><br>
+      <span style="opacity:0.9; font-size:14px;">50 prompts séquentiels — dropshipping scalable & duplicable</span></div>
+      <a href="/docs/playbook.md" download="PLAYBOOK_SENIOR_ECOM.md">⬇ Télécharger .md</a>
+    </div>
+    <div id="loading">Chargement du playbook...</div>
+    <article id="content" style="display:none;"></article>
+  </main>
+</div>
+
+<script>
+fetch('/docs/playbook.md')
+  .then(r => r.text())
+  .then(md => {
+    marked.setOptions({ gfm: true, breaks: false, headerIds: true });
+    const html = marked.parse(md);
+    const content = document.getElementById('content');
+    content.innerHTML = html;
+    content.style.display = 'block';
+    document.getElementById('loading').style.display = 'none';
+
+    // Build TOC
+    const toc = document.getElementById('toc');
+    content.querySelectorAll('h2, h3').forEach(h => {
+      if (!h.id) {
+        h.id = h.textContent.toLowerCase()
+          .replace(/[^a-z0-9àâäéèêëïîôöùûüÿñç\s-]/g, '')
+          .replace(/\s+/g, '-');
+      }
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = '#' + h.id;
+      a.textContent = h.textContent.replace(/^#\s*/, '');
+      a.className = 'toc-' + h.tagName.toLowerCase();
+      a.addEventListener('click', () => {
+        document.querySelector('aside').classList.remove('open');
+      });
+      li.appendChild(a);
+      toc.appendChild(li);
+    });
+  })
+  .catch(e => {
+    document.getElementById('loading').innerHTML = '⚠ Erreur de chargement: ' + e.message;
+  });
+</script>
+</body>
+</html>
