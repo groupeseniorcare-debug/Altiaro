@@ -1,41 +1,46 @@
 # Concept Factory — ROADMAP
 
-Backlog priorisé. Voir CHANGELOG.md pour l'historique de ce qui a été livré.
+Backlog priorisé.
 
-## ✅ Livré (résumé haut niveau)
-Auth JWT · Sites CRUD · Workflow 50 étapes (4 blocs) · Dashboard · Finances · Users · Niche Engine 20×6 · Catalogue i18n avec `cost_price_ht` · Storefront multilingue **dynamique** · Cart + Orders (snapshot HT) · Ops Center · Niche Analyzer · Ads Copy Generator · Site Duplication · Multi-domain CNAME · Scale 6 pays · Empire Dashboard · Mega-Block Execute · AI Copilot · Mollie Checkout + CB mandate + IBAN · **Virements 50% marge brute HT (1er/15)** · **Site Designer IA-first (Claude + Nano Banana logo + pages dynamiques)** · **Pages légales auto**
+## ✅ Livré
+Auth · Sites CRUD · Analyseur deep v2 (5 étapes, 8 pays, langue native) · Catalogue i18n + cost_price_ht · Storefront dynamique · Orders + snapshot HT · Niche Analyzer ouvert à tous produits · Ops Center · Ads Copy · Duplication · Multi-domain · Scale 6 pays · Empire Dashboard · Mega-Blocks · AI Copilot · Mollie Checkout + CB + IBAN · **Virements 50% marge brute HT (1er/15)** · **Site Designer IA-first** · **Pages légales auto**
 
-## 🔴 P0 — Automatisation remontée data
+## 🔴 P0 — Prochaine session
 
-### Google Ads READ-ONLY sync
-- [ ] Setup OAuth2 Admin (compte MCC + Developer Token)
-- [ ] Mapping site ↔ campagne par **URL de destination finale** (choix C)
-- [ ] Cron quotidien : pull spend, conversions, CPC, CTR, ROAS
-- [ ] Alimente automatiquement le débit hebdo 50% du VRAI spend (vs. estimation daily_budget × 7)
-- [ ] Affichage des KPIs réels dans Empire Dashboard + page site
+### Sprint 16 : Sourcing fournisseurs + Wizard de construction
+- [ ] Intégration **CJ Dropshipping API** (gratuite) — recherche produit → import fiches
+- [ ] Intégration **AliExpress Affiliate API** (clé gratuite, 5 min) — import fiches produits
+- [ ] **BigBuy** (optionnel si abonnement Admin)
+- [ ] **Wizard 10 étapes** : product → pays → sourcing → pricing → positionnement → identité → SEO → contenu → légal → publish
+- [ ] Chaque étape : prompt Claude pré-rempli éditable + génération + preview
 
-## 🟡 P1 — Finitions billing & communication
-- [ ] **Mollie Refunds** : déclencher des remboursements clients depuis Ops Center Admin
-- [ ] **Notification email Admin** le 1er/15 : « X virements prêts pour Y € » (Resend)
-- [ ] **Email SAV client** : notification au Concepteur quand un nouveau lead `/contact` arrive
-- [ ] **Page Leads** dans SiteDetail pour que le Concepteur voie ses messages reçus
+### Sprint 17 : SEO multi-pays avancé
+- [ ] **Routage `/fr/`, `/de/`, `/en/`** au niveau storefront
+- [ ] **hreflang** auto
+- [ ] **Sitemap.xml** par pays + robots.txt
+- [ ] **Schema.org** Product + Organization + FAQ markup
+- [ ] **Core Web Vitals** : lazy-load, preload fonts, CSS critique inline
+- [ ] **Feed Google Merchant Center** XML auto par pays
+- [ ] **Google Ads Keyword Planner API** (quand clé fournie) → remplacer estimations Claude par volumes officiels
 
-## 🟡 P2 — Améliorations Site Designer
-- [ ] **Historique des designs** (rollback version-1) — actuellement écrase
-- [ ] **A/B tests de design** : 2 variations générées, split 50/50
-- [ ] **Diff reviewer** : mode « voilà la nouvelle proposition de l'IA, accepte section par section »
-- [ ] **Images de catégorie / hero background** via Nano Banana (pas juste logo)
-- [ ] **SEO sitemap.xml** auto-généré
-- [ ] **Favicon** auto depuis logo
+## 🟡 P1 — Optimisations template vente
+- [ ] Trust badges dynamiques, scarcity countdown, social proof (nb commandes 7j), upsell cart, exit-intent popup
+- [ ] DeepL API pour traduction pro (alternative à Claude)
+
+## 🟡 P2 — Communication
+- [ ] Resend emails transactionnels (confirmation, expédition, notif payout)
+- [ ] Notification email Admin 1er/15 payouts
+- [ ] Page Leads Concepteur (formulaire contact reçu)
+- [ ] Mollie Refunds depuis Ops Center
 
 ## 🟢 P3 — Extensions
 - [ ] API bancaire (Wise/GoCardless/Qonto) pour virements 100% auto
-- [ ] DataForSEO recalibrage Niche Engine
-- [ ] Copilot tools étendus (refund, export CSV, change product status)
-- [ ] Role granularity (super-admin, lead-concepteur)
-- [ ] Webhooks Concepteurs (Zapier, Make)
+- [ ] Historique des designs avec rollback
+- [ ] A/B tests de design (2 variations split 50/50)
+- [ ] Copilot tools étendus
+- [ ] Webhooks Concepteurs (Zapier)
 
 ## 🚀 Next action items
-1. Validation utilisateur du Site Designer (tester un vrai cycle génération sur un site)
-2. Google Ads READ-ONLY sync (clés API requises)
-3. Email notifications via Resend
+1. **Sprint 16** : sourcing CJ + AE + wizard 10 étapes
+2. Obtenir clé Google Ads Keyword Planner (guide à fournir au user)
+3. Wizard construction site avec contexte analyseur

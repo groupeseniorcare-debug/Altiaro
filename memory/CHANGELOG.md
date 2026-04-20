@@ -3,6 +3,36 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-20 · Sprint 15 : Deep Market Analyzer v2 🔬
+
+**Vision :** passer d'une « analyse 30 secondes » (Claude mono-appel) à une **vraie étude de marché approfondie** multi-étapes, langue native par pays, 2-4 minutes de calcul.
+
+**Changements fondamentaux :**
+- 🔓 **Ouverture à TOUS les produits e-commerce** (plus limité Silver Economy). Nouveau champ `persona` (senior / millennial / famille / pro / tout public).
+- 🗑️ Suppression du **catalogue pré-seedé de 20 niches** côté frontend (route `/niches/:slug` + page `NicheDetail` retirées). Backend conservé pour compatibilité, invisible.
+- 🌍 Support **8 pays EU** (ajout IT + ES aux 6 existants : FR/DE/CH/BE/UK/NL).
+
+**Architecture multi-étapes (`routes/analyzer.py` réécrit complet) :**
+1. **Étape 1** — Extension keywords multi-langues natives (30s) : 30-50 mots-clés par pays en langue locale (transactionnels, informationnels, longue traîne)
+2. **Étape 2** — Sizing marché (60s) : volume mensuel, CPC, KD, AOV, marché total annuel, croissance 3 ans, pénétration e-com, saisonnalité
+3. **Étape 3** — Analyse concurrentielle (60s) : 5-8 concurrents réels par pays avec prix, forces/faiblesses, PDM, type (marketplace/DNVB/historique/dropshipper) + white-space de positionnement
+4. **Étape 4** — Cadre légal & opérationnel (30s) : certifications obligatoires, mentions, TVA, douanes, transporteurs, délais, langue SAV, paiements préférés
+5. **Étape 5** — Synthèse stratégique (30s) : verdict par pays argumenté avec chiffres, stratégie de lancement priorisée, pricing par pays, fournisseurs, risques/opportunités
+
+**Background tasks + progress tracking :**
+- `POST /api/niches/analyze` → crée un `analysis_job`, renvoie `job_id` immédiatement
+- `GET /api/niches/analysis-jobs/{id}` → polling 3s pour suivi temps réel
+- Collection `analysis_jobs` avec `step`, `step_label`, `status` (pending/running/completed/failed)
+
+**Frontend :**
+- 🆕 Nouvelle page `Analyzer.jsx` : formulaire propre (produit + persona + pays + notes) + progress panel live avec 5 étapes animées (spinner actif, check vert terminé) + historique
+- 🔄 Refonte complète `NicheAnalysisDetail.jsx` : hero verdict + 4 KPI cards + **stratégie de lancement** priorisée + **sélecteur pays** sticky + **onglets par pays** avec panel ultra détaillé (sizing 8 data points, pricing, keywords en 3 catégories, concurrents listés, cadre légal 8 champs) + risques/opportunités + suppliers + positioning white-space
+- 🏷️ Nav renommé « Niche Engine » → « **Analyseur** »
+
+**Validation E2E :**
+- Test réel sur « Support téléphone universel pour vélo » (FR/DE/UK) — analyse complète en ~2 min : verdict **NOGO** correctement identifié (AOV 16-19€ << seuil 80€, impossible à rentabiliser sur accessoire low-ticket), 7 concurrents réels par pays (Amazon/Decathlon/Alltricks/Cdiscount/Fnac/Quad Lock/dropshippers Shopify), certifications correctes (RoHS FR / GS DE / UKCA post-Brexit UK), 10 keywords natifs transactionnels par pays, stratégie de lancement priorisée DE→UK→FR avec justifications chiffrées.
+- Screenshots : formulaire, page résultat top, panel pays FR avec ses 30+ data points, panel concurrents + cadre légal
+
 ## 2026-04-20 · Sprint 14 : Site Designer IA-first 🎨
 - **Vision** : UN template unique (celui de Concept Factory), 100% personnalisé par l'IA. Le Concepteur clique sur « Générer mon site » et Claude Sonnet 4.5 produit le site de A à Z — aucun drag-and-drop, aucune édition manuelle.
 - **Backend nouveau module `routes/design.py`** :

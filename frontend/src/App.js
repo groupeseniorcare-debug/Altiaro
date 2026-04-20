@@ -9,8 +9,7 @@ import SiteDetail from "./pages/SiteDetail";
 import Validations from "./pages/Validations";
 import Finances from "./pages/Finances";
 import Users from "./pages/Users";
-import NicheEngine from "./pages/NicheEngine";
-import NicheDetail from "./pages/NicheDetail";
+import NicheEngine from "./pages/Analyzer";
 import NicheAnalysisDetail from "./pages/NicheAnalysisDetail";
 import SiteProducts from "./pages/SiteProducts";
 import AdsCopy from "./pages/AdsCopy";
@@ -92,14 +91,6 @@ function App() {
             element={
               <ProtectedRoute>
                 <NicheAnalysisDetail />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/niches/:slug"
-            element={
-              <ProtectedRoute>
-                <NicheDetail />
               </ProtectedRoute>
             }
           />
