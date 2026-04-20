@@ -37,7 +37,7 @@ export default function Login() {
             <div className="w-10 h-10 rounded-xl bg-white/95 flex items-center justify-center">
               <Rocket size={20} weight="fill" color="#B84B31" />
             </div>
-            <span className="font-heading text-xl font-semibold">Launch OS</span>
+            <span className="font-heading text-xl font-semibold">Concept Factory</span>
           </div>
           <div className="max-w-md">
             <h1 className="text-4xl font-heading font-semibold leading-tight mb-4">
@@ -75,7 +75,7 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 data-testid="login-email"
                 className="w-full h-12 px-4 rounded-xl border border-[#E7E5E4] bg-white focus:outline-none focus:ring-2 focus:ring-[#B84B31]/30 focus:border-[#B84B31] transition"
-                placeholder="vous@launchos.fr"
+                placeholder="vous@conceptfactory.fr"
               />
             </div>
             <div>

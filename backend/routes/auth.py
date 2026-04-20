@@ -59,6 +59,17 @@ async def me(user: dict = Depends(get_current_user)):
     return user
 
 
+@router.get("/session")
+async def session(request: Request):
+    """Silent probe — returns {user: null} instead of 401 when not logged in.
+    Used by the SPA to avoid noisy console errors on initial load."""
+    try:
+        user = await get_current_user(request)
+        return {"user": user}
+    except HTTPException:
+        return {"user": None}
+
+
 @router.post("/refresh")
 async def refresh(request: Request, response: Response):
     token = request.cookies.get("refresh_token")
