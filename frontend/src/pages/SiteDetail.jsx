@@ -20,7 +20,18 @@ import {
   ArrowClockwise,
   Warning,
   X as XIcon,
+  Rocket,
+  Sparkle,
 } from "@phosphor-icons/react";
+
+const COUNTRIES = [
+  { code: "FR", name: "France", flag: "🇫🇷", lang: "fr", currency: "EUR" },
+  { code: "DE", name: "Allemagne", flag: "🇩🇪", lang: "de", currency: "EUR" },
+  { code: "CH", name: "Suisse", flag: "🇨🇭", lang: "fr", currency: "CHF" },
+  { code: "BE", name: "Belgique", flag: "🇧🇪", lang: "fr", currency: "EUR" },
+  { code: "UK", name: "Royaume-Uni", flag: "🇬🇧", lang: "en", currency: "GBP" },
+  { code: "NL", name: "Pays-Bas", flag: "🇳🇱", lang: "nl", currency: "EUR" },
+];
 
 const STATUS_CONFIG = {
   locked: { label: "Verrouillée", icon: Lock, bg: "#F5F5F4", text: "#78716C" },
@@ -48,6 +59,9 @@ export default function SiteDetail() {
   const [dupName, setDupName] = useState("");
   const [dupCopyProducts, setDupCopyProducts] = useState(true);
   const [duplicating, setDuplicating] = useState(false);
+  const [showScale, setShowScale] = useState(false);
+  const [scaleResult, setScaleResult] = useState(null);
+  const [scaling, setScaling] = useState(false);
 
   const load = useCallback(async () => {
     const [siteRes, stepsRes, domRes] = await Promise.all([
@@ -139,6 +153,19 @@ export default function SiteDetail() {
     }
     setShowDuplicate(false);
     navigate(`/sites/${data.id}`);
+  };
+
+  const handleScale = async (payload) => {
+    setScaling(true);
+    const { data, error } = await apiCall(() =>
+      api.post(`/sites/${id}/scale`, payload)
+    );
+    setScaling(false);
+    if (error) {
+      window.alert(`Scale impossible : ${error}`);
+      return;
+    }
+    setScaleResult(data);
   };
 
   if (loading) {
@@ -280,6 +307,13 @@ export default function SiteDetail() {
                   className="h-10 px-4 rounded-xl bg-white border border-[#E7E5E4] hover:border-[#B84B31] text-[#1C1917] text-sm font-medium flex items-center gap-2 transition"
                 >
                   <Copy size={16} /> Dupliquer
+                </button>
+                <button
+                  onClick={() => setShowScale(true)}
+                  data-testid="scale-site"
+                  className="h-10 px-4 rounded-xl bg-gradient-to-r from-[#B84B31] to-[#D97706] hover:from-[#993D26] hover:to-[#B45309] text-white text-sm font-medium flex items-center gap-2 transition active:scale-[0.98]"
+                >
+                  <Rocket size={16} weight="fill" /> Scaler 6 pays
                 </button>
               </div>
             </div>
@@ -442,6 +476,24 @@ export default function SiteDetail() {
           duplicating={duplicating}
           onClose={() => setShowDuplicate(false)}
           onConfirm={handleDuplicate}
+        />
+      )}
+
+      {showScale && (
+        <ScaleModal
+          site={site}
+          scaling={scaling}
+          result={scaleResult}
+          onClose={() => {
+            setShowScale(false);
+            setScaleResult(null);
+          }}
+          onConfirm={handleScale}
+          onOpenSite={(sid) => {
+            setShowScale(false);
+            setScaleResult(null);
+            navigate(`/sites/${sid}`);
+          }}
         />
       )}
     </Layout>
@@ -641,6 +693,296 @@ function DuplicateModal({ siteName, dupName, setDupName, copyProducts, setCopyPr
             Dupliquer
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+function ScaleModal({ site, scaling, result, onClose, onConfirm, onOpenSite }) {
+  const alreadyCovered = new Set(site.selected_countries || []);
+  const available = COUNTRIES.filter((c) => !alreadyCovered.has(c.code));
+
+  const [selected, setSelected] = React.useState(available.map((c) => c.code));
+  const [customDomains, setCustomDomains] = React.useState({});
+  const [copyProducts, setCopyProducts] = React.useState(true);
+  const [generateAds, setGenerateAds] = React.useState(true);
+  const [tone, setTone] = React.useState("rassurant");
+
+  const toggle = (code) =>
+    setSelected((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+    );
+
+  const totalBudget = selected.length * 30;
+  const canConfirm = selected.length > 0 && !scaling && !result;
+
+  const submit = () => {
+    onConfirm({
+      target_countries: selected,
+      custom_domains: Object.fromEntries(
+        Object.entries(customDomains).filter(([, v]) => v && v.trim())
+      ),
+      copy_products: copyProducts,
+      generate_ads_copy: generateAds,
+      tone,
+    });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+        data-testid="scale-modal"
+      >
+        <div className="flex items-start justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#B84B31] to-[#D97706] flex items-center justify-center">
+              <Rocket size={20} weight="fill" className="text-white" />
+            </div>
+            <div>
+              <h2 className="font-heading text-2xl font-semibold text-[#1C1917]">
+                Scaler sur 6 pays
+              </h2>
+              <p className="text-sm text-[#78716C]">
+                En 1 clic : un clone par pays, chacun avec sa langue, son budget, son domaine, et ses Ads Copy.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg hover:bg-[#F5F2EB]"
+            data-testid="scale-modal-close"
+          >
+            <XIcon size={16} className="mx-auto" />
+          </button>
+        </div>
+
+        {!result ? (
+          <>
+            {available.length === 0 ? (
+              <div className="bg-[#FEF3C7] rounded-lg p-4 text-sm text-[#B45309]">
+                Ce site couvre déjà les 6 marchés. Il n'y a plus rien à scaler.
+              </div>
+            ) : (
+              <>
+                <label className="block text-xs font-semibold text-[#57534E] mb-2 uppercase tracking-wider">
+                  Pays cibles ({selected.length} sélectionnés)
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-5">
+                  {available.map((c) => {
+                    const active = selected.includes(c.code);
+                    return (
+                      <div
+                        key={c.code}
+                        className={`rounded-xl border p-3 transition cursor-pointer ${
+                          active
+                            ? "bg-[#FAF7F2] border-[#B84B31]"
+                            : "bg-white border-[#E7E5E4] hover:border-[#D6D3D1]"
+                        }`}
+                        onClick={() => toggle(c.code)}
+                        data-testid={`scale-country-${c.code}`}
+                      >
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-2xl">{c.flag}</span>
+                          <div className="flex-1">
+                            <div className="font-medium text-sm text-[#1C1917]">
+                              {c.name}
+                            </div>
+                            <div className="text-[11px] text-[#78716C] font-mono">
+                              {c.lang.toUpperCase()} · {c.currency} · 30€/jour
+                            </div>
+                          </div>
+                          <div
+                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                              active
+                                ? "bg-[#B84B31] border-[#B84B31]"
+                                : "border-[#D6D3D1]"
+                            }`}
+                          >
+                            {active && (
+                              <CheckCircle size={14} weight="fill" className="text-white" />
+                            )}
+                          </div>
+                        </div>
+                        {active && (
+                          <input
+                            type="text"
+                            placeholder={`Domaine custom (optionnel) — ex: shop.${c.code.toLowerCase()}`}
+                            value={customDomains[c.code] || ""}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              setCustomDomains((prev) => ({
+                                ...prev,
+                                [c.code]: e.target.value,
+                              }));
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            data-testid={`scale-domain-${c.code}`}
+                            className="w-full h-8 px-2 rounded border border-[#E7E5E4] bg-white text-xs focus:outline-none focus:border-[#B84B31]"
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="bg-[#FAF7F2] rounded-xl border border-[#E7E5E4] p-4 mb-5 space-y-3">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={copyProducts}
+                      onChange={(e) => setCopyProducts(e.target.checked)}
+                      data-testid="scale-copy-products"
+                      className="accent-[#B84B31]"
+                    />
+                    Cloner le catalogue produits (en statut <em className="mx-1">draft</em> pour revue)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={generateAds}
+                      onChange={(e) => setGenerateAds(e.target.checked)}
+                      data-testid="scale-generate-ads"
+                      className="accent-[#B84B31]"
+                    />
+                    <Sparkle size={14} weight="fill" className="text-[#B84B31]" />
+                    Générer les <strong>Ads Copy localisés</strong> en background (Claude 4.5, ~30s/pays)
+                  </label>
+                  {generateAds && (
+                    <div className="pl-6">
+                      <label className="block text-xs text-[#57534E] mb-1">Ton des annonces</label>
+                      <select
+                        value={tone}
+                        onChange={(e) => setTone(e.target.value)}
+                        data-testid="scale-tone"
+                        className="h-9 px-2 rounded-lg border border-[#E7E5E4] bg-white text-sm"
+                      >
+                        <option value="rassurant">Rassurant (senior-friendly)</option>
+                        <option value="premium">Premium (haut de gamme)</option>
+                        <option value="direct">Direct (promo / urgence)</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-[#1C1917] text-white rounded-xl p-4 mb-5 flex items-center justify-between">
+                  <div>
+                    <div className="text-[11px] uppercase tracking-widest text-white/60">
+                      Récapitulatif
+                    </div>
+                    <div className="font-heading text-lg font-semibold">
+                      {selected.length} nouveau{selected.length > 1 ? "x" : ""} site{selected.length > 1 ? "s" : ""} créé{selected.length > 1 ? "s" : ""}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[11px] uppercase tracking-widest text-white/60">
+                      Budget pub total
+                    </div>
+                    <div className="font-heading text-2xl font-semibold">
+                      {totalBudget}€<span className="text-sm text-white/60">/jour</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    disabled={scaling}
+                    className="h-11 px-4 rounded-xl text-sm text-[#57534E] hover:bg-[#F5F2EB]"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    onClick={submit}
+                    disabled={!canConfirm}
+                    data-testid="scale-confirm"
+                    className="h-11 px-5 rounded-xl bg-gradient-to-r from-[#B84B31] to-[#D97706] hover:from-[#993D26] hover:to-[#B45309] disabled:opacity-50 text-white text-sm font-medium flex items-center gap-2 transition active:scale-[0.98]"
+                  >
+                    {scaling ? (
+                      <>
+                        <ArrowClockwise size={16} className="animate-spin" /> Création des clones…
+                      </>
+                    ) : (
+                      <>
+                        <Rocket size={16} weight="fill" /> Lancer sur {selected.length} pays
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
+          </>
+        ) : (
+          <ScaleResult result={result} onOpenSite={onOpenSite} onClose={onClose} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ScaleResult({ result, onOpenSite, onClose }) {
+  return (
+    <div data-testid="scale-result">
+      <div className="bg-[#D1FAE5] border border-[#047857]/20 rounded-xl p-4 mb-5 flex items-start gap-3">
+        <CheckCircle size={22} weight="fill" className="text-[#047857] shrink-0 mt-0.5" />
+        <div>
+          <div className="font-heading text-lg font-semibold text-[#047857]">
+            {result.created.length} clone{result.created.length > 1 ? "s" : ""} créé{result.created.length > 1 ? "s" : ""} !
+          </div>
+          <div className="text-sm text-[#047857]">
+            Budget total : <strong>{result.total_daily_budget_eur}€/jour</strong>
+            {result.ads_copy_scheduled > 0 && (
+              <> · <Sparkle size={12} weight="fill" className="inline" /> {result.ads_copy_scheduled} Ads Copy en génération (background)</>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2 mb-5">
+        {result.created.map((s) => {
+          const cc = s.selected_countries?.[0];
+          const meta = COUNTRIES.find((c) => c.code === cc);
+          return (
+            <div
+              key={s.id}
+              className="bg-white border border-[#E7E5E4] rounded-xl p-4 flex items-center gap-3 hover:border-[#B84B31]/40 transition cursor-pointer"
+              onClick={() => onOpenSite(s.id)}
+              data-testid={`scale-result-${cc}`}
+            >
+              <span className="text-2xl">{meta?.flag || "🌍"}</span>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm text-[#1C1917] truncate">{s.name}</div>
+                <div className="text-xs text-[#78716C]">
+                  {meta?.name} · lang {s.primary_language?.toUpperCase()} · {s.products_cloned} produits
+                  {s.custom_domain && (
+                    <> · <LinkIcon size={10} className="inline" /> {s.custom_domain}</>
+                  )}
+                </div>
+              </div>
+              <div className="text-xs text-[#B84B31] font-medium">
+                Ouvrir →
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={onClose}
+          className="h-10 px-4 rounded-xl bg-[#1C1917] hover:bg-[#44403C] text-white text-sm font-medium"
+          data-testid="scale-result-close"
+        >
+          Terminer
+        </button>
       </div>
     </div>
   );

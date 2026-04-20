@@ -206,44 +206,63 @@ async def _build_context(site: dict) -> str:
 @router.post("/generate")
 async def generate_ads_copy(site_id: str, data: GenerateAdsInput, user: dict = Depends(get_current_user)):
     site = await _check_site_access(site_id, user)
+    return await _generate_and_persist(
+        site=site,
+        country=data.country,
+        language=data.language,
+        tone=data.tone or "rassurant",
+        product_focus=data.product_focus or "",
+        user_id=user["id"],
+    )
 
-    country = data.country.upper().strip()
+
+async def _generate_and_persist(
+    site: dict,
+    country: str,
+    language: Optional[str],
+    tone: str,
+    product_focus: str,
+    user_id: str,
+) -> dict:
+    """Reusable core : same logic used by /generate endpoint and by the
+    Scale-6-pays background tasks."""
+    country = (country or "").upper().strip()
     if country not in COUNTRY_LOCALES:
         raise HTTPException(status_code=400, detail=f"Pays non supporté : {country}")
     locale = COUNTRY_LOCALES[country]
-    language = (data.language or locale["default_lang"]).lower()
-    if language not in LANG_NAMES:
-        raise HTTPException(status_code=400, detail=f"Langue non supportée : {language}")
+    lang = (language or locale["default_lang"]).lower()
+    if lang not in LANG_NAMES:
+        raise HTTPException(status_code=400, detail=f"Langue non supportée : {lang}")
 
     context = await _build_context(site)
 
     prompt = f"""{context}
 
 PAYS CIBLE : {locale['name']} ({country}) — devise : {locale['currency']}
-LANGUE DE RÉDACTION : {LANG_NAMES[language]} ({language})
-TON : {data.tone or 'rassurant'}
-{f"FOCUS PRODUIT : {data.product_focus}" if data.product_focus else ""}
+LANGUE DE RÉDACTION : {LANG_NAMES[lang]} ({lang})
+TON : {tone}
+{f"FOCUS PRODUIT : {product_focus}" if product_focus else ""}
 
 Génère une campagne Google Ads Responsive Search Ad complète selon le schéma JSON demandé.
 Rappel strict : 15 headlines ≤30 chars, 4 descriptions ≤90 chars. COMPTE LES CARACTÈRES.
 Adapte la réassurance au pays ({locale['name']}) : livraison, garantie légale, paiements locaux."""
 
-    session_id = f"ads-{site_id}-{country}-{uuid.uuid4().hex[:6]}"
+    session_id = f"ads-{site['id']}-{country}-{uuid.uuid4().hex[:6]}"
     raw = await _ask_claude(prompt, session_id)
     clean = _validate_and_sanitize(raw)
 
     now = datetime.now(timezone.utc).isoformat()
     doc = {
         "id": str(uuid.uuid4()),
-        "site_id": site_id,
+        "site_id": site["id"],
         "country": country,
         "country_name": locale["name"],
-        "language": language,
-        "tone": data.tone or "rassurant",
-        "product_focus": data.product_focus or "",
+        "language": lang,
+        "tone": tone,
+        "product_focus": product_focus,
         "data": clean,
         "created_at": now,
-        "created_by": user["id"],
+        "created_by": user_id,
     }
     await db.ads_copy.insert_one(dict(doc))
     doc.pop("_id", None)
