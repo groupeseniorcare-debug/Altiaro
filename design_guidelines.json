@@ -1,0 +1,116 @@
+{
+  "theme": "light",
+  "archetype": "Organic & Earthy + Swiss Precision (Premium Editorial SaaS)",
+  "design_philosophy": "A command center for ecommerce operators. French luxury meets operational efficiency. The UI must feel like a premium editorial workspace—warm beige backgrounds, sharp charcoal typography, and distinctive terracotta accents. No purple, no generic AI gradients. Total operational clarity.",
+  "colors": {
+    "background": "#FDFBF7",
+    "surface": "#FFFFFF",
+    "sidebar": "#F5F2EB",
+    "primary": "#B84B31",
+    "primary_foreground": "#FFFFFF",
+    "text": "#1C1917",
+    "muted_text": "#78716C",
+    "border": "#E7E5E4",
+    "status": {
+      "locked": { "bg": "#F5F5F4", "text": "#78716C" },
+      "in_progress": { "bg": "#FEF3C7", "text": "#B45309" },
+      "awaiting_validation": { "bg": "#E0F2FE", "text": "#0369A1" },
+      "validated": { "bg": "#D1FAE5", "text": "#047857" },
+      "blocked": { "bg": "#FFE4E6", "text": "#BE123C" }
+    },
+    "shadcn_css_variables": {
+      "light": {
+        "--background": "43 33% 98%",
+        "--foreground": "24 10% 10%",
+        "--card": "0 0% 100%",
+        "--card-foreground": "24 10% 10%",
+        "--popover": "0 0% 100%",
+        "--popover-foreground": "24 10% 10%",
+        "--primary": "12 59% 46%",
+        "--primary-foreground": "0 0% 100%",
+        "--secondary": "40 23% 94%",
+        "--secondary-foreground": "24 10% 10%",
+        "--muted": "40 23% 94%",
+        "--muted-foreground": "25 5% 45%",
+        "--accent": "40 23% 94%",
+        "--accent-foreground": "24 10% 10%",
+        "--destructive": "346 84% 41%",
+        "--destructive-foreground": "0 0% 100%",
+        "--border": "24 6% 90%",
+        "--input": "24 6% 90%",
+        "--ring": "12 59% 46%",
+        "--radius": "0.75rem"
+      }
+    }
+  },
+  "typography": {
+    "fonts": {
+      "heading": "Fraunces, serif",
+      "body": "Satoshi, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "rules": {
+      "h1": "text-4xl lg:text-5xl font-heading tracking-tight text-[#1C1917]",
+      "h2": "text-2xl lg:text-3xl font-heading tracking-tight text-[#1C1917]",
+      "h3": "text-xl font-heading tracking-tight text-[#1C1917]",
+      "body": "text-base font-body text-[#1C1917] leading-relaxed",
+      "small_label": "text-xs font-medium uppercase tracking-widest text-[#78716C]"
+    }
+  },
+  "spacing_and_layout": {
+    "sidebar_width": "260px",
+    "container_padding": "p-8 md:p-12",
+    "bento_grid": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
+    "card_padding": "p-6 md:p-8",
+    "border_radius": "rounded-xl"
+  },
+  "motion": {
+    "hover": "transition-all duration-250 ease-out",
+    "page_load": "staggered fade-up (y: 10, opacity: 0 to 1)",
+    "micro_interaction": "subtle scale 0.98 on active state for buttons"
+  },
+  "components_instructions": {
+    "cards": "White background (#FFFFFF), 1px border (#E7E5E4), very subtle shadow (shadow-sm). Do not overuse drop shadows.",
+    "buttons": "Primary buttons in Terracotta (#B84B31), sharp radius or fully rounded based on preference (use 0.75rem). Hover state should darken slightly to #993D26. Include data-testid.",
+    "timeline_kanban": "Use vertical lines for the roadmap. Steps should look like distinct editorial blocks, connected by a subtle gray 1px line. Status pills should be tiny and uppercase.",
+    "data_tables": "Minimalist borders. Header text should be uppercase, tracking-wide, text-xs, text-stone-500. Row hover state: bg-stone-50/50.",
+    "inputs": "Shadcn defaults but force the border to be stone-200, focus ring terracotta.",
+    "icons": "Use Phosphor Icons (@phosphor-icons/react) for a premium, consistent duotone or regular weight that matches the editorial feel."
+  },
+  "images": {
+    "login_background": {
+      "url": "https://images.unsplash.com/photo-1665760670979-708eb9626d73?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA4Mzl8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGFyY2hpdGVjdHVyYWwlMjB3YXJtJTIwYmVpZ2UlMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc3NjY2NzE3N3ww&ixlib=rb-4.1.0&q=85",
+      "description": "Abstract architectural warm beige shape, perfect for a subtle, premium login screen background.",
+      "category": "background"
+    },
+    "team_avatars": [
+      {
+        "url": "https://images.unsplash.com/photo-1711385532992-9d620284a943?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MDV8MHwxfHNlYXJjaHwyfHxwcm9mZXNzaW9uYWwlMjB0ZWFtJTIwYXZhdGFyJTIwcG9ydHJhaXR8ZW58MHx8fHwxNzc2NjY3MTc3fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Professional team avatar",
+        "category": "avatar"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1711385530980-6556289ac964?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MDV8MHwxfHNlYXJjaHwzfHxwcm9mZXNzaW9uYWwlMjB0ZWFtJTIwYXZhdGFyJTIwcG9ydHJhaXR8ZW58MHx8fHwxNzc2NjY3MTc3fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Professional team avatar 2",
+        "category": "avatar"
+      }
+    ],
+    "logo": {
+      "url": "https://images.unsplash.com/photo-1770660332921-17da4e20c247?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njl8MHwxfHNlYXJjaHwxfHxtaW5pbWFsaXN0JTIwZ2VvbWV0cmljJTIwbG9nb3xlbnwwfHx8fDE3NzY1ODYzMDJ8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Minimalist geometric logo shape",
+      "category": "logo"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Strictly follow the color palette: beige background (#FDFBF7), charcoal text (#1C1917), and terracotta accent (#B84B31).",
+    "Do NOT use dark mode. This is an operational command center that requires maximum daylight clarity.",
+    "Use 'Fraunces' for headings. Do NOT use Inter, Roboto, or Poppins. Use 'Satoshi' for body text.",
+    "Implement the layout with a 260px fixed left sidebar. The main content area must have generous padding (p-8 or p-12).",
+    "Use Shadcn UI components but customize their CSS variables to match the warm, editorial theme provided in 'shadcn_css_variables'.",
+    "All interactive elements (buttons, inputs, menu items, table rows) MUST have a 'data-testid' attribute in kebab-case describing their role.",
+    "For the 50-step workflow roadmap, build a vertical timeline UI. Steps should clearly indicate their status using the provided status colors.",
+    "Do NOT use HTML <select> or <input type='date'>. Always use Shadcn DropdownMenu/Select and Calendar/Popover.",
+    "Add @phosphor-icons/react for icons.",
+    "Never use placeholders for images. Use the URLs provided in the 'images' object."
+  ]
+}
