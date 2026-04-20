@@ -14,6 +14,7 @@ import NicheDetail from "./pages/NicheDetail";
 import NicheAnalysisDetail from "./pages/NicheAnalysisDetail";
 import SiteProducts from "./pages/SiteProducts";
 import AdsCopy from "./pages/AdsCopy";
+import Empire from "./pages/Empire";
 import Orders from "./pages/Orders";
 import {
   StorefrontHome,
@@ -135,6 +136,14 @@ function App() {
             element={
               <ProtectedRoute adminOnly>
                 <Orders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/empire"
+            element={
+              <ProtectedRoute adminOnly>
+                <Empire />
               </ProtectedRoute>
             }
           />

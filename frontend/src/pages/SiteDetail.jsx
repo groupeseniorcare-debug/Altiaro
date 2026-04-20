@@ -4,6 +4,7 @@ import { api, apiCall } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import Layout from "../components/Layout";
 import StepPanel from "../components/StepPanel";
+import BlockOutputModal from "../components/BlockOutputModal";
 import {
   ArrowLeft,
   Lock,
@@ -62,12 +63,16 @@ export default function SiteDetail() {
   const [showScale, setShowScale] = useState(false);
   const [scaleResult, setScaleResult] = useState(null);
   const [scaling, setScaling] = useState(false);
+  const [blockOutputs, setBlockOutputs] = useState({});
+  const [executingBlock, setExecutingBlock] = useState(null);
+  const [viewingBlockOutput, setViewingBlockOutput] = useState(null);
 
   const load = useCallback(async () => {
-    const [siteRes, stepsRes, domRes] = await Promise.all([
+    const [siteRes, stepsRes, domRes, blocksRes] = await Promise.all([
       apiCall(() => api.get(`/sites/${id}`)),
       apiCall(() => api.get(`/sites/${id}/steps`)),
       apiCall(() => api.get(`/sites/${id}/domain`)),
+      apiCall(() => api.get(`/sites/${id}/blocks/outputs-latest`)),
     ]);
     if (siteRes.data) setSite(siteRes.data);
     if (stepsRes.data) setSteps(stepsRes.data);
@@ -75,6 +80,7 @@ export default function SiteDetail() {
       setDomainStatus(domRes.data);
       setDomainInput(domRes.data.custom_domain || "");
     }
+    if (blocksRes.data) setBlockOutputs(blocksRes.data);
     setLoading(false);
   }, [id]);
 
@@ -166,6 +172,20 @@ export default function SiteDetail() {
       return;
     }
     setScaleResult(data);
+  };
+
+  const handleExecuteBlock = async (blockId) => {
+    setExecutingBlock(blockId);
+    const { data, error } = await apiCall(() =>
+      api.post(`/sites/${id}/blocks/${blockId}/execute`, {})
+    );
+    setExecutingBlock(null);
+    if (error) {
+      window.alert(`Génération impossible : ${error}`);
+      return;
+    }
+    setBlockOutputs((prev) => ({ ...prev, [blockId]: data }));
+    setViewingBlockOutput(data);
   };
 
   if (loading) {
@@ -353,18 +373,46 @@ export default function SiteDetail() {
                       {block.name}
                     </h2>
                   </div>
-                  <div className="text-right">
-                    <div className="font-heading text-xl font-semibold text-[#1C1917]">
-                      {blockPct}%
-                    </div>
-                    <div className="text-xs text-[#78716C]">
-                      {blockValidated} / {blockStepsFlat.length} validées
-                    </div>
-                    <div className="w-32 h-1.5 bg-[#F5F2EB] rounded-full overflow-hidden mt-1.5">
-                      <div
-                        className="h-full bg-[#B84B31] rounded-full transition-all duration-500"
-                        style={{ width: `${blockPct}%` }}
-                      />
+                  <div className="flex items-center gap-3">
+                    {blockOutputs[block.id] && (
+                      <button
+                        onClick={() => setViewingBlockOutput(blockOutputs[block.id])}
+                        data-testid={`view-block-output-${block.id}`}
+                        className="h-9 px-3 rounded-lg bg-[#D1FAE5] text-[#047857] text-xs font-medium hover:bg-[#A7F3D0] transition flex items-center gap-1.5"
+                      >
+                        <CheckCircle size={12} weight="fill" /> Livrable IA prêt
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleExecuteBlock(block.id)}
+                      disabled={executingBlock === block.id}
+                      data-testid={`execute-block-${block.id}`}
+                      className="h-9 px-3 rounded-lg bg-[#1C1917] hover:bg-[#44403C] disabled:opacity-60 text-white text-xs font-medium flex items-center gap-1.5 transition"
+                    >
+                      {executingBlock === block.id ? (
+                        <>
+                          <ArrowClockwise size={12} className="animate-spin" /> Génération…
+                        </>
+                      ) : (
+                        <>
+                          <Sparkle size={12} weight="fill" />
+                          {blockOutputs[block.id] ? "Régénérer" : "Générer le bloc en IA"}
+                        </>
+                      )}
+                    </button>
+                    <div className="text-right pl-3 border-l border-[#E7E5E4]">
+                      <div className="font-heading text-xl font-semibold text-[#1C1917]">
+                        {blockPct}%
+                      </div>
+                      <div className="text-xs text-[#78716C]">
+                        {blockValidated} / {blockStepsFlat.length} validées
+                      </div>
+                      <div className="w-32 h-1.5 bg-[#F5F2EB] rounded-full overflow-hidden mt-1.5">
+                        <div
+                          className="h-full bg-[#B84B31] rounded-full transition-all duration-500"
+                          style={{ width: `${blockPct}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -494,6 +542,13 @@ export default function SiteDetail() {
             setScaleResult(null);
             navigate(`/sites/${sid}`);
           }}
+        />
+      )}
+
+      {viewingBlockOutput && (
+        <BlockOutputModal
+          output={viewingBlockOutput}
+          onClose={() => setViewingBlockOutput(null)}
         />
       )}
     </Layout>
@@ -987,3 +1042,7 @@ function ScaleResult({ result, onOpenSite, onClose }) {
     </div>
   );
 }
+
+// BlockOutputModal moved to components/BlockOutputModal.jsx
+
+
