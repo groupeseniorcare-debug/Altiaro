@@ -39,6 +39,19 @@ SaaS multi-tenant d'e-commerce 100% custom (pas de Shopify) dédié à la **Silv
 
 ## What's been implemented
 
+### 2026-04-20 · Sprint 6 : Niche Analyzer IA + Sync + Mobile
+- **🤖 Niche Analyzer IA** : `POST /api/niches/analyze` via Claude Sonnet 4.5 → analyse structurée JSON (category, tagline, description, keywords, buy/sell prices, margin_pct, ecf_score, hero, suppliers, **country_metrics 6 pays** avec volume/cpc/kd/cpa_target/seasonality/verdict, risks, opportunities, synthesis_per_country, overall_verdict, go_countries)
+- **📊 Règles verdict** : GO si vol≥3k ET CPC ok · MAYBE 1.5k-3k · NOGO <1.5k. Global : GO si ≥20k cumulé ET marge>60% ET ≥2 marchés GO
+- **🗃 Collection `niche_analyses`** scopée par user (history via `GET /api/niches/analyses`)
+- **🌍 Multi-market launch** : Concepteur coche les marchés sur la page détail, budget calculé live (**30€/jour par marché**), sticky bar en bas, bouton "Lancer sur N marchés"
+- **👥 Operator peut créer ses sites** : `POST /api/sites` ouvert à tous les roles (auto-assigné à l'operator courant), admin garde le pouvoir d'assigner à un autre operator
+- **🔄 Sync fournisseur** : `POST /api/sites/{id}/products/{pid}/resync` refetch l'URL supplier, calcule diff prix (old/new/%), modal UI avec warning si hausse >10%, alerte si marge < 30%, bouton "Appliquer le nouveau prix"
+- **📱 Mobile responsive** : hamburger <768px, sidebar slide-in drawer avec backdrop blur, launch bar pleine largeur sur mobile
+- **🛠 Fix route ordering** : `analyzer_routes` registered BEFORE `niches_routes` (sinon `/niches/{slug}` matche `/niches/analyses`)
+- Testing : 13/13 pytest + E2E frontend (iteration_4.json) — 0 bug critique
+
+---
+
 ### 2026-04-20 · Sprint 5 : Command Palette ⌘K + Streaming CSV
 - **⌘K Global Search** : `GET /api/admin/search?q=...` cherche simultanément dans sites/products/orders/niches/users · regex escape safe · limit 5 par type
 - Composant `CommandPalette` déclenché par Cmd/Ctrl+K (ou bouton flottant en bas à droite) — modal centré avec backdrop blur, groupes visuels par type, thumbnails produits, navigation clavier ↑↓ + Entrée, surlignage cursor, ESC ferme
