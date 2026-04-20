@@ -1,105 +1,96 @@
 # Concept Factory — Product Requirements Document
 
 ## Problem statement original
-L'utilisateur veut bâtir **Concept Factory**, un SaaS multi-tenant d'e-commerce 100% custom (pas de Shopify) dédié à la **Silver Economy** (60+ et aidants) sur 6 marchés EU : 🇫🇷 FR · 🇩🇪 DE · 🇨🇭 CH · 🇧🇪 BE+LU · 🇬🇧 UK · 🇳🇱 NL.
+SaaS multi-tenant d'e-commerce 100% custom (pas de Shopify) dédié à la **Silver Economy** (60+ et aidants) sur 6 marchés EU : 🇫🇷 FR · 🇩🇪 DE · 🇨🇭 CH · 🇧🇪 BE+LU · 🇬🇧 UK · 🇳🇱 NL.
 
-- **Admin (founder)** gère centralement Google Ads, finances globales, les commandes côté fournisseurs.
-- **Concepteurs (opérateurs)** montent leurs sites, sélectionnent les produits (catalogue DSers-like interne), traitent le SAV et les remboursements.
-- Modèle économique : 50% marge brute partageable entre Admin et Concepteur.
-- Produits non-médicaux ; catalogue fournisseurs CJ / BigBuy / AliExpress EU.
+- **Admin** gère Google Ads, finances globales, commandes côté fournisseurs.
+- **Concepteurs** montent sites, choisissent produits, traitent SAV et remboursements.
+- Modèle 50% marge brute partagée.
 
 ## Architecture
-- **Stack** : FastAPI + MongoDB (motor async) + React 18 + Tailwind + shadcn/ui + @phosphor-icons/react + Framer Motion + recharts
-- **Auth** : JWT httpOnly cookies (access 8h + refresh 7j), bcrypt, brute force 15min après 5 échecs, admin seeded via .env
-- **LLM** : Emergent LLM Key via emergentintegrations.LlmChat (Claude Sonnet 4.5 par défaut). Timeout 50s + 402 budget + 504 timeout gracieux.
-- **Niche Engine** : 20 niches × 6 pays seedées idempotemment.
-- **Site Factory (Phase 3)** : catalogue produits i18n par site + storefront public `/shop/{siteId}` + cart localStorage + checkout → commande `pending_payment`.
+- **Stack** : FastAPI (10 routers modulaires) + MongoDB (motor async) + React 18 + Tailwind + Phosphor icons + Framer Motion + recharts
+- **Structure backend** : `server.py` orchestrateur 117 lignes + `deps.py` (shared : db, auth, helpers) + `routes/{auth,users,sites,steps,products,orders,public_shop,niches,dashboard,meta}.py`
+- **Auth** : JWT httpOnly cookies, bcrypt, brute force 15min, admin seeded via .env
+- **LLM** : Emergent LLM Key via emergentintegrations, timeout 50s, 402 budget, 504 timeout, 402 budget épuisé propre
+- **Niche Engine** : 20 niches × 6 pays seedées idempotemment
+- **Site Factory** : catalogue produits i18n FR/EN/DE/NL par site + storefront `/shop/{id}` + cart localStorage + checkout → commande
+- **Admin Ops Center** : `/orders` globale avec stats, filtres, transitions de statut, export CSV, rate-limit IP 10/10min (via X-Forwarded-For)
 
 ## User personas
-- **Admin (fondateur)** : voit tout, crée sites (wizard lié au Niche Engine), gère users et finances.
-- **Concepteur (opérateur)** : voit uniquement ses sites, exécute les étapes en auto-progression, gère son catalogue produits.
-- **Client final (public)** : achète sur `/shop/{siteId}`, navigue en FR/EN/DE/NL, passe commande sans créer de compte.
+- **Admin** : voit tout, crée sites + users, gère commandes + finances
+- **Concepteur** : voit ses sites, gère son catalogue, auto-progression étapes
+- **Client final** (public) : achète sur `/shop/{id}` en FR/EN/DE/NL sans compte
 
 ## Core requirements (status)
 1. Auth JWT 2 rôles ✅
 2. Dashboard KPIs ✅
-3. Liste sites en cards ✅
-4. Wizard création site + seed 50 étapes ✅
-5. SiteDetail workflow phases ✅
-6. StepPanel auto-progression ✅
-7. Monitoring Admin ✅
-8. Finances manuelles ✅
-9. Users CRUD admin ✅
-10. Niche Engine 20×6 ✅
-11. **Catalogue produits par site (CRUD admin i18n)** ✅ (NEW 2026-04-20)
-12. **Storefront public multilingue FR/EN/DE/NL** ✅ (NEW 2026-04-20)
-13. **Cart + Checkout + Orders** ✅ (NEW 2026-04-20)
+3. Sites CRUD + wizard ✅
+4. Workflow 50 étapes auto-progression ✅
+5. StepPanel avec IA ✅
+6. Monitoring Admin ✅
+7. Finances manuelles ✅
+8. Users CRUD admin ✅
+9. Niche Engine 20×6 ✅
+10. Catalogue produits i18n ✅
+11. Storefront public multilingue ✅
+12. Cart + Checkout + Orders ✅
+13. **Admin Ops Center** ✅ (NEW 2026-04-20 · Sprint 3)
+14. **Server.py refactoré en 10 routers** ✅ (NEW 2026-04-20 · Sprint 3)
 
 ## What's been implemented
 
+### 2026-04-20 · Sprint 3 : Admin Ops Center + refactor
+- **5 endpoints admin ops** : `GET /admin/orders` (filtrable), `/stats`, `PATCH /admin/orders/{id}` (transitions validées), `GET /export.csv`
+- **Page frontend `/orders`** : stats cards (7 statuts), table avec recherche, slide-in détail avec historique + copy address + copy email + liens fournisseurs + transitions contextuelles
+- **Status transitions** : pending_payment → paid|cancelled · paid → shipped|refunded|cancelled · shipped → delivered|refunded · delivered → refunded · cancelled/refunded terminaux
+- **Rate-limit IP-based** sur POST public orders : 10 cmd / IP / 10 min via X-Forwarded-For + index Mongo dédié
+- **Refactor server.py** : 1252 → 117 lignes + 10 routers modulaires (auth 78, users 57, sites 97, steps 264, products 63, orders 179, public_shop 146, niches 29, dashboard 129, meta 17) + `deps.py` shared
+- Testing : 27/27 pytest backend + frontend E2E validé (iteration_3.json)
+
 ### 2026-04-20 · Sprint 2 : Phase 3 Site Factory MVP
-- Backend `models_shop.py` (ProductCreateInput i18n, OrderCreateInput avec validators `quantity>0, le=99`, `price>=0`)
-- Collections MongoDB `products`, `orders` + indexes dédiés
-- Endpoints CRUD admin : `GET/POST/PATCH/DELETE /api/sites/{id}/products` + `GET /api/sites/{id}/orders`
-- Endpoints publics (sans auth) : `GET /api/public/sites/{id}`, `.../products`, `.../products/{id}`, `POST /api/public/sites/{id}/orders`, `GET /api/public/sites/{id}/orders/{order_number}`
-- **Sécurité** : recalcul serveur des totaux avec **prix canoniques DB** (pas les prix client) · order_number unique `CF-{ts}-{hex}` · cascade delete site → products + orders
-- Frontend admin : page `/sites/{id}/products` avec grille + slide-in ProductEditor (tabs FR/EN/DE/NL, images multiples, featured, statut active/draft/archived)
-- Frontend public : 5 pages `/shop/{siteId}` (Home grid · /product/:id · /cart · /checkout · /confirmation) via `StorefrontLayout` senior-friendly + footer trust signals
-- i18n dictionnaire 4 langues + localStorage persistant `cf_lang_{siteId}`
-- Cart localStorage scopé `cf_cart_{siteId}` avec événement `cf_cart_updated` pour refresh temps réel du badge
-- Livraison gratuite dès 50€, sinon 4.90€ (hard-codé MVP, Phase 5 TVA par pays)
-- `/auth/me` skip sur routes `/shop/*` pour éviter les 401 bruyants
-- Testing : 21/21 backend pytest + E2E frontend passés, 0 bug critique
+- `models_shop.py` (ProductCreateInput i18n, OrderCreateInput avec validators)
+- Collections `products`, `orders` + indexes
+- Admin CRUD produits + endpoints publics storefront
+- Sécurité : prix canoniques serveur, cascade delete, order_number unique
+- Frontend : ProductEditor i18n, 5 pages `/shop/{id}`, i18n 4 langues, cart localStorage scopé
 
 ### 2026-04-20 · Sprint 1 : Niche Engine + rebranding
-- Rebranding "Launch OS" → "Concept Factory"
-- Workflow auto-progression (suppression du gating admin)
-- 20 niches × 6 pays seedées idempotemment
-- Pages `/niches` (catalogue filtrable) et `/niches/:slug` (analyse 6 pays + bouton Lancer un site)
-- Pré-remplissage wizard `/sites/new` depuis fiche niche
-
-### Précédemment
-- FastAPI + 30+ endpoints · Seed 50 prompts du playbook · React routing + Layout sidebar + StepPanel
+- Rebranding "Launch OS" → "Concept Factory", auto-progression étapes, 20 niches × 6 pays, `/niches` et `/niches/:slug`, pré-remplissage wizard
 
 ## Prioritized backlog
 
 ### P0 (fait)
-- [x] Auth + admin seed
-- [x] Sites CRUD + workflow 50 étapes
-- [x] Niche Engine
-- [x] Auto-progression étapes
-- [x] Phase 3 MVP : catalogue produits + storefront + cart + checkout
+- [x] Auth, Sites, Workflow, Niche Engine, Phase 3 MVP shop, Admin Ops Center, Refactor
 
-### P1 — Phase 4 (prochain sprint)
-- [ ] **Admin Ops Center** : page `/orders` globale pour l'admin (toutes commandes tous sites) · filtres par statut · action "Envoyer au fournisseur" · export CSV
-- [ ] **Refactor `server.py`** (1046 lignes) → `/app/backend/routes/{auth,sites,steps,niches,products,orders,financials,dashboard}.py`
-- [ ] **Rate-limiting** sur `/public/orders` (IP-based) pour éviter le spam
-- [ ] **Import DSers-like** : page Admin/Concepteur pour coller une URL AliExpress/CJ/BigBuy → parse + création produit auto
-- [ ] **Upload images** pour produits (actuellement URL manuelle)
+### P1 — Phase 5 : Paiement réel (⏳ en attente clés user)
+- [ ] **Mollie** (paiement + payouts) — **requiert clé API Mollie**
+- [ ] **Resend** (emails transactionnels FR/EN/DE/NL) — **requiert clé API + domaine vérifié**
+- [ ] **TVA multi-pays** (5 taux : FR 20%, DE 19%, BE 21%, NL 21%, UK 20%, CH TVA import)
+- [ ] **Moteur 50/50** : calcul Marge Brute Partageable par commande
+- [ ] **SAV workflow** : tickets, messages client, refunds partiels
 
-### P2 — Phase 5 (finances)
-- [ ] **Intégration Mollie** (paiement réel + payouts) · lien de paiement envoyé par email
-- [ ] **TVA multi-pays** (5 taux : FR 20%, DE 19%, BE 21%, NL 21%, UK 20%, CH 0%+TVA import)
-- [ ] **Moteur 50/50** : calcul Marge Brute Partageable auto par commande
-- [ ] **SAV workflow** : tickets, messages client, refunds
+### P1.5 — Améliorations produit (sans clé externe)
+- [ ] **Import DSers-like** : page pour coller URL AliExpress/CJ/BigBuy → parse auto
+- [ ] **Upload images** produits (remplacer URL manuelle)
+- [ ] **Streaming CSV export** pour gros volumes (actuellement memory buffer 5000 rows max)
 
-### P3 — Phase 6+
-- [ ] **Google Ads Center** : interface admin pour créer/gérer campagnes via API
-- [ ] **DataForSEO** pour recalibrer métriques Niche Engine avec chiffres réels
-- [ ] **Emails transactionnels** (Resend) : confirmation commande, relance panier, expédition
-- [ ] **Multi-domaine** : chaque site sur `marque.com` via DNS CNAME + routing Nginx
-- [ ] **Notifications** (email admin) + recherche globale ⌘K
+### P2 — Phase 6
+- [ ] **Google Ads Center** admin (API)
+- [ ] **DataForSEO** : recalibrage métriques Niche Engine
+- [ ] **Multi-domaine** : CNAME par site → routing Nginx
+- [ ] **Notifications admin** (email nouvelle commande)
+- [ ] **Recherche globale** ⌘K
+- [ ] **Mobile responsive** storefront (déjà partiellement fait)
 
-## Refactoring futur (urgence moyenne)
-- `server.py` 1046 lignes → split en routers FastAPI
+## Refactoring encore à faire (urgence basse)
+- Rate-limit order : réindexer `_meta_ip + created_at` ✅ fait sprint 3
 - `seed_prompts.py` 50 prompts → 4 blocs Template/Produits/SEO/Marketing
-- Ajouter validation `product_id` existe dans OrderCreateInput (déjà fait côté endpoint, à déplacer en model_validator pour uniformité)
+- Ajout de tests pytest pour chaque route.py nouvellement créée
 
-## Next tasks (après validation user)
-1. Phase 4 : Admin Ops Center (commandes + export CSV)
-2. Refactor server.py en routers
-3. Import automatique produit depuis URL fournisseur
-4. Intégration Mollie + TVA
+## Next tasks
+1. **Phase 5** quand l'user fournit clés Mollie + Resend
+2. **Import produit** depuis URL fournisseur (pas de clé requise)
+3. **Upload images** produits
 
 ## Credentials
 Voir `/app/memory/test_credentials.md` — `admin@conceptfactory.fr` / `Factory2026!`

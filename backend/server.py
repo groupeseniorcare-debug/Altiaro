@@ -67,6 +67,7 @@ async def startup():
     await db.products.create_index("created_at")
     await db.orders.create_index([("site_id", 1), ("created_at", -1)])
     await db.orders.create_index("order_number", unique=True)
+    await db.orders.create_index([("_meta_ip", 1), ("created_at", -1)])
 
     # Seed niche catalog (idempotent)
     try:

@@ -61,7 +61,9 @@ async def public_create_order(site_id: str, data: OrderCreateInput, request: Req
     - Rate limit: 10 commandes / IP / 10 min
     - Sécurité: prix canoniques serveur (ignore le prix client)
     """
-    ip = request.client.host if request.client else "unknown"
+    ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
+        request.client.host if request.client else "unknown"
+    )
     window_start = datetime.now(timezone.utc) - timedelta(minutes=10)
     recent_count = await db.orders.count_documents({
         "_meta_ip": ip,
