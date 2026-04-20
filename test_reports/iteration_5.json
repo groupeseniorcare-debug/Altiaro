@@ -1,0 +1,27 @@
+{
+  "summary": "Iteration 5 (Google Ads Copy Generator + Blocks refactor) — ALL tests pass. Backend: 15/15 pytest (2 live Claude Sonnet 4.5 calls FR+DE, ~30s each, both respect 30/90 char limits; invalid country rejected 400; list sorted desc; CSV export with all 6 row types + Character count header; cross-site access denied; delete verified via 404; unit test on _truncate/_validate_and_sanitize enforces caps even with over-long LLM outputs). Meta: /api/meta/blocks returns 4 ordered blocks with phases arrays; /api/meta/phases still returns 15 phases each carrying block key; all 50 steps on existing Luméa Confort site and 2 other sampled sites have block/block_name/block_order/block_emoji populated (backfill migration confirmed). Frontend E2E as Concepteur: site detail renders BLOC 1/4 Template & Boutique header with 🏗️ emoji + progress 0/20, phase subgroups (D Cadre juridique 0/2, E Shopify backend 0/3, F Front React headless 0/8) with locked steps; Google Ads Copy button opens /sites/:id/ads-copy; Ads page renders 6 country flag buttons (FR/DE/CH/BE/UK/NL), language dropdown (Français), tone dropdown (Rassurant senior-friendly), focus input, Générer CTA, Historique sidebar, empty state.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration5.py",
+    "/app/test_reports/pytest/iter5.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/ads_copy.py _ask_claude: generic Exception bucket catches 'budget' substring to emit 402, same brittle pattern as analyzer.py. Fine for now but a shared helper (e.g. deps.llm_error_to_http) would DRY analyzer + ads_copy + any future LLM route.",
+    "_validate_and_sanitize silently truncates when LLM exceeds limits and never logs — headlines may end with '…' which reduces Quality Score. Recommend logger.warning() when any headline/desc was actually truncated so the operator knows to re-generate.",
+    "generate_ads_copy writes the raw LLM response with _truncate suffix '…' (U+2026) inside CSV — Google Ads Editor tolerates UTF-8 but some operators paste in Excel which may mojibake. Non-blocking.",
+    "server.py backfill migration runs only if `block` field is missing; if we later rename a block the migration won't re-run. Consider versioning the migration with a `_migrations` collection (idempotent by version).",
+    "ads_copy router uses prefix='/sites/{site_id}/ads-copy' and is registered before niches_routes — fine, but sites_routes is registered first with prefix='/sites'; FastAPI resolves longest-match correctly, just flagging the implicit ordering dependency for future refactors.",
+    "_build_context queries products sync per call. At 100+ products the 3-limit is safe but a dedicated index on {site_id:1, status:1} already exists — good.",
+    "Frontend body-encoded '&' in block names forced to '&amp;' only in raw HTML — not a bug but playwright substring assertions should use getByText instead. (Test-side fix, not product.)"
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration5.py"],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "100%"},
+  "test_credentials": "concepteur@conceptfactory.fr / Concepteur2026! and admin@conceptfactory.fr / Factory2026! (from /app/memory/test_credentials.md) — both valid.",
+  "seed_data_creation": "Created 2 real ads_copy docs via live Claude Sonnet 4.5 (FR+DE) on Luméa Confort site during pytest; the FR one was deleted at end of test_delete_ads_copy. DE one remains.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Regression suite at /app/backend/tests/test_iteration5.py (15 tests, ~90s including 2 live LLM calls). Uses dotenv to load REACT_APP_BACKEND_URL from /app/frontend/.env and MONGO_URL from /app/backend/.env so it runs standalone. Pytest.fr_copy_id shared across tests (created in test_generate_fr_ads_copy, consumed by list/get/csv/delete). UI testids on ads page need a once-over — I located the 'Google Ads Copy' button by text; country buttons by flag. If main agent adds data-testid='ads-country-FR' etc. future E2E will be tighter.",
+  "rca of the issue": "No issues. All 15 backend assertions + frontend smoke pass. Sanitizer correctly truncates LLM outputs that exceed 30/90 char (verified by synthetic 50-char headlines in unit test). Cross-site access returns 403/404 (_check_site_access in deps). Backfill migration idempotent: count_documents({block: {$exists: false}}) == 0 on 2nd run."
+}

@@ -18,6 +18,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from deps import db, client, ADMIN_EMAIL, ADMIN_PASSWORD, FRONTEND_URL, UPLOAD_DIR, hash_password, verify_password
 from seed_niches import seed_niches
+from seed_prompts import BLOCKS, PHASE_TO_BLOCK
 
 from routes import auth as auth_routes
 from routes import users as users_routes
@@ -32,6 +33,7 @@ from routes import meta as meta_routes
 from routes import uploads as uploads_routes
 from routes import search as search_routes
 from routes import analyzer as analyzer_routes
+from routes import ads_copy as ads_copy_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,6 +53,7 @@ api.include_router(products_routes.router)
 api.include_router(orders_routes.router)
 api.include_router(public_routes.router)
 api.include_router(analyzer_routes.router)  # must be registered BEFORE niches to avoid /niches/{slug} conflict
+api.include_router(ads_copy_routes.router)
 api.include_router(niches_routes.router)
 api.include_router(dashboard_routes.router)
 api.include_router(meta_routes.router)
@@ -75,6 +78,7 @@ async def startup():
     await db.orders.create_index("order_number", unique=True)
     await db.orders.create_index([("_meta_ip", 1), ("created_at", -1)])
     await db.niche_analyses.create_index([("user_id", 1), ("created_at", -1)])
+    await db.ads_copy.create_index([("site_id", 1), ("created_at", -1)])
 
     # Seed niche catalog (idempotent)
     try:
@@ -82,6 +86,26 @@ async def startup():
         logger.info(f"Seeded {seeded} niches in catalog")
     except Exception:
         logger.exception("Failed to seed niches catalog")
+
+    # Backfill block info on existing steps (idempotent migration)
+    try:
+        missing_block = await db.steps.count_documents({"block": {"$exists": False}})
+        if missing_block > 0:
+            logger.info(f"Backfilling block info on {missing_block} steps...")
+            for phase_code, block_id in PHASE_TO_BLOCK.items():
+                meta = BLOCKS[block_id]
+                await db.steps.update_many(
+                    {"phase": phase_code, "block": {"$exists": False}},
+                    {"$set": {
+                        "block": block_id,
+                        "block_name": meta["name"],
+                        "block_order": meta["order"],
+                        "block_emoji": meta["emoji"],
+                    }},
+                )
+            logger.info("Block backfill complete.")
+    except Exception:
+        logger.exception("Failed block backfill migration")
 
     # Seed admin user
     existing = await db.users.find_one({"email": ADMIN_EMAIL})

@@ -14,6 +14,7 @@ import {
   Link as LinkIcon,
   Package,
   Eye,
+  Megaphone,
 } from "@phosphor-icons/react";
 
 const STATUS_CONFIG = {
@@ -78,12 +79,26 @@ export default function SiteDetail() {
     );
   }
 
-  // Group steps by phase
-  const phaseGroups = {};
+        // Group steps by BLOCK, then by phase inside each block
+  const blockGroups = {};
   steps.forEach((s) => {
-    if (!phaseGroups[s.phase]) phaseGroups[s.phase] = { name: s.phase_name, steps: [] };
-    phaseGroups[s.phase].steps.push(s);
+    const blockId = s.block || "template";
+    if (!blockGroups[blockId]) {
+      blockGroups[blockId] = {
+        id: blockId,
+        name: s.block_name || blockId,
+        emoji: s.block_emoji || "📦",
+        order: s.block_order || 99,
+        phases: {},
+      };
+    }
+    const blk = blockGroups[blockId];
+    if (!blk.phases[s.phase]) {
+      blk.phases[s.phase] = { code: s.phase, name: s.phase_name, steps: [] };
+    }
+    blk.phases[s.phase].steps.push(s);
   });
+  const sortedBlocks = Object.values(blockGroups).sort((a, b) => a.order - b.order);
 
   const totalValidated = steps.filter((s) => s.status === "validated").length;
   const progress = steps.length ? Math.round((totalValidated / steps.length) * 100) : 0;
@@ -147,6 +162,13 @@ export default function SiteDetail() {
                 >
                   <Package size={16} weight="bold" /> Gérer les produits
                 </button>
+                <button
+                  onClick={() => navigate(`/sites/${id}/ads-copy`)}
+                  data-testid="ads-copy-link"
+                  className="h-10 px-4 rounded-xl bg-white border border-[#E7E5E4] hover:border-[#B84B31] text-[#1C1917] text-sm font-medium flex items-center gap-2 transition"
+                >
+                  <Megaphone size={16} weight="duotone" /> Google Ads Copy
+                </button>
                 <a
                   href={`/shop/${id}`}
                   target="_blank"
@@ -176,62 +198,103 @@ export default function SiteDetail() {
         </div>
 
         <div className="space-y-10">
-          {Object.entries(phaseGroups).map(([phase, group], pidx) => {
-            const phaseValidated = group.steps.filter((s) => s.status === "validated").length;
+          {sortedBlocks.map((block) => {
+            const blockStepsFlat = Object.values(block.phases).flatMap((p) => p.steps);
+            const blockValidated = blockStepsFlat.filter((s) => s.status === "validated").length;
+            const blockPct = blockStepsFlat.length
+              ? Math.round((blockValidated / blockStepsFlat.length) * 100)
+              : 0;
             return (
-              <div key={phase} data-testid={`phase-${phase}`}>
-                <div className="flex items-baseline gap-3 mb-5">
-                  <div className="w-8 h-8 rounded-lg bg-[#1C1917] text-white flex items-center justify-center font-heading font-semibold text-sm">
-                    {phase}
+              <div key={block.id} data-testid={`block-${block.id}`}>
+                <div className="flex items-center gap-4 mb-5 pb-3 border-b border-[#E7E5E4]">
+                  <div className="text-3xl">{block.emoji}</div>
+                  <div className="flex-1">
+                    <div className="text-[11px] uppercase tracking-widest text-[#78716C]">
+                      Bloc {block.order} / 4
+                    </div>
+                    <h2 className="font-heading text-2xl font-semibold text-[#1C1917]">
+                      {block.name}
+                    </h2>
                   </div>
-                  <h2 className="font-heading text-xl font-semibold text-[#1C1917]">{group.name}</h2>
-                  <div className="text-xs text-[#78716C] font-medium">
-                    {phaseValidated}/{group.steps.length} validées
+                  <div className="text-right">
+                    <div className="font-heading text-xl font-semibold text-[#1C1917]">
+                      {blockPct}%
+                    </div>
+                    <div className="text-xs text-[#78716C]">
+                      {blockValidated} / {blockStepsFlat.length} validées
+                    </div>
+                    <div className="w-32 h-1.5 bg-[#F5F2EB] rounded-full overflow-hidden mt-1.5">
+                      <div
+                        className="h-full bg-[#B84B31] rounded-full transition-all duration-500"
+                        style={{ width: `${blockPct}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="relative">
-                  <div className="absolute left-[15px] top-6 bottom-6 w-px bg-[#E7E5E4]" />
-                  <div className="space-y-3">
-                    {group.steps.map((step) => {
-                      const cfg = STATUS_CONFIG[step.status] || STATUS_CONFIG.locked;
-                      const Icon = cfg.icon;
-                      const clickable = step.status !== "locked";
-                      return (
-                        <button
-                          key={step.id}
-                          disabled={!clickable}
-                          onClick={() => setSelectedStep(step)}
-                          data-testid={`step-${step.number}`}
-                          className={`w-full flex items-center gap-4 text-left rounded-xl border px-5 py-4 transition-all duration-200 ${
-                            clickable
-                              ? "bg-white border-[#E7E5E4] hover:border-[#B84B31]/50 hover:shadow-sm cursor-pointer"
-                              : "bg-[#FAF7F2] border-[#F5F2EB] cursor-not-allowed opacity-70"
-                          }`}
-                        >
-                          <div
-                            className="relative z-10 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: cfg.bg }}
-                          >
-                            <Icon size={14} weight="bold" style={{ color: cfg.text }} />
+                <div className="space-y-6 pl-2">
+                  {Object.values(block.phases).map((group) => {
+                    const phaseValidated = group.steps.filter((s) => s.status === "validated").length;
+                    return (
+                      <div key={group.code} data-testid={`phase-${group.code}`}>
+                        <div className="flex items-baseline gap-3 mb-3">
+                          <div className="w-7 h-7 rounded-md bg-[#1C1917] text-white flex items-center justify-center font-heading font-semibold text-xs">
+                            {group.code}
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-baseline gap-2 mb-0.5">
-                              <span className="text-xs font-mono text-[#78716C]">#{step.number}</span>
-                              <span className="font-medium text-[#1C1917]">{step.title}</span>
-                            </div>
-                            <div className="text-sm text-[#78716C] truncate">{step.summary}</div>
+                          <h3 className="font-heading text-base font-semibold text-[#1C1917]">
+                            {group.name}
+                          </h3>
+                          <div className="text-xs text-[#78716C] font-medium">
+                            {phaseValidated}/{group.steps.length}
                           </div>
-                          <span
-                            className="text-[10px] uppercase tracking-widest px-2 py-1 rounded-full whitespace-nowrap"
-                            style={{ backgroundColor: cfg.bg, color: cfg.text }}
-                          >
-                            {cfg.label}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                        </div>
+
+                        <div className="relative">
+                          <div className="absolute left-[13px] top-5 bottom-5 w-px bg-[#E7E5E4]" />
+                          <div className="space-y-2">
+                            {group.steps.map((step) => {
+                              const cfg = STATUS_CONFIG[step.status] || STATUS_CONFIG.locked;
+                              const Icon = cfg.icon;
+                              const clickable = step.status !== "locked";
+                              return (
+                                <button
+                                  key={step.id}
+                                  disabled={!clickable}
+                                  onClick={() => setSelectedStep(step)}
+                                  data-testid={`step-${step.number}`}
+                                  className={`w-full flex items-center gap-4 text-left rounded-xl border px-5 py-3.5 transition-all duration-200 ${
+                                    clickable
+                                      ? "bg-white border-[#E7E5E4] hover:border-[#B84B31]/50 hover:shadow-sm cursor-pointer"
+                                      : "bg-[#FAF7F2] border-[#F5F2EB] cursor-not-allowed opacity-70"
+                                  }`}
+                                >
+                                  <div
+                                    className="relative z-10 w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                                    style={{ backgroundColor: cfg.bg }}
+                                  >
+                                    <Icon size={12} weight="bold" style={{ color: cfg.text }} />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-baseline gap-2 mb-0.5">
+                                      <span className="text-xs font-mono text-[#78716C]">#{step.number}</span>
+                                      <span className="font-medium text-[#1C1917]">{step.title}</span>
+                                    </div>
+                                    <div className="text-sm text-[#78716C] truncate">{step.summary}</div>
+                                  </div>
+                                  <span
+                                    className="text-[10px] uppercase tracking-widest px-2 py-1 rounded-full whitespace-nowrap"
+                                    style={{ backgroundColor: cfg.bg, color: cfg.text }}
+                                  >
+                                    {cfg.label}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );

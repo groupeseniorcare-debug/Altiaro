@@ -13,6 +13,7 @@ import NicheEngine from "./pages/NicheEngine";
 import NicheDetail from "./pages/NicheDetail";
 import NicheAnalysisDetail from "./pages/NicheAnalysisDetail";
 import SiteProducts from "./pages/SiteProducts";
+import AdsCopy from "./pages/AdsCopy";
 import Orders from "./pages/Orders";
 import {
   StorefrontHome,
@@ -103,6 +104,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <SiteProducts />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites/:id/ads-copy"
+            element={
+              <ProtectedRoute>
+                <AdsCopy />
               </ProtectedRoute>
             }
           />

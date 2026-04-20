@@ -1,6 +1,15 @@
 """
 Seed data for the 50 prompts that compose the e-commerce launch playbook.
 Each new site created in Launch OS is auto-seeded with these 50 steps.
+
+The 15 phases (A-O) are now grouped into 4 higher-level BLOCKS :
+    1. template   — Template & Boutique (build the storefront engine)
+    2. products   — Produits & Sourcing (find what to sell)
+    3. seo        — SEO & Marque (organic visibility)
+    4. marketing  — Marketing & Scale (paid acquisition + scaling)
+
+Each step exposes `block`, `block_name`, `block_order` so the UI can
+collapse / progress-bar per block without touching the underlying content.
 """
 
 PHASES = {
@@ -19,6 +28,54 @@ PHASES = {
     "M": "Acquisition Google Ads",
     "N": "Analytics",
     "O": "Duplication",
+}
+
+
+# ---------- 4 logical blocks ------------------------------------ #
+BLOCKS = {
+    "template": {
+        "order": 1,
+        "name": "Template & Boutique",
+        "emoji": "🏗️",
+        "description": "Monter la boutique : back-office, front React, paiement, logistique, SAV, juridique.",
+    },
+    "products": {
+        "order": 2,
+        "name": "Produits & Sourcing",
+        "emoji": "📦",
+        "description": "Choisir et sourcer les produits gagnants : matrice, fournisseurs, échantillons.",
+    },
+    "seo": {
+        "order": 3,
+        "name": "SEO & Marque",
+        "emoji": "🔍",
+        "description": "Construire la marque et la visibilité organique : positionnement, contenu, SEO technique, AEO.",
+    },
+    "marketing": {
+        "order": 4,
+        "name": "Marketing & Scale",
+        "emoji": "🚀",
+        "description": "Acquisition payante, conversion, analytics, duplication cross-pays.",
+    },
+}
+
+# Which block does each phase belong to ?
+PHASE_TO_BLOCK = {
+    "A": "products",   # Étude marché
+    "C": "products",   # Sourcing
+    "B": "seo",        # Marque/voix
+    "G": "seo",        # SEO technique
+    "H": "seo",        # AEO/GEO
+    "D": "template",   # Juridique
+    "E": "template",   # Shopify backend
+    "F": "template",   # Front React
+    "J": "template",   # Paiement
+    "K": "template",   # Service client
+    "L": "template",   # Logistique
+    "I": "marketing",  # Conversion & social proof
+    "M": "marketing",  # Google Ads
+    "N": "marketing",  # Analytics
+    "O": "marketing",  # Duplication
 }
 
 
@@ -1235,12 +1292,18 @@ def get_seed_steps_for_site(site_id: str):
     steps = []
     now = datetime.now(timezone.utc).isoformat()
     for p in PROMPTS:
+        block_id = PHASE_TO_BLOCK.get(p["phase"], "template")
+        block_meta = BLOCKS[block_id]
         steps.append({
             "id": str(uuid.uuid4()),
             "site_id": site_id,
             "number": p["number"],
             "phase": p["phase"],
             "phase_name": PHASES[p["phase"]],
+            "block": block_id,
+            "block_name": block_meta["name"],
+            "block_order": block_meta["order"],
+            "block_emoji": block_meta["emoji"],
             "title": p["title"],
             "summary": p["summary"],
             "prompt": p["prompt"],
