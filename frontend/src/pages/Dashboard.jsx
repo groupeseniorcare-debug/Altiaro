@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, apiCall } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import Layout from "../components/Layout";
 import {
   CurrencyEur,
@@ -40,6 +41,8 @@ export default function Dashboard() {
   const [kpis, setKpis] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   useEffect(() => {
     (async () => {
@@ -61,11 +64,19 @@ export default function Dashboard() {
             </p>
           </div>
           <button
-            onClick={() => navigate("/sites/new")}
+            onClick={() => navigate(isAdmin ? "/sites/new" : "/sites")}
             data-testid="create-site-btn-dashboard"
             className="h-11 px-5 rounded-xl bg-[#B84B31] hover:bg-[#993D26] text-white font-medium transition-all duration-200 flex items-center gap-2 active:scale-[0.98] shadow-sm"
           >
-            <Plus size={18} weight="bold" /> Lancer un site
+            {isAdmin ? (
+              <>
+                <Plus size={18} weight="bold" /> Lancer un site
+              </>
+            ) : (
+              <>
+                <Storefront size={18} weight="bold" /> Mes sites
+              </>
+            )}
           </button>
         </div>
 

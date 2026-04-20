@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, apiCall } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import Layout from "../components/Layout";
 import { Plus, Storefront, ArrowRight } from "@phosphor-icons/react";
 
@@ -8,6 +9,8 @@ export default function Sites() {
   const [sites, setSites] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   useEffect(() => {
     (async () => {
@@ -23,16 +26,24 @@ export default function Sites() {
         <div className="flex items-start justify-between mb-10 animate-fade-up">
           <div>
             <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-2">Portefeuille</div>
-            <h1 className="font-heading text-4xl font-semibold text-[#1C1917]">Sites</h1>
-            <p className="text-[#57534E] mt-2">Gérez toutes vos marques et suivez leur progression.</p>
+            <h1 className="font-heading text-4xl font-semibold text-[#1C1917]">
+              {isAdmin ? "Sites" : "Mes sites"}
+            </h1>
+            <p className="text-[#57534E] mt-2">
+              {isAdmin
+                ? "Gérez toutes vos marques et suivez leur progression."
+                : "Voici les sites qui te sont assignés. Avance à ton rythme sur chaque étape."}
+            </p>
           </div>
-          <button
-            onClick={() => navigate("/sites/new")}
-            data-testid="create-site-btn"
-            className="h-11 px-5 rounded-xl bg-[#B84B31] hover:bg-[#993D26] text-white font-medium transition-all duration-200 flex items-center gap-2 active:scale-[0.98] shadow-sm"
-          >
-            <Plus size={18} weight="bold" /> Lancer un site
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => navigate("/sites/new")}
+              data-testid="create-site-btn"
+              className="h-11 px-5 rounded-xl bg-[#B84B31] hover:bg-[#993D26] text-white font-medium transition-all duration-200 flex items-center gap-2 active:scale-[0.98] shadow-sm"
+            >
+              <Plus size={18} weight="bold" /> Lancer un site
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -42,17 +53,23 @@ export default function Sites() {
             <div className="w-14 h-14 rounded-full bg-[#F5F2EB] flex items-center justify-center mx-auto mb-5">
               <Storefront size={28} weight="duotone" color="#B84B31" />
             </div>
-            <h3 className="font-heading text-xl font-semibold text-[#1C1917] mb-2">Aucun site pour l'instant</h3>
+            <h3 className="font-heading text-xl font-semibold text-[#1C1917] mb-2">
+              {isAdmin ? "Aucun site pour l'instant" : "Pas encore de site assigné"}
+            </h3>
             <p className="text-[#57534E] mb-6 max-w-md mx-auto">
-              Lancez votre première marque. Les 50 étapes du playbook seront automatiquement chargées.
+              {isAdmin
+                ? "Lancez votre première marque. Les 50 étapes du playbook seront automatiquement chargées."
+                : "L'admin va t'assigner un site dès qu'il est prêt. Tu recevras une notification."}
             </p>
-            <button
-              onClick={() => navigate("/sites/new")}
-              data-testid="create-first-site"
-              className="h-11 px-5 rounded-xl bg-[#B84B31] hover:bg-[#993D26] text-white font-medium inline-flex items-center gap-2 transition"
-            >
-              <Plus size={18} weight="bold" /> Lancer mon premier site
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => navigate("/sites/new")}
+                data-testid="create-first-site"
+                className="h-11 px-5 rounded-xl bg-[#B84B31] hover:bg-[#993D26] text-white font-medium inline-flex items-center gap-2 transition"
+              >
+                <Plus size={18} weight="bold" /> Lancer mon premier site
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
