@@ -1,0 +1,41 @@
+{
+  "summary": "Phase 3 MVP Shop — backend + frontend E2E. 21/21 pytest backend tests PASS (products CRUD i18n, public storefront filtering, server-side total recomputation, order number format, order lookup, admin listing, auth gating). Frontend E2E PASS: admin /sites/{id}/products with ProductEditor FR/EN/DE/NL tabs + featured toggle + status select, public storefront featured-first ordering, draft products NOT leaked publicly, language switcher persists via localStorage cf_lang_{siteId} and applies to header/buttons on reload (DE verified end-to-end), cart scoped per siteId (other site's cart items don't pollute count), real-time cart badge update, full checkout producing CF-{ts}-{hex} order number, confirmation page with order recap, cart cleared after order.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Public storefront (unauthenticated)", "issues": ["Several 401 console errors from /api/auth/me fired on every public /shop/* page. Not blocking but noisy — consider skipping the auth/me probe when the route prefix is /shop/*."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_shop.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_shop.xml"
+  ],
+  "action_items": [
+    "(Optional) Skip /api/auth/me call on public /shop/* routes to remove noisy 401s in browser console.",
+    "(Optional, carry-over from iter1) Wrap emergentintegrations LlmChat.send_message in asyncio.wait_for to convert slow LLM calls into 504 instead of ingress 502.",
+    "(Optional) models_shop.OrderCreateInput currently doesn't forbid extra fields; clients could send total/subtotal and be silently ignored (verified OK by test). Consider model_config = {'extra': 'ignore'} explicit + a note. Non-blocking."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now 1046 lines — well past the 700-line split threshold. Strongly recommend splitting into routers/: auth.py, sites.py, steps.py, products.py, orders.py, niches.py, dashboard.py.",
+    "Deleting a site does NOT cascade delete its products and orders (server.py delete_site only removes sites+steps+financials). Orphaned products/orders will remain queryable via admin endpoints with the dead site_id. Recommend adding db.products.delete_many({'site_id': site_id}) and orders cascade in delete_site.",
+    "public_create_order does not validate that each item.product_id actually exists or is status='active' — a malicious client could post arbitrary product_ids with any price. Server DOES recompute totals from client-supplied prices, so a client can still set any price. Recommend fetching products by id from DB and using canonical server-side price for the subtotal calculation.",
+    "OrderCreateInput.items quantity has no min=1 validator; a client could post quantity=0 or negative and produce subtotal=0 + shipping_fee=4.90, creating a 4.90€ order. Add pydantic Field(gt=0) on quantity.",
+    "No rate-limiting on the public POST /public/sites/{id}/orders endpoint — vulnerable to order spam. Recommend IP-based throttle."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_shop.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin@conceptfactory.fr / Factory2026! (from /app/memory/test_credentials.md) — valid",
+  "seed_data_creation": "Created TEST_Shop Site P3 (backend tests, auto-cleaned via fixture teardown) and TEST_UI_Shop (UI tests, cleaned up at end). Zero lingering data.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 3 MVP shop is fully functional & tested. All security priorities from main agent's note are verified: (1) server-side total recomputation ignores client-supplied totals (TestPublicOrders::test_server_recomputes_total_ignoring_client_hint), (2) draft products are NOT leaked in public listing or detail endpoints (TestPublicStorefront + TestProductsCRUD::test_patch_status_to_draft_hides_from_public), (3) language selector persists via localStorage cf_lang_{siteId} and hydrates on reload, (4) cart is scoped by siteId via cf_cart_{siteId} key (other site's cart items don't bleed in). Backend tests live in /app/backend/tests/test_shop.py (21 tests, 3s runtime). Carry-forward concerns: server.py now 1046 lines (split overdue), delete_site doesn't cascade products/orders, public order endpoint trusts client item prices (only totals are recomputed from those client prices).",
+  "rca of the issue": "No bugs found in this iteration. All 21 backend tests + full frontend E2E pass."
+}

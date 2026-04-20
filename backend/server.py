@@ -28,6 +28,9 @@ from pydantic import BaseModel, EmailStr, Field
 
 from seed_prompts import get_seed_steps_for_site, PROMPTS, PHASES
 from seed_niches import seed_niches, COUNTRIES
+from models_shop import (
+    ProductCreateInput, ProductUpdateInput, OrderCreateInput,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("launchos")
@@ -211,6 +214,10 @@ async def startup():
     await db.niches.create_index("slug", unique=True)
     await db.niches.create_index("rank")
     await db.countries.create_index("code", unique=True)
+    await db.products.create_index([("site_id", 1), ("status", 1)])
+    await db.products.create_index("created_at")
+    await db.orders.create_index([("site_id", 1), ("created_at", -1)])
+    await db.orders.create_index("order_number", unique=True)
 
     # seed niche engine catalog (idempotent)
     try:
@@ -798,6 +805,182 @@ async def dashboard_kpis(user: dict = Depends(get_current_user)):
         "per_site": per_site,
         "monthly_trend": trend,
     }
+
+
+# ------------------------------------------------------------------ #
+# PRODUCTS (admin/operator — catalogue d'un site)
+# ------------------------------------------------------------------ #
+def _serialize_product(doc: dict) -> dict:
+    doc.pop("_id", None)
+    return doc
+
+
+@api.get("/sites/{site_id}/products")
+async def list_products(site_id: str, user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    items = await db.products.find({"site_id": site_id}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return items
+
+
+@api.post("/sites/{site_id}/products")
+async def create_product(site_id: str, data: ProductCreateInput, user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "id": str(uuid.uuid4()),
+        "site_id": site_id,
+        **data.model_dump(),
+        "created_at": now,
+        "updated_at": now,
+        "created_by": user["id"],
+    }
+    await db.products.insert_one(dict(doc))
+    return _serialize_product(doc)
+
+
+@api.get("/sites/{site_id}/products/{product_id}")
+async def get_product(site_id: str, product_id: str, user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    p = await db.products.find_one({"id": product_id, "site_id": site_id}, {"_id": 0})
+    if not p:
+        raise HTTPException(status_code=404, detail="Produit introuvable")
+    return p
+
+
+@api.patch("/sites/{site_id}/products/{product_id}")
+async def update_product(site_id: str, product_id: str, data: ProductUpdateInput, user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    update = {k: v for k, v in data.model_dump().items() if v is not None}
+    if not update:
+        raise HTTPException(status_code=400, detail="Aucun champ à mettre à jour")
+    update["updated_at"] = datetime.now(timezone.utc).isoformat()
+    result = await db.products.update_one({"id": product_id, "site_id": site_id}, {"$set": update})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Produit introuvable")
+    p = await db.products.find_one({"id": product_id, "site_id": site_id}, {"_id": 0})
+    return p
+
+
+@api.delete("/sites/{site_id}/products/{product_id}")
+async def delete_product(site_id: str, product_id: str, user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    await db.products.delete_one({"id": product_id, "site_id": site_id})
+    return {"ok": True}
+
+
+# ------------------------------------------------------------------ #
+# ORDERS (admin/operator)
+# ------------------------------------------------------------------ #
+@api.get("/sites/{site_id}/orders")
+async def list_orders(site_id: str, user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    items = await db.orders.find({"site_id": site_id}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return items
+
+
+# ------------------------------------------------------------------ #
+# PUBLIC STOREFRONT (no auth) — /api/public/*
+# ------------------------------------------------------------------ #
+@api.get("/public/sites/{site_id}")
+async def public_site(site_id: str):
+    """Infos publiques d'un site (pour rendre la storefront sans auth)."""
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(status_code=404, detail="Site introuvable")
+    # Retourner uniquement champs publics
+    niche = None
+    if site.get("niche_slug"):
+        niche = await db.niches.find_one(
+            {"slug": site["niche_slug"]},
+            {"_id": 0, "name": 1, "emoji": 1, "tagline": 1, "category": 1}
+        )
+    return {
+        "id": site["id"],
+        "name": site["name"],
+        "niche": site.get("niche", ""),
+        "domain": site.get("domain", ""),
+        "niche_data": niche,
+    }
+
+
+@api.get("/public/sites/{site_id}/products")
+async def public_products(site_id: str):
+    """Liste publique des produits actifs d'un site (storefront)."""
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "id": 1})
+    if not site:
+        raise HTTPException(status_code=404, detail="Site introuvable")
+    items = await db.products.find(
+        {"site_id": site_id, "status": "active"},
+        {"_id": 0}
+    ).sort([("featured", -1), ("created_at", -1)]).to_list(500)
+    return items
+
+
+@api.get("/public/sites/{site_id}/products/{product_id}")
+async def public_product_detail(site_id: str, product_id: str):
+    p = await db.products.find_one(
+        {"id": product_id, "site_id": site_id, "status": "active"},
+        {"_id": 0}
+    )
+    if not p:
+        raise HTTPException(status_code=404, detail="Produit introuvable")
+    return p
+
+
+@api.post("/public/sites/{site_id}/orders")
+async def public_create_order(site_id: str, data: OrderCreateInput):
+    """Endpoint public checkout — crée une commande en statut pending_payment.
+    Mollie sera branché en Phase 5."""
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "id": 1, "name": 1})
+    if not site:
+        raise HTTPException(status_code=404, detail="Site introuvable")
+    if not data.items:
+        raise HTTPException(status_code=400, detail="Panier vide")
+
+    # Recompute totals côté serveur (ne pas faire confiance au client)
+    subtotal = sum(item.price * item.quantity for item in data.items)
+    shipping_fee = 0 if subtotal >= 50 else 4.90  # free shipping > 50€
+    tax = 0  # TVA sera calculée en Phase 5 par pays
+    total = round(subtotal + shipping_fee + tax, 2)
+
+    now = datetime.now(timezone.utc)
+    order_number = f"CF-{int(now.timestamp())}-{secrets.token_hex(2).upper()}"
+
+    doc = {
+        "id": str(uuid.uuid4()),
+        "site_id": site_id,
+        "site_name": site["name"],
+        "order_number": order_number,
+        "items": [item.model_dump() for item in data.items],
+        "customer": data.customer.model_dump(),
+        "shipping_address": data.shipping_address.model_dump(),
+        "language": data.language,
+        "notes": data.notes or "",
+        "subtotal": round(subtotal, 2),
+        "shipping_fee": shipping_fee,
+        "tax": tax,
+        "total": total,
+        "currency": data.items[0].currency if data.items else "EUR",
+        "status": "pending_payment",
+        "payment_method": None,
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat(),
+    }
+    await db.orders.insert_one(dict(doc))
+    doc.pop("_id", None)
+    return doc
+
+
+@api.get("/public/sites/{site_id}/orders/{order_number}")
+async def public_order_lookup(site_id: str, order_number: str):
+    """Permet au client de consulter le détail de sa commande après checkout."""
+    o = await db.orders.find_one(
+        {"site_id": site_id, "order_number": order_number},
+        {"_id": 0}
+    )
+    if not o:
+        raise HTTPException(status_code=404, detail="Commande introuvable")
+    return o
 
 
 # ------------------------------------------------------------------ #

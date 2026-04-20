@@ -12,6 +12,8 @@ import {
   XCircle,
   Storefront,
   Link as LinkIcon,
+  Package,
+  Eye,
 } from "@phosphor-icons/react";
 
 const STATUS_CONFIG = {
@@ -135,6 +137,25 @@ export default function SiteDetail() {
                     <LinkIcon size={14} /> Shopify admin
                   </a>
                 )}
+              </div>
+
+              <div className="flex flex-wrap gap-2 mt-5">
+                <button
+                  onClick={() => navigate(`/sites/${id}/products`)}
+                  data-testid="manage-products"
+                  className="h-10 px-4 rounded-xl bg-[#1C1917] hover:bg-[#44403C] text-white text-sm font-medium flex items-center gap-2 transition"
+                >
+                  <Package size={16} weight="bold" /> Gérer les produits
+                </button>
+                <a
+                  href={`/shop/${id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  data-testid="view-storefront"
+                  className="h-10 px-4 rounded-xl bg-white border border-[#E7E5E4] hover:border-[#B84B31] text-[#1C1917] text-sm font-medium flex items-center gap-2 transition"
+                >
+                  <Eye size={16} /> Voir la boutique
+                </a>
               </div>
             </div>
 

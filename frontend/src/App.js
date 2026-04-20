@@ -11,6 +11,14 @@ import Finances from "./pages/Finances";
 import Users from "./pages/Users";
 import NicheEngine from "./pages/NicheEngine";
 import NicheDetail from "./pages/NicheDetail";
+import SiteProducts from "./pages/SiteProducts";
+import {
+  StorefrontHome,
+  StorefrontProduct,
+  StorefrontCart,
+  StorefrontCheckout,
+  StorefrontConfirmation,
+} from "./pages/Storefront";
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user } = useAuth();
@@ -80,6 +88,21 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/sites/:id/products"
+            element={
+              <ProtectedRoute>
+                <SiteProducts />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Public Storefront (no auth) */}
+          <Route path="/shop/:siteId" element={<StorefrontHome />} />
+          <Route path="/shop/:siteId/product/:productId" element={<StorefrontProduct />} />
+          <Route path="/shop/:siteId/cart" element={<StorefrontCart />} />
+          <Route path="/shop/:siteId/checkout" element={<StorefrontCheckout />} />
+          <Route path="/shop/:siteId/confirmation" element={<StorefrontConfirmation />} />
           <Route
             path="/validations"
             element={
