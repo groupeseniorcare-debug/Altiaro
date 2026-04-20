@@ -39,6 +39,14 @@ SaaS multi-tenant d'e-commerce 100% custom (pas de Shopify) dédié à la **Silv
 
 ## What's been implemented
 
+### 2026-04-20 · Sprint 5 : Command Palette ⌘K + Streaming CSV
+- **⌘K Global Search** : `GET /api/admin/search?q=...` cherche simultanément dans sites/products/orders/niches/users · regex escape safe · limit 5 par type
+- Composant `CommandPalette` déclenché par Cmd/Ctrl+K (ou bouton flottant en bas à droite) — modal centré avec backdrop blur, groupes visuels par type, thumbnails produits, navigation clavier ↑↓ + Entrée, surlignage cursor, ESC ferme
+- **Streaming CSV export** : `StreamingResponse` avec generator async cursor Mongo → O(1) mémoire quel que soit le volume de commandes
+- Limité aux admins (le palette ne s'affiche pas pour les Concepteurs)
+
+---
+
 ### 2026-04-20 · Sprint 4 : Media & Import
 - **Scraper `/app/backend/scraper.py`** : fetch + extraction Open Graph + JSON-LD + Schema.org Product + fallback Shopify Analytics
 - **POST `/api/sites/{id}/products/import`** : renvoie un draft produit pré-rempli (name FR/EN, description, price, currency, images, sku, supplier_url) — **non persisté**, le frontend l'injecte dans l'editor
@@ -81,7 +89,8 @@ SaaS multi-tenant d'e-commerce 100% custom (pas de Shopify) dédié à la **Silv
 ### P1.5 — Améliorations produit (sans clé externe)
 - [x] **Import DSers-like** ✅ (2026-04-20 sprint 4)
 - [x] **Upload images** ✅ (2026-04-20 sprint 4)
-- [ ] **Streaming CSV export** pour gros volumes (actuellement memory buffer 5000 rows max)
+- [x] **Streaming CSV export** ✅ (2026-04-20 sprint 5)
+- [x] **Recherche globale ⌘K** ✅ (2026-04-20 sprint 5)
 
 ### P2 — Phase 6
 - [ ] **Google Ads Center** admin (API)

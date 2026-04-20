@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import Response as FastResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from deps import db, get_current_user, require_admin, _check_site_access
@@ -144,36 +144,48 @@ async def admin_orders_csv(
     site_id: Optional[str] = None,
     admin: dict = Depends(require_admin),
 ):
+    """Streaming CSV export — O(1) memory regardless of volume."""
     query = {}
     if status:
         query["status"] = status
     if site_id:
         query["site_id"] = site_id
-    items = await db.orders.find(query, {"_id": 0, "_meta_ip": 0}).sort("created_at", -1).to_list(5000)
 
-    buf = io.StringIO()
-    writer = csv.writer(buf)
-    writer.writerow([
+    COLUMNS = [
         "order_number", "created_at", "status", "site_name",
         "customer_name", "customer_email", "customer_phone",
         "country", "postal_code", "city", "address",
         "items_count", "subtotal", "shipping", "total", "currency", "language",
-    ])
-    for o in items:
-        items_count = sum(it.get("quantity", 0) for it in o.get("items", []))
-        addr = o.get("shipping_address", {})
-        cust = o.get("customer", {})
-        writer.writerow([
-            o.get("order_number", ""), o.get("created_at", ""), o.get("status", ""),
-            o.get("site_name", ""),
-            cust.get("name", ""), cust.get("email", ""), cust.get("phone", ""),
-            addr.get("country_code", ""), addr.get("postal_code", ""),
-            addr.get("city", ""), addr.get("line1", ""),
-            items_count, o.get("subtotal", 0), o.get("shipping_fee", 0),
-            o.get("total", 0), o.get("currency", "EUR"), o.get("language", ""),
-        ])
-    return FastResponse(
-        content=buf.getvalue(),
+    ]
+
+    async def row_generator():
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(COLUMNS)
+        yield buf.getvalue()
+        buf.seek(0)
+        buf.truncate(0)
+
+        cursor = db.orders.find(query, {"_id": 0, "_meta_ip": 0}).sort("created_at", -1)
+        async for o in cursor:
+            items_count = sum(it.get("quantity", 0) for it in o.get("items", []))
+            addr = o.get("shipping_address", {})
+            cust = o.get("customer", {})
+            writer.writerow([
+                o.get("order_number", ""), o.get("created_at", ""), o.get("status", ""),
+                o.get("site_name", ""),
+                cust.get("name", ""), cust.get("email", ""), cust.get("phone", ""),
+                addr.get("country_code", ""), addr.get("postal_code", ""),
+                addr.get("city", ""), addr.get("line1", ""),
+                items_count, o.get("subtotal", 0), o.get("shipping_fee", 0),
+                o.get("total", 0), o.get("currency", "EUR"), o.get("language", ""),
+            ])
+            yield buf.getvalue()
+            buf.seek(0)
+            buf.truncate(0)
+
+    return StreamingResponse(
+        row_generator(),
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="orders.csv"'},
     )

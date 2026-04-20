@@ -1,6 +1,7 @@
 import React from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import CommandPalette from "./CommandPalette";
 import {
   House,
   SquaresFour,
@@ -103,6 +104,7 @@ export default function Layout({ children }) {
       </aside>
 
       <main className="flex-1 ml-[260px] min-h-screen">{children}</main>
+      {user?.role === "admin" && <CommandPalette />}
     </div>
   );
 }
