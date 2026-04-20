@@ -583,6 +583,7 @@ async def execute_step_with_ai(step_id: str, data: StepExecuteInput, user: dict 
 
     # Call LLM
     try:
+        import asyncio as _asyncio
         from emergentintegrations.llm.chat import LlmChat, UserMessage
         system_msg = (
             "Tu es un expert e-commerce, SEO, copywriting et ops. Tu réponds en français. "
@@ -595,8 +596,13 @@ async def execute_step_with_ai(step_id: str, data: StepExecuteInput, user: dict 
             system_message=system_msg,
         ).with_model(data.model_provider, data.model_name)
         message = UserMessage(text=prompt_text)
-        response = await chat.send_message(message)
+        response = await _asyncio.wait_for(chat.send_message(message), timeout=50)
         ai_text = response if isinstance(response, str) else str(response)
+    except _asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail="Le modèle met trop de temps à répondre (>50s). Réessayez ou changez de modèle."
+        )
     except Exception as e:
         logger.exception("LLM execution failed")
         err_str = str(e)
