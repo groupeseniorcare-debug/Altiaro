@@ -16,6 +16,7 @@ import {
   Package,
   Globe,
   CreditCard,
+  Bank,
 } from "@phosphor-icons/react";
 
 export default function Layout({ children }) {
@@ -31,6 +32,7 @@ export default function Layout({ children }) {
       ? [
           { to: "/empire", label: "Empire", icon: Globe, testId: "nav-empire" },
           { to: "/orders", label: "Commandes", icon: Package, testId: "nav-orders" },
+          { to: "/admin/payouts", label: "Virements", icon: Bank, testId: "nav-admin-payouts" },
           { to: "/validations", label: "Activité", icon: CheckSquare, testId: "nav-validations" },
           { to: "/finances", label: "Finances", icon: ChartLineUp, testId: "nav-finances" },
           { to: "/billing", label: "Paiements", icon: CreditCard, testId: "nav-billing" },

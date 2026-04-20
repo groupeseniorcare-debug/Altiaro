@@ -295,14 +295,21 @@ async def _log_ledger(entry: dict):
 
 
 async def _compute_balance(user_id: str) -> dict:
-    """Somme ledger pour un Concepteur :
-    - owed_to_cf = total ad_debit non payés (pending + failed)
-    - pending_in = somme order_share encaissés - ad_debit réussis - payouts
+    """Somme ledger pour un Concepteur (vue financière).
+
+    - owed_share = total des parts Concepteur sur commandes payées (50% marge brute HT)
+    - payouts_scheduled = somme des payouts pending/paid déjà loggés
+    - net_due = owed_share - payouts_scheduled  → ce qui reste à virer
+    - paid_ad_debits / pending_ad_debits : affichés pour info (collectés séparément via CB)
     """
     entries = await db.ledger.find({"concepteur_id": user_id}, {"_id": 0}).to_list(5000)
     pending_debits = 0.0
     paid_debits = 0.0
     order_share = 0.0
+    gross_margin_ht_total = 0.0
+    revenue_ht_total = 0.0
+    cost_ht_total = 0.0
+    orders_count = 0
     payouts = 0.0
     for e in entries:
         amount = float(e.get("amount") or 0)
@@ -315,13 +322,20 @@ async def _compute_balance(user_id: str) -> dict:
                 pending_debits += amount
         elif t == "order_share" and status == "paid":
             order_share += amount
+            gross_margin_ht_total += float(e.get("gross_margin_ht") or 0)
+            revenue_ht_total += float(e.get("revenue_ht") or 0)
+            cost_ht_total += float(e.get("cost_ht") or 0)
+            orders_count += 1
         elif t == "payout" and status in ("paid", "pending"):
             payouts += amount
-    # Net balance to pay out to Concepteur = revenus - debits - payouts déjà planifiés
-    net_due = order_share - paid_debits - payouts
+    net_due = order_share - payouts   # ad_debits collectés séparément via CB → pas de netting
     return {
-        "order_share_total": round(order_share, 2),
-        "paid_ad_debits_total": round(paid_debits, 2),
+        "revenue_ht_total": round(revenue_ht_total, 2),
+        "cost_ht_total": round(cost_ht_total, 2),
+        "gross_margin_ht_total": round(gross_margin_ht_total, 2),
+        "orders_count": orders_count,
+        "order_share_total": round(order_share, 2),         # = 50% × marge brute HT
+        "paid_ad_debits_total": round(paid_debits, 2),      # info seulement
         "pending_ad_debits_total": round(pending_debits, 2),
         "payouts_total": round(payouts, 2),
         "net_due_to_concepteur": round(net_due, 2),
@@ -463,32 +477,123 @@ async def admin_run_weekly_debits(since_days: int = 7, admin: dict = Depends(req
 
 @router.get("/admin/billing/payouts-preview")
 async def admin_payouts_preview(admin: dict = Depends(require_admin)):
-    """Calcule le solde net à verser pour chaque Concepteur, sans exécuter."""
+    """Liste des virements à effectuer pour chaque Concepteur.
+
+    Formule : 50% × marge brute HT (CA HT − Prix d'achat HT), déduction faite
+    des payouts déjà loggés (pending ou paid).
+    """
     operators = await db.users.find({"role": "operator"}, {"password": 0, "password_hash": 0}).to_list(1000)
     for op in operators:
         op["id"] = str(op.pop("_id"))
+
+    # Pré-charge tous les sites par operator pour la ventilation
+    all_sites = await db.sites.find({}, {"_id": 0, "id": 1, "name": 1, "operator_id": 1}).to_list(5000)
+    sites_by_op: dict[str, list[dict]] = {}
+    for s in all_sites:
+        sites_by_op.setdefault(s.get("operator_id") or "", []).append(s)
+
     rows = []
     total_due = 0.0
     for op in operators:
         bal = await _compute_balance(op["id"])
         net = bal["net_due_to_concepteur"]
-        if net <= 0:
-            continue
+        if net <= 0.009:
+            continue   # rien à verser
+
         prof = await db.billing_profiles.find_one({"user_id": op["id"]}, {"_id": 0}) or {}
+
+        # Ventilation par site : marge brute HT cumul + part Concepteur par site
+        site_breakdown = []
+        for s in sites_by_op.get(op["id"], []):
+            agg = await db.ledger.aggregate([
+                {"$match": {
+                    "concepteur_id": op["id"],
+                    "site_id": s["id"],
+                    "type": "order_share",
+                    "status": "paid",
+                }},
+                {"$group": {
+                    "_id": None,
+                    "share": {"$sum": "$amount"},
+                    "revenue_ht": {"$sum": "$revenue_ht"},
+                    "cost_ht": {"$sum": "$cost_ht"},
+                    "gross_margin_ht": {"$sum": "$gross_margin_ht"},
+                    "orders": {"$sum": 1},
+                }},
+            ]).to_list(1)
+            if agg and agg[0]["share"]:
+                a = agg[0]
+                site_breakdown.append({
+                    "site_id": s["id"],
+                    "site_name": s.get("name"),
+                    "orders": a.get("orders") or 0,
+                    "revenue_ht": round(a.get("revenue_ht") or 0, 2),
+                    "cost_ht": round(a.get("cost_ht") or 0, 2),
+                    "gross_margin_ht": round(a.get("gross_margin_ht") or 0, 2),
+                    "concepteur_share": round(a.get("share") or 0, 2),
+                })
+        site_breakdown.sort(key=lambda x: x["concepteur_share"], reverse=True)
+
         rows.append({
             "user_id": op["id"],
             "email": op.get("email"),
             "name": op.get("name"),
             "net_due_eur": net,
             "has_iban": bool(prof.get("iban")),
+            "iban": prof.get("iban") or None,           # plein en clair pour copier-coller
             "iban_masked": prof.get("iban_masked"),
             "holder_name": prof.get("iban_holder_name"),
             "bic": prof.get("bic"),
+            "iban_bank_name": prof.get("iban_bank_name"),
+            "site_breakdown": site_breakdown,
             **bal,
         })
         total_due += net
     rows.sort(key=lambda r: r["net_due_eur"], reverse=True)
-    return {"count": len(rows), "total_due_eur": round(total_due, 2), "rows": rows}
+
+    # Prochain cycle (1er ou 15 du mois)
+    now = datetime.now(timezone.utc)
+    if now.day < 15:
+        next_cycle = now.replace(day=15, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        y, m = now.year, now.month + 1
+        if m > 12:
+            m = 1
+            y += 1
+        next_cycle = now.replace(year=y, month=m, day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    return {
+        "count": len(rows),
+        "total_due_eur": round(total_due, 2),
+        "next_cycle_date": next_cycle.date().isoformat(),
+        "now": now.isoformat(),
+        "rows": rows,
+    }
+
+
+@router.get("/admin/billing/payouts-history")
+async def admin_payouts_history(limit: int = 100, admin: dict = Depends(require_admin)):
+    """Historique des payouts (pending + paid), triés du plus récent au plus ancien."""
+    entries = await db.ledger.find(
+        {"type": "payout"}, {"_id": 0}
+    ).sort("created_at", -1).limit(min(limit, 500)).to_list(min(limit, 500))
+    # Enrichir avec nom du Concepteur
+    by_uid = {e["concepteur_id"] for e in entries if e.get("concepteur_id")}
+    from bson import ObjectId
+    users_lookup: dict[str, dict] = {}
+    for uid in by_uid:
+        try:
+            u = await db.users.find_one({"_id": ObjectId(uid)}, {"name": 1, "email": 1})
+            if u:
+                users_lookup[uid] = {"name": u.get("name"), "email": u.get("email")}
+        except Exception:
+            pass
+    for e in entries:
+        u = users_lookup.get(e.get("concepteur_id"))
+        if u:
+            e["concepteur_name"] = u.get("name")
+            e["concepteur_email"] = u.get("email")
+    return {"count": len(entries), "items": entries}
 
 
 @router.post("/admin/billing/run-payouts")
@@ -523,10 +628,37 @@ async def admin_mark_payout_paid(payout_id: str, admin: dict = Depends(require_a
     now = datetime.now(timezone.utc).isoformat()
     res = await db.ledger.update_one(
         {"id": payout_id, "type": "payout", "status": "pending"},
-        {"$set": {"status": "paid", "paid_at": now}},
+        {"$set": {"status": "paid", "paid_at": now, "paid_by": admin.get("email")}},
     )
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Payout introuvable ou déjà traité.")
+    return {"ok": True}
+
+
+@router.post("/admin/billing/payouts/{payout_id}/cancel")
+async def admin_cancel_payout(payout_id: str, admin: dict = Depends(require_admin)):
+    """Annule un payout pending (remet le solde chez le Concepteur)."""
+    now = datetime.now(timezone.utc).isoformat()
+    res = await db.ledger.update_one(
+        {"id": payout_id, "type": "payout", "status": "pending"},
+        {"$set": {"status": "cancelled", "cancelled_at": now, "cancelled_by": admin.get("email")}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Payout introuvable ou déjà traité.")
+    return {"ok": True}
+
+
+# ============ Admin notifications (payouts_ready toast) ============ #
+@router.get("/admin/notifications")
+async def admin_notifications(unread_only: bool = False, admin: dict = Depends(require_admin)):
+    q = {"read": False} if unread_only else {}
+    items = await db.admin_notifications.find(q, {"_id": 0}).sort("created_at", -1).limit(50).to_list(50)
+    return {"count": len(items), "items": items}
+
+
+@router.post("/admin/notifications/{notif_id}/read")
+async def admin_notification_mark_read(notif_id: str, admin: dict = Depends(require_admin)):
+    await db.admin_notifications.update_one({"id": notif_id}, {"$set": {"read": True}})
     return {"ok": True}
 
 
@@ -597,15 +729,36 @@ async def admin_payouts_sepa_xml(admin: dict = Depends(require_admin)):
 
 # ============ Order share ledger (triggered by Mollie webhook for paid orders) ============ #
 async def log_order_share_on_paid(order: dict):
-    """Called by Mollie webhook when order transitions to paid."""
+    """Called by Mollie webhook when order transitions to paid.
+
+    La part Concepteur = 50% × marge brute HT (CA HT − Prix d'achat HT).
+    Si la commande n'a pas les champs HT (ex: commande legacy), on les recalcule
+    à la volée avec les produits actuels comme fallback.
+    """
     operator_id = None
     site = await db.sites.find_one({"id": order.get("site_id")}, {"_id": 0})
     if site:
         operator_id = site.get("operator_id")
     if not operator_id:
         return
-    total = float(order.get("total") or 0)
-    share = round(total * 0.5, 2)
+
+    # Récupération des montants HT (snapshot à la commande)
+    revenue_ht = float(order.get("subtotal_ht") or 0)
+    cost_ht = float(order.get("cost_ht") or 0)
+    gross_margin_ht = float(order.get("gross_margin_ht") or 0)
+
+    # Fallback : recalcule à partir de `items` + VAT du site si snapshot absent
+    if gross_margin_ht == 0 and (revenue_ht == 0 or cost_ht == 0):
+        from tax_utils import site_vat_rate, compute_order_ht
+        vat_rate = site_vat_rate(site)
+        recomputed = compute_order_ht(order.get("items") or [], vat_rate)
+        revenue_ht = recomputed["subtotal_ht"]
+        cost_ht = recomputed["cost_ht"]
+        gross_margin_ht = recomputed["gross_margin_ht"]
+
+    # Part Concepteur : 50% de la marge brute (jamais négative)
+    share = round(max(0.0, gross_margin_ht) * 0.5, 2)
+
     await _log_ledger({
         "concepteur_id": operator_id,
         "site_id": order.get("site_id"),
@@ -615,7 +768,10 @@ async def log_order_share_on_paid(order: dict):
         "type": "order_share",
         "status": "paid",
         "amount": share,
-        "gross_order_total": total,
+        "revenue_ht": round(revenue_ht, 2),
+        "cost_ht": round(cost_ht, 2),
+        "gross_margin_ht": round(gross_margin_ht, 2),
+        "gross_order_total": float(order.get("total") or 0),
         "currency": order.get("currency") or "EUR",
-        "description": f"50% de la commande {order.get('order_number')}",
+        "description": f"50% marge brute HT commande {order.get('order_number')}",
     })

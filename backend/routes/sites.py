@@ -72,6 +72,7 @@ async def create_site(data: SiteCreateInput, user: dict = Depends(get_current_us
         "shopify_url": data.shopify_url or "",
         "operator_id": operator_id,
         "notes": data.notes or "",
+        "vat_rate": data.vat_rate,   # null → dérivé au moment du calcul
         "status": "active",
         "created_at": now,
         "created_by": user["id"],

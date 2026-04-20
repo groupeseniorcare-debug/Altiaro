@@ -17,6 +17,7 @@ import AdsCopy from "./pages/AdsCopy";
 import Empire from "./pages/Empire";
 import Billing from "./pages/Billing";
 import Orders from "./pages/Orders";
+import AdminPayouts from "./pages/AdminPayouts";
 import {
   StorefrontHome,
   StorefrontProduct,
@@ -154,6 +155,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Billing />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/payouts"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminPayouts />
               </ProtectedRoute>
             }
           />

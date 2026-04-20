@@ -17,14 +17,16 @@ class I18nText(BaseModel):
 class ProductCreateInput(BaseModel):
     name: I18nText
     description: Optional[I18nText] = Field(default_factory=I18nText)
-    price: float = 0
+    price: float = 0                           # Prix de vente TTC
+    cost_price_ht: float = 0                   # Prix d'achat HT (fournisseur)
+    vat_rate: Optional[float] = None           # Override ex: 0.20 (sinon taux du site)
     compare_at_price: Optional[float] = None
     currency: str = "EUR"
     images: List[str] = Field(default_factory=list)
-    stock: Optional[int] = None  # None = illimité (dropshipping)
+    stock: Optional[int] = None                # None = illimité (dropshipping)
     supplier_url: str = ""
     sku: str = ""
-    status: str = "active"  # active | draft | archived
+    status: str = "active"                     # active | draft | archived
     featured: bool = False
 
 
@@ -32,6 +34,8 @@ class ProductUpdateInput(BaseModel):
     name: Optional[I18nText] = None
     description: Optional[I18nText] = None
     price: Optional[float] = None
+    cost_price_ht: Optional[float] = None
+    vat_rate: Optional[float] = None
     compare_at_price: Optional[float] = None
     currency: Optional[str] = None
     images: Optional[List[str]] = None

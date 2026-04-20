@@ -1,0 +1,38 @@
+{
+  "summary": "Sprint 13 — Système de virements bi-mensuels (payouts) testé end-to-end. Backend : 17/17 tests pytest PASSING (test_iteration12_payouts.py). Régression iter11 : 21/21 PASSING. Frontend : page /admin/payouts entièrement fonctionnelle avec 3 onglets (À effectuer, Aperçu prochain cycle, Historique), 4 KPI cards (À VIRER MAINTENANT, APERÇU PROCHAIN CYCLE, PROCHAIN CYCLE AUTOMATIQUE, DÉJÀ VERSÉ), boutons refresh-btn + run-payouts-btn présents. Nav sidebar admin contient bien le lien 'Virements' avec data-testid=nav-admin-payouts. Concepteur ne voit PAS ce lien et est redirigé sur '/' s'il accède directement à /admin/payouts. SiteProducts modal de création produit affiche correctement le champ 'Prix d'achat HT fournisseur (€)' + preview live 'Marge HT 0.00€ (0%) | 50% Concepteur : 0.00€'. Toutes les 13 features demandées validées. Calculs vérifiés : produit 120€ TTC + cost 35€ HT × 2 unités → subtotal_ht=200, cost_ht=70, gross_margin_ht=130, share=65€ (50% × marge brute HT, PAS 50% × TTC).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration12_payouts.py",
+    "/app/test_reports/pytest/iter12.xml"
+  ],
+  "action_items": [
+    "(NICE-TO-HAVE) /admin/payouts : quand un onglet est vide, l'empty-state remplace [data-testid=preview-list] / [data-testid=history-table]. C'est OK fonctionnellement mais les data-testid ne sont visibles QUE si la liste a au moins 1 élément. Considérer ajouter le testid sur le wrapper parent pour faciliter les futurs tests E2E.",
+    "(LOW) Bouton 'Générer les virements du cycle' apparait grisé avec 0 lignes en aperçu — vérifier le flow quand le preview redevient non-vide après marquage 'paid' partiel."
+  ],
+  "critical_code_review_comments": [
+    "routes/billing.py admin_payouts_preview & log_order_share_on_paid : la formule 50% × gross_margin_ht est correctement implémentée et testée. Bon point : le fallback compute_order_ht recalcule à la volée si le snapshot HT est absent (legacy orders).",
+    "routes/billing.py _compute_balance ligne 329-330 : payouts_total inclut payouts 'paid' ET 'pending', donc dès qu'on lance run-payouts, le concepteur disparaît du preview même avant que l'admin marque le payout comme payé. C'est correct (évite double-issue) mais une UI clarification 'Payout en cours' serait utile.",
+    "routes/billing.py admin_payouts_history utilise db.users.find_one({'_id': ObjectId(uid)}) — assume tous les concepteur_id du ledger sont des ObjectId-strings. log_order_share_on_paid stocke operator_id qui vient de site.operator_id ; vérifier que ce dernier est bien str(ObjectId) cohérent partout.",
+    "Pas de rate-limit sur POST /admin/billing/run-payouts — un admin pourrait spam le bouton et créer des doublons de payouts pending. Heureusement net_due tombe à 0 après le 1er run donc pas de doublon réel, mais à confirmer en cas de race condition.",
+    "AdminPayouts.jsx : run_payouts utilise window.confirm() — bloque le test E2E automatique. Suggérer un modal shadcn AlertDialog avec data-testid pour faciliter les futurs tests.",
+    "AdminPayouts.jsx ligne 60-69 : pas de loading state visible sur le bouton 'Générer' pendant le call API (juste running=true en interne). Ajouter un spinner ou texte 'Génération…' visible."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration12_payouts.py (NEW — 17 tests, 100% pass)"
+  ],
+  "success_rate": {"backend": "100% (17/17 iter12 + 21/21 iter11 regression)", "frontend": "100% sur tous les flows critiques validés"},
+  "test_credentials": "admin@conceptfactory.fr / Factory2026! et concepteur@conceptfactory.fr / Concepteur2026! — tous deux opérationnels. Marie a toujours son IBAN FR1420041010050500013M02606 enregistré.",
+  "seed_data_creation": "Tests créent puis nettoient : 2 produits TEST_S13 (sku TEST-S13-A, TEST-S13-ORDER), 1 commande publique 240€ TTC (2×120€), 1 ledger entry order_share=65€, 1 payout pending=65€ (mark-paid puis nouveau pending pour cancel test), 1 user fictif TEST_NOIBAN_xxx + ledger entry pour test skip-no-iban, 1 admin_notification TEST_S13_NOTIF. Cleanup automatique en fin de module + cleanup manuel post-pytest pour retirer les payouts résiduels (1 payout pending de 130€ supprimé manuellement après tests UI).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Sprint 13 production-ready. Tous les endpoints payouts testés (preview/run/mark-paid/cancel/history/notifications). Le flow complet validé : produit avec cost_price_ht → commande publique snapshote cost_ht/gross_margin_ht/vat_rate → log_order_share_on_paid (déclenchable directement via import depuis routes.billing) crée ledger entry avec amount=50%×gross_margin_ht → admin_payouts_preview agrège par concepteur avec site_breakdown → run-payouts crée payout pending si has_iban → mark-paid/cancel transitionne → history retourne enrichi avec concepteur_name/email. data-testids vérifiés UI : nav-admin-payouts, kpi-to-pay, refresh-btn, run-payouts-btn, pending-table, preview-list (visible si >0 rows), history-table (visible si >0 rows). VAT auto-déduction par pays validée (FR=0.20, DE=0.19, BE/NL=0.21, UK=0.20, CH=0.077, default=0.20). Concepteur 403 sur tous endpoints admin/billing.",
+  "rca of the issue": "Aucun bug bloquant identifié. La fonctionnalité Sprint 13 est correctement implémentée et conforme à la spec. Le test E2E manuel de l'agent principal (produit 120€ TTC + cost 35€ HT × 2u → gross_margin_ht=130 → share=65) a été reproduit avec succès dans test_iteration12_payouts.py::TestPublicOrderHT + TestLogOrderShareOnPaid."
+}

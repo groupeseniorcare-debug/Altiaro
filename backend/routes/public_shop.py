@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Request
 from deps import db
 from models_shop import OrderCreateInput
 from seed_niches import COUNTRIES
+from tax_utils import site_vat_rate, compute_order_ht
 
 router = APIRouter(prefix="/public")
 
@@ -75,17 +76,20 @@ async def public_create_order(site_id: str, data: OrderCreateInput, request: Req
             detail="Trop de commandes depuis cette adresse. Réessayez dans 10 minutes."
         )
 
-    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "id": 1, "name": 1})
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
     if not site:
         raise HTTPException(status_code=404, detail="Site introuvable")
     if not data.items:
         raise HTTPException(status_code=400, detail="Panier vide")
 
+    vat_rate = site_vat_rate(site)
+
     canonical_items = []
     for item in data.items:
         prod = await db.products.find_one(
             {"id": item.product_id, "site_id": site_id, "status": "active"},
-            {"_id": 0, "price": 1, "currency": 1, "name": 1, "images": 1}
+            {"_id": 0, "price": 1, "currency": 1, "name": 1, "images": 1,
+             "cost_price_ht": 1, "vat_rate": 1, "sku": 1}
         )
         if not prod:
             raise HTTPException(
@@ -95,16 +99,20 @@ async def public_create_order(site_id: str, data: OrderCreateInput, request: Req
         canonical_items.append({
             "product_id": item.product_id,
             "name": item.name,
-            "price": prod["price"],
+            "sku": prod.get("sku") or "",
+            "price": prod["price"],                         # TTC
+            "cost_price_ht": float(prod.get("cost_price_ht") or 0),   # snapshot achat HT
+            "item_vat_rate": prod.get("vat_rate"),          # override line-level si défini
             "quantity": item.quantity,
             "currency": prod.get("currency", "EUR"),
             "image": (prod.get("images") or [None])[0],
         })
 
-    subtotal = sum(it["price"] * it["quantity"] for it in canonical_items)
+    ht_breakdown = compute_order_ht(canonical_items, vat_rate)
+    subtotal = ht_breakdown["subtotal_ttc"]
     shipping_fee = 0 if subtotal >= 50 else 4.90
-    tax = 0
-    total = round(subtotal + shipping_fee + tax, 2)
+    tax = round(subtotal - ht_breakdown["subtotal_ht"], 2)   # TVA collectée
+    total = round(subtotal + shipping_fee, 2)
 
     now = datetime.now(timezone.utc)
     order_number = f"CF-{int(now.timestamp())}-{secrets.token_hex(2).upper()}"
@@ -119,7 +127,11 @@ async def public_create_order(site_id: str, data: OrderCreateInput, request: Req
         "shipping_address": data.shipping_address.model_dump(),
         "language": data.language,
         "notes": data.notes or "",
-        "subtotal": round(subtotal, 2),
+        "vat_rate": vat_rate,
+        "subtotal": subtotal,
+        "subtotal_ht": ht_breakdown["subtotal_ht"],
+        "cost_ht": ht_breakdown["cost_ht"],
+        "gross_margin_ht": ht_breakdown["gross_margin_ht"],
         "shipping_fee": shipping_fee,
         "tax": tax,
         "total": total,

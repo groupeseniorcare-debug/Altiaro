@@ -34,6 +34,7 @@ const emptyProduct = () => ({
   name: { fr: "", en: "", de: "", nl: "" },
   description: { fr: "", en: "", de: "", nl: "" },
   price: 0,
+  cost_price_ht: 0,
   compare_at_price: null,
   currency: "EUR",
   images: [""],
@@ -265,8 +266,26 @@ export default function SiteProducts() {
                     {p.name?.fr || "(sans nom)"}
                   </div>
                   <div className="text-sm text-[#57534E] mt-1">
-                    {p.price}€ {p.compare_at_price ? `(avant ${p.compare_at_price}€)` : ""}
+                    {p.price}€ TTC {p.compare_at_price ? `(avant ${p.compare_at_price}€)` : ""}
                   </div>
+                  {p.cost_price_ht > 0 && (
+                    <div className="text-[11px] text-[#78716C] mt-0.5 flex items-center gap-1.5">
+                      <span>Achat&nbsp;: {p.cost_price_ht}€ HT</span>
+                      {(() => {
+                        const ht = p.price / 1.2;
+                        const m = ht - (p.cost_price_ht || 0);
+                        const pct = ht > 0 ? (m / ht) * 100 : 0;
+                        return (
+                          <span
+                            className="font-medium"
+                            style={{ color: m <= 0 ? "#BE123C" : pct < 30 ? "#854D0E" : "#047857" }}
+                          >
+                            · Marge {m.toFixed(2)}€ ({pct.toFixed(0)}%)
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 mt-3">
                     <button
                       onClick={() => setEditing(p)}
@@ -440,6 +459,7 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
       name: form.name,
       description: form.description,
       price: parseFloat(form.price) || 0,
+      cost_price_ht: parseFloat(form.cost_price_ht) || 0,
       compare_at_price: form.compare_at_price ? parseFloat(form.compare_at_price) : null,
       currency: form.currency || "EUR",
       images: form.images.filter(Boolean),
@@ -522,7 +542,7 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
           {/* Price */}
           <div className="grid grid-cols-2 gap-4">
             <Field
-              label="Prix (€) *"
+              label="Prix de vente TTC (€) *"
               type="number"
               value={form.price}
               onChange={(v) => setForm({ ...form, price: v })}
@@ -530,12 +550,25 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
               required
             />
             <Field
-              label="Prix barré (optionnel)"
+              label="Prix barré TTC (optionnel)"
               type="number"
               value={form.compare_at_price || ""}
               onChange={(v) => setForm({ ...form, compare_at_price: v })}
               testId="compare-price"
             />
+          </div>
+
+          {/* Cost price HT + margin preview */}
+          <div className="grid grid-cols-2 gap-4">
+            <Field
+              label="Prix d'achat HT fournisseur (€) *"
+              type="number"
+              value={form.cost_price_ht}
+              onChange={(v) => setForm({ ...form, cost_price_ht: v })}
+              testId="cost-price-ht"
+              required
+            />
+            <MarginPreview price={form.price} costHt={form.cost_price_ht} />
           </div>
 
           {/* Images */}
@@ -634,6 +667,27 @@ function Field({ label, value, onChange, type = "text", required, testId }) {
         data-testid={`field-${testId}`}
         className="w-full h-11 px-4 rounded-xl border border-[#E7E5E4] bg-white focus:ring-2 focus:ring-[#B84B31]/30 focus:border-[#B84B31] outline-none"
       />
+    </div>
+  );
+}
+
+function MarginPreview({ price, costHt, vatRate = 0.20 }) {
+  const p = parseFloat(price) || 0;
+  const c = parseFloat(costHt) || 0;
+  const ht = p > 0 ? p / (1 + vatRate) : 0;
+  const margin = ht - c;
+  const marginPct = ht > 0 ? (margin / ht) * 100 : 0;
+  const concepteur = margin > 0 ? margin * 0.5 : 0;
+  const color = margin <= 0 ? "#BE123C" : marginPct < 30 ? "#854D0E" : "#047857";
+  return (
+    <div className="h-11 px-3 rounded-xl border border-dashed border-[#E7E5E4] bg-[#FDFBF7] flex items-center" data-testid="margin-preview">
+      <div className="text-[11px] text-[#78716C] mr-2">Marge HT</div>
+      <div className="font-heading tabular-nums text-sm font-semibold" style={{ color }}>
+        {margin.toFixed(2)}€ ({marginPct.toFixed(0)}%)
+      </div>
+      <div className="text-[11px] text-[#78716C] ml-auto">
+        50% Concepteur&nbsp;: <span className="font-medium text-[#1C1917]">{concepteur.toFixed(2)}€</span>
+      </div>
     </div>
   );
 }

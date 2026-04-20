@@ -156,7 +156,7 @@ async def startup():
     try:
         from apscheduler.schedulers.asyncio import AsyncIOScheduler
         from apscheduler.triggers.cron import CronTrigger
-        from routes.billing import _run_weekly_debits_inner, admin_payouts_preview
+        from routes.billing import _run_weekly_debits_inner, admin_payouts_preview, admin_run_payouts
 
         scheduler = AsyncIOScheduler(timezone="UTC")
 
@@ -168,15 +168,27 @@ async def startup():
             except Exception:
                 logger.exception("[scheduler] weekly debits failed")
 
-        async def _scheduled_bimonthly_payouts_preview():
-            """On 1st and 15th we only LOG the preview — admin triggers the actual payouts manually."""
-            logger.info("[scheduler] bimonthly payouts preview")
+        async def _scheduled_bimonthly_payouts_run():
+            """Le 1er et 15 du mois à 03h UTC : calcule la preview + crée
+            automatiquement les entrées 'payout pending' dans le ledger afin que
+            l'Admin voie directement la liste des virements à effectuer."""
+            logger.info("[scheduler] bimonthly payouts — auto generate pending entries")
             try:
-                # Insert system log ledger row so admin sees alert
-                preview = await admin_payouts_preview({"role": "admin", "id": "scheduler", "email": "system"})
-                logger.info(f"[scheduler] payouts preview : total_due={preview.get('total_due_eur')}")
+                fake_admin = {"role": "admin", "id": "scheduler", "email": "system"}
+                result = await admin_run_payouts(fake_admin)
+                # Notification (toast) — stocke un log d'alerte pour l'admin
+                from datetime import datetime as _dt, timezone as _tz
+                await db.admin_notifications.insert_one({
+                    "id": str(__import__("uuid").uuid4()),
+                    "type": "payouts_ready",
+                    "payouts_created": result.get("payouts_created", 0),
+                    "total_eur": result.get("total_eur", 0),
+                    "read": False,
+                    "created_at": _dt.now(_tz.utc).isoformat(),
+                })
+                logger.info(f"[scheduler] bimonthly payouts : {result}")
             except Exception:
-                logger.exception("[scheduler] payouts preview failed")
+                logger.exception("[scheduler] bimonthly payouts run failed")
 
         # Monday 03:00 UTC
         scheduler.add_job(
@@ -186,13 +198,13 @@ async def startup():
         )
         # 1st and 15th of every month at 03:00 UTC
         scheduler.add_job(
-            _scheduled_bimonthly_payouts_preview,
+            _scheduled_bimonthly_payouts_run,
             CronTrigger(day="1,15", hour=3, minute=0),
-            id="bimonthly_payouts_preview", replace_existing=True, misfire_grace_time=3600,
+            id="bimonthly_payouts", replace_existing=True, misfire_grace_time=3600,
         )
         scheduler.start()
         app.state.scheduler = scheduler
-        logger.info("APScheduler started : weekly_debits (Mon 03:00 UTC) + bimonthly_payouts_preview (1st/15th 03:00 UTC)")
+        logger.info("APScheduler started : weekly_debits (Mon 03:00 UTC) + bimonthly_payouts (1st/15th 03:00 UTC)")
     except Exception:
         logger.exception("Failed to start APScheduler")
 
