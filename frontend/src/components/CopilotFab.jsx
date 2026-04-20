@@ -201,29 +201,35 @@ export default function CopilotFab({ user }) {
                   </div>
                 ) : (
                   sessions.map((s) => (
-                    <button
+                    <div
                       key={s.session_id}
-                      onClick={() => loadSession(s.session_id)}
-                      data-testid={`copilot-session-${s.session_id}`}
-                      className={`w-full text-left p-2 rounded-lg mb-1 flex items-start gap-2 hover:bg-white transition ${
-                        s.session_id === sessionId ? "bg-white border border-[#B84B31]/30" : ""
+                      className={`w-full p-2 rounded-lg mb-1 flex items-start gap-2 transition ${
+                        s.session_id === sessionId ? "bg-white border border-[#B84B31]/30" : "hover:bg-white"
                       }`}
                     >
-                      <div className="flex-1 min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => loadSession(s.session_id)}
+                        data-testid={`copilot-session-${s.session_id}`}
+                        className="flex-1 min-w-0 text-left"
+                      >
                         <div className="text-xs font-medium text-[#1C1917] truncate">
                           {s.last_message_preview || "(vide)"}
                         </div>
                         <div className="text-[10px] text-[#78716C]">
                           {s.message_count} msgs · {s.last_at ? new Date(s.last_at).toLocaleString("fr-FR") : ""}
                         </div>
-                      </div>
+                      </button>
                       <button
+                        type="button"
                         onClick={(e) => deleteSession(s.session_id, e)}
-                        className="w-6 h-6 rounded hover:bg-[#FFE4E6] text-[#BE123C] flex items-center justify-center"
+                        data-testid={`copilot-session-delete-${s.session_id}`}
+                        className="w-6 h-6 rounded hover:bg-[#FFE4E6] text-[#BE123C] flex items-center justify-center shrink-0"
+                        aria-label="Supprimer la conversation"
                       >
                         <Trash size={12} />
                       </button>
-                    </button>
+                    </div>
                   ))
                 )}
               </div>

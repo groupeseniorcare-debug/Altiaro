@@ -3,9 +3,16 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
-## 2026-04-20 · Sprint 10 : PRD split + AI Copilot
-- **📚 Split documentation** : PRD.md (exigences statiques) + CHANGELOG.md (ce fichier, historique) + ROADMAP.md (backlog priorisé). Plus lisible au fil des sprints.
-- **🤖 AI Copilot** : assistant conversationnel Claude Sonnet 4.5 avec function calling. Intégré sur toutes les pages via un bouton flottant. Le Concepteur peut demander en langage naturel : "Liste mes sites", "Quelle est ma meilleure famille scalée ?", "Augmente le prix de tous mes produits DE de 10%", etc. Le Copilot exécute via tools scopés au rôle de l'utilisateur.
+## 2026-04-20 · Sprint 10 : PRD split + AI Copilot conversationnel
+- **📚 Documentation split** : PRD.md (exigences statiques) + CHANGELOG.md (ce fichier) + ROADMAP.md (backlog priorisé). Plus scalable dans le temps.
+- **🤖 AI Copilot conversationnel** : assistant Claude Sonnet 4.5 avec function calling maison (ReAct loop). `POST /api/copilot/chat` exécute jusqu'à 6 itérations tools → finale. 9 outils :
+  - `list_my_sites`, `get_site_details`, `get_site_orders`, `get_site_products`, `search_sites`, `list_scale_family` (lecture)
+  - `update_product_price`, `batch_update_prices` (écriture, ±50% max)
+  - `empire_overview` (admin only)
+- **📝 Sessions persistées** dans `copilot_messages` (user-scoped, ts_seq ordonné). Endpoints : `GET/DELETE /api/copilot/sessions(/id)` + `GET /api/copilot/tools`.
+- **🎨 UI Copilot FAB** : bouton flottant bottom-20 right-6 gradient noir sur toutes les pages authentifiées, slide-over panel avec header, suggestions de démarrage, input multi-line, historique des sessions avec preview + delete, tool trace expandable sous chaque message assistant.
+- **🔒 Auto-correction** : quand Claude hallucine un nom d'outil, le backend renvoie `{error, hint: [tools_list]}` et Claude se corrige au tour suivant (testé live).
+- Tests : 16/16 iter9 + 44/44 régression = **60/60** + 100% frontend E2E (iteration_9.json, 1 low-priority warning résolu : nested button fix).
 
 ## 2026-04-20 · Sprint 9 : Dashboard Empire + Mega-Block Execute
 - **🏛️ GET `/api/admin/empire`** (admin only) : agrège temps réel tous les sites. KPIs : GMV total, AOV, split 50/50 admin/concepteur, nb sites actifs, ads campaigns. Breakdown par pays (via shipping_address.country_code), familles scalées (scale_batch_id), top 5 produits cross-sites, timeseries 30j, alertes auto (no_orders_7d, domain_unverified, no_active_products, empty_catalog), commandes en attente.
