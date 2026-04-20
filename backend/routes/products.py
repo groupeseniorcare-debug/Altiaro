@@ -1,13 +1,19 @@
-"""Products CRUD per site."""
+"""Products CRUD per site + import from URL."""
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, HttpUrl
 
 from deps import db, get_current_user, _check_site_access
 from models_shop import ProductCreateInput, ProductUpdateInput
+from scraper import import_from_url
 
 router = APIRouter(prefix="/sites/{site_id}/products")
+
+
+class ImportInput(BaseModel):
+    url: HttpUrl
 
 
 @router.get("")
@@ -61,3 +67,41 @@ async def delete_product(site_id: str, product_id: str, user: dict = Depends(get
     await _check_site_access(site_id, user)
     await db.products.delete_one({"id": product_id, "site_id": site_id})
     return {"ok": True}
+
+
+@router.post("/import")
+async def import_product_from_url(site_id: str, data: ImportInput, user: dict = Depends(get_current_user)):
+    """Fetch a supplier URL and return a *draft* product (NOT persisted).
+    The frontend pre-fills the editor, the user reviews, then POSTs normally.
+    Supported best : Shopify, WooCommerce, sites exposant JSON-LD ou Open Graph.
+    AliExpress/CJ peuvent retourner des données partielles (JS rendering)."""
+    await _check_site_access(site_id, user)
+    try:
+        draft = await import_from_url(str(data.url))
+    except (TimeoutError, ValueError, RuntimeError) as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    # Shape it into ProductCreateInput format
+    name_text = draft.get("name", "")[:200]
+    desc_text = draft.get("description", "")[:4000]
+    return {
+        "draft": {
+            "name": {"fr": name_text, "en": name_text, "de": "", "nl": ""},
+            "description": {"fr": desc_text, "en": "", "de": "", "nl": ""},
+            "price": draft.get("price") or 0,
+            "currency": draft.get("currency") or "EUR",
+            "images": draft.get("images") or [],
+            "sku": draft.get("sku", ""),
+            "supplier_url": draft.get("source_url", ""),
+            "status": "draft",
+            "featured": False,
+            "stock": None,
+            "compare_at_price": None,
+        },
+        "source": {
+            "host": draft.get("source_host"),
+            "url": draft.get("source_url"),
+            "has_price": bool(draft.get("price")),
+            "images_found": len(draft.get("images") or []),
+        }
+    }

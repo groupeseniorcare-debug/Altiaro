@@ -39,6 +39,15 @@ SaaS multi-tenant d'e-commerce 100% custom (pas de Shopify) dédié à la **Silv
 
 ## What's been implemented
 
+### 2026-04-20 · Sprint 4 : Media & Import
+- **Scraper `/app/backend/scraper.py`** : fetch + extraction Open Graph + JSON-LD + Schema.org Product + fallback Shopify Analytics
+- **POST `/api/sites/{id}/products/import`** : renvoie un draft produit pré-rempli (name FR/EN, description, price, currency, images, sku, supplier_url) — **non persisté**, le frontend l'injecte dans l'editor
+- **POST `/api/uploads/image`** : upload image générique (jpg/png/webp/gif/avif, max 8 Mo), renvoie URL publique
+- Frontend : barre d'import URL au-dessus de la grille produits, composant `ImagesField` avec drag&drop, multi-upload, preview gallery, reorder, badge "Principale", fallback input URL
+- Testé : Allbirds (Shopify) → import complet (nom + 110$ + image + description). Patagonia/Google : partial fallback gracieux.
+
+---
+
 ### 2026-04-20 · Sprint 3 : Admin Ops Center + refactor
 - **5 endpoints admin ops** : `GET /admin/orders` (filtrable), `/stats`, `PATCH /admin/orders/{id}` (transitions validées), `GET /export.csv`
 - **Page frontend `/orders`** : stats cards (7 statuts), table avec recherche, slide-in détail avec historique + copy address + copy email + liens fournisseurs + transitions contextuelles
@@ -70,8 +79,8 @@ SaaS multi-tenant d'e-commerce 100% custom (pas de Shopify) dédié à la **Silv
 - [ ] **SAV workflow** : tickets, messages client, refunds partiels
 
 ### P1.5 — Améliorations produit (sans clé externe)
-- [ ] **Import DSers-like** : page pour coller URL AliExpress/CJ/BigBuy → parse auto
-- [ ] **Upload images** produits (remplacer URL manuelle)
+- [x] **Import DSers-like** ✅ (2026-04-20 sprint 4)
+- [x] **Upload images** ✅ (2026-04-20 sprint 4)
 - [ ] **Streaming CSV export** pour gros volumes (actuellement memory buffer 5000 rows max)
 
 ### P2 — Phase 6

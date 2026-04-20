@@ -12,7 +12,13 @@ import {
   X,
   CheckCircle,
   Star,
+  DownloadSimple,
+  UploadSimple,
+  Sparkle,
+  Image as ImageIcon,
 } from "@phosphor-icons/react";
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 const LANGS = [
   { code: "fr", label: "FR 🇫🇷" },
@@ -41,8 +47,10 @@ export default function SiteProducts() {
   const [site, setSite] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(null); // null | {..product} — edit/create
-  const backendUrl = process.env.REACT_APP_BACKEND_URL;
+  const [editing, setEditing] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importUrl, setImportUrl] = useState("");
+  const [importError, setImportError] = useState("");
 
   const load = useCallback(async () => {
     const [sRes, pRes] = await Promise.all([
@@ -64,6 +72,22 @@ export default function SiteProducts() {
     load();
   };
 
+  const handleImport = async () => {
+    if (!importUrl.trim()) return;
+    setImporting(true);
+    setImportError("");
+    const { data, error } = await apiCall(() =>
+      api.post(`/sites/${siteId}/products/import`, { url: importUrl.trim() })
+    );
+    setImporting(false);
+    if (error) {
+      setImportError(error);
+      return;
+    }
+    setImportUrl("");
+    setEditing(data.draft);
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -71,8 +95,6 @@ export default function SiteProducts() {
       </Layout>
     );
   }
-
-  const shopUrl = `${backendUrl.replace(/\/$/, "")}/shop/${siteId}`;
 
   return (
     <Layout>
@@ -92,8 +114,8 @@ export default function SiteProducts() {
             </div>
             <h1 className="font-heading text-4xl font-semibold text-[#1C1917]">Produits</h1>
             <p className="text-[#57534E] mt-2 max-w-xl">
-              Ajoute tes produits manuellement (l'import automatique DSers / CJ arrivera en Phase 4).
-              Les fiches multilingues FR/EN/DE/NL sont publiées sur la boutique publique.
+              Importe depuis une URL fournisseur ou crée tes produits à la main.
+              Fiches multilingues FR/EN/DE/NL publiées sur la boutique publique.
             </p>
           </div>
           <div className="flex gap-2">
@@ -114,6 +136,48 @@ export default function SiteProducts() {
               <Plus size={16} weight="bold" /> Nouveau produit
             </button>
           </div>
+        </div>
+
+        {/* Import from URL bar */}
+        <div className="bg-white rounded-2xl border border-[#E7E5E4] p-5 mb-6" data-testid="import-url-bar">
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkle size={16} weight="fill" className="text-[#B84B31]" />
+            <div className="font-heading text-sm font-semibold text-[#1C1917]">
+              Import rapide depuis une URL fournisseur
+            </div>
+            <div className="text-xs text-[#78716C]">
+              · Shopify / WooCommerce / sites structurés (JSON-LD, Open Graph)
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={importUrl}
+              onChange={(e) => setImportUrl(e.target.value)}
+              placeholder="https://fournisseur.com/produits/..."
+              data-testid="import-url-input"
+              onKeyDown={(e) => e.key === "Enter" && handleImport()}
+              className="flex-1 h-11 px-4 rounded-xl border border-[#E7E5E4] bg-[#FDFBF7] focus:ring-2 focus:ring-[#B84B31]/30 focus:border-[#B84B31] outline-none text-sm"
+            />
+            <button
+              onClick={handleImport}
+              disabled={importing || !importUrl.trim()}
+              data-testid="import-url-submit"
+              className="h-11 px-5 rounded-xl bg-[#1C1917] hover:bg-[#44403C] text-white text-sm font-medium flex items-center gap-2 transition disabled:opacity-50"
+            >
+              {importing ? (
+                "Analyse..."
+              ) : (
+                <>
+                  <DownloadSimple size={16} weight="bold" /> Importer
+                </>
+              )}
+            </button>
+          </div>
+          {importError && (
+            <div className="mt-3 px-3 py-2 rounded-lg bg-[#FFE4E6] text-[#BE123C] text-sm" data-testid="import-error">
+              {importError}
+            </div>
+          )}
         </div>
 
         {products.length === 0 ? (
@@ -219,17 +283,6 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
 
   const setI18n = (field, lang, value) => {
     setForm((f) => ({ ...f, [field]: { ...f[field], [lang]: value } }));
-  };
-
-  const setImage = (idx, url) => {
-    const imgs = [...form.images];
-    imgs[idx] = url;
-    setForm({ ...form, images: imgs });
-  };
-  const addImage = () => setForm({ ...form, images: [...form.images, ""] });
-  const removeImage = (idx) => {
-    const imgs = form.images.filter((_, i) => i !== idx);
-    setForm({ ...form, images: imgs.length ? imgs : [""] });
   };
 
   const submit = async (e) => {
@@ -339,41 +392,10 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
           </div>
 
           {/* Images */}
-          <div>
-            <label className="block text-[13px] font-medium text-[#1C1917] mb-1.5">
-              Images (URL)
-            </label>
-            <div className="space-y-2">
-              {form.images.map((url, idx) => (
-                <div key={idx} className="flex gap-2">
-                  <input
-                    value={url}
-                    onChange={(e) => setImage(idx, e.target.value)}
-                    placeholder="https://…"
-                    data-testid={`image-${idx}`}
-                    className="flex-1 h-11 px-4 rounded-xl border border-[#E7E5E4] bg-white focus:ring-2 focus:ring-[#B84B31]/30 focus:border-[#B84B31] outline-none"
-                  />
-                  {form.images.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeImage(idx)}
-                      className="h-11 w-11 rounded-xl border border-[#E7E5E4] hover:border-[#BE123C] hover:text-[#BE123C] transition"
-                    >
-                      <Trash size={16} className="mx-auto" />
-                    </button>
-                  )}
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={addImage}
-                className="text-sm text-[#B84B31] hover:underline"
-                data-testid="add-image"
-              >
-                + Ajouter une image
-              </button>
-            </div>
-          </div>
+          <ImagesField
+            images={form.images}
+            onChange={(imgs) => setForm({ ...form, images: imgs.length ? imgs : [""] })}
+          />
 
           {/* Extras */}
           <div className="grid grid-cols-2 gap-4">
@@ -468,3 +490,194 @@ function Field({ label, value, onChange, type = "text", required, testId }) {
     </div>
   );
 }
+
+/* ================================================================
+ * ImagesField — gallery with upload + URL dual mode, drag&drop reorder
+ * ================================================================ */
+function ImagesField({ images, onChange }) {
+  const [uploading, setUploading] = useState(false);
+  const [urlInput, setUrlInput] = useState("");
+  const [error, setError] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = React.useRef(null);
+
+  const clean = images.filter(Boolean);
+
+  const handleFiles = async (files) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    setError("");
+    const uploaded = [];
+    for (const file of Array.from(files)) {
+      const fd = new FormData();
+      fd.append("file", file);
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/uploads/image`, {
+          method: "POST",
+          credentials: "include",
+          body: fd,
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          setError(err.detail || `Upload échoué (HTTP ${res.status})`);
+          continue;
+        }
+        const data = await res.json();
+        uploaded.push(`${BACKEND_URL}${data.url}`);
+      } catch (e) {
+        setError("Erreur réseau durant l'upload.");
+      }
+    }
+    setUploading(false);
+    if (uploaded.length) {
+      onChange([...clean, ...uploaded]);
+    }
+  };
+
+  const addFromUrl = () => {
+    if (!urlInput.trim()) return;
+    onChange([...clean, urlInput.trim()]);
+    setUrlInput("");
+  };
+
+  const remove = (idx) => {
+    const next = clean.filter((_, i) => i !== idx);
+    onChange(next);
+  };
+
+  const move = (from, to) => {
+    if (from === to || to < 0 || to >= clean.length) return;
+    const next = [...clean];
+    const [m] = next.splice(from, 1);
+    next.splice(to, 0, m);
+    onChange(next);
+  };
+
+  return (
+    <div data-testid="images-field">
+      <label className="block text-[13px] font-medium text-[#1C1917] mb-1.5">
+        Images <span className="text-[#78716C] font-normal">· La 1ère est l'image principale</span>
+      </label>
+
+      {/* Gallery */}
+      {clean.length > 0 && (
+        <div className="grid grid-cols-4 gap-2 mb-3">
+          {clean.map((url, idx) => (
+            <div
+              key={`${url}-${idx}`}
+              data-testid={`image-thumb-${idx}`}
+              className="relative aspect-square rounded-lg overflow-hidden bg-[#F5F2EB] border border-[#E7E5E4] group"
+            >
+              <img src={url} alt="" className="w-full h-full object-cover" />
+              {idx === 0 && (
+                <div className="absolute top-1 left-1 bg-[#B84B31] text-white text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full">
+                  Principale
+                </div>
+              )}
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1 transition">
+                {idx > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => move(idx, idx - 1)}
+                    className="w-7 h-7 rounded-full bg-white text-[#1C1917] flex items-center justify-center text-xs hover:scale-110 transition"
+                    title="Remonter"
+                  >
+                    ←
+                  </button>
+                )}
+                {idx < clean.length - 1 && (
+                  <button
+                    type="button"
+                    onClick={() => move(idx, idx + 1)}
+                    className="w-7 h-7 rounded-full bg-white text-[#1C1917] flex items-center justify-center text-xs hover:scale-110 transition"
+                    title="Descendre"
+                  >
+                    →
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => remove(idx)}
+                  data-testid={`remove-image-${idx}`}
+                  className="w-7 h-7 rounded-full bg-white text-[#BE123C] flex items-center justify-center hover:scale-110 transition"
+                  title="Supprimer"
+                >
+                  <Trash size={12} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Dropzone */}
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          handleFiles(e.dataTransfer.files);
+        }}
+        onClick={() => fileRef.current?.click()}
+        data-testid="image-dropzone"
+        className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition ${
+          dragOver
+            ? "border-[#B84B31] bg-[#FDF4E7]"
+            : "border-[#E7E5E4] bg-[#FDFBF7] hover:border-[#B84B31]/50"
+        }`}
+      >
+        <UploadSimple size={24} weight="regular" className="mx-auto text-[#B84B31] mb-2" />
+        <div className="text-sm text-[#1C1917]">
+          {uploading ? (
+            "Upload en cours..."
+          ) : (
+            <>
+              <span className="font-medium">Clique ou dépose</span> des images (.jpg, .png, .webp · max 8 Mo)
+            </>
+          )}
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={(e) => handleFiles(e.target.files)}
+          data-testid="image-file-input"
+        />
+      </div>
+
+      {/* Alt : URL input */}
+      <div className="flex gap-2 mt-3">
+        <input
+          value={urlInput}
+          onChange={(e) => setUrlInput(e.target.value)}
+          placeholder="...ou colle une URL d'image (https://...)"
+          data-testid="image-url-input"
+          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addFromUrl())}
+          className="flex-1 h-10 px-3 rounded-lg border border-[#E7E5E4] bg-white focus:ring-2 focus:ring-[#B84B31]/30 focus:border-[#B84B31] outline-none text-sm"
+        />
+        <button
+          type="button"
+          onClick={addFromUrl}
+          data-testid="image-url-add"
+          disabled={!urlInput.trim()}
+          className="h-10 px-4 rounded-lg border border-[#E7E5E4] bg-white text-sm text-[#1C1917] hover:border-[#B84B31] disabled:opacity-40"
+        >
+          <ImageIcon size={14} className="inline mr-1" /> Ajouter
+        </button>
+      </div>
+
+      {error && (
+        <div className="mt-2 text-sm text-[#BE123C]" data-testid="image-error">
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+

@@ -29,6 +29,7 @@ from routes import public_shop as public_routes
 from routes import niches as niches_routes
 from routes import dashboard as dashboard_routes
 from routes import meta as meta_routes
+from routes import uploads as uploads_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,6 +51,7 @@ api.include_router(public_routes.router)
 api.include_router(niches_routes.router)
 api.include_router(dashboard_routes.router)
 api.include_router(meta_routes.router)
+api.include_router(uploads_routes.router)
 
 
 @app.on_event("startup")
