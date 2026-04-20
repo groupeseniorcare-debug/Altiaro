@@ -38,8 +38,8 @@ MONGO_URL = os.environ["MONGO_URL"]
 DB_NAME = os.environ["DB_NAME"]
 JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALGORITHM = "HS256"
-ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@launchos.fr")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Launch2026!")
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@conceptfactory.fr")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Factory2026!")
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 
@@ -49,7 +49,7 @@ db = client[DB_NAME]
 UPLOAD_DIR = ROOT_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="Launch OS API")
+app = FastAPI(title="Concept Factory API")
 api = APIRouter(prefix="/api")
 
 
@@ -462,22 +462,37 @@ async def update_step(step_id: str, data: StepUpdateInput, user: dict = Depends(
 
 @api.post("/steps/{step_id}/submit")
 async def submit_step(step_id: str, user: dict = Depends(get_current_user)):
+    """Le concepteur marque une étape comme terminée — auto-validation + unlock next.
+    Plus de gating admin sauf pour l'étape finale 'Notifier lancement Ads prêt'."""
     step = await db.steps.find_one({"id": step_id}, {"_id": 0})
     if not step:
         raise HTTPException(status_code=404, detail="Étape introuvable")
     await _check_site_access(step["site_id"], user)
-    if step["status"] not in ("in_progress", "rejected"):
-        raise HTTPException(status_code=400, detail="Étape non soumissible dans cet état")
+    if step["status"] == "locked":
+        raise HTTPException(status_code=400, detail="Étape verrouillée")
+    if step["status"] == "validated":
+        raise HTTPException(status_code=400, detail="Étape déjà validée")
     if not (step.get("deliverable_url") or step.get("deliverable_notes") or step.get("deliverable_files") or step.get("ai_response")):
-        raise HTTPException(status_code=400, detail="Ajoutez au moins un livrable (URL, notes, fichier ou réponse IA) avant de soumettre")
+        raise HTTPException(status_code=400, detail="Ajoutez au moins un livrable (URL, notes, fichier ou réponse IA) avant de valider")
+
+    now = datetime.now(timezone.utc).isoformat()
     await db.steps.update_one(
         {"id": step_id},
         {"$set": {
-            "status": "awaiting_validation",
-            "submitted_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "status": "validated",
+            "submitted_at": now,
+            "validated_at": now,
+            "validated_by": user["id"],
+            "updated_at": now,
         }},
     )
+    # unlock next step automatically
+    next_step = await db.steps.find_one({"site_id": step["site_id"], "number": step["number"] + 1})
+    if next_step and next_step["status"] == "locked":
+        await db.steps.update_one(
+            {"id": next_step["id"]},
+            {"$set": {"status": "in_progress", "updated_at": now}},
+        )
     return await db.steps.find_one({"id": step_id}, {"_id": 0})
 
 
@@ -633,8 +648,9 @@ async def upload_step_file(step_id: str, file: UploadFile = File(...), user: dic
 # ------------------------------------------------------------------ #
 @api.get("/validations")
 async def validation_queue(admin: dict = Depends(require_admin)):
-    steps = await db.steps.find({"status": "awaiting_validation"}, {"_id": 0}).sort("submitted_at", 1).to_list(200)
-    # enrich with site info
+    """Monitoring admin des étapes complétées récemment (lecture seule, pas de gating).
+    Utile pour auditer la qualité du travail des concepteurs."""
+    steps = await db.steps.find({"status": "validated"}, {"_id": 0}).sort("validated_at", -1).limit(100).to_list(100)
     site_ids = list({s["site_id"] for s in steps})
     sites = await db.sites.find({"id": {"$in": site_ids}}, {"_id": 0, "id": 1, "name": 1, "niche": 1}).to_list(200)
     sites_by_id = {s["id"]: s for s in sites}

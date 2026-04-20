@@ -416,9 +416,7 @@ export default function StepPanel({ step: initialStep, site, isAdmin, onClose, o
           {(step.status === "in_progress" || step.status === "rejected") && !readOnly && (
             <div className="flex items-center justify-between">
               <div className="text-xs text-[#78716C]">
-                {step.status === "rejected"
-                  ? "Corrigez et resoumettez pour validation."
-                  : "Renseignez vos livrables puis soumettez à validation."}
+                Renseignez vos livrables puis validez pour passer à l'étape suivante.
               </div>
               <div className="flex gap-3">
                 <button
@@ -434,10 +432,10 @@ export default function StepPanel({ step: initialStep, site, isAdmin, onClose, o
                   onClick={handleSubmit}
                   disabled={submitting}
                   data-testid="step-submit-btn"
-                  className="h-11 px-5 rounded-xl bg-[#B84B31] hover:bg-[#993D26] text-white font-medium transition flex items-center gap-2 active:scale-[0.98] disabled:opacity-60"
+                  className="h-11 px-5 rounded-xl bg-[#047857] hover:bg-[#065F46] text-white font-medium transition flex items-center gap-2 active:scale-[0.98] disabled:opacity-60"
                 >
-                  {submitting ? <Spinner size={16} className="animate-spin" /> : <PaperPlaneRight size={16} weight="fill" />}
-                  Soumettre à validation
+                  {submitting ? <Spinner size={16} className="animate-spin" /> : <CheckCircle size={16} weight="fill" />}
+                  Valider & continuer
                 </button>
               </div>
             </div>

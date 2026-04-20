@@ -10,7 +10,6 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  Hourglass,
   Storefront,
   Link as LinkIcon,
 } from "@phosphor-icons/react";
@@ -18,7 +17,7 @@ import {
 const STATUS_CONFIG = {
   locked: { label: "Verrouillée", icon: Lock, bg: "#F5F5F4", text: "#78716C" },
   in_progress: { label: "En cours", icon: Clock, bg: "#FEF3C7", text: "#B45309" },
-  awaiting_validation: { label: "À valider", icon: Hourglass, bg: "#E0F2FE", text: "#0369A1" },
+  awaiting_validation: { label: "Complétée", icon: CheckCircle, bg: "#D1FAE5", text: "#047857" },
   validated: { label: "Validée", icon: CheckCircle, bg: "#D1FAE5", text: "#047857" },
   rejected: { label: "À refaire", icon: XCircle, bg: "#FFE4E6", text: "#BE123C" },
   blocked: { label: "Bloquée", icon: XCircle, bg: "#FFE4E6", text: "#BE123C" },

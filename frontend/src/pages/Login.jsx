@@ -124,8 +124,8 @@ export default function Login() {
             <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-1.5">
               Accès administrateur (seed)
             </div>
-            <div className="font-mono text-[13px] text-[#1C1917]">admin@launchos.fr</div>
-            <div className="font-mono text-[13px] text-[#1C1917]">Launch2026!</div>
+            <div className="font-mono text-[13px] text-[#1C1917]">admin@conceptfactory.fr</div>
+            <div className="font-mono text-[13px] text-[#1C1917]">Factory2026!</div>
           </div>
         </div>
       </div>

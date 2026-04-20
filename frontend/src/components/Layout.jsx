@@ -20,11 +20,11 @@ export default function Layout({ children }) {
     { to: "/sites", label: "Sites", icon: SquaresFour, testId: "nav-sites" },
     ...(user?.role === "admin"
       ? [
-          { to: "/validations", label: "Validations", icon: CheckSquare, testId: "nav-validations" },
+          { to: "/validations", label: "Activité", icon: CheckSquare, testId: "nav-validations" },
           { to: "/finances", label: "Finances", icon: ChartLineUp, testId: "nav-finances" },
           { to: "/users", label: "Équipe", icon: Users, testId: "nav-users" },
         ]
-      : [{ to: "/finances", label: "Finances", icon: ChartLineUp, testId: "nav-finances" }]),
+      : [{ to: "/finances", label: "Mes paiements", icon: ChartLineUp, testId: "nav-finances" }]),
   ];
 
   const handleLogout = async () => {
@@ -45,10 +45,10 @@ export default function Layout({ children }) {
             </div>
             <div>
               <div className="font-heading font-semibold text-lg leading-tight text-[#1C1917]">
-                Launch OS
+                Concept Factory
               </div>
               <div className="text-[11px] uppercase tracking-widest text-[#78716C]">
-                Brand Factory
+                E-commerce Machine
               </div>
             </div>
           </div>
@@ -83,7 +83,7 @@ export default function Layout({ children }) {
             <div className="flex-1 min-w-0">
               <div className="text-[13.5px] font-medium text-[#1C1917] truncate">{user?.name}</div>
               <div className="text-[11px] uppercase tracking-wider text-[#78716C]">
-                {user?.role === "admin" ? "Administrateur" : "Opérateur"}
+                {user?.role === "admin" ? "Administrateur" : "Concepteur"}
               </div>
             </div>
             <button
