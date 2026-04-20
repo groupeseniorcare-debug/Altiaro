@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, apiCall } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import Layout from "../components/Layout";
 import { ArrowLeft, Rocket, Spinner } from "@phosphor-icons/react";
 
 export default function NewSite() {
+  const [searchParams] = useSearchParams();
   const [form, setForm] = useState({
-    name: "",
-    niche: "",
+    name: searchParams.get("name") || "",
+    niche: searchParams.get("niche") || "",
+    niche_slug: searchParams.get("niche_slug") || "",
     domain: "",
     shopify_url: "",
     operator_id: "",
@@ -32,7 +34,15 @@ export default function NewSite() {
     e.preventDefault();
     setSubmitting(true);
     setError("");
-    const payload = { ...form, operator_id: form.operator_id || null };
+    const payload = {
+      name: form.name,
+      niche: form.niche,
+      niche_slug: form.niche_slug || null,
+      domain: form.domain,
+      shopify_url: form.shopify_url,
+      operator_id: form.operator_id || null,
+      notes: form.notes,
+    };
     const { data, error: err } = await apiCall(() => api.post("/sites", payload));
     setSubmitting(false);
     if (err) {
@@ -63,6 +73,11 @@ export default function NewSite() {
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-[#E7E5E4] p-8 space-y-6" data-testid="new-site-form">
+          {form.niche_slug && (
+            <div className="px-4 py-3 rounded-lg bg-[#FDF4E7] border border-[#F5E0C3] text-sm text-[#854D0E]" data-testid="niche-prefill-banner">
+              🎯 Pré-rempli depuis le <strong>Niche Engine</strong> — niche « {form.niche} »
+            </div>
+          )}
           <div>
             <label className="block text-[13px] font-medium text-[#1C1917] mb-1.5">
               Nom de la marque *

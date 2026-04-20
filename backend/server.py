@@ -27,6 +27,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
 
 from seed_prompts import get_seed_steps_for_site, PROMPTS, PHASES
+from seed_niches import seed_niches, COUNTRIES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("launchos")
@@ -149,6 +150,7 @@ class UserCreateInput(BaseModel):
 class SiteCreateInput(BaseModel):
     name: str
     niche: str
+    niche_slug: Optional[str] = None
     domain: Optional[str] = ""
     shopify_url: Optional[str] = ""
     operator_id: Optional[str] = None
@@ -206,6 +208,16 @@ async def startup():
     await db.steps.create_index([("site_id", 1), ("number", 1)])
     await db.financials.create_index([("site_id", 1), ("month", 1)], unique=True)
     await db.login_attempts.create_index("identifier")
+    await db.niches.create_index("slug", unique=True)
+    await db.niches.create_index("rank")
+    await db.countries.create_index("code", unique=True)
+
+    # seed niche engine catalog (idempotent)
+    try:
+        seeded = await seed_niches(db)
+        logger.info(f"Seeded {seeded} niches in catalog")
+    except Exception:
+        logger.exception("Failed to seed niches catalog")
 
     # seed admin
     existing = await db.users.find_one({"email": ADMIN_EMAIL})
@@ -369,6 +381,7 @@ async def create_site(data: SiteCreateInput, admin: dict = Depends(require_admin
         "id": site_id,
         "name": data.name,
         "niche": data.niche,
+        "niche_slug": data.niche_slug or None,
         "domain": data.domain or "",
         "shopify_url": data.shopify_url or "",
         "operator_id": data.operator_id,
@@ -779,6 +792,34 @@ async def dashboard_kpis(user: dict = Depends(get_current_user)):
         "per_site": per_site,
         "monthly_trend": trend,
     }
+
+
+# ------------------------------------------------------------------ #
+# NICHE ENGINE (catalogue 20 niches × 6 pays)
+# ------------------------------------------------------------------ #
+@api.get("/niches")
+async def list_niches(user: dict = Depends(get_current_user)):
+    """Liste complète du catalogue de niches (triée par rank croissant)."""
+    niches = await db.niches.find({}, {"_id": 0}).sort("rank", 1).to_list(200)
+    return niches
+
+
+@api.get("/niches/{slug}")
+async def get_niche(slug: str, user: dict = Depends(get_current_user)):
+    niche = await db.niches.find_one({"slug": slug}, {"_id": 0})
+    if not niche:
+        raise HTTPException(status_code=404, detail="Niche introuvable")
+    return niche
+
+
+@api.get("/countries")
+async def list_countries(user: dict = Depends(get_current_user)):
+    """Liste des 6 pays supportés (référentiel)."""
+    countries = await db.countries.find({}, {"_id": 0}).sort("code", 1).to_list(20)
+    if not countries:
+        # Fallback si jamais la collection est vide
+        return COUNTRIES
+    return countries
 
 
 # ------------------------------------------------------------------ #

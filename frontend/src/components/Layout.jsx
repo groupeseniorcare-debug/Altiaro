@@ -9,6 +9,7 @@ import {
   Users,
   SignOut,
   Rocket,
+  Target,
 } from "@phosphor-icons/react";
 
 export default function Layout({ children }) {
@@ -18,6 +19,7 @@ export default function Layout({ children }) {
   const links = [
     { to: "/", label: "Tableau de bord", icon: House, testId: "nav-dashboard" },
     { to: "/sites", label: "Sites", icon: SquaresFour, testId: "nav-sites" },
+    { to: "/niches", label: "Niche Engine", icon: Target, testId: "nav-niches" },
     ...(user?.role === "admin"
       ? [
           { to: "/validations", label: "Activité", icon: CheckSquare, testId: "nav-validations" },

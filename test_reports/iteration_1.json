@@ -1,0 +1,41 @@
+{
+  "summary": "Full backend + frontend E2E testing of Concept Factory Niche Engine iteration. Backend 11/12 pytest tests passed (1 LLM test timed out at ingress 502 — LLM call exceeded preview ingress read-timeout; not a code bug, 402-budget code-path is correctly implemented). Frontend: login, /niches catalogue (20 niches, filters Toutes/Top 10/HERO), /niches/:slug detail (6-country table, FR leader highlighted, Lancer un site button), pre-fill + 'Pré-rempli' banner on /sites/new, and 404 on invalid slug all verified. Auth-gating (401 without cookie) confirmed. Auto-progression (step1 validated → step2 unlocked from locked→in_progress) confirmed without admin gating.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/steps/{id}/execute", "issue": "LLM call through preview ingress exceeds read-timeout (502) when EMERGENT_LLM_KEY is valid but response slow. The 402 budget-exhaustion branch is implemented correctly in code but could not be directly exercised (budget not actually exhausted during test). Consider adding a server-side timeout (~50s) with French error message to avoid ingress 502."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "NewSite form (operator dropdown)", "issues": ["React DOM warning: '<span> cannot be a child of <option>' — likely a country flag emoji wrapped in <span> inside <option>. Non-breaking but triggers hydration warning."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Wrap the emergentintegrations LlmChat.send_message call with asyncio.wait_for(..., timeout=50) in /app/backend/server.py execute_step_with_ai to convert long LLM calls into a graceful 504/408 with French message instead of bubbling up as an ingress 502.",
+    "(Optional, minor) Remove <span> wrapper around flag emoji inside <option> elements to eliminate React hydration warning."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 857 lines — approaching the 700-line split threshold. Consider splitting into routers (auth, sites, steps, niches, financials, dashboard).",
+    "Niche Engine endpoints do not honour role-based filtering — operators can see all 20 niches (intended per test_credentials.md, so OK).",
+    "login_attempts counter increments only on wrong password; consider also limiting on valid password to prevent enumeration (low priority).",
+    "execute_step_with_ai catches broad Exception — exception-string sniffing for budget detection is fragile; would be safer to inspect exception class/code from emergentintegrations if available."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/__init__.py"
+  ],
+  "success_rate": {"backend": "92%", "frontend": "100%"},
+  "test_credentials": "admin@conceptfactory.fr / Factory2026! (valid, from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Test-only site 'TEST_Niche Site Autoprog' and 'TEST_LLM' were created during step-progression test and deleted in teardown. No lingering data.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend tests live in /app/backend/tests/backend_test.py (pytest, auto-discovers BASE_URL from REACT_APP_BACKEND_URL). All niche/country/auth/site-creation/step-autoprog flows are covered. The LLM execute test currently asserts status in {200, 402, 401}; under the preview environment the call sometimes returns 502 due to ingress timeout — treat as environment flakiness, not regression.",
+  "rca of the issue": "LLM 502: the /api/steps/{id}/execute endpoint calls emergentintegrations which synchronously awaits the LLM provider. When the provider (LiteLLM → OpenAI/Anthropic) is slow or retries, total latency exceeds the Kubernetes ingress read-timeout (~60s), producing a 502 'preview environment not responding' response before FastAPI can return. The budget-exhausted (402) code-path is correctly implemented and would fire if the exception string contained 'budget' — verified by code review of server.py lines 600-613."
+}
