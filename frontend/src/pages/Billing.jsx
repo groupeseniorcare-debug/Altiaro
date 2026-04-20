@@ -238,11 +238,21 @@ function CardSection({ card, onSetup, onRemove }) {
           </button>
         </>
       ) : pending ? (
-        <div className="bg-[#FEF3C7] rounded-xl p-4 text-sm text-[#B45309] flex items-start gap-2">
-          <ArrowClockwise size={16} weight="fill" className="shrink-0 mt-0.5 animate-spin" />
-          <div>
-            Validation en cours… Reviens dans quelques instants.
+        <div>
+          <div className="bg-[#FEF3C7] rounded-xl p-4 text-sm text-[#B45309] flex items-start gap-2 mb-3">
+            <ArrowClockwise size={16} weight="fill" className="shrink-0 mt-0.5 animate-spin" />
+            <div>
+              Validation en cours… Reviens dans quelques instants.
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={onSetup}
+            data-testid="card-setup-retry"
+            className="w-full h-10 rounded-lg bg-white border border-[#E7E5E4] hover:border-[#B84B31] text-sm text-[#57534E] transition"
+          >
+            Relancer la validation
+          </button>
         </div>
       ) : (
         <>

@@ -3,6 +3,21 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-20 · Sprint 12 : Facturation Concepteurs (CB + IBAN + payouts) 💳
+- **🗂️ Espace Concepteur "Mon compte"** (`/billing`) :
+  - **Carte bancaire** via Mollie mandate (first payment 0.01€ en sequenceType=first → mandate_id stocké). CB affichée en carte noire gradient avec last4/brand + mode test/live.
+  - **IBAN + BIC + titulaire** avec validation `schwifty` (auto-détection BIC + nom banque). IBAN affiché masqué (FR76 XXXX XXXX XXXX XXXX 2606).
+  - **Balance** : 3 cartes (Ta part à recevoir en highlight gradient · Commandes encaissées · Dépenses pub prélevées)
+  - **Historique ledger** complet (order_share · ad_debit · payout) avec couleurs + pending badge.
+- **🔐 Activation Ads bloquée** sans CB : `POST /api/admin/sites/{id}/ads/activate` retourne 400 tant que l'opérateur n'a pas validé sa CB (exigence user).
+- **📅 APScheduler** démarré au boot backend :
+  - Lundi 03:00 UTC → prélèvement 50% dépense pub 7j pour chaque site `ads_active` (via Mollie recurring payment sur le mandate).
+  - 1er + 15 de chaque mois 03:00 UTC → preview des payouts (log dans les stats admin).
+- **📊 Admin Billing Cockpit** : `GET /api/admin/billing/overview`, `payouts-preview`, `run-payouts`, `payouts/sepa-xml` (export PAIN.001.001.03 pour virement bancaire groupé).
+- **🪙 Ledger auto** : à chaque commande `paid` via webhook Mollie → `order_share` 50% crédité au Concepteur. À chaque `batch_update_prices` → pas encore de ledger (tracking orders only pour l'instant).
+- Tests : 23/23 pytest iter11 + 13/13 régression iter10 = **36/36 backend** + 100% frontend E2E (iteration_11.json).
+- 2 fixes post-test : `DELETE /billing/card` clear aussi `pending_setup_payment_id` + bouton "Relancer la validation" sur état pending.
+
 ## 2026-04-20 · Sprint 11 : Phase 5 — Paiement Mollie 💳
 - **💰 Intégration Mollie complète** (`mollie-api-python==3.9.1`) avec clés test/live + profile configurés via `.env` (MOLLIE_TEST_KEY, MOLLIE_LIVE_KEY, MOLLIE_PROFILE_ID, MOLLIE_MODE).
 - **3 endpoints Mollie** :

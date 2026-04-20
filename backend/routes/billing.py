@@ -156,6 +156,7 @@ async def billing_card_revoke(user: dict = Depends(get_current_user)):
             "card_last4": "",
             "card_brand": "",
             "mandate_created_at": "",
+            "pending_setup_payment_id": "",
         }},
     )
     return {"ok": True, "revoked": True}
