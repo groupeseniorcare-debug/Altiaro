@@ -1,0 +1,463 @@
+import React, { useState, useEffect } from "react";
+import { api, apiCall } from "../lib/api";
+import Layout from "../components/Layout";
+import { useAuth } from "../lib/auth";
+import {
+  CreditCard,
+  Bank,
+  CheckCircle,
+  Warning,
+  ArrowClockwise,
+  ArrowRight,
+  CaretRight,
+  Receipt,
+  Coins,
+  Info,
+  Trash,
+} from "@phosphor-icons/react";
+
+function formatEuro(v) {
+  return `${(v || 0).toFixed(2).replace(".", ",")}€`;
+}
+
+export default function Billing() {
+  const { user } = useAuth();
+  const [card, setCard] = useState(null);
+  const [iban, setIban] = useState(null);
+  const [balance, setBalance] = useState(null);
+  const [ledger, setLedger] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const isConcepteur = user?.role === "operator";
+
+  const load = async () => {
+    const [c, i, b, l] = await Promise.all([
+      apiCall(() => api.get("/billing/card")),
+      apiCall(() => api.get("/billing/iban")),
+      apiCall(() => api.get("/billing/balance")),
+      apiCall(() => api.get("/billing/ledger?limit=50")),
+    ]);
+    if (c.data) setCard(c.data);
+    if (i.data) setIban(i.data);
+    if (b.data) setBalance(b.data);
+    if (l.data) setLedger(l.data);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  // When user returns from Mollie with ?setup=done, reload
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("setup") === "done") {
+      // Poll for up to 30s to catch the webhook
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts += 1;
+        const { data } = await apiCall(() => api.get("/billing/card"));
+        if (data?.has_card) {
+          setCard(data);
+          clearInterval(poll);
+          window.history.replaceState({}, "", "/billing");
+        } else if (attempts > 15) {
+          clearInterval(poll);
+        }
+      }, 2000);
+    }
+  }, []);
+
+  const handleSetupCard = async () => {
+    const { data, error } = await apiCall(() => api.post("/billing/card/setup", {}));
+    if (error) { window.alert(error); return; }
+    window.location.href = data.checkout_url;
+  };
+
+  const handleRemoveCard = async () => {
+    if (!window.confirm("Retirer votre CB ? Les prélèvements hebdo seront suspendus.")) return;
+    await apiCall(() => api.delete("/billing/card"));
+    load();
+  };
+
+  if (loading) {
+    return <Layout><div className="p-8 text-[#78716C]">Chargement…</div></Layout>;
+  }
+
+  return (
+    <Layout>
+      <div className="p-6 md:p-12 max-w-5xl">
+        <div className="mb-8">
+          <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-2">
+            Facturation · {isConcepteur ? "Concepteur" : "Admin"}
+          </div>
+          <h1 className="font-heading text-4xl font-semibold text-[#1C1917]">
+            Mon compte & paiements
+          </h1>
+          <p className="text-[#57534E] mt-2 max-w-2xl">
+            Une CB pour que nous prélevions <strong>50% des dépenses pub</strong> chaque lundi quand
+            tes Ads tournent · Un RIB pour recevoir ta part <strong>le 1er et le 15</strong> de chaque mois.
+          </p>
+        </div>
+
+        {/* Balance hero */}
+        {balance && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <BalanceCard
+              testid="balance-net-due"
+              label="Ta part à recevoir"
+              value={formatEuro(Math.max(0, balance.net_due_to_concepteur))}
+              sub={balance.net_due_to_concepteur > 0 ? "Versé aux 1er et 15" : "Rien pour le moment"}
+              icon={Coins}
+              highlight
+            />
+            <BalanceCard
+              testid="balance-orders"
+              label="Commandes encaissées"
+              value={formatEuro(balance.order_share_total)}
+              sub="50% des ventes (parts cumulées)"
+              icon={Receipt}
+            />
+            <BalanceCard
+              testid="balance-ad-debits"
+              label="Dépenses pub prélevées"
+              value={formatEuro(balance.paid_ad_debits_total + balance.pending_ad_debits_total)}
+              sub={balance.pending_ad_debits_total > 0 ? `${formatEuro(balance.pending_ad_debits_total)} en attente` : "Réglées"}
+              icon={Receipt}
+            />
+          </div>
+        )}
+
+        {/* Card + IBAN */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+          <CardSection
+            card={card}
+            onSetup={handleSetupCard}
+            onRemove={handleRemoveCard}
+          />
+          <IbanSection iban={iban} onChange={load} />
+        </div>
+
+        {/* Ledger */}
+        <section className="bg-white rounded-2xl border border-[#E7E5E4] overflow-hidden" data-testid="ledger-section">
+          <div className="px-5 py-4 border-b border-[#E7E5E4] flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Receipt size={18} weight="duotone" className="text-[#B84B31]" />
+              <h2 className="font-heading text-sm font-semibold uppercase tracking-wider">
+                Historique ({ledger.length})
+              </h2>
+            </div>
+          </div>
+          {ledger.length === 0 ? (
+            <div className="px-5 py-12 text-center text-sm text-[#78716C]">
+              Aucun mouvement enregistré pour l'instant.
+            </div>
+          ) : (
+            <div className="divide-y divide-[#F5F2EB]">
+              {ledger.map((e) => (
+                <LedgerRow key={e.id} entry={e} />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </Layout>
+  );
+}
+
+
+function BalanceCard({ testid, label, value, sub, icon: Icon, highlight }) {
+  return (
+    <div
+      className={`rounded-2xl p-5 ${
+        highlight ? "bg-gradient-to-br from-[#1C1917] to-[#44403C] text-white" : "bg-white border border-[#E7E5E4]"
+      }`}
+      data-testid={testid}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <Icon size={14} weight="duotone" className={highlight ? "text-white/80" : "text-[#B84B31]"} />
+        <div className={`text-[10px] uppercase tracking-widest ${highlight ? "text-white/60" : "text-[#78716C]"}`}>
+          {label}
+        </div>
+      </div>
+      <div className={`font-heading text-3xl font-semibold ${highlight ? "text-white" : "text-[#1C1917]"}`}>
+        {value}
+      </div>
+      <div className={`text-xs mt-1.5 ${highlight ? "text-white/70" : "text-[#78716C]"}`}>
+        {sub}
+      </div>
+    </div>
+  );
+}
+
+
+function CardSection({ card, onSetup, onRemove }) {
+  const has = card?.has_card;
+  const pending = card?.status === "pending";
+
+  return (
+    <section className="bg-white rounded-2xl border border-[#E7E5E4] p-5" data-testid="card-section">
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#F5F2EB] flex items-center justify-center">
+            <CreditCard size={20} weight="duotone" className="text-[#B84B31]" />
+          </div>
+          <div>
+            <h2 className="font-heading text-lg font-semibold text-[#1C1917]">Carte bancaire</h2>
+            <p className="text-xs text-[#78716C]">Prélèvement hebdo · 50% dépense pub</p>
+          </div>
+        </div>
+        {has && (
+          <span className="px-2 py-0.5 rounded-full bg-[#D1FAE5] text-[#047857] text-[10px] uppercase tracking-wider font-semibold">
+            Validée
+          </span>
+        )}
+      </div>
+
+      {has ? (
+        <>
+          <div className="bg-gradient-to-br from-[#1C1917] to-[#44403C] text-white rounded-xl p-5 mb-4">
+            <div className="flex items-center justify-between mb-6">
+              <CreditCard size={24} weight="duotone" className="text-white/80" />
+              <span className="text-[10px] uppercase tracking-wider text-white/60">
+                {card.card_brand || "Carte"} · {card.mode === "live" ? "LIVE" : "TEST"}
+              </span>
+            </div>
+            <div className="font-mono text-lg tracking-widest">
+              •••• •••• •••• {card.card_last4 || "••••"}
+            </div>
+            <div className="text-xs text-white/60 mt-2">
+              Enregistrée le {card.setup_at ? new Date(card.setup_at).toLocaleDateString("fr-FR") : "—"}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onRemove}
+            data-testid="card-remove"
+            className="w-full h-10 rounded-lg bg-white border border-[#E7E5E4] hover:border-[#BE123C] hover:text-[#BE123C] text-sm text-[#57534E] transition flex items-center justify-center gap-2"
+          >
+            <Trash size={14} /> Retirer la carte
+          </button>
+        </>
+      ) : pending ? (
+        <div className="bg-[#FEF3C7] rounded-xl p-4 text-sm text-[#B45309] flex items-start gap-2">
+          <ArrowClockwise size={16} weight="fill" className="shrink-0 mt-0.5 animate-spin" />
+          <div>
+            Validation en cours… Reviens dans quelques instants.
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="bg-[#FAF7F2] rounded-xl p-4 mb-4 text-sm text-[#57534E] space-y-2">
+            <div className="flex gap-2">
+              <Info size={14} weight="fill" className="text-[#B84B31] shrink-0 mt-0.5" />
+              <div>
+                Validation par un <strong>débit d'autorisation de 0,01€</strong> (remboursé). Aucun prélèvement
+                tant que tes Google Ads ne tournent pas.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onSetup}
+            data-testid="card-setup"
+            className="w-full h-11 rounded-xl bg-[#B84B31] hover:bg-[#993D26] text-white text-sm font-medium flex items-center justify-center gap-2 transition active:scale-[0.98]"
+          >
+            Enregistrer ma CB <ArrowRight size={14} weight="bold" />
+          </button>
+        </>
+      )}
+    </section>
+  );
+}
+
+
+function IbanSection({ iban, onChange }) {
+  const has = iban?.has_iban;
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({ iban: "", bic: "", holder_name: "" });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const submit = async () => {
+    setBusy(true);
+    setErr("");
+    const { error } = await apiCall(() => api.post("/billing/iban", form));
+    setBusy(false);
+    if (error) { setErr(error); return; }
+    setEditing(false);
+    setForm({ iban: "", bic: "", holder_name: "" });
+    onChange();
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm("Retirer votre IBAN ? Vous ne pourrez plus recevoir de versements.")) return;
+    await apiCall(() => api.delete("/billing/iban"));
+    onChange();
+  };
+
+  return (
+    <section className="bg-white rounded-2xl border border-[#E7E5E4] p-5" data-testid="iban-section">
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#F5F2EB] flex items-center justify-center">
+            <Bank size={20} weight="duotone" className="text-[#047857]" />
+          </div>
+          <div>
+            <h2 className="font-heading text-lg font-semibold text-[#1C1917]">Compte bancaire</h2>
+            <p className="text-xs text-[#78716C]">Versements · 1er et 15 de chaque mois</p>
+          </div>
+        </div>
+        {has && !editing && (
+          <span className="px-2 py-0.5 rounded-full bg-[#D1FAE5] text-[#047857] text-[10px] uppercase tracking-wider font-semibold">
+            Valide
+          </span>
+        )}
+      </div>
+
+      {has && !editing ? (
+        <>
+          <div className="bg-[#FAF7F2] rounded-xl p-4 mb-4">
+            <div className="text-xs text-[#78716C] mb-0.5">IBAN</div>
+            <div className="font-mono text-sm text-[#1C1917] mb-3" data-testid="iban-display">{iban.iban_masked}</div>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <div className="text-[#78716C]">BIC</div>
+                <div className="font-mono text-[#1C1917]">{iban.bic || "—"}</div>
+              </div>
+              <div>
+                <div className="text-[#78716C]">Titulaire</div>
+                <div className="text-[#1C1917]">{iban.holder_name}</div>
+              </div>
+              <div>
+                <div className="text-[#78716C]">Banque</div>
+                <div className="text-[#1C1917] truncate">{iban.bank_name || "—"}</div>
+              </div>
+              <div>
+                <div className="text-[#78716C]">Pays</div>
+                <div className="text-[#1C1917]">{iban.country}</div>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(true);
+                setForm({ iban: "", bic: iban.bic || "", holder_name: iban.holder_name || "" });
+              }}
+              data-testid="iban-edit"
+              className="flex-1 h-10 rounded-lg bg-white border border-[#E7E5E4] hover:border-[#B84B31] text-sm"
+            >
+              Modifier
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              data-testid="iban-delete"
+              className="w-10 h-10 rounded-lg bg-white border border-[#E7E5E4] hover:border-[#BE123C] hover:text-[#BE123C] text-sm flex items-center justify-center"
+            >
+              <Trash size={14} />
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-[#57534E] mb-1.5">IBAN</label>
+            <input
+              type="text"
+              value={form.iban}
+              onChange={(e) => setForm({ ...form, iban: e.target.value.toUpperCase() })}
+              placeholder="FR76 3000 3000 0000 0000 0000 000"
+              data-testid="iban-input"
+              className="w-full h-11 px-3 rounded-lg border border-[#E7E5E4] bg-white text-sm font-mono focus:outline-none focus:border-[#B84B31]"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-[#57534E] mb-1.5">BIC (optionnel)</label>
+              <input
+                type="text"
+                value={form.bic}
+                onChange={(e) => setForm({ ...form, bic: e.target.value.toUpperCase() })}
+                placeholder="BNPAFRPPXXX"
+                data-testid="bic-input"
+                className="w-full h-11 px-3 rounded-lg border border-[#E7E5E4] bg-white text-sm font-mono focus:outline-none focus:border-[#B84B31]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[#57534E] mb-1.5">Titulaire</label>
+              <input
+                type="text"
+                value={form.holder_name}
+                onChange={(e) => setForm({ ...form, holder_name: e.target.value })}
+                placeholder="Marie Dupont"
+                data-testid="holder-input"
+                className="w-full h-11 px-3 rounded-lg border border-[#E7E5E4] bg-white text-sm focus:outline-none focus:border-[#B84B31]"
+              />
+            </div>
+          </div>
+          {err && (
+            <div className="p-2.5 rounded-lg bg-[#FFE4E6] text-[#BE123C] text-xs flex gap-2">
+              <Warning size={14} weight="fill" className="shrink-0 mt-0.5" />
+              {err}
+            </div>
+          )}
+          <div className="flex gap-2">
+            {editing && has && (
+              <button type="button" onClick={() => setEditing(false)} className="h-10 px-4 rounded-lg text-sm text-[#57534E]">
+                Annuler
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={submit}
+              disabled={busy || !form.iban || !form.holder_name}
+              data-testid="iban-save"
+              className="flex-1 h-11 rounded-xl bg-[#047857] hover:bg-[#065F46] disabled:opacity-50 text-white text-sm font-medium flex items-center justify-center gap-2"
+            >
+              {busy ? <ArrowClockwise size={14} className="animate-spin" /> : <CheckCircle size={14} weight="fill" />}
+              Enregistrer
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+
+function LedgerRow({ entry }) {
+  const cfg = {
+    order_share: { label: "Part commande", color: "#047857", prefix: "+" },
+    ad_debit: { label: "Prélèvement pub", color: "#BE123C", prefix: "-" },
+    payout: { label: "Versement prévu", color: "#D97706", prefix: "→" },
+  }[entry.type] || { label: entry.type, color: "#78716C", prefix: "" };
+  const isPending = entry.status === "pending";
+  return (
+    <div className="px-5 py-3 flex items-center gap-4" data-testid={`ledger-${entry.id}`}>
+      <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: cfg.color + "18" }}>
+        <span className="font-semibold text-xs" style={{ color: cfg.color }}>{cfg.prefix}</span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm text-[#1C1917]">
+          {cfg.label}
+          {entry.site_name && <span className="text-[#78716C]"> · {entry.site_name}</span>}
+          {entry.order_number && <span className="text-[#78716C] font-mono text-xs"> · {entry.order_number}</span>}
+        </div>
+        <div className="text-xs text-[#78716C] flex items-center gap-2">
+          {new Date(entry.created_at).toLocaleString("fr-FR")}
+          {isPending && (
+            <span className="px-1.5 py-0.5 rounded bg-[#FEF3C7] text-[#B45309] text-[10px] uppercase tracking-wider">
+              En attente
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="text-right">
+        <div className="font-heading font-semibold" style={{ color: cfg.color }}>
+          {cfg.prefix}{formatEuro(entry.amount)}
+        </div>
+      </div>
+    </div>
+  );
+}

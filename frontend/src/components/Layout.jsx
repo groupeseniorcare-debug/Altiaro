@@ -15,6 +15,7 @@ import {
   Target,
   Package,
   Globe,
+  CreditCard,
 } from "@phosphor-icons/react";
 
 export default function Layout({ children }) {
@@ -32,9 +33,13 @@ export default function Layout({ children }) {
           { to: "/orders", label: "Commandes", icon: Package, testId: "nav-orders" },
           { to: "/validations", label: "Activité", icon: CheckSquare, testId: "nav-validations" },
           { to: "/finances", label: "Finances", icon: ChartLineUp, testId: "nav-finances" },
+          { to: "/billing", label: "Paiements", icon: CreditCard, testId: "nav-billing" },
           { to: "/users", label: "Équipe", icon: Users, testId: "nav-users" },
         ]
-      : [{ to: "/finances", label: "Mes paiements", icon: ChartLineUp, testId: "nav-finances" }]),
+      : [
+          { to: "/billing", label: "Mon compte", icon: CreditCard, testId: "nav-billing" },
+          { to: "/finances", label: "Mes paiements", icon: ChartLineUp, testId: "nav-finances" },
+        ]),
   ];
 
   const handleLogout = async () => {

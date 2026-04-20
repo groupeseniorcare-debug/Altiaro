@@ -144,7 +144,8 @@ async def mollie_webhook(request: Request):
             {"mollie_payment_id": payment_id}, {"_id": 0}
         )
         if not order:
-            logger.warning(f"Webhook pour paiement inconnu : {payment_id}")
+            # Maybe it's a card mandate setup ?
+            await _handle_card_setup_webhook(payment, payment_id)
             return {"ok": True}
 
         current = order.get("status")
@@ -187,6 +188,15 @@ async def mollie_webhook(request: Request):
                 },
             )
             logger.info(f"Order {order.get('order_number')} : {current} → {new_status}")
+            # Log 50% share into Concepteur ledger on first 'paid' transition
+            if new_status == "paid":
+                try:
+                    from routes.billing import log_order_share_on_paid
+                    refreshed = await db.orders.find_one({"id": order["id"]}, {"_id": 0})
+                    if refreshed:
+                        await log_order_share_on_paid(refreshed)
+                except Exception:
+                    logger.exception("Failed to log order_share to ledger")
         else:
             await db.orders.update_one({"id": order["id"]}, {"$set": updates})
 
@@ -200,3 +210,50 @@ def _locale_for_language(lang: str | None) -> str:
     return {
         "fr": "fr_FR", "en": "en_GB", "de": "de_DE", "nl": "nl_NL",
     }.get((lang or "fr").lower(), "fr_FR")
+
+
+async def _handle_card_setup_webhook(payment, payment_id: str):
+    """When a card mandate first payment (0.01€) succeeds, capture the mandate_id and card details."""
+    meta = getattr(payment, "metadata", None) or {}
+    if isinstance(meta, dict) and meta.get("purpose") != "card_mandate_setup":
+        return
+    user_id = meta.get("user_id") if isinstance(meta, dict) else None
+    if not user_id:
+        # try to find by pending setup payment id
+        prof = await db.billing_profiles.find_one({"pending_setup_payment_id": payment_id}, {"_id": 0})
+        if prof:
+            user_id = prof.get("user_id")
+    if not user_id:
+        logger.warning(f"Card setup webhook without user_id : {payment_id}")
+        return
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    if not payment.is_paid():
+        await db.orders.find_one  # no-op
+        await db.billing_profiles.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "mandate_status": payment.status,
+                "updated_at": now_iso,
+            }},
+        )
+        return
+
+    mandate_id = getattr(payment, "mandate_id", None) or ""
+    details = getattr(payment, "details", None) or {}
+    card_last4 = details.get("cardNumber") if isinstance(details, dict) else None
+    card_brand = details.get("cardLabel") if isinstance(details, dict) else None
+
+    await db.billing_profiles.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "mandate_id": mandate_id,
+            "mandate_status": "valid",
+            "card_last4": card_last4,
+            "card_brand": card_brand,
+            "mandate_created_at": now_iso,
+            "updated_at": now_iso,
+        },
+         "$unset": {"pending_setup_payment_id": ""}},
+    )
+    logger.info(f"Card mandate stored for user {user_id}: {mandate_id}")

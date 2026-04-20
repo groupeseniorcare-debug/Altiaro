@@ -41,6 +41,7 @@ from routes import empire as empire_routes
 from routes import blocks_execute as blocks_execute_routes
 from routes import copilot as copilot_routes
 from routes import payments as payments_routes
+from routes import billing as billing_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -68,6 +69,7 @@ api.include_router(empire_routes.router)
 api.include_router(blocks_execute_routes.router)
 api.include_router(copilot_routes.router)
 api.include_router(payments_routes.router)
+api.include_router(billing_routes.router)
 api.include_router(niches_routes.router)
 api.include_router(dashboard_routes.router)
 api.include_router(meta_routes.router)
@@ -101,6 +103,9 @@ async def startup():
     )
     await db.block_outputs.create_index([("site_id", 1), ("block_id", 1), ("created_at", -1)])
     await db.copilot_messages.create_index([("user_id", 1), ("session_id", 1), ("ts_seq", 1)])
+    await db.billing_profiles.create_index("user_id", unique=True)
+    await db.ledger.create_index([("concepteur_id", 1), ("created_at", -1)])
+    await db.ledger.create_index([("type", 1), ("status", 1)])
 
     # Seed niche catalog (idempotent)
     try:
@@ -147,9 +152,59 @@ async def startup():
         )
         logger.info(f"Updated admin password for {ADMIN_EMAIL}")
 
+    # ---------- APScheduler : weekly debits + bi-monthly payouts ---------- #
+    try:
+        from apscheduler.schedulers.asyncio import AsyncIOScheduler
+        from apscheduler.triggers.cron import CronTrigger
+        from routes.billing import _run_weekly_debits_inner, admin_payouts_preview
+
+        scheduler = AsyncIOScheduler(timezone="UTC")
+
+        async def _scheduled_weekly_debits():
+            logger.info("[scheduler] weekly debits start")
+            try:
+                result = await _run_weekly_debits_inner(7)
+                logger.info(f"[scheduler] weekly debits done : {result}")
+            except Exception:
+                logger.exception("[scheduler] weekly debits failed")
+
+        async def _scheduled_bimonthly_payouts_preview():
+            """On 1st and 15th we only LOG the preview — admin triggers the actual payouts manually."""
+            logger.info("[scheduler] bimonthly payouts preview")
+            try:
+                # Insert system log ledger row so admin sees alert
+                preview = await admin_payouts_preview({"role": "admin", "id": "scheduler", "email": "system"})
+                logger.info(f"[scheduler] payouts preview : total_due={preview.get('total_due_eur')}")
+            except Exception:
+                logger.exception("[scheduler] payouts preview failed")
+
+        # Monday 03:00 UTC
+        scheduler.add_job(
+            _scheduled_weekly_debits,
+            CronTrigger(day_of_week="mon", hour=3, minute=0),
+            id="weekly_debits", replace_existing=True, misfire_grace_time=3600,
+        )
+        # 1st and 15th of every month at 03:00 UTC
+        scheduler.add_job(
+            _scheduled_bimonthly_payouts_preview,
+            CronTrigger(day="1,15", hour=3, minute=0),
+            id="bimonthly_payouts_preview", replace_existing=True, misfire_grace_time=3600,
+        )
+        scheduler.start()
+        app.state.scheduler = scheduler
+        logger.info("APScheduler started : weekly_debits (Mon 03:00 UTC) + bimonthly_payouts_preview (1st/15th 03:00 UTC)")
+    except Exception:
+        logger.exception("Failed to start APScheduler")
+
 
 @app.on_event("shutdown")
 async def shutdown():
+    try:
+        scheduler = getattr(app.state, "scheduler", None)
+        if scheduler and scheduler.running:
+            scheduler.shutdown(wait=False)
+    except Exception:
+        logger.exception("Failed to stop scheduler")
     client.close()
 
 
