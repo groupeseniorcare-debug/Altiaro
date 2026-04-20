@@ -1,0 +1,35 @@
+{
+  "summary": "Phase 4 Admin Ops Center + refactor non-regression testing. Backend: 27/27 pytest PASS (non-regression on auth/sites/steps/products/niches/dashboard/meta/public-shop + all 5 new admin/orders endpoints + rate-limit 10/IP/10min + no _meta_ip/status_history leak). Frontend: /orders page fully functional — stats cards (total/by-status/revenue), table listing 6 orders, slide-in detail panel opens on row click, status badge + history section + transition buttons correctly filtered per current status (paid -> [shipped, refunded, cancelled]), status note + copy-address + export CSV + refresh all work. E2E verified: UI transition Payée -> Expédiée persisted and appears in Historique with note '« test note ui »'. Sites/Niches pages still load after refactor.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin_ops.py",
+    "/app/test_reports/pytest/pytest_admin_ops.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "public_shop.py rate-limit uses request.client.host — behind ingress this may be the cluster IP of the reverse proxy, so in prod many users can share the same apparent IP and be throttled together. Recommend reading X-Forwarded-For (take first public hop) with a safe fallback to request.client.host, and documenting the trust boundary.",
+    "Rate-limit uses count_documents({_meta_ip, created_at >= t}) — fine at low volumes, but does not create a proper index on _meta_ip + created_at. For Ops scale, add db.orders.create_index([('_meta_ip', 1), ('created_at', -1)]) at startup.",
+    "orders.py STATUS_TRANSITIONS.get(current, []) silently treats unknown current statuses as terminal (no allowed transitions). Fine for now, but if data drifts a future bad status row becomes un-editable with a generic 400. Consider logging/monitoring.",
+    "admin/orders CSV export loads up to 5000 rows into memory via to_list(5000) — OK today, but for larger tenants switch to streaming (StreamingResponse + generator) to avoid building the whole CSV in a buffer.",
+    "delete_site still does not cascade delete products/orders (carried over from iter_2 review). Orphaned orders will keep showing in /admin/orders after site deletion.",
+    "Carry-forward: server.py refactor was done cleanly (now 117 lines, 10 routers). Good split."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_admin_ops.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin@conceptfactory.fr / Factory2026! (from /app/memory/test_credentials.md) — valid",
+  "seed_data_creation": "Created 1 test site (TEST_P4_*) with 1 active product + 12 orders from /public checkout (rate-limit probe) + 1 status-history entry via patch. Test site is auto-deleted by fixture teardown; orders remain (delete_site does not cascade — known issue).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 4 (Admin Ops Center + rate-limit + server.py modular refactor) is fully verified. Backend regression suite available at /app/backend/tests/test_admin_ops.py (27 tests, ~3s). Status transitions matrix verified: pending_payment -> {paid, cancelled}; paid -> {shipped, refunded, cancelled}; shipped -> {delivered, refunded}; delivered -> {refunded}; cancelled/refunded terminal. _meta_ip never leaks in admin/orders list or public lookup; status_history hidden from public lookup. Rate-limit 10/IP/10min enforced with 429. Frontend /orders page complete: stats cards with testids [stat-total, stat-{status}], rows [order-row-{order_number}], detail [order-detail-panel, order-status-badge, copy-address, status-note, change-to-{status}, close-detail], actions [refresh-orders, export-csv, orders-search]. LLM endpoints NOT tested per main agent instruction (budget potentially exhausted).",
+  "rca of the issue": "No bugs detected. Only 2 test-writing adjustments were required on my side: (1) product schema uses name/description as I18nText objects (not name_i18n/description_i18n), (2) dashboard endpoint is /api/dashboard/kpis (not /api/dashboard). After fixes, 100% pass."
+}

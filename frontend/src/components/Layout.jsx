@@ -10,6 +10,7 @@ import {
   SignOut,
   Rocket,
   Target,
+  Package,
 } from "@phosphor-icons/react";
 
 export default function Layout({ children }) {
@@ -22,6 +23,7 @@ export default function Layout({ children }) {
     { to: "/niches", label: "Niche Engine", icon: Target, testId: "nav-niches" },
     ...(user?.role === "admin"
       ? [
+          { to: "/orders", label: "Commandes", icon: Package, testId: "nav-orders" },
           { to: "/validations", label: "Activité", icon: CheckSquare, testId: "nav-validations" },
           { to: "/finances", label: "Finances", icon: ChartLineUp, testId: "nav-finances" },
           { to: "/users", label: "Équipe", icon: Users, testId: "nav-users" },
