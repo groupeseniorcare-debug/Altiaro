@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="20" failures="2" skipped="0" tests="66" time="186.589" timestamp="2026-04-20T15:34:41.485992+00:00" hostname="agent-env-cc1144b7-b77d-4b46-9065-c5d45ee57ccd"><testcase classname="backend.tests.test_iteration5" name="test_meta_blocks" time="0.434" /><testcase classname="backend.tests.test_iteration5" name="test_meta_phases_backward_compat" time="0.053" /><testcase classname="backend.tests.test_iteration5" name="test_steps_have_block_fields" time="0.121" /><testcase classname="backend.tests.test_iteration5" name="test_backfill_all_steps_have_block" time="0.693" /><testcase classname="backend.tests.test_iteration5" name="test_generate_fr_ads_copy" time="23.755" /><testcase classname="backend.tests.test_iteration5" name="test_generate_de_ads_copy" time="23.304" /><testcase classname="backend.tests.test_iteration5" name="test_generate_invalid_country" time="0.064" /><testcase classname="backend.tests.test_iteration5" name="test_list_ads_copy" time="0.070" /><testcase classname="backend.tests.test_iteration5" name="test_get_ads_copy_detail" time="0.051" /><testcase classname="backend.tests.test_iteration5" name="test_export_csv" time="0.061" /><testcase classname="backend.tests.test_iteration5" name="test_cross_site_forbidden" time="0.175" /><testcase classname="backend.tests.test_iteration5" name="test_delete_ads_copy" time="0.111" /><testcase classname="backend.tests.test_iteration5" name="test_health" time="0.048" /><testcase classname="backend.tests.test_iteration5" name="test_sites_list_regression" time="0.057" /><testcase classname="backend.tests.test_iteration5" name="test_truncate_unit" time="0.309" /><testcase classname="backend.tests.test_iteration6" name="test_duplicate_preserves_50_steps_and_clones_products" time="1.102" /><testcase classname="backend.tests.test_iteration6" name="test_duplicate_without_products_has_empty_catalog" time="0.525" /><testcase classname="backend.tests.test_iteration6" name="test_duplicate_cross_user_forbidden" time="0.835" /><testcase classname="backend.tests.test_iteration6" name="test_domain_get_returns_cname_target" time="0.055" /><testcase classname="backend.tests.test_iteration6" name="test_domain_set_invalid_rejected" time="0.275" /><testcase classname="backend.tests.test_iteration6" name="test_domain_set_valid_and_clear" time="0.193" /><testcase classname="backend.tests.test_iteration6" name="test_domain_uniqueness" time="0.291" /><testcase classname="backend.tests.test_iteration6" name="test_public_resolve_requires_verified" time="0.209" /><testcase classname="backend.tests.test_iteration7" name="test_scale_to_2_countries" time="1.056" /><testcase classname="backend.tests.test_iteration7" name="test_scale_rejects_invalid_country" time="0.122" /><testcase classname="backend.tests.test_iteration7" name="test_scale_rejects_empty_list" time="0.119" /><testcase classname="backend.tests.test_iteration7" name="test_scale_with_custom_domains" time="0.310" /><testcase classname="backend.tests.test_iteration7" name="test_scale_rejects_invalid_domain" time="0.116" /><testcase classname="backend.tests.test_iteration7" name="test_scale_rejects_duplicate_domain_across_countries" time="0.112" /><testcase classname="backend.tests.test_iteration7" name="test_scale_siblings_endpoint" time="0.353" /><testcase classname="backend.tests.test_iteration7" name="test_scale_copies_products_as_draft" time="0.293" /><testcase classname="backend.tests.test_iteration7" name="test_scale_requires_access" time="0.284" /><testcase classname="backend.tests.test_iteration7_extra" name="test_cross_site_domain_uniqueness_returns_409" time="1.028" /><testcase classname="backend.tests.test_iteration7_extra" name="test_generate_ads_copy_scheduled_count" time="42.369" /><testcase classname="backend.tests.test_iteration7_extra" name="test_total_daily_budget_scales_linearly" time="0.293" /><testcase classname="backend.tests.test_iteration7_extra" name="test_copy_products_false_yields_empty_catalog" time="0.321" /><testcase classname="backend.tests.test_iteration8" name="test_empire_requires_admin" time="0.442" /><testcase classname="backend.tests.test_iteration8" name="test_empire_returns_full_shape" time="0.422" /><testcase classname="backend.tests.test_iteration8" name="test_empire_custom_days" time="0.079" /><testcase classname="backend.tests.test_iteration8" name="test_empire_alerts_are_site_linked" time="0.070" /><testcase classname="backend.tests.test_iteration8" name="test_blocks_prompts_catalog" time="0.076" /><testcase classname="backend.tests.test_iteration8" name="test_block_outputs_empty_initially" time="0.142" /><testcase classname="backend.tests.test_iteration8" name="test_block_execute_unknown_block_404" time="0.111" /><testcase classname="backend.tests.test_iteration8" name="test_block_execute_requires_site_access" time="0.182" /><testcase classname="backend.tests.test_iteration8" name="test_block_execute_products_block_end_to_end" time="60.120"><failure message="AssertionError: The preview environment is not responding. It may be starting up.&#10;  &#10;assert 502 == 200&#10; +  where 502 = &lt;Response [502]&gt;.status_code">E   AssertionError: The preview environment is not responding. It may be starting up.
+      
+    assert 502 == 200
+     +  where 502 = &lt;Response [502]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_shop.TestProductsCRUD" name="test_list_products_requires_auth" time="15.113"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestProductsCRUD" name="test_create_product_i18n" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestProductsCRUD" name="test_create_second_featured_product" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestProductsCRUD" name="test_create_draft_product_should_not_leak_public" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestProductsCRUD" name="test_list_products_admin_sees_all" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestProductsCRUD" name="test_patch_product_partial" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestProductsCRUD" name="test_patch_status_to_draft_hides_from_public" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestProductsCRUD" name="test_delete_product_then_404" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestPublicStorefront" name="test_public_site_no_auth" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestPublicStorefront" name="test_public_site_404" time="10.079"><failure message="requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)</failure></testcase><testcase classname="backend.tests.test_shop.TestPublicStorefront" name="test_public_products_only_active_and_featured_first" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestPublicStorefront" name="test_public_product_detail_active_only" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestPublicOrders" name="test_order_empty_items_400" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestPublicOrders" name="test_order_invalid_site_404" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestPublicOrders" name="test_order_under_50_has_shipping_fee" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestPublicOrders" name="test_order_50_plus_free_shipping" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestPublicOrders" name="test_server_recomputes_total_ignoring_client_hint" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestPublicOrders" name="test_order_lookup_by_number" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestPublicOrders" name="test_order_lookup_unknown_404" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestPublicOrders" name="test_admin_orders_list" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase><testcase classname="backend.tests.test_shop.TestPublicOrders" name="test_admin_orders_requires_auth" time="0.000"><error message="failed on setup with &quot;requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)&quot;">E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)
+
+During handling of the above exception, another exception occurred:
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='senior-france.preview.emergentagent.com', port=443): Read timed out. (read timeout=15)</error></testcase></testsuite></testsuites>

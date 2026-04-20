@@ -484,6 +484,20 @@ export function StorefrontCheckout() {
         payload
       );
       clearCart(siteId);
+      // Create Mollie payment and redirect to checkout URL
+      try {
+        const payRes = await axios.post(
+          `${BACKEND_URL}/api/public/payments/create`,
+          { order_number: data.order_number, site_id: siteId }
+        );
+        if (payRes.data?.checkout_url) {
+          window.location.href = payRes.data.checkout_url;
+          return;
+        }
+      } catch (payErr) {
+        // Fallback : go to confirmation page if Mollie fails (pending_payment)
+        console.error("Mollie payment creation failed", payErr);
+      }
       navigate(`/shop/${siteId}/confirmation?order=${data.order_number}`);
     } catch (err) {
       setError(err.response?.data?.detail || "Erreur lors de la commande");
@@ -609,24 +623,46 @@ export function StorefrontConfirmation() {
   const { siteId, site, lang, setLang } = useSiteAndLang();
   const [search] = useSearchParams();
   const orderNumber = search.get("order");
+  const isSuccessPage = window.location.pathname.includes("/checkout/success");
   const [order, setOrder] = useState(null);
 
   useEffect(() => {
     if (!orderNumber) return;
-    axios
-      .get(`${BACKEND_URL}/api/public/sites/${siteId}/orders/${orderNumber}`)
-      .then(({ data }) => setOrder(data))
-      .catch(() => setOrder(null));
+    let cancelled = false;
+    let attempts = 0;
+    const fetchOrder = () => {
+      axios
+        .get(`${BACKEND_URL}/api/public/sites/${siteId}/orders/${orderNumber}`)
+        .then(({ data }) => {
+          if (cancelled) return;
+          setOrder(data);
+          // Keep polling while payment still pending (Mollie webhook async)
+          attempts += 1;
+          if (data.status === "pending_payment" && attempts < 20) {
+            setTimeout(fetchOrder, 2000);
+          }
+        })
+        .catch(() => setOrder(null));
+    };
+    fetchOrder();
+    return () => { cancelled = true; };
   }, [siteId, orderNumber]);
+
+  const paid = order?.status === "paid";
+  const failed = order?.status === "failed" || order?.status === "expired" || order?.status === "cancelled";
 
   return (
     <StorefrontLayout lang={lang} setLang={setLang} site={site}>
       <div className="max-w-2xl mx-auto px-6 py-16 text-center">
-        <div className="w-16 h-16 rounded-full bg-[#D1FAE5] mx-auto flex items-center justify-center mb-6">
-          <CheckCircle size={32} weight="fill" className="text-[#047857]" />
+        <div className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-6 ${
+          paid ? "bg-[#D1FAE5]" : failed ? "bg-[#FFE4E6]" : "bg-[#FEF3C7]"
+        }`}>
+          <CheckCircle size={32} weight="fill" className={
+            paid ? "text-[#047857]" : failed ? "text-[#BE123C]" : "text-[#D97706]"
+          } />
         </div>
         <h1 className="font-heading text-4xl font-semibold text-[#1C1917] mb-3">
-          {t(lang, "order_confirmed")}
+          {paid ? t(lang, "order_confirmed") : failed ? "Paiement échoué" : (isSuccessPage ? "Finalisation du paiement…" : t(lang, "order_confirmed"))}
         </h1>
         {orderNumber && (
           <div className="text-[#57534E] mb-8" data-testid="order-number">

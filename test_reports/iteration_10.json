@@ -1,0 +1,42 @@
+{
+  "summary": "Iter10 — Mollie payment integration (Sprint 11 Phase 5) verified end-to-end. Backend: 13/13 new iter10 tests PASSING — POST /api/public/payments/create returns {payment_id:tr_*, checkout_url:mollie.com/*, mode:test}, persists mollie_payment_id + mollie_checkout_url + payment_method='mollie' on order (verified via GET /status); 404 on non-existent order; duplicate create on pending_payment regenerates (200 OK — intended); GET /api/public/payments/{id}/status returns {order_number, status:pending_payment, total, currency, paid_at:null}; 404 on mismatched site_id OR order_number; 404 on unknown payment id. Webhook: POST /api/webhooks/mollie with form body id=tr_invalidXXX → 200 OK (no state change — designed); no id → 200 OK; unknown real-looking id → 200 OK; idempotence — calling webhook twice for our real pending payment returns 200 OK both times, order status unchanged (Mollie reports 'open', no transition). Regression: admin login + public site/products endpoints still working. Two pre-existing test failures unrelated to Mollie: test_shop.py asserts BASE_URL directly (env-loading issue in that file only) and test_iteration8 LLM test times out at 15s. Frontend E2E: /shop/{siteId}/product/{productId} → add-to-cart → /checkout → fill form → click place-order → window.location.href redirect to https://www.mollie.com/checkout/select-method/SYrvTUAUNFwoefAZ5U7QJ displaying 'Commande CF-1776699566-1236', '54,80 €', 'Note: this is a testmode payment', payment methods (Carte/PayPal/iDEAL|Wero), 'Paiement sécurisé et effectué par mollie' — full redirect chain works. /checkout/success?order=CF-... polling page displays 'Finalisation du paiement…' heading with amber icon (pending_payment state), order detail card with item lines, polls every 2s. All data-testids present and functional.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/public/payments/create", "issue": "No explicit 400 branch reached in automated tests — the 'order already paid' path requires a successful Mollie webhook transition to 'paid' which can't be triggered without a real Mollie sandbox payment. Code at routes/payments.py:51-52 correctly rejects non-pending_payment orders, but is effectively untestable without simulating a real Mollie webhook roundtrip."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration10_mollie.py",
+    "/app/test_reports/pytest/iter10.xml",
+    "/app/test_reports/pytest/regress10.xml"
+  ],
+  "action_items": [
+    "(LOW) Consider adding admin-only endpoint to manually mark an order as paid (bypass Mollie) for easier e2e testing of the 'already paid → 400' branch.",
+    "(LOW) Carry-over from iter9 — fix nested <button> in CopilotFab sessions dropdown (hydration warning, no functional impact)."
+  ],
+  "critical_code_review_comments": [
+    "routes/payments.py mollie_webhook — no signature / IP verification today. Relying on 'Mollie API must be queried to verify status' is OK for the happy path, but a forged webhook call to /api/webhooks/mollie with a REAL id from a DIFFERENT merchant account would fail at client.payments.get() (401/404), so no state change. Still, adding a shared-secret query param (?token=xxx) or Mollie IP allowlist is the expected Phase 6 hardening.",
+    "routes/payments.py line 52 — HTTP 400 'Commande déjà {status}' leaks internal status enum to the client. Consider mapping to user-friendly fr strings ('Cette commande a déjà été payée', 'Cette commande a été annulée').",
+    "routes/payments.py line 62 request.url_for('mollie_webhook') — works behind ingress IF FastAPI sees the correct host. Verify Kubernetes ingress passes X-Forwarded-Host/Proto so webhook URL is the public HTTPS URL. If stripped, Mollie will call an internal URL and fail silently. Manual sanity: the checkout_url returned is correct (mollie.com/...), but the webhookUrl sent to Mollie is server-generated and never visible in tests — worth logging once at creation time.",
+    "routes/payments.py no rate-limiting on /public/payments/create. A script could create thousands of payments for any pending order (including ones the caller didn't create) since the endpoint is fully public with only order_number+site_id as 'auth'. Mollie has its own quotas but this adds $ cost. Recommend per-IP rate limit (e.g. 10 creates / 10min) OR requiring order creation + payment creation to share a short-lived token.",
+    "routes/payments.py webhook: writes 'mollie_status' even when current status != pending_payment (line 157). This may overwrite a legitimate downstream 'refunded' state if an admin manually refunded via Mollie dashboard. Consider skipping all writes when terminal.",
+    "Storefront.jsx line 482-501 — if axios.post /orders succeeds BUT /payments/create fails (network / Mollie 502), we navigate to /confirmation with an order in pending_payment and NO mollie_payment_id. The user lands on the old confirmation page with no way to pay. Consider: (a) show 'Réessayer le paiement' button that re-calls /payments/create, OR (b) move cart-clear AFTER the Mollie redirect actually happens.",
+    "Storefront.jsx line 630-649 — polling continues every 2s up to 20 attempts = 40s total, then stops silently. After 40s pending_payment, the UI still shows 'Finalisation du paiement…' forever with no retry mechanism or support-contact info. Add: after 20 attempts → switch to 'Paiement non confirmé — contactez-nous' with the order number."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration10_mollie.py (new)"
+  ],
+  "success_rate": {"backend": "100% (13/13 new iter10 tests incl. 1 real Mollie API call for payment creation + status verification)", "frontend": "100% — full redirect-to-Mollie + pending-payment polling UI verified"},
+  "test_credentials": "admin@conceptfactory.fr / Factory2026! (verified working). Not required for the public payment flow which uses only site_id + order_number.",
+  "seed_data_creation": "Each test creates a throwaway public order via /api/public/sites/{TEST_SITE_ID}/orders with customer 'TEST Mollie Buyer'. These accumulate as pending_payment in DB but are easily filterable by name prefix. Also creates a real Mollie test-mode payment (no $ cost) per test run — ~4 tr_* IDs per full suite. Frontend E2E created one additional order CF-1776699566-1236 (54.80 €, now stuck in pending_payment since Mollie checkout was not completed).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Mollie integration is production-ready for test mode. MOLLIE_MODE=test in backend/.env — checkout page correctly says 'Note: this is a testmode payment'. Site 14842ebe-32b2-4e46-90fe-f6859e8b8dcd (Luméa Confort) in EUR, product c9dd2728 priced 19.90€. Shipping fee 15€ under 50€ threshold, free above. For e2e verification of the paid path, main agent can (a) manually complete a Mollie sandbox payment clicking 'Carte' → filling test card 3782 8224 6310 005 (AMEX test), OR (b) directly update db.orders via script to status='paid' and verify /checkout/success transitions UI from 'Finalisation du paiement…' to 'Commande confirmée'. Data-testids used in E2E: products-grid, product-card-{id}, add-to-cart, checkout-form, field-name/email/line1/postal_code/city, country-select, place-order, checkout-error, order-number. Pre-existing test failures to ignore: test_shop.py has its own BASE_URL env assertion that fails when invoked from a subfolder (not a regression), test_iteration8 LLM block takes >15s (flaky infra, not Mollie).",
+  "rca of the issue": "No new issues. All 13 Mollie endpoint behaviors match the spec: create→201 w/ checkout_url, status→200 w/ pending_payment, webhook→always 200, 404 boundaries respected. Idempotence verified: 2× webhook POST for same open payment → no double-update, status unchanged. Frontend redirect confirmed by successful navigation to mollie.com/checkout/select-method/* with matching order number and amount."
+}

@@ -40,6 +40,7 @@ from routes import scale as scale_routes
 from routes import empire as empire_routes
 from routes import blocks_execute as blocks_execute_routes
 from routes import copilot as copilot_routes
+from routes import payments as payments_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -66,6 +67,7 @@ api.include_router(scale_routes.router)
 api.include_router(empire_routes.router)
 api.include_router(blocks_execute_routes.router)
 api.include_router(copilot_routes.router)
+api.include_router(payments_routes.router)
 api.include_router(niches_routes.router)
 api.include_router(dashboard_routes.router)
 api.include_router(meta_routes.router)

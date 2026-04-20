@@ -123,6 +123,7 @@ function App() {
           <Route path="/shop/:siteId/cart" element={<StorefrontCart />} />
           <Route path="/shop/:siteId/checkout" element={<StorefrontCheckout />} />
           <Route path="/shop/:siteId/confirmation" element={<StorefrontConfirmation />} />
+          <Route path="/shop/:siteId/checkout/success" element={<StorefrontConfirmation />} />
           <Route
             path="/validations"
             element={
