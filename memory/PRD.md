@@ -57,9 +57,10 @@ Les 50 étapes du playbook sont regroupées en 4 blocs :
 | 21 | Dashboard Empire (KPIs cross-pays) | ✅ |
 | 22 | Mega-Block Execute (4 mega-prompts) | ✅ |
 | 23 | AI Copilot conversationnel (function calling) | ✅ |
-| 24 | Paiement Mollie + Resend | ⏳ (attente clés) |
-| 25 | TVA multi-pays + split 50/50 runtime | ⏳ (attente Phase 5) |
-| 26 | Google Ads Center | ⏳ (attente clé) |
+| 24 | Paiement Mollie (checkout + webhook) | ✅ |
+| 25 | TVA multi-pays + split 50/50 runtime | ⏳ (P1) |
+| 26 | Resend (emails transactionnels) | ⏳ (attente clé) |
+| 27 | Google Ads Center | ⏳ (attente clé) |
 
 ## Règles critiques
 - Pas de Shopify — tout custom React/FastAPI.
