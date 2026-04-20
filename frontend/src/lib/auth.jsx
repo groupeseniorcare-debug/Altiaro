@@ -8,6 +8,11 @@ export function AuthProvider({ children }) {
   const [error, setError] = useState("");
 
   const checkSession = useCallback(async () => {
+    // Skip auth probe on public storefront routes to avoid noisy 401s
+    if (typeof window !== "undefined" && window.location.pathname.startsWith("/shop/")) {
+      setUser(false);
+      return;
+    }
     try {
       const { data } = await api.get("/auth/me");
       setUser(data);

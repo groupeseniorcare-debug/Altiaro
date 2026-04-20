@@ -432,6 +432,8 @@ async def delete_site(site_id: str, admin: dict = Depends(require_admin)):
     await db.sites.delete_one({"id": site_id})
     await db.steps.delete_many({"site_id": site_id})
     await db.financials.delete_many({"site_id": site_id})
+    await db.products.delete_many({"site_id": site_id})
+    await db.orders.delete_many({"site_id": site_id})
     return {"ok": True}
 
 
@@ -930,17 +932,38 @@ async def public_product_detail(site_id: str, product_id: str):
 @api.post("/public/sites/{site_id}/orders")
 async def public_create_order(site_id: str, data: OrderCreateInput):
     """Endpoint public checkout — crée une commande en statut pending_payment.
-    Mollie sera branché en Phase 5."""
+    Mollie sera branché en Phase 5.
+    SÉCURITÉ: on ignore les prix envoyés par le client et on utilise ceux en base."""
     site = await db.sites.find_one({"id": site_id}, {"_id": 0, "id": 1, "name": 1})
     if not site:
         raise HTTPException(status_code=404, detail="Site introuvable")
     if not data.items:
         raise HTTPException(status_code=400, detail="Panier vide")
 
-    # Recompute totals côté serveur (ne pas faire confiance au client)
-    subtotal = sum(item.price * item.quantity for item in data.items)
-    shipping_fee = 0 if subtotal >= 50 else 4.90  # free shipping > 50€
-    tax = 0  # TVA sera calculée en Phase 5 par pays
+    # Validate each item against DB and use canonical server-side price
+    canonical_items = []
+    for item in data.items:
+        prod = await db.products.find_one(
+            {"id": item.product_id, "site_id": site_id, "status": "active"},
+            {"_id": 0, "price": 1, "currency": 1, "name": 1, "images": 1}
+        )
+        if not prod:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Produit {item.product_id} introuvable ou inactif"
+            )
+        canonical_items.append({
+            "product_id": item.product_id,
+            "name": item.name,
+            "price": prod["price"],  # ⚠ server-side canonical price
+            "quantity": item.quantity,
+            "currency": prod.get("currency", "EUR"),
+            "image": (prod.get("images") or [None])[0],
+        })
+
+    subtotal = sum(it["price"] * it["quantity"] for it in canonical_items)
+    shipping_fee = 0 if subtotal >= 50 else 4.90
+    tax = 0  # TVA en Phase 5 par pays
     total = round(subtotal + shipping_fee + tax, 2)
 
     now = datetime.now(timezone.utc)
@@ -951,7 +974,7 @@ async def public_create_order(site_id: str, data: OrderCreateInput):
         "site_id": site_id,
         "site_name": site["name"],
         "order_number": order_number,
-        "items": [item.model_dump() for item in data.items],
+        "items": canonical_items,
         "customer": data.customer.model_dump(),
         "shipping_address": data.shipping_address.model_dump(),
         "language": data.language,
@@ -960,7 +983,7 @@ async def public_create_order(site_id: str, data: OrderCreateInput):
         "shipping_fee": shipping_fee,
         "tax": tax,
         "total": total,
-        "currency": data.items[0].currency if data.items else "EUR",
+        "currency": canonical_items[0]["currency"] if canonical_items else "EUR",
         "status": "pending_payment",
         "payment_method": None,
         "created_at": now.isoformat(),

@@ -45,8 +45,8 @@ class ProductUpdateInput(BaseModel):
 class OrderItem(BaseModel):
     product_id: str
     name: str
-    price: float
-    quantity: int
+    price: float = Field(ge=0)
+    quantity: int = Field(gt=0, le=99)
     currency: str = "EUR"
     image: Optional[str] = None
 
