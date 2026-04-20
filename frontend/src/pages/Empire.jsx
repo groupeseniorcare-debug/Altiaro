@@ -225,24 +225,26 @@ export default function Empire() {
             <h3 className="font-heading text-sm font-semibold text-[#1C1917] mb-4 uppercase tracking-wider">
               Evolution GMV · {days}j
             </h3>
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={data.timeseries}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F5F2EB" />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={(d) => d.slice(5)}
-                  tick={{ fontSize: 10, fill: "#78716C" }}
-                />
-                <YAxis tick={{ fontSize: 10, fill: "#78716C" }} />
-                <Tooltip
-                  contentStyle={{ background: "#1C1917", border: "none", borderRadius: 8 }}
-                  labelStyle={{ color: "#FFF" }}
-                  itemStyle={{ color: "#FFF" }}
-                  formatter={(v, n) => [n === "revenue" ? formatEuro(v) : v, n]}
-                />
-                <Line type="monotone" dataKey="revenue" stroke="#B84B31" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
+            <div style={{ width: "100%", height: 260 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data.timeseries}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F5F2EB" />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(d) => d.slice(5)}
+                    tick={{ fontSize: 10, fill: "#78716C" }}
+                  />
+                  <YAxis tick={{ fontSize: 10, fill: "#78716C" }} />
+                  <Tooltip
+                    contentStyle={{ background: "#1C1917", border: "none", borderRadius: 8 }}
+                    labelStyle={{ color: "#FFF" }}
+                    itemStyle={{ color: "#FFF" }}
+                    formatter={(v, n) => [n === "revenue" ? formatEuro(v) : v, n]}
+                  />
+                  <Line type="monotone" dataKey="revenue" stroke="#B84B31" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
           <div className="bg-white rounded-2xl border border-[#E7E5E4] p-5" data-testid="chart-countries">
@@ -254,27 +256,29 @@ export default function Empire() {
                 Aucune commande encore.
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={data.per_country}
-                    dataKey="revenue"
-                    nameKey="code"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={2}
-                  >
-                    {data.per_country.map((c) => (
-                      <Cell key={c.code} fill={COUNTRY_COLORS[c.code] || COUNTRY_COLORS.UNKNOWN} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(v) => formatEuro(v)} />
-                  <Legend
-                    wrapperStyle={{ fontSize: 11 }}
-                    formatter={(val) => `${COUNTRY_EMOJI[val] || "🌍"} ${val}`}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              <div style={{ width: "100%", height: 220 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={data.per_country}
+                      dataKey="revenue"
+                      nameKey="code"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                    >
+                      {data.per_country.map((c) => (
+                        <Cell key={c.code} fill={COUNTRY_COLORS[c.code] || COUNTRY_COLORS.UNKNOWN} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v) => formatEuro(v)} />
+                    <Legend
+                      wrapperStyle={{ fontSize: 11 }}
+                      formatter={(val) => `${COUNTRY_EMOJI[val] || "🌍"} ${val}`}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             )}
           </div>
         </div>
