@@ -1,5 +1,10 @@
 """Iteration 5: ads-copy generator + blocks refactor regression."""
-import os, csv, io, sys, pytest, requests
+import os
+import csv
+import io
+import sys
+import pytest
+import requests
 from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")

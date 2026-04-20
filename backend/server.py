@@ -34,6 +34,8 @@ from routes import uploads as uploads_routes
 from routes import search as search_routes
 from routes import analyzer as analyzer_routes
 from routes import ads_copy as ads_copy_routes
+from routes import duplicate as duplicate_routes
+from routes import domain as domain_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -54,6 +56,8 @@ api.include_router(orders_routes.router)
 api.include_router(public_routes.router)
 api.include_router(analyzer_routes.router)  # must be registered BEFORE niches to avoid /niches/{slug} conflict
 api.include_router(ads_copy_routes.router)
+api.include_router(duplicate_routes.router)
+api.include_router(domain_routes.router)
 api.include_router(niches_routes.router)
 api.include_router(dashboard_routes.router)
 api.include_router(meta_routes.router)
@@ -79,6 +83,12 @@ async def startup():
     await db.orders.create_index([("_meta_ip", 1), ("created_at", -1)])
     await db.niche_analyses.create_index([("user_id", 1), ("created_at", -1)])
     await db.ads_copy.create_index([("site_id", 1), ("created_at", -1)])
+    # Custom domain routing — unique per verified site
+    await db.sites.create_index(
+        "custom_domain",
+        unique=True,
+        partialFilterExpression={"custom_domain": {"$type": "string"}},
+    )
 
     # Seed niche catalog (idempotent)
     try:
