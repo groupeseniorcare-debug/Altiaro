@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import CommandPalette from "./CommandPalette";
+import { List, X } from "@phosphor-icons/react";
 import {
   House,
   SquaresFour,
@@ -17,6 +18,7 @@ import {
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const links = [
     { to: "/", label: "Tableau de bord", icon: House, testId: "nav-dashboard" },
@@ -39,8 +41,28 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen flex bg-[#FDFBF7]">
+      {/* Mobile hamburger */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        data-testid="mobile-menu-open"
+        aria-label="Ouvrir le menu"
+        className="fixed top-4 left-4 z-40 md:hidden w-11 h-11 rounded-xl bg-white border border-[#E7E5E4] shadow-sm flex items-center justify-center hover:bg-[#F5F2EB] transition"
+      >
+        <List size={20} />
+      </button>
+
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 md:hidden bg-black/40 backdrop-blur-sm"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
       <aside
-        className="w-[260px] bg-[#F5F2EB] border-r border-[#E7E5E4] flex flex-col fixed h-screen"
+        className={`w-[260px] bg-[#F5F2EB] border-r border-[#E7E5E4] flex flex-col fixed h-screen z-50 transition-transform duration-300 md:translate-x-0 ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        }`}
         data-testid="sidebar"
       >
         <div className="px-6 py-7 border-b border-[#E7E5E4]">
@@ -60,11 +82,20 @@ export default function Layout({ children }) {
         </div>
 
         <nav className="flex-1 px-3 py-5 space-y-1">
+          <button
+            onClick={() => setMobileOpen(false)}
+            data-testid="mobile-menu-close"
+            aria-label="Fermer"
+            className="md:hidden absolute top-4 right-3 p-2 rounded-lg hover:bg-white/60"
+          >
+            <X size={20} />
+          </button>
           {links.map(({ to, label, icon: Icon, testId }) => (
             <NavLink
               key={to}
               to={to}
               end={to === "/"}
+              onClick={() => setMobileOpen(false)}
               data-testid={testId}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-[14.5px] transition-all duration-200 ${
@@ -103,7 +134,7 @@ export default function Layout({ children }) {
         </div>
       </aside>
 
-      <main className="flex-1 ml-[260px] min-h-screen">{children}</main>
+      <main className="flex-1 md:ml-[260px] min-h-screen pt-14 md:pt-0">{children}</main>
       {user?.role === "admin" && <CommandPalette />}
     </div>
   );

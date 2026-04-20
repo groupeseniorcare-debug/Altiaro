@@ -1,0 +1,25 @@
+{
+  "summary": "Sprint 6 (Niche Analyzer IA + Operator sites + Resync + Mobile) — ALL tests pass. Backend: 13/13 pytest (including full Claude Sonnet 4.5 analyzer roundtrip ~30s, route ordering guard /niches/analyses vs /niches/{slug}, per-user scoping, operator site creation with auto-budget 30€/market, admin-only operator_id assignment, resync 400/404 edge cases). Frontend E2E as Concepteur: /niches renders big input 'Quelle niche veux-tu attaquer ?' with idea chips + 3 recent analyses cards (all GO) + 20-niche inspiration grid; analysis detail page shows hero+verdict badge, 5 KPIs, 6 country rows with toggles and rich reasoning; sticky launch bar LIVE budget (1 market=30€, 3 markets=90€, 5 markets=150€) with vol cumulé; Lancer button creates site and redirects to /sites/{id} with 50 steps seeded. Mobile hamburger (<768px) opens drawer with backdrop, close button works, hamburger reappears.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_sprint6.py",
+    "/app/test_reports/pytest/pytest_sprint6.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "analyzer.py: _ask_claude catches broad Exception then bucket-matches error strings ('Budget has been exceeded'/'budget') to produce 402. Brittle vs emergentintegrations exception types; a dedicated exception class check would be safer. Not blocking — already returns a french-friendly message.",
+    "analyzer.py _enrich does not validate presence of required fields before computing averages; if the LLM occasionally omits country_metrics entries, total_volume_monthly silently becomes 0. Add a schema validation step (pydantic model on the parsed JSON) before persist.",
+    "sites.py create_site does not validate analysis_id exists or belongs to the caller when provided. An operator could POST /sites with analysis_id='anything' and it'd be stored as-is. Low-severity data-integrity issue.",
+    "products.py /resync re-invokes scraper which is a slow synchronous-ish HTTP call; no rate limit per user/site. A Concepteur spamming the button could pressure supplier endpoints. Consider a 5-second cool-down per product.",
+    "analyzer router uses prefix='/niches' and is registered before niches_routes to avoid /niches/{slug} matching /analyses. Current ordering in server.py is correct but a comment already warns — consider switching to distinct prefixes (/niche-analyzer) to eliminate the coupling."
+  ],
+  "updated_files": ["/app/backend/tests/test_sprint6.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin@conceptfactory.fr / Factory2026! + concepteur@conceptfactory.fr / Concepteur2026! (from /app/memory/test_credentials.md) — both valid.",
+  "seed_data_creation": "Created 4 TEST_S6_* sites during pytest runs + one real analysis ('Coussin orthopédique...') via live LLM call (persisted in niche_analyses, 42 600 vol/mois, verdict GO). One site launched from UI test (Coussin... — Silver). No cleanup of TEST_S6 entries executed.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Sprint 6 fully green. Regression suite at /app/backend/tests/test_sprint6.py (13 tests, ~45s incl. 1 live LLM call). data-testids on analysis detail: back-to-niches, verdict-badge, countries-list, country-row-{FR|DE|CH|BE|UK|NL}, toggle-{FR|DE|CH|BE|UK|NL}, launch-bar, launch-site-btn. Mobile testids: mobile-menu-open, sidebar, mobile-menu-close. Default selection on analysis detail = go_countries (pre-checked). Budget formula = len(selected)*30€. LLM budget was OK during this run — Claude Sonnet 4.5 returned valid JSON.",
+  "rca of the issue": "No issues; all 3 Sprint 6 features (analyzer IA, operator-creates-site, mobile responsive) work end-to-end. Backend resync has correct 400 (no supplier_url) and 404 (unknown product) handling. Route ordering fix (analyzer before niches) verified by GET /api/niches/analyses returning list instead of 404 slug lookup."
+}

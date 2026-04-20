@@ -11,6 +11,7 @@ import Finances from "./pages/Finances";
 import Users from "./pages/Users";
 import NicheEngine from "./pages/NicheEngine";
 import NicheDetail from "./pages/NicheDetail";
+import NicheAnalysisDetail from "./pages/NicheAnalysisDetail";
 import SiteProducts from "./pages/SiteProducts";
 import Orders from "./pages/Orders";
 import {
@@ -70,6 +71,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <NicheEngine />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/niches/analysis/:id"
+            element={
+              <ProtectedRoute>
+                <NicheAnalysisDetail />
               </ProtectedRoute>
             }
           />

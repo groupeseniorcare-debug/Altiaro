@@ -16,6 +16,9 @@ import {
   UploadSimple,
   Sparkle,
   Image as ImageIcon,
+  ArrowsClockwise,
+  Warning,
+  TrendUp,
 } from "@phosphor-icons/react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -51,6 +54,8 @@ export default function SiteProducts() {
   const [importing, setImporting] = useState(false);
   const [importUrl, setImportUrl] = useState("");
   const [importError, setImportError] = useState("");
+  const [syncing, setSyncing] = useState(null); // product.id currently syncing
+  const [syncResult, setSyncResult] = useState(null); // {product, diff}
 
   const load = useCallback(async () => {
     const [sRes, pRes] = await Promise.all([
@@ -86,6 +91,37 @@ export default function SiteProducts() {
     }
     setImportUrl("");
     setEditing(data.draft);
+  };
+
+  const handleResync = async (p) => {
+    setSyncing(p.id);
+    const { data, error } = await apiCall(() =>
+      api.post(`/sites/${siteId}/products/${p.id}/resync`)
+    );
+    setSyncing(null);
+    if (error) {
+      window.alert(`Re-sync impossible : ${error}`);
+      return;
+    }
+    setSyncResult({ product: p, diff: data });
+  };
+
+  const handleApplyResync = async () => {
+    if (!syncResult) return;
+    const { product, diff } = syncResult;
+    const updates = {};
+    if (diff.price?.new && diff.price.new !== product.price) {
+      updates.price = diff.price.new;
+    }
+    if (Object.keys(updates).length === 0) {
+      setSyncResult(null);
+      return;
+    }
+    await apiCall(() =>
+      api.patch(`/sites/${siteId}/products/${product.id}`, updates)
+    );
+    setSyncResult(null);
+    load();
   };
 
   if (loading) {
@@ -239,6 +275,17 @@ export default function SiteProducts() {
                     >
                       <PencilSimple size={14} /> Éditer
                     </button>
+                    {p.supplier_url && (
+                      <button
+                        onClick={() => handleResync(p)}
+                        disabled={syncing === p.id}
+                        data-testid={`resync-${p.id}`}
+                        title="Re-vérifier le prix fournisseur"
+                        className="h-9 w-9 rounded-lg border border-[#E7E5E4] hover:border-[#B84B31] text-[#78716C] hover:text-[#B84B31] flex items-center justify-center transition disabled:opacity-50"
+                      >
+                        <ArrowsClockwise size={14} className={syncing === p.id ? "animate-spin" : ""} />
+                      </button>
+                    )}
                     <button
                       onClick={() => handleDelete(p)}
                       data-testid={`delete-${p.id}`}
@@ -265,7 +312,107 @@ export default function SiteProducts() {
           }}
         />
       )}
+
+      {syncResult && (
+        <ResyncModal
+          result={syncResult}
+          onClose={() => setSyncResult(null)}
+          onApply={handleApplyResync}
+        />
+      )}
     </Layout>
+  );
+}
+
+function ResyncModal({ result, onClose, onApply }) {
+  const { product, diff } = result;
+  const priceChanged = diff.price?.diff && Math.abs(diff.price.diff) > 0.01;
+  const bigIncrease = diff.price?.diff_pct > 10;
+  const hasMargin = product.price && diff.price?.new
+    ? ((product.price - diff.price.new) / product.price) * 100
+    : null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose} data-testid="resync-modal">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-[#E7E5E4] overflow-hidden animate-fade-up" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E7E5E4]">
+          <div>
+            <div className="text-[11px] uppercase tracking-widest text-[#78716C]">Re-sync fournisseur</div>
+            <div className="font-heading text-lg font-semibold text-[#1C1917] truncate max-w-xs">
+              {product.name?.fr || "Produit"}
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-[#F5F2EB]"><X size={18} /></button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div className="flex items-center gap-2 text-xs text-[#78716C]">
+            <ArrowsClockwise size={12} /> Source : {diff.source_host || "Fournisseur"}
+          </div>
+
+          {priceChanged ? (
+            <div className={`p-4 rounded-xl border-2 ${bigIncrease ? "bg-[#FFE4E6] border-[#FCA5A5]" : "bg-[#FEF3C7] border-[#FCD34D]"}`} data-testid="price-change-panel">
+              <div className="flex items-center gap-2 mb-2">
+                {bigIncrease ? (
+                  <><Warning size={16} weight="fill" className="text-[#BE123C]" /><span className="text-sm font-medium text-[#BE123C]">Hausse significative du prix fournisseur</span></>
+                ) : (
+                  <><TrendUp size={16} weight="fill" className="text-[#854D0E]" /><span className="text-sm font-medium text-[#854D0E]">Prix fournisseur à jour</span></>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-[#78716C]">Ancien</div>
+                  <div className="font-heading text-xl font-semibold text-[#1C1917] mt-1 tabular-nums">{diff.price.old}€</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-[#78716C]">Nouveau</div>
+                  <div className="font-heading text-xl font-semibold text-[#1C1917] mt-1 tabular-nums">{diff.price.new}€</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-[#78716C]">Variation</div>
+                  <div className="font-heading text-xl font-semibold mt-1 tabular-nums" style={{ color: bigIncrease ? "#BE123C" : "#854D0E" }}>
+                    {diff.price.diff > 0 ? "+" : ""}{diff.price.diff}€ ({diff.price.diff_pct > 0 ? "+" : ""}{diff.price.diff_pct}%)
+                  </div>
+                </div>
+              </div>
+              {hasMargin !== null && hasMargin < 30 && (
+                <div className="mt-3 text-xs text-[#BE123C] flex items-start gap-1.5">
+                  <Warning size={12} weight="fill" className="mt-0.5 flex-shrink-0" />
+                  Ta marge risque de descendre sous 30% à ce nouveau prix. Revois ton prix de vente.
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="p-4 rounded-xl bg-[#DCF5E7] border-2 border-[#86EFAC] flex items-center gap-2" data-testid="no-change-panel">
+              <CheckCircle size={16} weight="fill" className="text-[#166534]" />
+              <span className="text-sm text-[#166534] font-medium">Aucun changement de prix détecté.</span>
+            </div>
+          )}
+
+          {diff.has_new_images && (
+            <div className="p-3 rounded-xl bg-[#DBEAFE] border border-[#93C5FD] text-sm text-[#1E40AF]">
+              📸 {diff.fresh_images_count} images côté fournisseur (tu en as {diff.current_images_count}).
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 bg-[#FDFBF7] border-t border-[#E7E5E4] flex items-center justify-end gap-3">
+          <button onClick={onClose} className="h-10 px-4 rounded-xl border border-[#E7E5E4] bg-white text-sm text-[#57534E] hover:bg-[#F5F2EB] transition">
+            Fermer
+          </button>
+          {priceChanged && (
+            <button
+              onClick={onApply}
+              data-testid="apply-resync"
+              className="h-10 px-4 rounded-xl bg-[#B84B31] hover:bg-[#993D26] text-white text-sm font-medium flex items-center gap-2 transition"
+            >
+              <CheckCircle size={14} weight="fill" /> Appliquer le nouveau prix
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

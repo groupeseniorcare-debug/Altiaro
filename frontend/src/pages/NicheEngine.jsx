@@ -2,135 +2,221 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, apiCall } from "../lib/api";
 import Layout from "../components/Layout";
-import { Target, TrendUp, CurrencyEur, Sparkle, ArrowRight } from "@phosphor-icons/react";
+import {
+  Sparkle,
+  MagnifyingGlass,
+  ArrowRight,
+  Target,
+  TrendUp,
+  CurrencyEur,
+  Clock,
+  CheckCircle,
+  Warning,
+  XCircle,
+} from "@phosphor-icons/react";
 
-const scoreBand = (score) => {
-  if (score >= 85) return { label: "Excellent", bg: "bg-[#DCF5E7]", text: "text-[#166534]" };
-  if (score >= 80) return { label: "Très bon", bg: "bg-[#FEF3C7]", text: "text-[#854D0E]" };
-  return { label: "Bon", bg: "bg-[#FFE4E6]", text: "text-[#9F1239]" };
+const VERDICT_META = {
+  GO:    { label: "GO",        bg: "#DCF5E7", text: "#166534", Icon: CheckCircle, desc: "Lance ce site sans hésiter" },
+  MAYBE: { label: "À creuser", bg: "#FEF3C7", text: "#854D0E", Icon: Warning,     desc: "Potentiel OK, à affiner" },
+  NOGO:  { label: "Pass",      bg: "#FFE4E6", text: "#9F1239", Icon: XCircle,     desc: "Marché trop difficile" },
 };
 
+const SUGGESTIONS = [
+  "Fauteuil releveur électrique",
+  "Coussin anti-escarres",
+  "Lève-personne portable",
+  "Rehausseur WC avec accoudoirs",
+  "Téléphone senior grandes touches",
+  "Pilulier électronique avec alertes",
+];
+
 export default function NicheEngine() {
-  const [niches, setNiches] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all"); // all | hero | top10
+  const [product, setProduct] = useState("");
+  const [notes, setNotes] = useState("");
+  const [analyzing, setAnalyzing] = useState(false);
+  const [error, setError] = useState("");
+  const [history, setHistory] = useState([]);
+  const [catalog, setCatalog] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
     (async () => {
-      const { data } = await apiCall(() => api.get("/niches"));
-      setNiches(data || []);
-      setLoading(false);
+      const [h, c] = await Promise.all([
+        apiCall(() => api.get("/niches/analyses?limit=6")),
+        apiCall(() => api.get("/niches?limit=8")),
+      ]);
+      setHistory(h.data || []);
+      setCatalog((c.data || []).slice(0, 8));
     })();
   }, []);
 
-  const filtered = niches.filter((n) => {
-    if (filter === "hero") return n.hero;
-    if (filter === "top10") return n.rank <= 10;
-    return true;
-  });
+  const launch = async (p = product) => {
+    const target = (p || "").trim();
+    if (!target || analyzing) return;
+    setAnalyzing(true);
+    setError("");
+    const { data, error: err } = await apiCall(() =>
+      api.post("/niches/analyze", { product: target, notes }, { timeout: 120000 })
+    );
+    setAnalyzing(false);
+    if (err) {
+      setError(err);
+      return;
+    }
+    navigate(`/niches/analysis/${data.id}`);
+  };
 
   return (
     <Layout>
-      <div className="p-8 md:p-12 max-w-7xl">
-        <div className="mb-8 animate-fade-up">
-          <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-2">Niche Engine</div>
-          <h1 className="font-heading text-4xl font-semibold text-[#1C1917]">
-            Catalogue Silver Economy
+      <div className="p-6 md:p-12 max-w-5xl mx-auto">
+        {/* Hero analyzer */}
+        <div className="mb-10 animate-fade-up">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-[#B84B31] mb-3">
+            <Sparkle size={12} weight="fill" /> Analyse IA · 6 marchés EU
+          </div>
+          <h1 className="font-heading text-3xl md:text-5xl font-semibold text-[#1C1917] leading-[1.05]">
+            Quelle niche veux-tu attaquer ?
           </h1>
-          <p className="text-[#57534E] mt-2 max-w-2xl">
-            20 niches × 6 pays. Volume de recherche, CPC, difficulté SEO et score ECF
-            pré-calculés pour choisir rapidement ton prochain site rentable.
+          <p className="text-[#57534E] mt-3 max-w-2xl text-[17px]">
+            Décris un produit Silver Economy. L'IA analyse en ~30 secondes le volume de
+            recherche, le CPC, la concurrence et la saisonnalité sur <strong>6 pays</strong>
+            (FR · DE · CH · BE · UK · NL). Verdict GO / À creuser / Pass + synthèse par marché.
           </p>
+
+          {/* Input */}
+          <div className="mt-8">
+            <div className="relative">
+              <MagnifyingGlass size={20} className="absolute left-5 top-1/2 -translate-y-1/2 text-[#78716C]" />
+              <input
+                value={product}
+                onChange={(e) => setProduct(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && launch()}
+                placeholder="Ex: Monte-escalier portable, pilulier électronique..."
+                data-testid="analyze-input"
+                className="w-full h-16 pl-14 pr-48 rounded-2xl border-2 border-[#E7E5E4] bg-white focus:ring-4 focus:ring-[#B84B31]/15 focus:border-[#B84B31] outline-none text-[17px] transition shadow-sm"
+              />
+              <button
+                onClick={() => launch()}
+                disabled={analyzing || !product.trim()}
+                data-testid="analyze-submit"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-12 px-5 rounded-xl bg-[#B84B31] hover:bg-[#993D26] text-white font-medium flex items-center gap-2 transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {analyzing ? (
+                  <>
+                    <Clock size={16} className="animate-spin" weight="bold" /> Analyse...
+                  </>
+                ) : (
+                  <>
+                    <Sparkle size={16} weight="fill" /> Analyser
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Suggestion chips */}
+            <div className="flex flex-wrap gap-2 mt-3" data-testid="suggestion-chips">
+              <span className="text-xs text-[#78716C] py-1.5 pr-1">Idées :</span>
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => { setProduct(s); }}
+                  className="px-3 py-1.5 rounded-full text-xs bg-white border border-[#E7E5E4] hover:border-[#B84B31] hover:text-[#B84B31] transition"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+
+            {analyzing && (
+              <div className="mt-4 p-4 rounded-xl bg-[#FDF4E7] border border-[#F5E0C3] flex items-start gap-3" data-testid="analyzing-bar">
+                <Sparkle size={18} weight="fill" className="text-[#B84B31] mt-0.5 animate-pulse" />
+                <div className="flex-1">
+                  <div className="font-medium text-[#1C1917] text-sm">L'IA analyse 6 marchés en profondeur...</div>
+                  <div className="text-xs text-[#78716C] mt-0.5">
+                    Volume · CPC · Concurrence · Saisonnalité · Verdict par pays · ~30 secondes
+                  </div>
+                </div>
+              </div>
+            )}
+            {error && (
+              <div className="mt-4 p-3.5 rounded-xl bg-[#FFE4E6] text-[#BE123C] text-sm" data-testid="analyze-error">
+                {error}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 mb-6" data-testid="niche-filters">
-          {[
-            { key: "all", label: "Toutes (20)" },
-            { key: "top10", label: "Top 10" },
-            { key: "hero", label: "HERO (gros AOV)" },
-          ].map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              data-testid={`filter-${f.key}`}
-              className={`h-9 px-4 rounded-full text-sm transition ${
-                filter === f.key
-                  ? "bg-[#1C1917] text-white"
-                  : "bg-white border border-[#E7E5E4] text-[#57534E] hover:border-[#B84B31]"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+        {/* History */}
+        {history.length > 0 && (
+          <section className="mb-12">
+            <h2 className="text-[11px] uppercase tracking-widest text-[#78716C] mb-3">Tes analyses récentes</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" data-testid="history-grid">
+              {history.map((h) => {
+                const s = h.analysis_summary || {};
+                const v = VERDICT_META[s.overall_verdict] || VERDICT_META.MAYBE;
+                return (
+                  <button
+                    key={h.id}
+                    onClick={() => navigate(`/niches/analysis/${h.id}`)}
+                    data-testid={`history-${h.id}`}
+                    className="text-left bg-white rounded-xl border border-[#E7E5E4] p-4 hover:border-[#B84B31] transition group"
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="text-xl">{s.emoji || "📦"}</div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium" style={{ backgroundColor: v.bg, color: v.text }}>
+                        {v.label}
+                      </span>
+                    </div>
+                    <div className="font-medium text-[#1C1917] text-sm group-hover:text-[#B84B31] transition line-clamp-2">
+                      {s.name || h.product_input}
+                    </div>
+                    <div className="text-[11px] text-[#78716C] mt-1 flex items-center gap-2">
+                      <TrendUp size={10} /> {(s.total_volume_monthly || 0).toLocaleString("fr-FR")}/mois
+                      {s.go_countries?.length > 0 && (
+                        <span>· {s.go_countries.length} GO</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
-        {loading ? (
-          <div className="text-[#78716C]">Chargement du catalogue...</div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" data-testid="niche-grid">
-            {filtered.map((n) => {
-              const band = scoreBand(n.ecf_score);
-              return (
+        {/* Inspiration catalog */}
+        {catalog.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-[11px] uppercase tracking-widest text-[#78716C]">
+                Niches recommandées par Concept Factory
+              </h2>
+              <div className="text-xs text-[#78716C]">Basé sur 20 produits qualifiés</div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3" data-testid="catalog-grid">
+              {catalog.map((n) => (
                 <button
                   key={n.slug}
-                  onClick={() => navigate(`/niches/${n.slug}`)}
-                  data-testid={`niche-card-${n.slug}`}
-                  className="group text-left bg-white rounded-2xl border border-[#E7E5E4] p-6 hover:border-[#B84B31] hover:shadow-md transition-all duration-200"
+                  onClick={() => {
+                    setProduct(n.name);
+                    setTimeout(() => launch(n.name), 50);
+                  }}
+                  data-testid={`catalog-${n.slug}`}
+                  className="text-left bg-white rounded-xl border border-[#E7E5E4] p-3.5 hover:border-[#B84B31] hover:shadow-sm transition group"
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="text-3xl">{n.emoji}</div>
-                    <div className={`px-2.5 py-1 rounded-full text-[11px] font-medium ${band.bg} ${band.text}`}>
-                      ECF {n.ecf_score}
-                    </div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="text-xl">{n.emoji}</div>
+                    {n.hero && <Target size={12} weight="fill" className="text-[#B84B31]" />}
                   </div>
-
-                  <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-1">
-                    #{n.rank} · {n.category}
-                  </div>
-                  <div className="font-heading text-lg font-semibold text-[#1C1917] mb-2 group-hover:text-[#B84B31] transition">
+                  <div className="text-xs font-medium text-[#1C1917] line-clamp-2 group-hover:text-[#B84B31] transition">
                     {n.name}
                   </div>
-                  <p className="text-sm text-[#57534E] line-clamp-2 mb-4">{n.tagline}</p>
-
-                  <div className="grid grid-cols-3 gap-2 pt-4 border-t border-[#F5F2EB]">
-                    <div>
-                      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-[#78716C]">
-                        <TrendUp size={10} /> Vol/mois
-                      </div>
-                      <div className="font-medium text-[#1C1917] text-sm mt-0.5">
-                        {(n.total_volume_monthly || 0).toLocaleString("fr-FR")}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-[#78716C]">
-                        <CurrencyEur size={10} /> Panier
-                      </div>
-                      <div className="font-medium text-[#1C1917] text-sm mt-0.5">
-                        {n.aov_eur[0]}–{n.aov_eur[1]}€
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-[#78716C]">
-                        <Sparkle size={10} /> Marge
-                      </div>
-                      <div className="font-medium text-[#1C1917] text-sm mt-0.5">{n.margin_pct}%</div>
-                    </div>
-                  </div>
-
-                  {n.hero && (
-                    <div className="mt-4 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#FEF3C7] text-[#854D0E] text-[11px] font-medium">
-                      <Target size={10} weight="fill" /> HERO produit
-                    </div>
-                  )}
-
-                  <div className="mt-4 flex items-center gap-1.5 text-[13px] font-medium text-[#B84B31] opacity-0 group-hover:opacity-100 transition">
-                    Analyser par pays <ArrowRight size={14} />
+                  <div className="text-[10px] text-[#78716C] mt-1 tabular-nums">
+                    {(n.total_volume_monthly || 0).toLocaleString("fr-FR")}/mois · ECF {n.ecf_score}
                   </div>
                 </button>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          </section>
         )}
       </div>
     </Layout>

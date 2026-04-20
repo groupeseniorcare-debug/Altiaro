@@ -31,6 +31,7 @@ from routes import dashboard as dashboard_routes
 from routes import meta as meta_routes
 from routes import uploads as uploads_routes
 from routes import search as search_routes
+from routes import analyzer as analyzer_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -49,6 +50,7 @@ api.include_router(steps_routes.router)
 api.include_router(products_routes.router)
 api.include_router(orders_routes.router)
 api.include_router(public_routes.router)
+api.include_router(analyzer_routes.router)  # must be registered BEFORE niches to avoid /niches/{slug} conflict
 api.include_router(niches_routes.router)
 api.include_router(dashboard_routes.router)
 api.include_router(meta_routes.router)
@@ -72,6 +74,7 @@ async def startup():
     await db.orders.create_index([("site_id", 1), ("created_at", -1)])
     await db.orders.create_index("order_number", unique=True)
     await db.orders.create_index([("_meta_ip", 1), ("created_at", -1)])
+    await db.niche_analyses.create_index([("user_id", 1), ("created_at", -1)])
 
     # Seed niche catalog (idempotent)
     try:

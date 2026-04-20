@@ -1,7 +1,7 @@
 """Sites CRUD."""
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
@@ -11,11 +11,13 @@ from seed_prompts import get_seed_steps_for_site
 
 router = APIRouter(prefix="/sites")
 
-
 class SiteCreateInput(BaseModel):
     name: str
     niche: str
     niche_slug: Optional[str] = None
+    analysis_id: Optional[str] = None
+    selected_countries: Optional[List[str]] = None
+    daily_budget_eur: Optional[int] = None
     domain: Optional[str] = ""
     shopify_url: Optional[str] = ""
     operator_id: Optional[str] = None
@@ -25,6 +27,8 @@ class SiteCreateInput(BaseModel):
 class SiteUpdateInput(BaseModel):
     name: Optional[str] = None
     niche: Optional[str] = None
+    selected_countries: Optional[List[str]] = None
+    daily_budget_eur: Optional[int] = None
     domain: Optional[str] = None
     shopify_url: Optional[str] = None
     operator_id: Optional[str] = None
@@ -42,21 +46,35 @@ async def list_sites(user: dict = Depends(get_current_user)):
 
 
 @router.post("")
-async def create_site(data: SiteCreateInput, admin: dict = Depends(require_admin)):
+async def create_site(data: SiteCreateInput, user: dict = Depends(get_current_user)):
+    """Admins can create sites for anyone. Operators (Concepteurs) can create sites
+    for themselves — typically after running a niche analysis."""
     site_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
+    selected_countries = data.selected_countries or []
+    budget_eur = data.daily_budget_eur if data.daily_budget_eur is not None else len(selected_countries) * 30
+
+    # Operators can only assign to themselves
+    if user["role"] == "admin":
+        operator_id = data.operator_id
+    else:
+        operator_id = user["id"]
+
     doc = {
         "id": site_id,
         "name": data.name,
         "niche": data.niche,
         "niche_slug": data.niche_slug or None,
+        "analysis_id": data.analysis_id or None,
+        "selected_countries": selected_countries,
+        "daily_budget_eur": budget_eur,
         "domain": data.domain or "",
         "shopify_url": data.shopify_url or "",
-        "operator_id": data.operator_id,
+        "operator_id": operator_id,
         "notes": data.notes or "",
         "status": "active",
         "created_at": now,
-        "created_by": admin["id"],
+        "created_by": user["id"],
     }
     await db.sites.insert_one(doc)
     steps = get_seed_steps_for_site(site_id)

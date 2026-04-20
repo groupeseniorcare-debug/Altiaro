@@ -105,3 +105,46 @@ async def import_product_from_url(site_id: str, data: ImportInput, user: dict = 
             "images_found": len(draft.get("images") or []),
         }
     }
+
+
+@router.post("/{product_id}/resync")
+async def resync_product_from_supplier(site_id: str, product_id: str, user: dict = Depends(get_current_user)):
+    """Refetch the supplier URL and return *what changed* vs our DB.
+    We DO NOT overwrite automatically — the Concepteur decides."""
+    await _check_site_access(site_id, user)
+    p = await db.products.find_one({"id": product_id, "site_id": site_id}, {"_id": 0})
+    if not p:
+        raise HTTPException(status_code=404, detail="Produit introuvable")
+    if not p.get("supplier_url"):
+        raise HTTPException(status_code=400, detail="Ce produit n'a pas d'URL fournisseur")
+
+    try:
+        fresh = await import_from_url(p["supplier_url"])
+    except (TimeoutError, ValueError, RuntimeError) as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    fresh_price = fresh.get("price")
+    current_price = p.get("price")
+    price_delta = None
+    if fresh_price and current_price:
+        price_delta = {
+            "old": current_price,
+            "new": fresh_price,
+            "diff": round(fresh_price - current_price, 2),
+            "diff_pct": round(((fresh_price - current_price) / current_price) * 100, 1) if current_price else 0,
+        }
+
+    fresh_images = fresh.get("images") or []
+    current_images = p.get("images") or []
+
+    return {
+        "supplier_url": p["supplier_url"],
+        "source_host": fresh.get("source_host"),
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "price": price_delta,
+        "has_new_images": len(fresh_images) > len(current_images),
+        "fresh_name": fresh.get("name", "")[:200],
+        "fresh_images_count": len(fresh_images),
+        "current_images_count": len(current_images),
+        "raw": fresh,  # full payload so the UI can propose "apply"
+    }
