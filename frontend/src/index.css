@@ -84,6 +84,11 @@ code, .font-mono {
 .animate-fade-up-delay-1 { animation: fade-up 0.4s ease-out 0.05s both; }
 .animate-fade-up-delay-2 { animation: fade-up 0.4s ease-out 0.10s both; }
 .animate-fade-up-delay-3 { animation: fade-up 0.4s ease-out 0.15s both; }
+@keyframes cfSlideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
 .animate-fade-up-delay-4 { animation: fade-up 0.4s ease-out 0.20s both; }
 
 /* Markdown rendering in step panel */

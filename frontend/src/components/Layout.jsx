@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import CommandPalette from "./CommandPalette";
+import CopilotFab from "./CopilotFab";
 import { List, X } from "@phosphor-icons/react";
 import {
   House,
@@ -138,6 +139,7 @@ export default function Layout({ children }) {
 
       <main className="flex-1 md:ml-[260px] min-h-screen pt-14 md:pt-0">{children}</main>
       {user?.role === "admin" && <CommandPalette />}
+      {user && <CopilotFab user={user} />}
     </div>
   );
 }

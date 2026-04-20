@@ -39,6 +39,7 @@ from routes import domain as domain_routes
 from routes import scale as scale_routes
 from routes import empire as empire_routes
 from routes import blocks_execute as blocks_execute_routes
+from routes import copilot as copilot_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -64,6 +65,7 @@ api.include_router(domain_routes.router)
 api.include_router(scale_routes.router)
 api.include_router(empire_routes.router)
 api.include_router(blocks_execute_routes.router)
+api.include_router(copilot_routes.router)
 api.include_router(niches_routes.router)
 api.include_router(dashboard_routes.router)
 api.include_router(meta_routes.router)
@@ -96,6 +98,7 @@ async def startup():
         partialFilterExpression={"custom_domain": {"$type": "string"}},
     )
     await db.block_outputs.create_index([("site_id", 1), ("block_id", 1), ("created_at", -1)])
+    await db.copilot_messages.create_index([("user_id", 1), ("session_id", 1), ("ts_seq", 1)])
 
     # Seed niche catalog (idempotent)
     try:
