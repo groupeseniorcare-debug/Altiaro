@@ -8,18 +8,24 @@ SaaS multi-tenant d'e-commerce 100% custom (pas de Shopify) dédié à la **Silv
 - Modèle 50% marge brute partagée.
 
 ## Architecture
-- **Stack** : FastAPI (10 routers modulaires) + MongoDB (motor async) + React 18 + Tailwind + Phosphor icons + Framer Motion + recharts
-- **Structure backend** : `server.py` orchestrateur 117 lignes + `deps.py` (shared : db, auth, helpers) + `routes/{auth,users,sites,steps,products,orders,public_shop,niches,dashboard,meta}.py`
+- **Stack** : FastAPI (14 routers modulaires) + MongoDB (motor async) + React 18 + Tailwind + Phosphor icons + Framer Motion
 - **Auth** : JWT httpOnly cookies, bcrypt, brute force 15min, admin seeded via .env
-- **LLM** : Emergent LLM Key via emergentintegrations, timeout 50s, 402 budget, 504 timeout, 402 budget épuisé propre
-- **Niche Engine** : 20 niches × 6 pays seedées idempotemment
+- **LLM** : Emergent LLM Key (Claude Sonnet 4.5) via emergentintegrations pour Niche Analyzer et Ads Copy Generator
 - **Site Factory** : catalogue produits i18n FR/EN/DE/NL par site + storefront `/shop/{id}` + cart localStorage + checkout → commande
-- **Admin Ops Center** : `/orders` globale avec stats, filtres, transitions de statut, export CSV, rate-limit IP 10/10min (via X-Forwarded-For)
+- **Admin Ops Center** : `/orders` globale avec stats, filtres, transitions, export CSV streaming, rate-limit IP 10/10min
+- **Structure backend** : `server.py` (~130 lignes) + `deps.py` + `seed_prompts.py` + `routes/{auth,users,sites,steps,products,orders,public_shop,niches,dashboard,meta,uploads,search,analyzer,ads_copy,duplicate,domain}.py`
 
 ## User personas
 - **Admin** : voit tout, crée sites + users, gère commandes + finances
-- **Concepteur** : voit ses sites, gère son catalogue, auto-progression étapes
-- **Client final** (public) : achète sur `/shop/{id}` en FR/EN/DE/NL sans compte
+- **Concepteur** : voit SES sites, gère son catalogue, duplique ses sites, génère Ads Copy
+- **Client final** (public) : achète sur `/shop/{id}` ou `https://custom.domain` en FR/EN/DE/NL sans compte
+
+## Blocks logiques (depuis sprint 7)
+Les 50 étapes du playbook sont regroupées en 4 blocs :
+1. 🏗️ **Template & Boutique** — Shopify backend, Front React, Juridique, Paiement, SAV, Logistique
+2. 📦 **Produits & Sourcing** — Étude marché, Sourcing fournisseurs
+3. 🔍 **SEO & Marque** — Positionnement/voix, SEO technique, AEO/GEO
+4. 🚀 **Marketing & Scale** — Ads, Social proof, Analytics, Duplication
 
 ## Core requirements (status)
 1. Auth JWT 2 rôles ✅
@@ -34,94 +40,67 @@ SaaS multi-tenant d'e-commerce 100% custom (pas de Shopify) dédié à la **Silv
 10. Catalogue produits i18n ✅
 11. Storefront public multilingue ✅
 12. Cart + Checkout + Orders ✅
-13. **Admin Ops Center** ✅ (NEW 2026-04-20 · Sprint 3)
-14. **Server.py refactoré en 10 routers** ✅ (NEW 2026-04-20 · Sprint 3)
+13. Admin Ops Center ✅
+14. Server.py refactoré en 14 routers ✅
+15. **Niche Analyzer IA dynamique** (Claude 4.5, 6 marchés) ✅
+16. **Google Ads Copy Generator** (Claude 4.5, RSA 15h+4d+25kw) ✅
+17. **Blocks refactor** (50 étapes → 4 blocs logiques) ✅
+18. **Site Duplication** ✅
+19. **Multi-domain management** (CNAME + verification DNS) ✅
 
 ## What's been implemented
 
+### 2026-04-20 · Sprint 7 : Site Duplication + Multi-domain
+- **🔁 POST `/api/sites/{id}/duplicate`** : clone un site en 1 clic (nouveau nom, 50 étapes fresh, produits clonés en draft, orders/ads-copy NON copiés). Idéal pour scaler cross-pays.
+- **🌐 Multi-domain custom** : `GET/POST/DELETE /api/sites/{id}/domain` + `POST /api/sites/{id}/domain/verify` avec lookup DNS (dnspython) CNAME avec fallback A-records. Uniqueness garantie par index partiel Mongo. `GET /api/public/domains/resolve?host=...` pour le routage storefront public (404 si non vérifié).
+- **UI** : sur SiteDetail, 2 boutons `Dupliquer` et `Domaine` + 2 modales propres (instructions CNAME complètes : type/name/value/TTL + état vérifié).
+- Tests : 8/8 pytest nouveaux + 100% E2E frontend (iteration_6.json)
+
+### 2026-04-20 · Sprint 6.5 : Ads Copy Generator + Blocks refactor
+- **📣 Google Ads Copy Generator** : `POST /api/sites/{id}/ads-copy/generate` via Claude 4.5 → 15 headlines (≤30 chars), 4 descriptions (≤90 chars), 25 keywords, 12 negative keywords, 4 sitelinks, 6 callouts. Sanitizer server-side enforce les limites. Export CSV compatible Google Ads Editor. Historique par site + restauration. Support FR/DE/CH/BE/UK/NL + tons (rassurant/premium/direct).
+- **🧩 Blocks refactor** : `seed_prompts.py` expose BLOCKS dict (template/products/seo/marketing) + PHASE_TO_BLOCK mapping. Chaque step reçoit block, block_name, block_order, block_emoji. Migration idempotente au startup (200 steps backfilled). Endpoint `GET /api/meta/blocks`. UI SiteDetail groupe désormais par blocs avec progress bar dédiée.
+- Tests : 15/15 pytest backend + E2E frontend (iteration_5.json)
+
 ### 2026-04-20 · Sprint 6 : Niche Analyzer IA + Sync + Mobile
-- **🤖 Niche Analyzer IA** : `POST /api/niches/analyze` via Claude Sonnet 4.5 → analyse structurée JSON (category, tagline, description, keywords, buy/sell prices, margin_pct, ecf_score, hero, suppliers, **country_metrics 6 pays** avec volume/cpc/kd/cpa_target/seasonality/verdict, risks, opportunities, synthesis_per_country, overall_verdict, go_countries)
-- **📊 Règles verdict** : GO si vol≥3k ET CPC ok · MAYBE 1.5k-3k · NOGO <1.5k. Global : GO si ≥20k cumulé ET marge>60% ET ≥2 marchés GO
-- **🗃 Collection `niche_analyses`** scopée par user (history via `GET /api/niches/analyses`)
-- **🌍 Multi-market launch** : Concepteur coche les marchés sur la page détail, budget calculé live (**30€/jour par marché**), sticky bar en bas, bouton "Lancer sur N marchés"
-- **👥 Operator peut créer ses sites** : `POST /api/sites` ouvert à tous les roles (auto-assigné à l'operator courant), admin garde le pouvoir d'assigner à un autre operator
-- **🔄 Sync fournisseur** : `POST /api/sites/{id}/products/{pid}/resync` refetch l'URL supplier, calcule diff prix (old/new/%), modal UI avec warning si hausse >10%, alerte si marge < 30%, bouton "Appliquer le nouveau prix"
-- **📱 Mobile responsive** : hamburger <768px, sidebar slide-in drawer avec backdrop blur, launch bar pleine largeur sur mobile
-- **🛠 Fix route ordering** : `analyzer_routes` registered BEFORE `niches_routes` (sinon `/niches/{slug}` matche `/niches/analyses`)
-- Testing : 13/13 pytest + E2E frontend (iteration_4.json) — 0 bug critique
+- Niche Analyzer IA via Claude 4.5 (analyse 6 marchés FR/DE/CH/BE/UK/NL, verdicts GO/MAYBE/NOGO)
+- Multi-market launch avec budget 30€/jour par pays sélectionné
+- Concepteurs peuvent créer leurs sites (auto-assignés)
+- Resync fournisseur avec diff prix + alerte marge
+- Mobile responsive complet
 
----
-
-### 2026-04-20 · Sprint 5 : Command Palette ⌘K + Streaming CSV
-- **⌘K Global Search** : `GET /api/admin/search?q=...` cherche simultanément dans sites/products/orders/niches/users · regex escape safe · limit 5 par type
-- Composant `CommandPalette` déclenché par Cmd/Ctrl+K (ou bouton flottant en bas à droite) — modal centré avec backdrop blur, groupes visuels par type, thumbnails produits, navigation clavier ↑↓ + Entrée, surlignage cursor, ESC ferme
-- **Streaming CSV export** : `StreamingResponse` avec generator async cursor Mongo → O(1) mémoire quel que soit le volume de commandes
-- Limité aux admins (le palette ne s'affiche pas pour les Concepteurs)
-
----
+### 2026-04-20 · Sprint 5 : ⌘K + Streaming CSV
+- Command Palette `⌘K` global admin (sites/products/orders/niches/users)
+- Streaming CSV export O(1) mémoire
 
 ### 2026-04-20 · Sprint 4 : Media & Import
-- **Scraper `/app/backend/scraper.py`** : fetch + extraction Open Graph + JSON-LD + Schema.org Product + fallback Shopify Analytics
-- **POST `/api/sites/{id}/products/import`** : renvoie un draft produit pré-rempli (name FR/EN, description, price, currency, images, sku, supplier_url) — **non persisté**, le frontend l'injecte dans l'editor
-- **POST `/api/uploads/image`** : upload image générique (jpg/png/webp/gif/avif, max 8 Mo), renvoie URL publique
-- Frontend : barre d'import URL au-dessus de la grille produits, composant `ImagesField` avec drag&drop, multi-upload, preview gallery, reorder, badge "Principale", fallback input URL
-- Testé : Allbirds (Shopify) → import complet (nom + 110$ + image + description). Patagonia/Google : partial fallback gracieux.
-
----
+- Scraper Open Graph + JSON-LD + Shopify Analytics
+- Import URL produit + upload images drag&drop
 
 ### 2026-04-20 · Sprint 3 : Admin Ops Center + refactor
-- **5 endpoints admin ops** : `GET /admin/orders` (filtrable), `/stats`, `PATCH /admin/orders/{id}` (transitions validées), `GET /export.csv`
-- **Page frontend `/orders`** : stats cards (7 statuts), table avec recherche, slide-in détail avec historique + copy address + copy email + liens fournisseurs + transitions contextuelles
-- **Status transitions** : pending_payment → paid|cancelled · paid → shipped|refunded|cancelled · shipped → delivered|refunded · delivered → refunded · cancelled/refunded terminaux
-- **Rate-limit IP-based** sur POST public orders : 10 cmd / IP / 10 min via X-Forwarded-For + index Mongo dédié
-- **Refactor server.py** : 1252 → 117 lignes + 10 routers modulaires (auth 78, users 57, sites 97, steps 264, products 63, orders 179, public_shop 146, niches 29, dashboard 129, meta 17) + `deps.py` shared
-- Testing : 27/27 pytest backend + frontend E2E validé (iteration_3.json)
-
-### 2026-04-20 · Sprint 2 : Phase 3 Site Factory MVP
-- `models_shop.py` (ProductCreateInput i18n, OrderCreateInput avec validators)
-- Collections `products`, `orders` + indexes
-- Admin CRUD produits + endpoints publics storefront
-- Sécurité : prix canoniques serveur, cascade delete, order_number unique
-- Frontend : ProductEditor i18n, 5 pages `/shop/{id}`, i18n 4 langues, cart localStorage scopé
-
-### 2026-04-20 · Sprint 1 : Niche Engine + rebranding
-- Rebranding "Launch OS" → "Concept Factory", auto-progression étapes, 20 niches × 6 pays, `/niches` et `/niches/:slug`, pré-remplissage wizard
+- 5 endpoints admin orders, page /orders, transitions status, rate-limit IP
+- Refactor server.py monolithic → modulaire
 
 ## Prioritized backlog
 
-### P0 (fait)
-- [x] Auth, Sites, Workflow, Niche Engine, Phase 3 MVP shop, Admin Ops Center, Refactor
+### P0 (fait) ✅
+- Auth, Sites CRUD, Workflow 50 étapes, Niche Engine, Phase 3 MVP shop, Admin Ops Center, Niche Analyzer IA, Ads Copy Generator, Blocks refactor, Site duplication, Multi-domain
 
 ### P1 — Phase 5 : Paiement réel (⏳ en attente clés user)
-- [ ] **Mollie** (paiement + payouts) — **requiert clé API Mollie**
+- [ ] **Mollie** (paiement + payouts) — **requiert clé API Mollie** (test_xxx + live_xxx)
 - [ ] **Resend** (emails transactionnels FR/EN/DE/NL) — **requiert clé API + domaine vérifié**
-- [ ] **TVA multi-pays** (5 taux : FR 20%, DE 19%, BE 21%, NL 21%, UK 20%, CH TVA import)
+- [ ] **TVA multi-pays** (FR 20%, DE 19%, BE 21%, NL 21%, UK 20%, CH import)
 - [ ] **Moteur 50/50** : calcul Marge Brute Partageable par commande
 - [ ] **SAV workflow** : tickets, messages client, refunds partiels
 
-### P1.5 — Améliorations produit (sans clé externe)
-- [x] **Import DSers-like** ✅ (2026-04-20 sprint 4)
-- [x] **Upload images** ✅ (2026-04-20 sprint 4)
-- [x] **Streaming CSV export** ✅ (2026-04-20 sprint 5)
-- [x] **Recherche globale ⌘K** ✅ (2026-04-20 sprint 5)
-
 ### P2 — Phase 6
-- [ ] **Google Ads Center** admin (API)
-- [ ] **DataForSEO** : recalibrage métriques Niche Engine
-- [ ] **Multi-domaine** : CNAME par site → routing Nginx
-- [ ] **Notifications admin** (email nouvelle commande)
-- [ ] **Recherche globale** ⌘K
-- [ ] **Mobile responsive** storefront (déjà partiellement fait)
-
-## Refactoring encore à faire (urgence basse)
-- Rate-limit order : réindexer `_meta_ip + created_at` ✅ fait sprint 3
-- `seed_prompts.py` 50 prompts → 4 blocs Template/Produits/SEO/Marketing
-- Ajout de tests pytest pour chaque route.py nouvellement créée
+- [ ] **Google Ads Center** admin (API, requiert clé Google Ads API)
+- [ ] **DataForSEO** : recalibrage métriques Niche Engine (clé DataForSEO)
+- [ ] **Notifications admin** (email nouvelle commande — lié à Resend)
+- [ ] **Refactor seed_prompts.py en profondeur** — réécrire les 50 prompts en 4 mega-prompts (risque élevé, bénéfice UX marginal vs blocs actuels)
 
 ## Next tasks
 1. **Phase 5** quand l'user fournit clés Mollie + Resend
-2. **Import produit** depuis URL fournisseur (pas de clé requise)
-3. **Upload images** produits
+2. **Google Ads Center** quand clé Google Ads API fournie
 
 ## Credentials
-Voir `/app/memory/test_credentials.md` — `admin@conceptfactory.fr` / `Factory2026!`
+Voir `/app/memory/test_credentials.md` — `admin@conceptfactory.fr` / `Factory2026!` · `concepteur@conceptfactory.fr` / `Concepteur2026!`
