@@ -139,26 +139,28 @@ export default function NewSite() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-[13px] font-medium text-[#1C1917] mb-1.5">
-              Opérateur assigné
-            </label>
-            <select
-              name="operator_id"
-              value={form.operator_id}
-              onChange={handleChange}
-              data-testid="new-site-operator"
-              className="w-full h-12 px-4 rounded-xl border border-[#E7E5E4] bg-white focus:outline-none focus:ring-2 focus:ring-[#B84B31]/30 focus:border-[#B84B31]"
-            >
-              <option value="">Aucun (admin uniquement)</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} — {u.email} ({u.role})
-                </option>
-              ))}
-            </select>
-            <div className="text-xs text-[#78716C] mt-1">Seul cet opérateur (et les admins) verra ce site.</div>
-          </div>
+          {user?.role === "admin" && (
+            <div>
+              <label className="block text-[13px] font-medium text-[#1C1917] mb-1.5">
+                Opérateur assigné
+              </label>
+              <select
+                name="operator_id"
+                value={form.operator_id}
+                onChange={handleChange}
+                data-testid="new-site-operator"
+                className="w-full h-12 px-4 rounded-xl border border-[#E7E5E4] bg-white focus:outline-none focus:ring-2 focus:ring-[#B84B31]/30 focus:border-[#B84B31]"
+              >
+                <option value="">Aucun (admin uniquement)</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} — {u.email} ({u.role})
+                  </option>
+                ))}
+              </select>
+              <div className="text-xs text-[#78716C] mt-1">Seul cet opérateur (et les admins) verra ce site.</div>
+            </div>
+          )}
 
           <div>
             <label className="block text-[13px] font-medium text-[#1C1917] mb-1.5">

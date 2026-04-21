@@ -64,7 +64,7 @@ export default function Dashboard() {
             </p>
           </div>
           <button
-            onClick={() => navigate(isAdmin ? "/sites/new" : "/sites")}
+            onClick={() => navigate("/sites/new")}
             data-testid="create-site-btn-dashboard"
             className="h-11 px-5 rounded-xl bg-[#B84B31] hover:bg-[#993D26] text-white font-medium transition-all duration-200 flex items-center gap-2 active:scale-[0.98] shadow-sm"
           >
