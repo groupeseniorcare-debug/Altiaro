@@ -25,6 +25,7 @@ import Domains from "./pages/Domains";
 import GoogleAds from "./pages/GoogleAds";
 import Opportunities from "./pages/Opportunities";
 import QuickScan from "./pages/QuickScan";
+import LaunchSite from "./pages/LaunchSite";
 import {
   StorefrontHome,
   StorefrontProduct,
@@ -79,6 +80,14 @@ function App() {
           />
           <Route
             path="/sites/new"
+            element={
+              <ProtectedRoute>
+                <LaunchSite />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites/new-manual"
             element={
               <ProtectedRoute adminOnly>
                 <NewSite />

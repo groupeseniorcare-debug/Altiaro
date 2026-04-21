@@ -19,7 +19,6 @@ import {
   Bank,
   GoogleLogo,
   Fire,
-  Lightning,
 } from "@phosphor-icons/react";
 
 export default function Layout({ children }) {
@@ -27,28 +26,30 @@ export default function Layout({ children }) {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const links = [
-    { to: "/", label: "Tableau de bord", icon: House, testId: "nav-dashboard" },
-    { to: "/scan", label: "Scan Express", icon: Lightning, testId: "nav-scan" },
-    { to: "/sites", label: "Sites", icon: SquaresFour, testId: "nav-sites" },
-    { to: "/niches", label: "Analyseur", icon: Target, testId: "nav-niches" },
-    ...(user?.role === "admin"
-      ? [
-          { to: "/empire", label: "Empire", icon: Globe, testId: "nav-empire" },
-          { to: "/orders", label: "Commandes", icon: Package, testId: "nav-orders" },
-          { to: "/admin/payouts", label: "Virements", icon: Bank, testId: "nav-admin-payouts" },
-          { to: "/admin/google-ads", label: "Google Ads", icon: GoogleLogo, testId: "nav-google-ads" },
-          { to: "/admin/opportunities", label: "Opportunités", icon: Fire, testId: "nav-opportunities" },
-          { to: "/validations", label: "Activité", icon: CheckSquare, testId: "nav-validations" },
-          { to: "/finances", label: "Finances", icon: ChartLineUp, testId: "nav-finances" },
-          { to: "/billing", label: "Paiements", icon: CreditCard, testId: "nav-billing" },
-          { to: "/users", label: "Équipe", icon: Users, testId: "nav-users" },
-        ]
-      : [
-          { to: "/billing", label: "Mon compte", icon: CreditCard, testId: "nav-billing" },
-          { to: "/finances", label: "Mes paiements", icon: ChartLineUp, testId: "nav-finances" },
-        ]),
-  ];
+  const isAdmin = user?.role === "admin";
+  const links = isAdmin
+    ? [
+        { to: "/", label: "Tableau de bord", icon: House, testId: "nav-dashboard" },
+        { to: "/sites/new", label: "Lancer un site", icon: Rocket, testId: "nav-launch" },
+        { to: "/sites", label: "Sites", icon: SquaresFour, testId: "nav-sites" },
+        { to: "/niches", label: "Analyseur", icon: Target, testId: "nav-niches" },
+        { to: "/empire", label: "Empire", icon: Globe, testId: "nav-empire" },
+        { to: "/orders", label: "Commandes", icon: Package, testId: "nav-orders" },
+        { to: "/admin/payouts", label: "Virements", icon: Bank, testId: "nav-admin-payouts" },
+        { to: "/admin/google-ads", label: "Google Ads", icon: GoogleLogo, testId: "nav-google-ads" },
+        { to: "/admin/opportunities", label: "Opportunités", icon: Fire, testId: "nav-opportunities" },
+        { to: "/validations", label: "Activité", icon: CheckSquare, testId: "nav-validations" },
+        { to: "/finances", label: "Finances", icon: ChartLineUp, testId: "nav-finances" },
+        { to: "/billing", label: "Paiements", icon: CreditCard, testId: "nav-billing" },
+        { to: "/users", label: "Équipe", icon: Users, testId: "nav-users" },
+      ]
+    : [
+        { to: "/", label: "Dashboard", icon: House, testId: "nav-dashboard" },
+        { to: "/sites", label: "Sites", icon: SquaresFour, testId: "nav-sites" },
+        { to: "/sites/new", label: "Lancer un site", icon: Rocket, testId: "nav-launch" },
+        { to: "/finances", label: "Finance", icon: ChartLineUp, testId: "nav-finances" },
+        { to: "/billing", label: "Compte", icon: CreditCard, testId: "nav-billing" },
+      ];
 
   const handleLogout = async () => {
     await logout();

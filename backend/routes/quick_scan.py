@@ -40,9 +40,14 @@ EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 # Seuils Go/No-Go (tunables via .env pour ajuster sans déployer)
 MIN_PRICE_EUR = float(os.environ.get("QS_MIN_PRICE_EUR", "50"))
 MIN_VOLUME_TOTAL = int(os.environ.get("QS_MIN_VOLUME_TOTAL", "5000"))
-MAX_COMPETITION_INDEX = int(os.environ.get("QS_MAX_COMPETITION", "66"))
+MAX_COMPETITION_INDEX = int(os.environ.get("QS_MAX_COMPETITION", "75"))
 MAX_ACQ_COST_PCT = float(os.environ.get("QS_MAX_ACQ_COST_PCT", "40"))
 ASSUMED_CONV_RATE = float(os.environ.get("QS_ASSUMED_CONV_RATE", "0.02"))  # 2% e-com senior
+
+# 6 marchés Silver Economy à forts pouvoir d'achat 60+
+DEFAULT_MULTI_MARKETS = os.environ.get(
+    "QS_MULTI_MARKETS", "FR,DE,BE,NL,CH,IT"
+).split(",")
 
 
 # ============== CLAUDE : variantes + prix concurrents ============== #
@@ -211,8 +216,8 @@ def _compute_verdict(metrics: dict, insights: dict) -> dict:
         {
             "label": f"Concurrence Google ≤ {MAX_COMPETITION_INDEX}/100",
             "value": f"{competition}/100",
-            "status": "pass" if competition <= MAX_COMPETITION_INDEX else "fail",
-            "required": True,
+            "status": "pass" if competition <= MAX_COMPETITION_INDEX else "warn",
+            "required": False,  # soft constraint : warn only
         },
         {
             "label": f"Coût acquisition Ads ≤ {MAX_ACQ_COST_PCT:.0f}% du prix",
@@ -232,22 +237,29 @@ def _compute_verdict(metrics: dict, insights: dict) -> dict:
             red_flags.append(rf)
 
     required_failures = [c for c in checklist if c["required"] and c["status"] == "fail"]
-    hard_fail = len(required_failures) > 0 or insights.get("market_trend") == "declining" or insights.get("is_saturated")
+    hard_fail = (
+        len(required_failures) > 0
+        or insights.get("market_trend") == "declining"
+        or insights.get("is_saturated")
+    )
+    competition_warn = competition > MAX_COMPETITION_INDEX
 
-    # Score 0-100
+    # Score 0-100 (concurrence pèse moins car déjà soft)
     score = 0
     if avg_price >= 100:
         score += 25
     elif avg_price >= MIN_PRICE_EUR:
         score += 15
     if volume >= 20000:
-        score += 25
+        score += 30
     elif volume >= MIN_VOLUME_TOTAL:
-        score += 15
+        score += 20
     if competition <= 33:
-        score += 25
+        score += 20
     elif competition <= MAX_COMPETITION_INDEX:
         score += 15
+    elif competition <= 85:
+        score += 8
     if acq_pct <= 25:
         score += 25
     elif acq_pct <= MAX_ACQ_COST_PCT:
@@ -256,6 +268,9 @@ def _compute_verdict(metrics: dict, insights: dict) -> dict:
     # Verdict
     if hard_fail:
         verdict = "NO_GO"
+    elif competition_warn:
+        verdict = "GO_WITH_RESERVE"
+        red_flags.insert(0, "Concurrence très élevée (>75/100) — coût Ads pénalisant")
     elif score >= 75:
         verdict = "GO"
     else:
@@ -265,8 +280,11 @@ def _compute_verdict(metrics: dict, insights: dict) -> dict:
     if verdict == "GO":
         reason = f"Niche robuste : volume {volume:,}/mois, prix moyen {avg_price:.0f}€, concurrence {competition}/100, CPA estimé {estimated_cpa:.0f}€ ({acq_pct:.0f}% du prix).".replace(",", " ")
         recommendation = "Lance-toi. Configure un budget Ads à 30€/jour pour démarrer et vise un ROAS > 2 sur les 30 premiers jours."
+    elif verdict == "GO_WITH_RESERVE" and competition_warn and not hard_fail:
+        reason = f"Tous les fondamentaux sont au vert sauf la concurrence : **{competition}/100** (seuil {MAX_COMPETITION_INDEX})."
+        recommendation = "GO possible mais **concurrence très élevée** : prévois un budget Ads 2× plus gros que sur un marché normal (60-80€/jour) et travaille le SEO/brand sur 6 mois minimum pour ne pas dépendre à 100% des enchères."
     elif verdict == "GO_WITH_RESERVE":
-        weakest = min(checklist, key=lambda c: 0 if c["status"] == "fail" else 1)
+        weakest = min(checklist, key=lambda c: 0 if c["status"] != "pass" else 1)
         reason = f"Opportunité correcte mais un critère est tendu : **{weakest['label']}** à {weakest['value']}."
         recommendation = "Teste avec un budget réduit (15€/jour max) pendant 14 jours. Si CPA réel dépasse tes simulations, pivote."
     else:
@@ -288,6 +306,7 @@ def _compute_verdict(metrics: dict, insights: dict) -> dict:
         "recommendation": recommendation,
         "checklist": checklist,
         "red_flags": red_flags,
+        "competition_high": competition_warn,
     }
 
 
@@ -297,29 +316,31 @@ class QuickScanInput(BaseModel):
     country: str = Field("FR", min_length=2, max_length=2)
 
 
-@router.post("/quick-scan")
-async def run_quick_scan(data: QuickScanInput, user: dict = Depends(get_current_user)):
-    """Lance un scan Go/No-Go express. ~30s."""
-    from routes.google_ads import MARKETS
-    market = MARKETS.get(data.country.upper())
-    if not market:
-        raise HTTPException(400, f"Pays non supporté : {data.country}")
+class MultiScanInput(BaseModel):
+    product_or_niche: str = Field(..., min_length=3, max_length=120)
+    countries: Optional[list[str]] = None  # if None, uses DEFAULT_MULTI_MARKETS
 
-    product = data.product_or_niche.strip()
+
+async def _run_single_scan(product: str, country: str, user_id: Optional[str]) -> dict:
+    """Core scan logic — used by both single and multi-market endpoints."""
+    from routes.google_ads import MARKETS
+    market = MARKETS.get(country.upper())
+    if not market:
+        raise HTTPException(400, f"Pays non supporté : {country}")
     country_name = market["name"]
 
-    # Étape 1 — Claude (variantes + prix + insights + volumes estimés en fallback)
+    # Étape 1 — Claude
     insights = await _claude_analysis(product, country_name)
     variants = insights.get("keyword_variants") or []
     avg_price = insights.get("avg_price_eur") or {}
     price_median = float(avg_price.get("median") or 0)
 
-    # Étape 2 — Google Ads (source primaire)
+    # Étape 2 — Google Ads
     seeds = [product] + list(variants)
-    ideas = await _fetch_google_volumes(seeds, data.country)
+    ideas = await _fetch_google_volumes(seeds, country)
     data_source = "google_ads" if ideas else "claude_estimate"
 
-    # Fallback : si Google Ads indisponible, utilise les estimations Claude
+    # Fallback Claude estimates
     if not ideas:
         est = insights.get("estimated_keyword_metrics") or []
         ideas = []
@@ -334,7 +355,7 @@ async def run_quick_scan(data: QuickScanInput, user: dict = Depends(get_current_
             })
         ideas.sort(key=lambda x: x["volume"], reverse=True)
 
-    # Trouve le mot-clé principal + les 3 plus gros variants (hors principal)
+    # Primary + top 3 variants
     primary = None
     for idea in ideas:
         if idea["keyword"].lower().strip() == product.lower().strip():
@@ -345,14 +366,12 @@ async def run_quick_scan(data: QuickScanInput, user: dict = Depends(get_current_
     others = [i for i in ideas if i is not primary][:3]
     top4 = ([primary] if primary else []) + others
 
-    # Compute aggregated metrics
     if top4:
         volume_total = sum(i["volume"] for i in top4)
         total_vol_safe = max(volume_total, 1)
         competition_weighted = round(
             sum(i["competition_index"] * i["volume"] for i in top4) / total_vol_safe
         )
-        # CPC pondéré = moyenne (low+high)/2 pondérée par volume
         cpc_weighted = round(
             sum(((i["cpc_low_eur"] + i["cpc_high_eur"]) / 2) * i["volume"] for i in top4) / total_vol_safe,
             2,
@@ -370,16 +389,15 @@ async def run_quick_scan(data: QuickScanInput, user: dict = Depends(get_current_
         "competition_weighted": competition_weighted,
         "cpc_weighted_eur": cpc_weighted,
     }
-
     verdict_data = _compute_verdict(metrics, insights)
 
-    result = {
+    return {
         "id": f"qs-{uuid.uuid4().hex[:12]}",
         "product_or_niche": product,
-        "country": data.country.upper(),
+        "country": country.upper(),
         "country_name": country_name,
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "created_by": user.get("id"),
+        "created_by": user_id,
         "metrics": metrics,
         "verdict": verdict_data["verdict"],
         "score": verdict_data["score"],
@@ -387,6 +405,7 @@ async def run_quick_scan(data: QuickScanInput, user: dict = Depends(get_current_
         "recommendation": verdict_data["recommendation"],
         "checklist": verdict_data["checklist"],
         "red_flags": verdict_data["red_flags"],
+        "competition_high": verdict_data.get("competition_high", False),
         "keywords": [
             {
                 "keyword": i["keyword"],
@@ -413,14 +432,87 @@ async def run_quick_scan(data: QuickScanInput, user: dict = Depends(get_current_
         },
     }
 
-    # Persist for history
+
+@router.post("/quick-scan")
+async def run_quick_scan(data: QuickScanInput, user: dict = Depends(get_current_user)):
+    """Lance un scan Go/No-Go sur 1 marché."""
+    result = await _run_single_scan(
+        data.product_or_niche.strip(),
+        data.country,
+        user.get("id"),
+    )
     await db.quick_scans.insert_one(dict(result))
     return result
 
 
+@router.post("/quick-scan/multi")
+async def run_multi_market_scan(
+    data: MultiScanInput,
+    user: dict = Depends(get_current_user),
+):
+    """Lance un scan Go/No-Go en parallèle sur 6 marchés (FR, DE, BE, NL, CH, IT).
+
+    Retourne un tableau trié par score décroissant. Chaque marché reçoit son propre
+    appel Claude pour capturer les spécificités (prix, concurrents, réglementation
+    locale).
+    """
+    product = data.product_or_niche.strip()
+    countries = [c.upper().strip() for c in (data.countries or DEFAULT_MULTI_MARKETS) if c.strip()]
+    # Dedupe + cap à 8 max
+    countries = list(dict.fromkeys(countries))[:8]
+    group_id = f"mg-{uuid.uuid4().hex[:12]}"
+
+    async def _safe_scan(cc: str) -> dict:
+        try:
+            r = await _run_single_scan(product, cc, user.get("id"))
+            r["multi_group_id"] = group_id
+            return r
+        except HTTPException as e:
+            return {
+                "country": cc,
+                "error": e.detail,
+                "verdict": "ERROR",
+                "multi_group_id": group_id,
+            }
+        except Exception as e:
+            logger.exception(f"multi-scan failed for {cc}")
+            return {
+                "country": cc,
+                "error": str(e)[:200],
+                "verdict": "ERROR",
+                "multi_group_id": group_id,
+            }
+
+    tasks = [_safe_scan(cc) for cc in countries]
+    results = await asyncio.gather(*tasks)
+
+    # Persist all valid scans for history
+    to_store = [r for r in results if r.get("verdict") != "ERROR"]
+    if to_store:
+        await db.quick_scans.insert_many([dict(r) for r in to_store])
+
+    # Sort: GO (score desc) → GO_WITH_RESERVE → NO_GO → ERROR
+    order = {"GO": 0, "GO_WITH_RESERVE": 1, "NO_GO": 2, "ERROR": 3}
+    results.sort(key=lambda r: (order.get(r.get("verdict"), 9), -(r.get("score") or 0)))
+
+    return {
+        "group_id": group_id,
+        "product_or_niche": product,
+        "countries": countries,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "results": results,
+        "summary": {
+            "go": sum(1 for r in results if r.get("verdict") == "GO"),
+            "go_with_reserve": sum(1 for r in results if r.get("verdict") == "GO_WITH_RESERVE"),
+            "no_go": sum(1 for r in results if r.get("verdict") == "NO_GO"),
+            "error": sum(1 for r in results if r.get("verdict") == "ERROR"),
+        },
+    }
+
+
 @router.get("/quick-scan/history")
 async def list_quick_scans(user: dict = Depends(get_current_user), limit: int = 50):
-    """Liste les scans du user (ou tous si admin)."""
+    """Liste les scans du user (ou tous si admin). Groupe les multi-scans."""
     q = {} if user.get("role") == "admin" else {"created_by": user.get("id")}
     cursor = db.quick_scans.find(q, {"_id": 0}).sort("created_at", -1).limit(limit)
     return {"scans": await cursor.to_list(limit)}

@@ -75,6 +75,9 @@ Les 50 étapes du playbook sont regroupées en 4 blocs :
 | 39 | **Storefront splitté en composants** (`components/storefront/{Hero,Benefits,ProductGrid,Testimonials,FAQSection,FinalCTA,NarrativeProduct}.jsx` + `storefrontUtils.js`) | ✅ |
 | 40 | **Emails Resend domaine acheté / échec OVH** (envoyés au Concepteur post-webhook Mollie) | ✅ |
 | 41 | **Scan Express Go/No-Go** (Claude + Google Keyword Planner → verdict en 30s sur prix, volume, concurrence, rentabilité Ads) | ✅ |
+| 42 | **Scan multi-marché parallèle** (6 pays UE : FR/DE/BE/NL/CH/IT) + page "Lancer un site" qui fusionne scan + sélection marchés + création via `/sites/new` | ✅ |
+| 43 | **Seuil concurrence 66 → 75** + règle soft "GO avec réserve" quand concurrence > 75 mais autres critères OK | ✅ |
+| 44 | **Menu Concepteur restructuré** : Dashboard / Sites / Lancer un site / Finance / Compte | ✅ |
 
 ## Règles critiques
 - Pas de Shopify — tout custom React/FastAPI.
