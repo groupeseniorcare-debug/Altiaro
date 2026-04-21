@@ -44,17 +44,17 @@ MAX_COMPETITION_INDEX = int(os.environ.get("QS_MAX_COMPETITION", "75"))
 MAX_ACQ_COST_PCT = float(os.environ.get("QS_MAX_ACQ_COST_PCT", "40"))
 ASSUMED_CONV_RATE = float(os.environ.get("QS_ASSUMED_CONV_RATE", "0.02"))  # 2% e-com senior
 
-# 5 marchés cibles Silver Economy (Benelux agrégé)
+# 6 marchés cibles — Benelux dissocié : Belgique+Lux ensemble, Pays-Bas à part
 DEFAULT_MULTI_MARKETS = os.environ.get(
-    "QS_MULTI_MARKETS", "FR,DE,BNL,CH,UK"
+    "QS_MULTI_MARKETS", "FR,DE,BL,NL,CH,UK"
 ).split(",")
 
 # Agrégations : un code virtuel qui combine plusieurs vrais marchés.
 # Le scan exécute chaque sous-marché séparément puis merge les métriques.
 MARKET_AGGREGATES = {
-    "BNL": {
-        "name": "Benelux",
-        "members": ["BE", "NL", "LU"],
+    "BL": {
+        "name": "Belgique + Luxembourg",
+        "members": ["BE", "LU"],
     },
 }
 
@@ -579,10 +579,9 @@ async def run_multi_market_scan(
     data: MultiScanInput,
     user: dict = Depends(get_current_user),
 ):
-    """Démarre un scan Go/No-Go en arrière-plan sur 5 marchés (FR/DE/BNL/CH/UK).
+    """Démarre un scan Go/No-Go en arrière-plan sur 6 marchés (FR/DE/BL/NL/CH/UK).
 
-    Le code "BNL" est un agrégat Benelux (BE + NL + LU) exécuté en parallèle
-    puis mergé dans un seul résultat.
+    Le code "BL" est un agrégat Belgique + Luxembourg (Pays-Bas scanné séparément).
 
     Retourne immédiatement `{group_id, status: "running"}` — le frontend doit
     ensuite poller `GET /quick-scan/multi/{group_id}` toutes les 2-3s pour voir

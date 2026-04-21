@@ -33,5 +33,5 @@ async def platform_info():
         "email": "contact@altiaro.com",
         "website": "https://altiaro.com",
         "founded": 2026,
-        "markets": ["FR", "DE", "BNL", "CH", "UK"],
+        "markets": ["FR", "DE", "BL", "NL", "CH", "UK"],
     }
