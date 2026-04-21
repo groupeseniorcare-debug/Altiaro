@@ -69,7 +69,7 @@ export default function Wizard() {
   if (loading) {
     return (
       <Layout>
-        <div className="p-12 text-[#78716C]">Chargement du wizard…</div>
+        <div className="p-12 text-zinc-500">Chargement du wizard…</div>
       </Layout>
     );
   }
@@ -84,19 +84,19 @@ export default function Wizard() {
       <div className="p-8 md:p-12 max-w-[1200px]">
         <button
           onClick={() => navigate(`/sites/${siteId}`)}
-          className="flex items-center gap-2 text-sm text-[#78716C] hover:text-[#1C1917] mb-6 transition"
+          className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-100 mb-6 transition"
           data-testid="wizard-back"
         >
           <ArrowLeft size={16} /> Retour au site
         </button>
 
-        <div className="bg-gradient-to-br from-[#1C1917] via-[#44403C] to-[#7C3AED] rounded-2xl p-8 mb-8 text-white">
+        <div className="bg-gradient-to-br from-[#1C1917] via-[#44403C] to-[#7C3AED] rounded-md p-8 mb-8 text-white">
           <div className="flex items-start justify-between gap-6">
             <div>
               <div className="text-[11px] uppercase tracking-widest text-white/60 mb-2">
                 Wizard de création · 10 étapes guidées
               </div>
-              <h1 className="font-heading text-4xl font-semibold mb-2">
+              <h1 className="text-3xl font-semibold mb-2">
                 Lance ta boutique, étape par étape
               </h1>
               <p className="text-white/80 max-w-2xl">
@@ -112,13 +112,13 @@ export default function Wizard() {
             </div>
             <div className="text-right min-w-[180px]">
               <div className="text-[11px] uppercase tracking-widest text-white/60">Avancement</div>
-              <div className="font-heading text-5xl font-semibold">{percent}%</div>
+              <div className="text-4xl font-semibold">{percent}%</div>
               <div className="text-sm text-white/70 mt-1">
                 {state?.progress?.done} / {state?.progress?.total} étapes complétées
               </div>
-              <div className="w-44 h-2 bg-white/20 rounded-full overflow-hidden mt-3 ml-auto">
+              <div className="w-44 h-2 bg-zinc-950/20 rounded-full overflow-hidden mt-3 ml-auto">
                 <div
-                  className="h-full bg-white rounded-full transition-all duration-500"
+                  className="h-full bg-zinc-950 rounded-full transition-all duration-500"
                   style={{ width: `${percent}%` }}
                 />
               </div>
@@ -139,12 +139,12 @@ export default function Wizard() {
               <div
                 key={d.id}
                 data-testid={`wizard-step-${d.id}`}
-                className={`bg-white rounded-xl border p-5 transition ${
+                className={`bg-zinc-950 rounded-xl border p-5 transition ${
                   done
                     ? "border-[#D1FAE5]"
                     : isCurrent
                     ? "border-[#7C3AED] shadow-md"
-                    : "border-[#E7E5E4]"
+                    : "border-zinc-800"
                 }`}
               >
                 <div className="flex items-start gap-4">
@@ -152,14 +152,14 @@ export default function Wizard() {
                     <div
                       className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${
                         done
-                          ? "bg-[#D1FAE5]"
+                          ? "bg-emerald-500/10"
                           : isCurrent
                           ? "bg-[#EDE9FE]"
-                          : "bg-[#F5F2EB]"
+                          : "bg-zinc-800"
                       }`}
                     >
                       {done ? (
-                        <CheckCircle size={22} weight="fill" className="text-[#047857]" />
+                        <CheckCircle size={22} weight="fill" className="text-emerald-400" />
                       ) : (
                         <span>{d.icon}</span>
                       )}
@@ -170,11 +170,11 @@ export default function Wizard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-mono text-[#78716C]">
+                      <span className="text-xs font-mono text-zinc-500">
                         Étape {idx + 1}/10
                       </span>
                       {done && (
-                        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#D1FAE5] text-[#047857] font-medium">
+                        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-medium">
                           ✓ Complétée
                         </span>
                       )}
@@ -184,17 +184,17 @@ export default function Wizard() {
                         </span>
                       )}
                     </div>
-                    <h3 className="font-heading text-xl font-semibold text-[#1C1917] mb-1">
+                    <h3 className="text-lg font-semibold text-zinc-100 mb-1">
                       {d.title}
                     </h3>
-                    <p className="text-sm text-[#57534E]">{d.desc}</p>
+                    <p className="text-sm text-zinc-400">{d.desc}</p>
                   </div>
                   <div className="flex flex-col gap-2 items-end">
                     {actionPath && (
                       <button
                         onClick={() => navigate(actionPath)}
                         data-testid={`wizard-action-${d.id}`}
-                        className="h-9 px-3 rounded-lg bg-[#1C1917] hover:bg-[#44403C] text-white text-xs font-medium flex items-center gap-1.5 transition whitespace-nowrap"
+                        className="h-9 px-3 rounded-lg bg-white hover:bg-zinc-200 text-black text-xs font-medium flex items-center gap-1.5 transition whitespace-nowrap"
                       >
                         <ActionIcon size={12} weight="bold" /> {Action.label}
                       </button>
@@ -215,7 +215,7 @@ export default function Wizard() {
                         }
                         disabled={marking === d.id}
                         data-testid={`wizard-mark-done-${d.id}`}
-                        className="h-9 px-3 rounded-lg bg-white border border-[#D1FAE5] hover:bg-[#D1FAE5]/40 text-[#047857] text-xs font-medium flex items-center gap-1.5 transition disabled:opacity-60"
+                        className="h-9 px-3 rounded-lg bg-zinc-950 border border-[#D1FAE5] hover:bg-emerald-500/10/40 text-emerald-400 text-xs font-medium flex items-center gap-1.5 transition disabled:opacity-60"
                       >
                         {marking === d.id ? (
                           <ArrowClockwise size={12} className="animate-spin" />
@@ -229,7 +229,7 @@ export default function Wizard() {
                         onClick={() => mark(d.id, "pending")}
                         disabled={marking === d.id}
                         data-testid={`wizard-reopen-${d.id}`}
-                        className="h-9 px-3 rounded-lg bg-white border border-[#E7E5E4] hover:border-[#78716C] text-[#57534E] text-xs font-medium flex items-center gap-1.5 transition disabled:opacity-60"
+                        className="h-9 px-3 rounded-lg bg-zinc-950 border border-zinc-800 hover:border-[#78716C] text-zinc-400 text-xs font-medium flex items-center gap-1.5 transition disabled:opacity-60"
                       >
                         <Circle size={12} /> Rouvrir
                       </button>
@@ -247,10 +247,10 @@ export default function Wizard() {
               <Rocket size={22} weight="fill" className="text-white" />
             </div>
             <div className="flex-1">
-              <div className="font-heading text-xl font-semibold text-[#065F46] mb-1">
+              <div className="text-lg font-semibold text-emerald-300 mb-1">
                 🎉 Ta boutique est prête !
               </div>
-              <p className="text-sm text-[#065F46]">
+              <p className="text-sm text-emerald-300">
                 Les 10 étapes sont complétées. Tu peux maintenant ouvrir ta boutique en public ou
                 brancher un domaine custom.
               </p>

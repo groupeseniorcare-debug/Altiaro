@@ -168,7 +168,7 @@ export default function GoogleAds() {
       <div className="p-8 md:p-12 max-w-[1400px]">
         <button
           onClick={() => navigate("/")}
-          className="flex items-center gap-2 text-sm text-[#78716C] hover:text-[#1C1917] mb-6 transition"
+          className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-100 mb-6 transition"
           data-testid="gads-back"
         >
           <ArrowLeft size={16} /> Retour au tableau de bord
@@ -180,14 +180,14 @@ export default function GoogleAds() {
               <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-[#4285F4] via-[#EA4335] to-[#FBBC05] flex items-center justify-center">
                 <GoogleLogo size={22} weight="bold" color="#fff" />
               </div>
-              <span className="text-[11px] uppercase tracking-widest text-[#78716C]">
+              <span className="text-[11px] uppercase tracking-widest text-zinc-500">
                 Sprint 19 · Admin only
               </span>
             </div>
-            <h1 className="font-heading text-4xl font-semibold text-[#1C1917] mb-1">
+            <h1 className="text-3xl font-semibold text-zinc-100 mb-1">
               Google Ads Center
             </h1>
-            <p className="text-[#57534E]">
+            <p className="text-zinc-400">
               Pilote tes campagnes + enrichis l'Analyseur avec les <strong>vrais volumes Google</strong>{" "}
               (Keyword Planner API).
             </p>
@@ -199,8 +199,8 @@ export default function GoogleAds() {
             data-testid="gads-msg"
             className={`mb-5 p-3 rounded-lg text-sm flex items-start gap-2 ${
               msg.kind === "ok"
-                ? "bg-[#D1FAE5] text-[#047857]"
-                : "bg-[#FFE4E6] text-[#BE123C]"
+                ? "bg-emerald-500/10 text-emerald-400"
+                : "bg-red-500/10 text-red-400"
             }`}
           >
             {msg.kind === "ok" ? (
@@ -216,9 +216,9 @@ export default function GoogleAds() {
         )}
 
         {/* ======= CONNECTION STATE ======= */}
-        <div className="bg-white rounded-xl border border-[#E7E5E4] p-6 mb-6">
+        <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-6 mb-6">
           {!status?.config_ready ? (
-            <div className="flex items-center gap-3 text-[#B45309]">
+            <div className="flex items-center gap-3 text-amber-300">
               <Warning size={20} weight="fill" />
               Variables serveur manquantes. Vérifie GOOGLE_ADS_DEVELOPER_TOKEN, CLIENT_ID, SECRET,
               REDIRECT_URI dans backend/.env.
@@ -226,8 +226,8 @@ export default function GoogleAds() {
           ) : !status?.connected ? (
             <div className="flex items-center justify-between gap-4">
               <div>
-                <div className="font-medium text-[#1C1917] mb-1">Non connecté</div>
-                <p className="text-sm text-[#78716C]">
+                <div className="font-medium text-zinc-100 mb-1">Non connecté</div>
+                <p className="text-sm text-zinc-500">
                   Connecte ton compte Google Ads pour activer le Keyword Planner et voir tes
                   campagnes. Tu seras redirigé vers Google pour autoriser.
                 </p>
@@ -251,17 +251,17 @@ export default function GoogleAds() {
               <div className="flex items-center justify-between gap-4 mb-4">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <CheckCircle size={18} weight="fill" className="text-[#047857]" />
-                    <div className="font-medium text-[#1C1917]">Compte connecté</div>
+                    <CheckCircle size={18} weight="fill" className="text-emerald-400" />
+                    <div className="font-medium text-zinc-100">Compte connecté</div>
                   </div>
-                  <p className="text-xs text-[#78716C]">
+                  <p className="text-xs text-zinc-500">
                     Mis à jour : {status.updated_at?.slice(0, 16).replace("T", " ")}
                   </p>
                 </div>
                 <button
                   onClick={handleDisconnect}
                   data-testid="gads-disconnect"
-                  className="h-9 px-3 rounded-lg text-xs text-[#BE123C] hover:bg-[#FFE4E6] transition"
+                  className="h-9 px-3 rounded-lg text-xs text-red-400 hover:bg-red-500/10 transition"
                 >
                   Déconnecter
                 </button>
@@ -270,7 +270,7 @@ export default function GoogleAds() {
               {/* Customer ID selector */}
               {customers.length > 0 && (
                 <div className="mb-3">
-                  <label className="block text-xs font-semibold text-[#57534E] mb-1.5 uppercase tracking-wider">
+                  <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">
                     Compte Google Ads cible (Customer ID)
                   </label>
                   <div className="flex gap-2">
@@ -278,7 +278,7 @@ export default function GoogleAds() {
                       value={selectedCid}
                       onChange={(e) => setSelectedCid(e.target.value)}
                       data-testid="gads-customer-select"
-                      className="flex-1 h-11 px-3 rounded-lg border border-[#E7E5E4] bg-white text-sm focus:outline-none focus:border-[#4285F4]"
+                      className="flex-1 h-11 px-3 rounded-lg border border-zinc-800 bg-zinc-950 text-sm focus:outline-none focus:border-[#4285F4]"
                     >
                       {customers.map((c) => (
                         <option key={c.customer_id} value={c.customer_id}>
@@ -309,15 +309,15 @@ export default function GoogleAds() {
                       Définir comme cible
                     </button>
                   </div>
-                  <p className="text-[11px] text-[#78716C] mt-1">
+                  <p className="text-[11px] text-zinc-500 mt-1">
                     💡 Choisis le compte qui a des campagnes actives (pas un MCC). Requis pour le Keyword Planner.
                   </p>
                 </div>
               )}
 
               {/* Login Customer ID (MCC) */}
-              <div className="bg-[#FAF7F2] rounded-lg p-3">
-                <label className="block text-xs font-semibold text-[#57534E] mb-1.5 uppercase tracking-wider">
+              <div className="bg-zinc-900/40 rounded-lg p-3">
+                <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">
                   Login Customer ID (MCC) — optionnel
                 </label>
                 <div className="flex gap-2">
@@ -327,18 +327,18 @@ export default function GoogleAds() {
                     onChange={(e) => setLoginCidInput(e.target.value.replace(/[^0-9-]/g, ""))}
                     placeholder="123-456-7890 (ton MCC, sans tirets OK)"
                     data-testid="gads-login-cid-input"
-                    className="flex-1 h-10 px-3 rounded-lg border border-[#E7E5E4] bg-white text-sm font-mono focus:outline-none focus:border-[#4285F4]"
+                    className="flex-1 h-10 px-3 rounded-lg border border-zinc-800 bg-zinc-950 text-sm font-mono focus:outline-none focus:border-[#4285F4]"
                   />
                   <button
                     onClick={handleSaveLoginCid}
                     disabled={busy || !loginCidInput}
                     data-testid="gads-save-login-cid"
-                    className="h-10 px-4 rounded-lg bg-[#1C1917] hover:bg-[#44403C] text-white text-xs font-medium disabled:opacity-50"
+                    className="h-10 px-4 rounded-lg bg-white hover:bg-zinc-200 text-black text-xs font-medium disabled:opacity-50"
                   >
                     Enregistrer
                   </button>
                 </div>
-                <p className="text-[11px] text-[#78716C] mt-1.5">
+                <p className="text-[11px] text-zinc-500 mt-1.5">
                   Nécessaire si ton compte Google Ads est accessible via un MCC. Trouve-le en haut à
                   droite dans Google Ads.
                 </p>
@@ -350,16 +350,16 @@ export default function GoogleAds() {
         {status?.connected && (
           <>
             {/* ======= KEYWORD PLANNER ======= */}
-            <div className="bg-white rounded-xl border border-[#E7E5E4] p-6 mb-6">
+            <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-6 mb-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-9 h-9 rounded-lg bg-[#EDE9FE] flex items-center justify-center">
                   <MagnifyingGlass size={16} weight="bold" className="text-[#6D28D9]" />
                 </div>
                 <div>
-                  <h2 className="font-heading text-xl font-semibold text-[#1C1917]">
+                  <h2 className="text-lg font-semibold text-zinc-100">
                     Keyword Planner
                   </h2>
-                  <p className="text-xs text-[#78716C]">
+                  <p className="text-xs text-zinc-500">
                     Volumes réels Google + competition index + fourchette CPC
                   </p>
                 </div>
@@ -367,7 +367,7 @@ export default function GoogleAds() {
 
               <div className="flex flex-col md:flex-row md:items-end gap-3 mb-4">
                 <div className="flex-1">
-                  <label className="block text-xs font-semibold text-[#57534E] mb-1.5 uppercase tracking-wider">
+                  <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">
                     Mots-clés seed (séparés par virgule)
                   </label>
                   <input
@@ -377,18 +377,18 @@ export default function GoogleAds() {
                     onKeyDown={(e) => e.key === "Enter" && runKeywordIdeas()}
                     placeholder="fauteuil releveur, siège releveur senior, fauteuil relaxation électrique"
                     data-testid="gads-kw-seed"
-                    className="w-full h-11 px-3 rounded-lg border border-[#E7E5E4] bg-white text-sm focus:outline-none focus:border-[#6D28D9]"
+                    className="w-full h-11 px-3 rounded-lg border border-zinc-800 bg-zinc-950 text-sm focus:outline-none focus:border-[#6D28D9]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[#57534E] mb-1.5 uppercase tracking-wider">
+                  <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">
                     Pays
                   </label>
                   <select
                     value={country}
                     onChange={(e) => setCountry(e.target.value)}
                     data-testid="gads-kw-country"
-                    className="h-11 px-3 rounded-lg border border-[#E7E5E4] bg-white text-sm focus:outline-none focus:border-[#6D28D9]"
+                    className="h-11 px-3 rounded-lg border border-zinc-800 bg-zinc-950 text-sm focus:outline-none focus:border-[#6D28D9]"
                   >
                     {MARKETS.map((m) => (
                       <option key={m.code} value={m.code}>
@@ -416,26 +416,26 @@ export default function GoogleAds() {
               </div>
 
               {ideas.length > 0 && (
-                <div className="overflow-x-auto rounded-lg border border-[#E7E5E4]" data-testid="gads-kw-table">
+                <div className="overflow-x-auto rounded-lg border border-zinc-800" data-testid="gads-kw-table">
                   <table className="w-full text-sm">
-                    <thead className="bg-[#FAF7F2] border-b border-[#E7E5E4]">
+                    <thead className="bg-zinc-900/40 border-b border-zinc-800">
                       <tr>
-                        <th className="text-left p-2.5 text-xs font-semibold text-[#57534E] uppercase">Mot-clé</th>
-                        <th className="text-right p-2.5 text-xs font-semibold text-[#57534E] uppercase">Volume/mois</th>
-                        <th className="text-center p-2.5 text-xs font-semibold text-[#57534E] uppercase">Compétition</th>
-                        <th className="text-right p-2.5 text-xs font-semibold text-[#57534E] uppercase">Index</th>
-                        <th className="text-right p-2.5 text-xs font-semibold text-[#57534E] uppercase">CPC bas</th>
-                        <th className="text-right p-2.5 text-xs font-semibold text-[#57534E] uppercase">CPC haut</th>
+                        <th className="text-left p-2.5 text-xs font-semibold text-zinc-400 uppercase">Mot-clé</th>
+                        <th className="text-right p-2.5 text-xs font-semibold text-zinc-400 uppercase">Volume/mois</th>
+                        <th className="text-center p-2.5 text-xs font-semibold text-zinc-400 uppercase">Compétition</th>
+                        <th className="text-right p-2.5 text-xs font-semibold text-zinc-400 uppercase">Index</th>
+                        <th className="text-right p-2.5 text-xs font-semibold text-zinc-400 uppercase">CPC bas</th>
+                        <th className="text-right p-2.5 text-xs font-semibold text-zinc-400 uppercase">CPC haut</th>
                       </tr>
                     </thead>
                     <tbody>
                       {ideas.map((i, idx) => (
                         <tr
                           key={idx}
-                          className="border-b border-[#F5F2EB] hover:bg-[#FAF7F2]/50"
+                          className="border-b border-zinc-900 hover:bg-zinc-900/40/50"
                         >
-                          <td className="p-2.5 font-medium text-[#1C1917]">{i.keyword}</td>
-                          <td className="p-2.5 text-right font-mono font-semibold text-[#1C1917]">
+                          <td className="p-2.5 font-medium text-zinc-100">{i.keyword}</td>
+                          <td className="p-2.5 text-right font-mono font-semibold text-zinc-100">
                             {i.avg_monthly_searches.toLocaleString("fr-FR")}
                           </td>
                           <td className="p-2.5 text-center">
@@ -446,13 +446,13 @@ export default function GoogleAds() {
                               {i.competition}
                             </span>
                           </td>
-                          <td className="p-2.5 text-right font-mono text-xs text-[#78716C]">
+                          <td className="p-2.5 text-right font-mono text-xs text-zinc-500">
                             {i.competition_index}/100
                           </td>
-                          <td className="p-2.5 text-right font-mono text-xs text-[#78716C]">
+                          <td className="p-2.5 text-right font-mono text-xs text-zinc-500">
                             {i.low_top_of_page_bid_eur.toFixed(2)}€
                           </td>
-                          <td className="p-2.5 text-right font-mono text-xs text-[#1C1917]">
+                          <td className="p-2.5 text-right font-mono text-xs text-zinc-100">
                             {i.high_top_of_page_bid_eur.toFixed(2)}€
                           </td>
                         </tr>
@@ -464,17 +464,17 @@ export default function GoogleAds() {
             </div>
 
             {/* ======= CAMPAIGNS ======= */}
-            <div className="bg-white rounded-xl border border-[#E7E5E4] p-6">
+            <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-[#FEF3C7] flex items-center justify-center">
-                    <ChartBar size={16} weight="bold" className="text-[#B45309]" />
+                  <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                    <ChartBar size={16} weight="bold" className="text-amber-300" />
                   </div>
                   <div>
-                    <h2 className="font-heading text-xl font-semibold text-[#1C1917]">
+                    <h2 className="text-lg font-semibold text-zinc-100">
                       Campagnes actives
                     </h2>
-                    <p className="text-xs text-[#78716C]">Lecture seule — performances agrégées</p>
+                    <p className="text-xs text-zinc-500">Lecture seule — performances agrégées</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -482,7 +482,7 @@ export default function GoogleAds() {
                     value={days}
                     onChange={(e) => setDays(parseInt(e.target.value))}
                     data-testid="gads-camp-days"
-                    className="h-9 px-2 rounded-lg border border-[#E7E5E4] text-xs bg-white"
+                    className="h-9 px-2 rounded-lg border border-zinc-800 text-xs bg-zinc-950"
                   >
                     <option value={7}>7 jours</option>
                     <option value={14}>14 jours</option>
@@ -492,7 +492,7 @@ export default function GoogleAds() {
                     onClick={runCampaigns}
                     disabled={campLoading || !selectedCid}
                     data-testid="gads-camp-run"
-                    className="h-9 px-3 rounded-lg bg-[#1C1917] hover:bg-[#44403C] text-white text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
+                    className="h-9 px-3 rounded-lg bg-white hover:bg-zinc-200 text-black text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
                   >
                     {campLoading ? (
                       <ArrowClockwise size={12} className="animate-spin" />
@@ -505,42 +505,42 @@ export default function GoogleAds() {
               </div>
 
               {campaigns.length === 0 && !campLoading && (
-                <div className="py-8 text-center text-sm text-[#78716C]">
+                <div className="py-8 text-center text-sm text-zinc-500">
                   Clique sur "Charger" pour afficher tes campagnes.
                 </div>
               )}
 
               {campaigns.length > 0 && (
-                <div className="overflow-x-auto rounded-lg border border-[#E7E5E4]" data-testid="gads-camp-table">
+                <div className="overflow-x-auto rounded-lg border border-zinc-800" data-testid="gads-camp-table">
                   <table className="w-full text-sm">
-                    <thead className="bg-[#FAF7F2] border-b border-[#E7E5E4]">
+                    <thead className="bg-zinc-900/40 border-b border-zinc-800">
                       <tr>
-                        <th className="text-left p-2.5 text-xs font-semibold text-[#57534E] uppercase">Campagne</th>
-                        <th className="text-left p-2.5 text-xs font-semibold text-[#57534E] uppercase">Status</th>
-                        <th className="text-right p-2.5 text-xs font-semibold text-[#57534E] uppercase">Impressions</th>
-                        <th className="text-right p-2.5 text-xs font-semibold text-[#57534E] uppercase">Clics</th>
-                        <th className="text-right p-2.5 text-xs font-semibold text-[#57534E] uppercase">CTR</th>
-                        <th className="text-right p-2.5 text-xs font-semibold text-[#57534E] uppercase">CPC moy.</th>
-                        <th className="text-right p-2.5 text-xs font-semibold text-[#57534E] uppercase">Coût</th>
-                        <th className="text-right p-2.5 text-xs font-semibold text-[#57534E] uppercase">Conv.</th>
+                        <th className="text-left p-2.5 text-xs font-semibold text-zinc-400 uppercase">Campagne</th>
+                        <th className="text-left p-2.5 text-xs font-semibold text-zinc-400 uppercase">Status</th>
+                        <th className="text-right p-2.5 text-xs font-semibold text-zinc-400 uppercase">Impressions</th>
+                        <th className="text-right p-2.5 text-xs font-semibold text-zinc-400 uppercase">Clics</th>
+                        <th className="text-right p-2.5 text-xs font-semibold text-zinc-400 uppercase">CTR</th>
+                        <th className="text-right p-2.5 text-xs font-semibold text-zinc-400 uppercase">CPC moy.</th>
+                        <th className="text-right p-2.5 text-xs font-semibold text-zinc-400 uppercase">Coût</th>
+                        <th className="text-right p-2.5 text-xs font-semibold text-zinc-400 uppercase">Conv.</th>
                       </tr>
                     </thead>
                     <tbody>
                       {campaigns.map((c) => (
                         <tr
                           key={c.campaign_id}
-                          className="border-b border-[#F5F2EB] hover:bg-[#FAF7F2]/50"
+                          className="border-b border-zinc-900 hover:bg-zinc-900/40/50"
                         >
                           <td className="p-2.5">
-                            <div className="font-medium text-[#1C1917]">{c.name}</div>
-                            <div className="text-[11px] text-[#78716C]">{c.channel}</div>
+                            <div className="font-medium text-zinc-100">{c.name}</div>
+                            <div className="text-[11px] text-zinc-500">{c.channel}</div>
                           </td>
                           <td className="p-2.5">
                             <span
                               className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-semibold ${
                                 c.status === "ENABLED"
-                                  ? "bg-[#D1FAE5] text-[#047857]"
-                                  : "bg-[#F5F5F4] text-[#78716C]"
+                                  ? "bg-emerald-500/10 text-emerald-400"
+                                  : "bg-[#F5F5F4] text-zinc-500"
                               }`}
                             >
                               {c.status}

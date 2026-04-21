@@ -136,16 +136,16 @@ function ConcepteurFinance() {
 
   return (
     <Layout>
-      <div className="p-8 md:p-12 max-w-[1400px]">
+      <div className="p-8 md:p-10 max-w-[1400px]">
         {/* Header */}
-        <div className="mb-8">
-          <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-2">
-            Finance · Ledger unifié
+        <div className="mb-6">
+          <div className="text-[10px] uppercase tracking-[0.12em] text-zinc-500 font-medium mb-1.5">
+            Ledger unifié
           </div>
-          <h1 className="font-heading text-4xl font-semibold text-[#1C1917]">Finance</h1>
-          <p className="text-[#57534E] mt-1">
-            Toutes tes entrées et sorties : parts commandes, prélèvements Ads, versements reçus.
-            Filtre par site ou période et retrouve chaque transaction.
+          <h1 className="text-3xl font-semibold text-zinc-100 tracking-tight">Finance</h1>
+          <p className="text-zinc-500 text-sm mt-1 max-w-xl">
+            Toutes tes entrées et sorties : parts commandes, prélèvements Ads, versements Mollie.
+            Filtre par site, période ou type.
           </p>
         </div>
 
@@ -191,17 +191,17 @@ function ConcepteurFinance() {
         )}
 
         {/* Filters */}
-        <div className="bg-white rounded-2xl border border-[#E7E5E4] p-5 mb-5" data-testid="finance-filters">
+        <div className="bg-zinc-950 rounded-md border border-zinc-900 p-5 mb-5" data-testid="finance-filters">
           <div className="flex items-center gap-2 mb-4">
-            <FunnelSimple size={16} className="text-[#78716C]" />
-            <div className="text-xs uppercase tracking-widest text-[#78716C] font-semibold">Filtres</div>
+            <FunnelSimple size={16} className="text-zinc-500" />
+            <div className="text-xs uppercase tracking-widest text-zinc-500 font-semibold">Filtres</div>
             <div className="ml-auto flex gap-2 flex-wrap">
               {presets.map((p) => (
                 <button
                   key={p.label}
                   onClick={() => applyPreset(p)}
                   data-testid={`preset-${p.label}`}
-                  className="h-8 px-3 rounded-full text-xs font-medium border border-[#E7E5E4] text-[#57534E] hover:bg-[#FAF7F2] hover:border-[#EA580C] transition"
+                  className="h-8 px-3 rounded-full text-xs font-medium border border-zinc-900 text-zinc-400 hover:bg-zinc-900/40 hover:border-zinc-600 transition"
                 >
                   {p.label}
                 </button>
@@ -214,7 +214,7 @@ function ConcepteurFinance() {
                 value={filters.site_id}
                 onChange={(e) => setFilters({ ...filters, site_id: e.target.value })}
                 data-testid="filter-site"
-                className="w-full h-10 px-3 rounded-lg border border-[#E7E5E4] bg-white text-sm focus:outline-none focus:border-[#EA580C]"
+                className="w-full h-10 px-3 rounded-lg border border-zinc-900 bg-zinc-950 text-sm focus:outline-none focus:border-zinc-600"
               >
                 <option value="">Tous les sites</option>
                 {sites.map((s) => (
@@ -229,7 +229,7 @@ function ConcepteurFinance() {
                 value={filters.type}
                 onChange={(e) => setFilters({ ...filters, type: e.target.value })}
                 data-testid="filter-type"
-                className="w-full h-10 px-3 rounded-lg border border-[#E7E5E4] bg-white text-sm focus:outline-none focus:border-[#EA580C]"
+                className="w-full h-10 px-3 rounded-lg border border-zinc-900 bg-zinc-950 text-sm focus:outline-none focus:border-zinc-600"
               >
                 <option value="">Tous</option>
                 <option value="order_share">Parts commandes</option>
@@ -243,7 +243,7 @@ function ConcepteurFinance() {
                 value={filters.since}
                 onChange={(e) => setFilters({ ...filters, since: e.target.value })}
                 data-testid="filter-since"
-                className="w-full h-10 px-3 rounded-lg border border-[#E7E5E4] bg-white text-sm focus:outline-none focus:border-[#EA580C]"
+                className="w-full h-10 px-3 rounded-lg border border-zinc-900 bg-zinc-950 text-sm focus:outline-none focus:border-zinc-600"
               />
             </FilterField>
             <FilterField label="Jusqu'au">
@@ -252,13 +252,13 @@ function ConcepteurFinance() {
                 value={filters.until}
                 onChange={(e) => setFilters({ ...filters, until: e.target.value })}
                 data-testid="filter-until"
-                className="w-full h-10 px-3 rounded-lg border border-[#E7E5E4] bg-white text-sm focus:outline-none focus:border-[#EA580C]"
+                className="w-full h-10 px-3 rounded-lg border border-zinc-900 bg-zinc-950 text-sm focus:outline-none focus:border-zinc-600"
               />
             </FilterField>
           </div>
           {(filters.site_id || filters.type || filters.since || filters.until) && (
             <div className="mt-3 flex items-center justify-between">
-              <div className="text-xs text-[#57534E]">
+              <div className="text-xs text-zinc-400">
                 {ledger?.count || 0} transactions · flux net :{" "}
                 <strong style={{ color: netFlow >= 0 ? "#047857" : "#BE123C" }}>
                   {fmtEur(netFlow)}
@@ -267,7 +267,7 @@ function ConcepteurFinance() {
               <button
                 onClick={() => setFilters({ site_id: "", type: "", since: "", until: "" })}
                 data-testid="filter-clear"
-                className="text-xs text-[#EA580C] hover:underline"
+                className="text-xs text-zinc-200 hover:underline"
               >
                 Effacer les filtres
               </button>
@@ -276,23 +276,23 @@ function ConcepteurFinance() {
         </div>
 
         {/* Ledger table */}
-        <div className="bg-white rounded-2xl border border-[#E7E5E4] overflow-hidden" data-testid="ledger-table">
+        <div className="bg-zinc-950 rounded-md border border-zinc-900 overflow-hidden" data-testid="ledger-table">
           {loading ? (
-            <div className="p-12 text-center text-[#78716C] flex items-center gap-2 justify-center">
+            <div className="p-12 text-center text-zinc-500 flex items-center gap-2 justify-center">
               <ArrowClockwise size={16} className="animate-spin" /> Chargement…
             </div>
           ) : ledger?.entries?.length === 0 ? (
             <div className="p-16 text-center">
-              <Receipt size={40} weight="thin" className="mx-auto text-[#D6D3D1] mb-3" />
-              <div className="text-[#78716C] mb-1">Aucune transaction sur cette période.</div>
-              <div className="text-xs text-[#A8A29E]">
+              <Receipt size={40} weight="thin" className="mx-auto text-zinc-700 mb-3" />
+              <div className="text-zinc-500 mb-1">Aucune transaction sur cette période.</div>
+              <div className="text-xs text-zinc-600">
                 Les entrées apparaîtront ici dès que tes sites réaliseront des ventes.
               </div>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-[#FAF7F2] border-b border-[#E7E5E4]">
+                <thead className="bg-zinc-900/40 border-b border-zinc-900">
                   <tr>
                     <Th>Date</Th>
                     <Th>Type</Th>
@@ -312,12 +312,12 @@ function ConcepteurFinance() {
           )}
         </div>
 
-        <div className="mt-6 p-4 rounded-xl bg-[#FAF7F2] border border-[#E7E5E4]">
-          <div className="flex items-start gap-2 text-xs text-[#57534E] leading-relaxed">
-            <Warning size={14} className="text-[#D97706] shrink-0 mt-0.5" />
+        <div className="mt-6 p-4 rounded-md bg-zinc-900/40 border border-zinc-900">
+          <div className="flex items-start gap-2 text-xs text-zinc-400 leading-relaxed">
+            <Warning size={14} className="text-amber-400 shrink-0 mt-0.5" />
             <div>
               Les versements Mollie sont exécutés <strong>tous les 15 jours</strong> sur l'IBAN
-              renseigné dans ton <Link to="/billing" className="text-[#EA580C] underline">Compte</Link>.
+              renseigné dans ton <Link to="/billing" className="text-zinc-200 underline">Compte</Link>.
               Les prélèvements Ads sont hebdomadaires (50% du budget dépensé).
             </div>
           </div>
@@ -330,31 +330,26 @@ function ConcepteurFinance() {
 function TotalCard({ label, value, sub, color, flow, icon: Icon, testId }) {
   return (
     <div
-      className="rounded-2xl p-5 border"
-      style={{ background: `${color}08`, borderColor: `${color}22` }}
+      className="rounded-md p-4 border bg-zinc-950"
+      style={{ borderColor: "#27272A" }}
       data-testid={testId}
     >
       <div className="flex items-center justify-between mb-3">
         <div>
-          <div className="text-[11px] uppercase tracking-widest font-semibold" style={{ color }}>
+          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold" style={{ color }}>
             {flow}
           </div>
-          <div className="text-xs text-[#78716C] mt-0.5">{label}</div>
+          <div className="text-[11px] text-zinc-500 mt-0.5">{label}</div>
         </div>
-        <div
-          className="w-10 h-10 rounded-full flex items-center justify-center"
-          style={{ background: color }}
-        >
-          <Icon size={18} weight="bold" color="#ffffff" />
-        </div>
+        <Icon size={14} weight="bold" className="text-zinc-600" />
       </div>
       <div
-        className="text-3xl font-semibold tracking-tight leading-tight"
-        style={{ color, fontFamily: 'Georgia, serif' }}
+        className="text-2xl font-semibold tracking-tight leading-none font-mono tabular-nums"
+        style={{ color }}
       >
         {value}
       </div>
-      <div className="text-xs text-[#78716C] mt-1">{sub}</div>
+      <div className="text-[11px] text-zinc-500 mt-1.5">{sub}</div>
     </div>
   );
 }
@@ -362,7 +357,7 @@ function TotalCard({ label, value, sub, color, flow, icon: Icon, testId }) {
 function FilterField({ label, children }) {
   return (
     <div>
-      <label className="block text-[11px] uppercase tracking-widest text-[#78716C] font-medium mb-1">
+      <label className="block text-[11px] uppercase tracking-widest text-zinc-500 font-medium mb-1">
         {label}
       </label>
       {children}
@@ -373,7 +368,7 @@ function FilterField({ label, children }) {
 function Th({ children, align = "left" }) {
   return (
     <th
-      className={`px-4 py-3 text-[11px] uppercase tracking-widest text-[#78716C] font-semibold text-${align}`}
+      className={`px-4 py-3 text-[11px] uppercase tracking-widest text-zinc-500 font-semibold text-${align}`}
     >
       {children}
     </th>
@@ -396,10 +391,10 @@ function LedgerRow({ entry }) {
 
   return (
     <tr
-      className="border-b border-[#F5F2EB] hover:bg-[#FAF7F2] transition"
+      className="border-b border-zinc-900 hover:bg-zinc-900/40 transition"
       data-testid={`row-${entry.id}`}
     >
-      <td className="px-4 py-3 text-[#57534E] whitespace-nowrap">{fmtDate(entry.created_at)}</td>
+      <td className="px-4 py-3 text-zinc-400 whitespace-nowrap">{fmtDate(entry.created_at)}</td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
           <div
@@ -408,11 +403,11 @@ function LedgerRow({ entry }) {
           >
             <TypeIcon size={12} weight="bold" color={type.color} />
           </div>
-          <span className="font-medium text-[#1C1917]">{type.label}</span>
+          <span className="font-medium text-zinc-100">{type.label}</span>
         </div>
       </td>
-      <td className="px-4 py-3 text-[#57534E]">{entry.site_name || "—"}</td>
-      <td className="px-4 py-3 text-xs text-[#78716C]">
+      <td className="px-4 py-3 text-zinc-400">{entry.site_name || "—"}</td>
+      <td className="px-4 py-3 text-xs text-zinc-500">
         {entry.note ||
           (entry.order_number ? `Cmd #${entry.order_number}` : entry.id.slice(0, 10))}
       </td>

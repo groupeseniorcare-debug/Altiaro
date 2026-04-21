@@ -128,7 +128,7 @@ export default function SiteProducts() {
   if (loading) {
     return (
       <Layout>
-        <div className="p-8 text-[#78716C]">Chargement…</div>
+        <div className="p-8 text-zinc-500">Chargement…</div>
       </Layout>
     );
   }
@@ -138,7 +138,7 @@ export default function SiteProducts() {
       <div className="p-8 md:p-12 max-w-7xl">
         <button
           onClick={() => navigate(`/sites/${siteId}`)}
-          className="flex items-center gap-2 text-sm text-[#78716C] hover:text-[#1C1917] mb-6 transition"
+          className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-100 mb-6 transition"
           data-testid="back-to-site"
         >
           <ArrowLeft size={16} /> Retour au site
@@ -146,11 +146,11 @@ export default function SiteProducts() {
 
         <div className="flex items-start justify-between gap-8 mb-10 animate-fade-up">
           <div>
-            <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-2">
+            <div className="text-[11px] uppercase tracking-widest text-zinc-500 mb-2">
               {site?.name} · Catalogue
             </div>
-            <h1 className="font-heading text-4xl font-semibold text-[#1C1917]">Produits</h1>
-            <p className="text-[#57534E] mt-2 max-w-xl">
+            <h1 className="text-3xl font-semibold text-zinc-100">Produits</h1>
+            <p className="text-zinc-400 mt-2 max-w-xl">
               Importe depuis une URL fournisseur ou crée tes produits à la main.
               Fiches multilingues FR/EN/DE/NL publiées sur la boutique publique.
             </p>
@@ -161,14 +161,14 @@ export default function SiteProducts() {
               target="_blank"
               rel="noreferrer"
               data-testid="preview-shop"
-              className="h-11 px-4 rounded-xl bg-white border border-[#E7E5E4] hover:border-[#B84B31] text-[#1C1917] text-sm font-medium flex items-center gap-2 transition"
+              className="h-11 px-4 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-[#B84B31] text-zinc-100 text-sm font-medium flex items-center gap-2 transition"
             >
               <Eye size={16} /> Voir la boutique
             </a>
             <button
               onClick={() => setEditing(emptyProduct())}
               data-testid="add-product"
-              className="h-11 px-4 rounded-xl bg-[#B84B31] hover:bg-[#993D26] text-white text-sm font-medium flex items-center gap-2 transition active:scale-[0.98]"
+              className="h-11 px-4 rounded-xl bg-white hover:bg-zinc-200 text-black text-sm font-medium flex items-center gap-2 transition active:scale-[0.98]"
             >
               <Plus size={16} weight="bold" /> Nouveau produit
             </button>
@@ -176,13 +176,13 @@ export default function SiteProducts() {
         </div>
 
         {/* Import from URL bar */}
-        <div className="bg-white rounded-2xl border border-[#E7E5E4] p-5 mb-6" data-testid="import-url-bar">
+        <div className="bg-zinc-950 rounded-md border border-zinc-800 p-5 mb-6" data-testid="import-url-bar">
           <div className="flex items-center gap-2 mb-2">
-            <Sparkle size={16} weight="fill" className="text-[#B84B31]" />
-            <div className="font-heading text-sm font-semibold text-[#1C1917]">
+            <Sparkle size={16} weight="fill" className="text-zinc-100" />
+            <div className="font-heading text-sm font-semibold text-zinc-100">
               Import rapide depuis une URL fournisseur
             </div>
-            <div className="text-xs text-[#78716C]">
+            <div className="text-xs text-zinc-500">
               · Shopify / WooCommerce / sites structurés (JSON-LD, Open Graph)
             </div>
           </div>
@@ -193,13 +193,13 @@ export default function SiteProducts() {
               placeholder="https://fournisseur.com/produits/..."
               data-testid="import-url-input"
               onKeyDown={(e) => e.key === "Enter" && handleImport()}
-              className="flex-1 h-11 px-4 rounded-xl border border-[#E7E5E4] bg-[#FDFBF7] focus:ring-2 focus:ring-[#B84B31]/30 focus:border-[#B84B31] outline-none text-sm"
+              className="flex-1 h-11 px-4 rounded-xl border border-zinc-800 bg-black focus:ring-2 focus:ring-zinc-500/30 focus:border-zinc-500 outline-none text-sm"
             />
             <button
               onClick={handleImport}
               disabled={importing || !importUrl.trim()}
               data-testid="import-url-submit"
-              className="h-11 px-5 rounded-xl bg-[#1C1917] hover:bg-[#44403C] text-white text-sm font-medium flex items-center gap-2 transition disabled:opacity-50"
+              className="h-11 px-5 rounded-xl bg-white hover:bg-zinc-200 text-black text-sm font-medium flex items-center gap-2 transition disabled:opacity-50"
             >
               {importing ? (
                 "Analyse..."
@@ -211,19 +211,19 @@ export default function SiteProducts() {
             </button>
           </div>
           {importError && (
-            <div className="mt-3 px-3 py-2 rounded-lg bg-[#FFE4E6] text-[#BE123C] text-sm" data-testid="import-error">
+            <div className="mt-3 px-3 py-2 rounded-lg bg-red-500/10 text-red-400 text-sm" data-testid="import-error">
               {importError}
             </div>
           )}
         </div>
 
         {products.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-[#E7E5E4] p-16 text-center">
-            <Storefront size={48} weight="thin" className="mx-auto text-[#D6D3D1] mb-4" />
-            <div className="text-[#78716C] mb-4">Aucun produit pour l'instant.</div>
+          <div className="bg-zinc-950 rounded-md border border-zinc-800 p-16 text-center">
+            <Storefront size={48} weight="thin" className="mx-auto text-zinc-700 mb-4" />
+            <div className="text-zinc-500 mb-4">Aucun produit pour l'instant.</div>
             <button
               onClick={() => setEditing(emptyProduct())}
-              className="inline-flex items-center gap-2 h-11 px-5 rounded-xl bg-[#B84B31] hover:bg-[#993D26] text-white text-sm font-medium transition"
+              className="inline-flex items-center gap-2 h-11 px-5 rounded-xl bg-white hover:bg-zinc-200 text-black text-sm font-medium transition"
             >
               <Plus size={16} weight="bold" /> Ajouter mon premier produit
             </button>
@@ -234,18 +234,18 @@ export default function SiteProducts() {
               <div
                 key={p.id}
                 data-testid={`admin-product-${p.id}`}
-                className="group bg-white rounded-xl border border-[#E7E5E4] overflow-hidden hover:shadow-md transition"
+                className="group bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden hover:shadow-md transition"
               >
-                <div className="aspect-[4/3] bg-[#F5F2EB] relative">
+                <div className="aspect-[4/3] bg-zinc-800 relative">
                   {p.images?.[0] ? (
                     <img src={p.images[0]} alt={p.name?.fr} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[#D6D3D1]">
+                    <div className="w-full h-full flex items-center justify-center text-zinc-700">
                       <Storefront size={40} weight="thin" />
                     </div>
                   )}
                   {p.featured && (
-                    <div className="absolute top-2 left-2 bg-[#B84B31] text-white text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <div className="absolute top-2 left-2 bg-white text-black text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full flex items-center gap-1">
                       <Star size={10} weight="fill" /> Phare
                     </div>
                   )}
@@ -253,8 +253,8 @@ export default function SiteProducts() {
                     <span
                       className={`text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full ${
                         p.status === "active"
-                          ? "bg-[#D1FAE5] text-[#047857]"
-                          : "bg-[#F5F5F4] text-[#78716C]"
+                          ? "bg-emerald-500/10 text-emerald-400"
+                          : "bg-[#F5F5F4] text-zinc-500"
                       }`}
                     >
                       {p.status}
@@ -262,14 +262,14 @@ export default function SiteProducts() {
                   </div>
                 </div>
                 <div className="p-4">
-                  <div className="font-medium text-[#1C1917] truncate">
+                  <div className="font-medium text-zinc-100 truncate">
                     {p.name?.fr || "(sans nom)"}
                   </div>
-                  <div className="text-sm text-[#57534E] mt-1">
+                  <div className="text-sm text-zinc-400 mt-1">
                     {p.price}€ TTC {p.compare_at_price ? `(avant ${p.compare_at_price}€)` : ""}
                   </div>
                   {p.cost_price_ht > 0 && (
-                    <div className="text-[11px] text-[#78716C] mt-0.5 flex items-center gap-1.5">
+                    <div className="text-[11px] text-zinc-500 mt-0.5 flex items-center gap-1.5">
                       <span>Achat&nbsp;: {p.cost_price_ht}€ HT</span>
                       {(() => {
                         const ht = p.price / 1.2;
@@ -290,7 +290,7 @@ export default function SiteProducts() {
                     <button
                       onClick={() => setEditing(p)}
                       data-testid={`edit-${p.id}`}
-                      className="flex-1 h-9 rounded-lg bg-[#FDFBF7] border border-[#E7E5E4] hover:border-[#B84B31] text-[13px] text-[#1C1917] flex items-center justify-center gap-1.5 transition"
+                      className="flex-1 h-9 rounded-lg bg-black border border-zinc-800 hover:border-[#B84B31] text-[13px] text-zinc-100 flex items-center justify-center gap-1.5 transition"
                     >
                       <PencilSimple size={14} /> Éditer
                     </button>
@@ -300,7 +300,7 @@ export default function SiteProducts() {
                         disabled={syncing === p.id}
                         data-testid={`resync-${p.id}`}
                         title="Re-vérifier le prix fournisseur"
-                        className="h-9 w-9 rounded-lg border border-[#E7E5E4] hover:border-[#B84B31] text-[#78716C] hover:text-[#B84B31] flex items-center justify-center transition disabled:opacity-50"
+                        className="h-9 w-9 rounded-lg border border-zinc-800 hover:border-[#B84B31] text-zinc-500 hover:text-zinc-100 flex items-center justify-center transition disabled:opacity-50"
                       >
                         <ArrowsClockwise size={14} className={syncing === p.id ? "animate-spin" : ""} />
                       </button>
@@ -308,7 +308,7 @@ export default function SiteProducts() {
                     <button
                       onClick={() => handleDelete(p)}
                       data-testid={`delete-${p.id}`}
-                      className="h-9 w-9 rounded-lg border border-[#E7E5E4] hover:border-[#BE123C] hover:text-[#BE123C] text-[#78716C] flex items-center justify-center transition"
+                      className="h-9 w-9 rounded-lg border border-zinc-800 hover:border-[#BE123C] hover:text-red-400 text-zinc-500 flex items-center justify-center transition"
                     >
                       <Trash size={14} />
                     </button>
@@ -354,49 +354,49 @@ function ResyncModal({ result, onClose, onApply }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose} data-testid="resync-modal">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-[#E7E5E4] overflow-hidden animate-fade-up" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E7E5E4]">
+      <div className="relative w-full max-w-lg bg-zinc-950 rounded-md shadow-2xl border border-zinc-800 overflow-hidden animate-fade-up" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
           <div>
-            <div className="text-[11px] uppercase tracking-widest text-[#78716C]">Re-sync fournisseur</div>
-            <div className="font-heading text-lg font-semibold text-[#1C1917] truncate max-w-xs">
+            <div className="text-[11px] uppercase tracking-widest text-zinc-500">Re-sync fournisseur</div>
+            <div className="text-base font-semibold text-zinc-100 truncate max-w-xs">
               {product.name?.fr || "Produit"}
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-[#F5F2EB]"><X size={18} /></button>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-800"><X size={18} /></button>
         </div>
 
         <div className="p-6 space-y-4">
-          <div className="flex items-center gap-2 text-xs text-[#78716C]">
+          <div className="flex items-center gap-2 text-xs text-zinc-500">
             <ArrowsClockwise size={12} /> Source : {diff.source_host || "Fournisseur"}
           </div>
 
           {priceChanged ? (
-            <div className={`p-4 rounded-xl border-2 ${bigIncrease ? "bg-[#FFE4E6] border-[#FCA5A5]" : "bg-[#FEF3C7] border-[#FCD34D]"}`} data-testid="price-change-panel">
+            <div className={`p-4 rounded-xl border-2 ${bigIncrease ? "bg-red-500/10 border-[#FCA5A5]" : "bg-amber-500/10 border-[#FCD34D]"}`} data-testid="price-change-panel">
               <div className="flex items-center gap-2 mb-2">
                 {bigIncrease ? (
-                  <><Warning size={16} weight="fill" className="text-[#BE123C]" /><span className="text-sm font-medium text-[#BE123C]">Hausse significative du prix fournisseur</span></>
+                  <><Warning size={16} weight="fill" className="text-red-400" /><span className="text-sm font-medium text-red-400">Hausse significative du prix fournisseur</span></>
                 ) : (
                   <><TrendUp size={16} weight="fill" className="text-[#854D0E]" /><span className="text-sm font-medium text-[#854D0E]">Prix fournisseur à jour</span></>
                 )}
               </div>
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div>
-                  <div className="text-[10px] uppercase tracking-widest text-[#78716C]">Ancien</div>
-                  <div className="font-heading text-xl font-semibold text-[#1C1917] mt-1 tabular-nums">{diff.price.old}€</div>
+                  <div className="text-[10px] uppercase tracking-widest text-zinc-500">Ancien</div>
+                  <div className="text-lg font-semibold text-zinc-100 mt-1 tabular-nums">{diff.price.old}€</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase tracking-widest text-[#78716C]">Nouveau</div>
-                  <div className="font-heading text-xl font-semibold text-[#1C1917] mt-1 tabular-nums">{diff.price.new}€</div>
+                  <div className="text-[10px] uppercase tracking-widest text-zinc-500">Nouveau</div>
+                  <div className="text-lg font-semibold text-zinc-100 mt-1 tabular-nums">{diff.price.new}€</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase tracking-widest text-[#78716C]">Variation</div>
-                  <div className="font-heading text-xl font-semibold mt-1 tabular-nums" style={{ color: bigIncrease ? "#BE123C" : "#854D0E" }}>
+                  <div className="text-[10px] uppercase tracking-widest text-zinc-500">Variation</div>
+                  <div className="text-lg font-semibold mt-1 tabular-nums" style={{ color: bigIncrease ? "#BE123C" : "#854D0E" }}>
                     {diff.price.diff > 0 ? "+" : ""}{diff.price.diff}€ ({diff.price.diff_pct > 0 ? "+" : ""}{diff.price.diff_pct}%)
                   </div>
                 </div>
               </div>
               {hasMargin !== null && hasMargin < 30 && (
-                <div className="mt-3 text-xs text-[#BE123C] flex items-start gap-1.5">
+                <div className="mt-3 text-xs text-red-400 flex items-start gap-1.5">
                   <Warning size={12} weight="fill" className="mt-0.5 flex-shrink-0" />
                   Ta marge risque de descendre sous 30% à ce nouveau prix. Revois ton prix de vente.
                 </div>
@@ -416,15 +416,15 @@ function ResyncModal({ result, onClose, onApply }) {
           )}
         </div>
 
-        <div className="px-6 py-4 bg-[#FDFBF7] border-t border-[#E7E5E4] flex items-center justify-end gap-3">
-          <button onClick={onClose} className="h-10 px-4 rounded-xl border border-[#E7E5E4] bg-white text-sm text-[#57534E] hover:bg-[#F5F2EB] transition">
+        <div className="px-6 py-4 bg-black border-t border-zinc-800 flex items-center justify-end gap-3">
+          <button onClick={onClose} className="h-10 px-4 rounded-xl border border-zinc-800 bg-zinc-950 text-sm text-zinc-400 hover:bg-zinc-800 transition">
             Fermer
           </button>
           {priceChanged && (
             <button
               onClick={onApply}
               data-testid="apply-resync"
-              className="h-10 px-4 rounded-xl bg-[#B84B31] hover:bg-[#993D26] text-white text-sm font-medium flex items-center gap-2 transition"
+              className="h-10 px-4 rounded-xl bg-white hover:bg-zinc-200 text-black text-sm font-medium flex items-center gap-2 transition"
             >
               <CheckCircle size={14} weight="fill" /> Appliquer le nouveau prix
             </button>
@@ -480,17 +480,17 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
   return (
     <div className="fixed inset-0 z-50 flex" data-testid="product-editor">
       <div className="flex-1 bg-black/40" onClick={onClose} />
-      <div className="w-full max-w-2xl bg-[#FDFBF7] h-full overflow-y-auto shadow-2xl animate-slide-in-right">
-        <div className="sticky top-0 bg-white border-b border-[#E7E5E4] px-6 py-4 flex items-center justify-between z-10">
+      <div className="w-full max-w-2xl bg-black h-full overflow-y-auto shadow-2xl animate-slide-in-right">
+        <div className="sticky top-0 bg-zinc-950 border-b border-zinc-800 px-6 py-4 flex items-center justify-between z-10">
           <div>
-            <div className="text-[11px] uppercase tracking-widest text-[#78716C]">
+            <div className="text-[11px] uppercase tracking-widest text-zinc-500">
               {isNew ? "Nouveau" : "Édition"}
             </div>
-            <div className="font-heading text-lg font-semibold text-[#1C1917]">
+            <div className="text-base font-semibold text-zinc-100">
               {form.name?.fr || "Produit"}
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-[#F5F2EB]" data-testid="editor-close">
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-800" data-testid="editor-close">
             <X size={20} />
           </button>
         </div>
@@ -507,8 +507,8 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
                   data-testid={`lang-tab-${l.code}`}
                   className={`h-8 px-3 rounded-full text-xs font-medium transition ${
                     activeLang === l.code
-                      ? "bg-[#1C1917] text-white"
-                      : "bg-white border border-[#E7E5E4] text-[#57534E] hover:border-[#B84B31]"
+                      ? "bg-white text-white"
+                      : "bg-zinc-950 border border-zinc-800 text-zinc-400 hover:border-[#B84B31]"
                   }`}
                 >
                   {l.label}
@@ -525,7 +525,7 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
                 required={activeLang === "fr"}
               />
               <div>
-                <label className="block text-[13px] font-medium text-[#1C1917] mb-1.5">
+                <label className="block text-[13px] font-medium text-zinc-100 mb-1.5">
                   Description ({activeLang.toUpperCase()})
                 </label>
                 <textarea
@@ -533,7 +533,7 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
                   onChange={(e) => setI18n("description", activeLang, e.target.value)}
                   rows={5}
                   data-testid={`desc-${activeLang}`}
-                  className="w-full px-4 py-3 rounded-xl border border-[#E7E5E4] bg-white focus:ring-2 focus:ring-[#B84B31]/30 focus:border-[#B84B31] outline-none resize-none"
+                  className="w-full px-4 py-3 rounded-xl border border-zinc-800 bg-zinc-950 focus:ring-2 focus:ring-zinc-500/30 focus:border-zinc-500 outline-none resize-none"
                 />
               </div>
             </div>
@@ -598,12 +598,12 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[13px] font-medium text-[#1C1917] mb-1.5">Statut</label>
+              <label className="block text-[13px] font-medium text-zinc-100 mb-1.5">Statut</label>
               <select
                 value={form.status}
                 onChange={(e) => setForm({ ...form, status: e.target.value })}
                 data-testid="status"
-                className="w-full h-11 px-4 rounded-xl border border-[#E7E5E4] bg-white outline-none"
+                className="w-full h-11 px-4 rounded-xl border border-zinc-800 bg-zinc-950 outline-none"
               >
                 <option value="active">Actif (publié)</option>
                 <option value="draft">Brouillon</option>
@@ -617,21 +617,21 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
                 onChange={(e) => setForm({ ...form, featured: e.target.checked })}
                 className="w-4 h-4 accent-[#B84B31]"
               />
-              <span className="text-sm text-[#1C1917]">Produit phare (en haut de la boutique)</span>
+              <span className="text-sm text-zinc-100">Produit phare (en haut de la boutique)</span>
             </label>
           </div>
 
           {error && (
-            <div className="p-3 rounded-lg bg-[#FFE4E6] text-[#BE123C] text-sm" data-testid="editor-error">
+            <div className="p-3 rounded-lg bg-red-500/10 text-red-400 text-sm" data-testid="editor-error">
               {error}
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E7E5E4]">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-800">
             <button
               type="button"
               onClick={onClose}
-              className="h-11 px-5 rounded-xl border border-[#E7E5E4] text-[#57534E] hover:bg-white transition"
+              className="h-11 px-5 rounded-xl border border-zinc-800 text-zinc-400 hover:bg-zinc-950 transition"
             >
               Annuler
             </button>
@@ -639,7 +639,7 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
               type="submit"
               disabled={saving}
               data-testid="save-product"
-              className="h-11 px-5 rounded-xl bg-[#B84B31] hover:bg-[#993D26] text-white font-medium flex items-center gap-2 transition active:scale-[0.98] disabled:opacity-60"
+              className="h-11 px-5 rounded-xl bg-white hover:bg-zinc-200 text-black font-medium flex items-center gap-2 transition active:scale-[0.98] disabled:opacity-60"
             >
               {saving ? "…" : (
                 <>
@@ -657,7 +657,7 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
 function Field({ label, value, onChange, type = "text", required, testId }) {
   return (
     <div>
-      <label className="block text-[13px] font-medium text-[#1C1917] mb-1.5">{label}</label>
+      <label className="block text-[13px] font-medium text-zinc-100 mb-1.5">{label}</label>
       <input
         type={type}
         value={value}
@@ -665,7 +665,7 @@ function Field({ label, value, onChange, type = "text", required, testId }) {
         onChange={(e) => onChange(e.target.value)}
         required={required}
         data-testid={`field-${testId}`}
-        className="w-full h-11 px-4 rounded-xl border border-[#E7E5E4] bg-white focus:ring-2 focus:ring-[#B84B31]/30 focus:border-[#B84B31] outline-none"
+        className="w-full h-11 px-4 rounded-xl border border-zinc-800 bg-zinc-950 focus:ring-2 focus:ring-zinc-500/30 focus:border-zinc-500 outline-none"
       />
     </div>
   );
@@ -680,13 +680,13 @@ function MarginPreview({ price, costHt, vatRate = 0.20 }) {
   const concepteur = margin > 0 ? margin * 0.5 : 0;
   const color = margin <= 0 ? "#BE123C" : marginPct < 30 ? "#854D0E" : "#047857";
   return (
-    <div className="h-11 px-3 rounded-xl border border-dashed border-[#E7E5E4] bg-[#FDFBF7] flex items-center" data-testid="margin-preview">
-      <div className="text-[11px] text-[#78716C] mr-2">Marge HT</div>
+    <div className="h-11 px-3 rounded-xl border border-dashed border-zinc-800 bg-black flex items-center" data-testid="margin-preview">
+      <div className="text-[11px] text-zinc-500 mr-2">Marge HT</div>
       <div className="font-heading tabular-nums text-sm font-semibold" style={{ color }}>
         {margin.toFixed(2)}€ ({marginPct.toFixed(0)}%)
       </div>
-      <div className="text-[11px] text-[#78716C] ml-auto">
-        50% Concepteur&nbsp;: <span className="font-medium text-[#1C1917]">{concepteur.toFixed(2)}€</span>
+      <div className="text-[11px] text-zinc-500 ml-auto">
+        50% Concepteur&nbsp;: <span className="font-medium text-zinc-100">{concepteur.toFixed(2)}€</span>
       </div>
     </div>
   );
@@ -756,8 +756,8 @@ function ImagesField({ images, onChange }) {
 
   return (
     <div data-testid="images-field">
-      <label className="block text-[13px] font-medium text-[#1C1917] mb-1.5">
-        Images <span className="text-[#78716C] font-normal">· La 1ère est l'image principale</span>
+      <label className="block text-[13px] font-medium text-zinc-100 mb-1.5">
+        Images <span className="text-zinc-500 font-normal">· La 1ère est l'image principale</span>
       </label>
 
       {/* Gallery */}
@@ -767,11 +767,11 @@ function ImagesField({ images, onChange }) {
             <div
               key={`${url}-${idx}`}
               data-testid={`image-thumb-${idx}`}
-              className="relative aspect-square rounded-lg overflow-hidden bg-[#F5F2EB] border border-[#E7E5E4] group"
+              className="relative aspect-square rounded-lg overflow-hidden bg-zinc-800 border border-zinc-800 group"
             >
               <img src={url} alt="" className="w-full h-full object-cover" />
               {idx === 0 && (
-                <div className="absolute top-1 left-1 bg-[#B84B31] text-white text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full">
+                <div className="absolute top-1 left-1 bg-white text-black text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full">
                   Principale
                 </div>
               )}
@@ -780,7 +780,7 @@ function ImagesField({ images, onChange }) {
                   <button
                     type="button"
                     onClick={() => move(idx, idx - 1)}
-                    className="w-7 h-7 rounded-full bg-white text-[#1C1917] flex items-center justify-center text-xs hover:scale-110 transition"
+                    className="w-7 h-7 rounded-full bg-zinc-950 text-zinc-100 flex items-center justify-center text-xs hover:scale-110 transition"
                     title="Remonter"
                   >
                     ←
@@ -790,7 +790,7 @@ function ImagesField({ images, onChange }) {
                   <button
                     type="button"
                     onClick={() => move(idx, idx + 1)}
-                    className="w-7 h-7 rounded-full bg-white text-[#1C1917] flex items-center justify-center text-xs hover:scale-110 transition"
+                    className="w-7 h-7 rounded-full bg-zinc-950 text-zinc-100 flex items-center justify-center text-xs hover:scale-110 transition"
                     title="Descendre"
                   >
                     →
@@ -800,7 +800,7 @@ function ImagesField({ images, onChange }) {
                   type="button"
                   onClick={() => remove(idx)}
                   data-testid={`remove-image-${idx}`}
-                  className="w-7 h-7 rounded-full bg-white text-[#BE123C] flex items-center justify-center hover:scale-110 transition"
+                  className="w-7 h-7 rounded-full bg-zinc-950 text-red-400 flex items-center justify-center hover:scale-110 transition"
                   title="Supprimer"
                 >
                   <Trash size={12} />
@@ -828,11 +828,11 @@ function ImagesField({ images, onChange }) {
         className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition ${
           dragOver
             ? "border-[#B84B31] bg-[#FDF4E7]"
-            : "border-[#E7E5E4] bg-[#FDFBF7] hover:border-[#B84B31]/50"
+            : "border-zinc-800 bg-black hover:border-[#B84B31]/50"
         }`}
       >
-        <UploadSimple size={24} weight="regular" className="mx-auto text-[#B84B31] mb-2" />
-        <div className="text-sm text-[#1C1917]">
+        <UploadSimple size={24} weight="regular" className="mx-auto text-zinc-100 mb-2" />
+        <div className="text-sm text-zinc-100">
           {uploading ? (
             "Upload en cours..."
           ) : (
@@ -860,21 +860,21 @@ function ImagesField({ images, onChange }) {
           placeholder="...ou colle une URL d'image (https://...)"
           data-testid="image-url-input"
           onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addFromUrl())}
-          className="flex-1 h-10 px-3 rounded-lg border border-[#E7E5E4] bg-white focus:ring-2 focus:ring-[#B84B31]/30 focus:border-[#B84B31] outline-none text-sm"
+          className="flex-1 h-10 px-3 rounded-lg border border-zinc-800 bg-zinc-950 focus:ring-2 focus:ring-zinc-500/30 focus:border-zinc-500 outline-none text-sm"
         />
         <button
           type="button"
           onClick={addFromUrl}
           data-testid="image-url-add"
           disabled={!urlInput.trim()}
-          className="h-10 px-4 rounded-lg border border-[#E7E5E4] bg-white text-sm text-[#1C1917] hover:border-[#B84B31] disabled:opacity-40"
+          className="h-10 px-4 rounded-lg border border-zinc-800 bg-zinc-950 text-sm text-zinc-100 hover:border-[#B84B31] disabled:opacity-40"
         >
           <ImageIcon size={14} className="inline mr-1" /> Ajouter
         </button>
       </div>
 
       {error && (
-        <div className="mt-2 text-sm text-[#BE123C]" data-testid="image-error">
+        <div className="mt-2 text-sm text-red-400" data-testid="image-error">
           {error}
         </div>
       )}

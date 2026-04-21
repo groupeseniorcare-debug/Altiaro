@@ -150,20 +150,20 @@ export default function CopilotFab({ user }) {
         <div className="fixed inset-0 z-[55] pointer-events-none">
           <div className="absolute inset-0 bg-black/30 pointer-events-auto" onClick={() => setOpen(false)} />
           <div
-            className="absolute top-0 right-0 bottom-0 w-full max-w-md bg-white shadow-2xl pointer-events-auto flex flex-col"
+            className="absolute top-0 right-0 bottom-0 w-full max-w-md bg-zinc-950 shadow-2xl pointer-events-auto flex flex-col"
             style={{ animation: "cfSlideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1)" }}
             data-testid="copilot-panel"
           >
             {/* Header */}
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-[#E7E5E4]">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-zinc-800">
               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#B84B31] to-[#D97706] flex items-center justify-center">
                 <Sparkle size={16} weight="fill" className="text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className="font-heading text-base font-semibold text-[#1C1917]">
+                <h2 className="font-heading text-base font-semibold text-zinc-100">
                   Concept Copilot
                 </h2>
-                <p className="text-[11px] text-[#78716C]">
+                <p className="text-[11px] text-zinc-500">
                   Claude 4.5 · {messages.length > 0 ? `${messages.length} msgs` : "Prêt à aider"}
                 </p>
               </div>
@@ -171,7 +171,7 @@ export default function CopilotFab({ user }) {
                 onClick={() => setShowSessions((s) => !s)}
                 data-testid="copilot-sessions-toggle"
                 title="Historique"
-                className="w-8 h-8 rounded-lg hover:bg-[#F5F2EB] flex items-center justify-center"
+                className="w-8 h-8 rounded-lg hover:bg-zinc-800 flex items-center justify-center"
               >
                 <CaretDown size={14} className={showSessions ? "rotate-180" : ""} />
               </button>
@@ -179,14 +179,14 @@ export default function CopilotFab({ user }) {
                 onClick={newSession}
                 data-testid="copilot-new"
                 title="Nouvelle conversation"
-                className="w-8 h-8 rounded-lg hover:bg-[#F5F2EB] flex items-center justify-center"
+                className="w-8 h-8 rounded-lg hover:bg-zinc-800 flex items-center justify-center"
               >
                 <Plus size={14} />
               </button>
               <button
                 onClick={() => setOpen(false)}
                 data-testid="copilot-close"
-                className="w-8 h-8 rounded-lg hover:bg-[#F5F2EB] flex items-center justify-center"
+                className="w-8 h-8 rounded-lg hover:bg-zinc-800 flex items-center justify-center"
               >
                 <XIcon size={14} />
               </button>
@@ -194,9 +194,9 @@ export default function CopilotFab({ user }) {
 
             {/* Sessions dropdown */}
             {showSessions && (
-              <div className="border-b border-[#E7E5E4] bg-[#FAF7F2] p-3 max-h-56 overflow-y-auto">
+              <div className="border-b border-zinc-800 bg-zinc-900/40 p-3 max-h-56 overflow-y-auto">
                 {sessions.length === 0 ? (
-                  <div className="text-xs text-[#78716C] text-center py-4">
+                  <div className="text-xs text-zinc-500 text-center py-4">
                     Aucune conversation précédente.
                   </div>
                 ) : (
@@ -204,7 +204,7 @@ export default function CopilotFab({ user }) {
                     <div
                       key={s.session_id}
                       className={`w-full p-2 rounded-lg mb-1 flex items-start gap-2 transition ${
-                        s.session_id === sessionId ? "bg-white border border-[#B84B31]/30" : "hover:bg-white"
+                        s.session_id === sessionId ? "bg-zinc-950 border border-[#B84B31]/30" : "hover:bg-zinc-950"
                       }`}
                     >
                       <button
@@ -213,10 +213,10 @@ export default function CopilotFab({ user }) {
                         data-testid={`copilot-session-${s.session_id}`}
                         className="flex-1 min-w-0 text-left"
                       >
-                        <div className="text-xs font-medium text-[#1C1917] truncate">
+                        <div className="text-xs font-medium text-zinc-100 truncate">
                           {s.last_message_preview || "(vide)"}
                         </div>
-                        <div className="text-[10px] text-[#78716C]">
+                        <div className="text-[10px] text-zinc-500">
                           {s.message_count} msgs · {s.last_at ? new Date(s.last_at).toLocaleString("fr-FR") : ""}
                         </div>
                       </button>
@@ -224,7 +224,7 @@ export default function CopilotFab({ user }) {
                         type="button"
                         onClick={(e) => deleteSession(s.session_id, e)}
                         data-testid={`copilot-session-delete-${s.session_id}`}
-                        className="w-6 h-6 rounded hover:bg-[#FFE4E6] text-[#BE123C] flex items-center justify-center shrink-0"
+                        className="w-6 h-6 rounded hover:bg-red-500/10 text-red-400 flex items-center justify-center shrink-0"
                         aria-label="Supprimer la conversation"
                       >
                         <Trash size={12} />
@@ -245,7 +245,7 @@ export default function CopilotFab({ user }) {
                   <h3 className="font-heading text-lg font-semibold mb-1">
                     Salut {user?.name || "!"}
                   </h3>
-                  <p className="text-sm text-[#78716C] max-w-xs mb-4">
+                  <p className="text-sm text-zinc-500 max-w-xs mb-4">
                     Demande-moi n'importe quoi sur tes sites : stats, produits, commandes,
                     mises à jour en lot…
                   </p>
@@ -255,7 +255,7 @@ export default function CopilotFab({ user }) {
                         key={i}
                         onClick={() => send(s)}
                         data-testid={`copilot-suggestion-${i}`}
-                        className="text-left text-sm p-2.5 rounded-lg border border-[#E7E5E4] hover:border-[#B84B31] hover:bg-[#FAF7F2] transition"
+                        className="text-left text-sm p-2.5 rounded-lg border border-zinc-800 hover:border-[#B84B31] hover:bg-zinc-900/40 transition"
                       >
                         {s}
                       </button>
@@ -269,9 +269,9 @@ export default function CopilotFab({ user }) {
               ))}
 
               {busy && (
-                <div className="flex items-center gap-2 text-sm text-[#78716C]" data-testid="copilot-thinking">
-                  <div className="w-7 h-7 rounded-full bg-[#F5F2EB] flex items-center justify-center">
-                    <Sparkle size={12} weight="fill" className="text-[#B84B31] animate-pulse" />
+                <div className="flex items-center gap-2 text-sm text-zinc-500" data-testid="copilot-thinking">
+                  <div className="w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center">
+                    <Sparkle size={12} weight="fill" className="text-zinc-100 animate-pulse" />
                   </div>
                   <span className="italic">Copilot réfléchit…</span>
                 </div>
@@ -279,8 +279,8 @@ export default function CopilotFab({ user }) {
             </div>
 
             {/* Input */}
-            <div className="border-t border-[#E7E5E4] p-3">
-              <div className="flex items-end gap-2 bg-[#FAF7F2] rounded-xl p-2 focus-within:ring-2 focus-within:ring-[#B84B31]/30 transition">
+            <div className="border-t border-zinc-800 p-3">
+              <div className="flex items-end gap-2 bg-zinc-900/40 rounded-xl p-2 focus-within:ring-2 focus-within:ring-[#B84B31]/30 transition">
                 <textarea
                   rows={1}
                   value={input}
@@ -299,12 +299,12 @@ export default function CopilotFab({ user }) {
                   onClick={() => send()}
                   disabled={busy || !input.trim()}
                   data-testid="copilot-send"
-                  className="w-9 h-9 rounded-lg bg-[#1C1917] hover:bg-[#44403C] disabled:opacity-40 text-white flex items-center justify-center transition active:scale-95"
+                  className="w-9 h-9 rounded-lg bg-white hover:bg-[#44403C] disabled:opacity-40 text-black flex items-center justify-center transition active:scale-95"
                 >
                   {busy ? <ArrowClockwise size={14} className="animate-spin" /> : <PaperPlaneTilt size={14} weight="fill" />}
                 </button>
               </div>
-              <div className="text-[10px] text-[#78716C] mt-1 px-1">
+              <div className="text-[10px] text-zinc-500 mt-1 px-1">
                 Entrée pour envoyer · Maj+Entrée pour nouvelle ligne
               </div>
             </div>
@@ -320,7 +320,7 @@ function MessageBubble({ msg }) {
   if (role === "user") {
     return (
       <div className="flex justify-end" data-testid="copilot-msg-user">
-        <div className="max-w-[85%] bg-[#1C1917] text-white rounded-2xl rounded-tr-sm px-3.5 py-2.5 text-sm">
+        <div className="max-w-[85%] bg-white text-black rounded-md rounded-tr-sm px-3.5 py-2.5 text-sm">
           {msg.content}
         </div>
       </div>
@@ -335,23 +335,23 @@ function MessageBubble({ msg }) {
         <div className="flex-1 min-w-0">
           {msg.tool_trace && msg.tool_trace.length > 0 && (
             <details className="mb-2 text-xs">
-              <summary className="cursor-pointer text-[#78716C] hover:text-[#1C1917] flex items-center gap-1">
+              <summary className="cursor-pointer text-zinc-500 hover:text-zinc-100 flex items-center gap-1">
                 <Wrench size={11} />
                 {msg.tool_trace.length} outil{msg.tool_trace.length > 1 ? "s" : ""} utilisé{msg.tool_trace.length > 1 ? "s" : ""}
               </summary>
               <div className="mt-1.5 space-y-1">
                 {msg.tool_trace.map((t, i) => (
-                  <div key={i} className="bg-[#FAF7F2] rounded p-2 font-mono text-[10px]">
-                    <div className="font-semibold text-[#B84B31]">
+                  <div key={i} className="bg-zinc-900/40 rounded p-2 font-mono text-[10px]">
+                    <div className="font-semibold text-zinc-100">
                       {t.name}({Object.keys(t.arguments || {}).join(", ")})
                     </div>
-                    {t.thought && <div className="text-[#78716C] italic mt-0.5">{t.thought}</div>}
+                    {t.thought && <div className="text-zinc-500 italic mt-0.5">{t.thought}</div>}
                   </div>
                 ))}
               </div>
             </details>
           )}
-          <div className="bg-[#FAF7F2] rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm text-[#1C1917] whitespace-pre-wrap">
+          <div className="bg-zinc-900/40 rounded-md rounded-tl-sm px-3.5 py-2.5 text-sm text-zinc-100 whitespace-pre-wrap">
             {msg.content}
           </div>
         </div>

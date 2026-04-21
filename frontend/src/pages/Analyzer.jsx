@@ -99,13 +99,13 @@ export default function Analyzer() {
       <div className="p-6 md:p-12 max-w-5xl mx-auto">
         {/* Hero */}
         <div className="mb-10">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-[#B84B31] mb-3">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-zinc-100 mb-3">
             <Sparkle size={12} weight="fill" /> Étude de marché IA · 8 marchés EU
           </div>
-          <h1 className="font-heading text-3xl md:text-5xl font-semibold text-[#1C1917] leading-[1.05]">
+          <h1 className="text-2xl md:text-5xl font-semibold text-zinc-100 leading-[1.05]">
             Quel produit veux-tu lancer ?
           </h1>
-          <p className="text-[#57534E] mt-3 max-w-2xl text-[17px]">
+          <p className="text-zinc-400 mt-3 max-w-2xl text-[17px]">
             Décris un produit e-commerce (n'importe quelle catégorie). L'IA analyse en profondeur
             sur 2-4 minutes : <strong>mots-clés natifs par langue</strong>, volumes Google, concurrence,
             prix pratiqués, cadre légal, fournisseurs pertinents. Verdict argumenté par pays.
@@ -113,9 +113,9 @@ export default function Analyzer() {
         </div>
 
         {/* Form */}
-        <div className="bg-white rounded-2xl border border-[#E7E5E4] p-6 mb-8 shadow-sm">
+        <div className="bg-zinc-950 rounded-md border border-zinc-800 p-6 mb-8 shadow-sm">
           <div className="relative mb-5">
-            <MagnifyingGlass size={20} className="absolute left-5 top-1/2 -translate-y-1/2 text-[#78716C]" />
+            <MagnifyingGlass size={20} className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-500" />
             <input
               value={product}
               onChange={(e) => setProduct(e.target.value)}
@@ -123,13 +123,13 @@ export default function Analyzer() {
               placeholder="Ex: fauteuil releveur électrique, cafetière à grain compacte, support téléphone vélo…"
               data-testid="analyze-input"
               disabled={running}
-              className="w-full h-16 pl-14 pr-4 rounded-xl border border-[#E7E5E4] text-lg outline-none focus:border-[#B84B31] focus:ring-2 focus:ring-[#B84B31]/20 disabled:opacity-50"
+              className="w-full h-16 pl-14 pr-4 rounded-xl border border-zinc-800 text-lg outline-none focus:border-[#B84B31] focus:ring-2 focus:ring-[#B84B31]/20 disabled:opacity-50"
             />
           </div>
 
           {/* Persona */}
           <div className="mb-5">
-            <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-2">Persona cible</div>
+            <div className="text-[11px] uppercase tracking-widest text-zinc-500 mb-2">Persona cible</div>
             <div className="flex flex-wrap gap-2">
               {PERSONAS.map((p) => (
                 <button
@@ -139,8 +139,8 @@ export default function Analyzer() {
                   data-testid={`persona-${p.value}`}
                   className={`h-10 px-4 rounded-full border text-sm transition ${
                     persona === p.value
-                      ? "border-[#B84B31] bg-[#B84B31]/5 text-[#1C1917]"
-                      : "border-[#E7E5E4] text-[#57534E] hover:border-[#B84B31]/40"
+                      ? "border-[#B84B31] bg-white/5 text-zinc-100"
+                      : "border-zinc-800 text-zinc-400 hover:border-[#B84B31]/40"
                   }`}
                 >
                   <span className="mr-1">{p.emoji}</span> {p.label}
@@ -151,7 +151,7 @@ export default function Analyzer() {
 
           {/* Countries */}
           <div className="mb-5">
-            <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-2">
+            <div className="text-[11px] uppercase tracking-widest text-zinc-500 mb-2">
               Pays à analyser ({countries.length} sélectionné{countries.length > 1 ? "s" : ""})
             </div>
             <div className="flex flex-wrap gap-2">
@@ -163,8 +163,8 @@ export default function Analyzer() {
                   data-testid={`country-${c.code}`}
                   className={`h-9 px-3 rounded-lg border text-sm transition flex items-center gap-1.5 ${
                     countries.includes(c.code)
-                      ? "border-[#B84B31] bg-[#B84B31]/5 text-[#1C1917]"
-                      : "border-[#E7E5E4] text-[#78716C] hover:border-[#B84B31]/40"
+                      ? "border-[#B84B31] bg-white/5 text-zinc-100"
+                      : "border-zinc-800 text-zinc-500 hover:border-[#B84B31]/40"
                   }`}
                 >
                   <span>{c.flag}</span> {c.name}
@@ -181,11 +181,11 @@ export default function Analyzer() {
             rows={2}
             disabled={running}
             data-testid="notes"
-            className="w-full px-4 py-2.5 rounded-xl border border-[#E7E5E4] text-sm outline-none focus:border-[#B84B31] mb-4"
+            className="w-full px-4 py-2.5 rounded-xl border border-zinc-800 text-sm outline-none focus:border-[#B84B31] mb-4"
           />
 
           {error && (
-            <div className="text-sm text-[#BE123C] bg-[#FFE4E6] border border-[#FCA5A5] rounded-lg px-3 py-2 mb-3" data-testid="error">
+            <div className="text-sm text-red-400 bg-red-500/10 border border-[#FCA5A5] rounded-lg px-3 py-2 mb-3" data-testid="error">
               {error}
             </div>
           )}
@@ -194,7 +194,7 @@ export default function Analyzer() {
             onClick={launch}
             disabled={running || !product.trim()}
             data-testid="analyze-btn"
-            className="w-full h-12 rounded-xl bg-[#1C1917] hover:bg-[#44403C] text-white font-medium transition disabled:opacity-40 flex items-center justify-center gap-2"
+            className="w-full h-12 rounded-xl bg-white hover:bg-[#44403C] text-black font-medium transition disabled:opacity-40 flex items-center justify-center gap-2"
           >
             {running ? (
               <><Spinner size={16} className="animate-spin" /> Analyse en cours…</>
@@ -210,28 +210,28 @@ export default function Analyzer() {
         {/* History */}
         {!running && history.length > 0 && (
           <div>
-            <h2 className="font-heading text-xl font-semibold text-[#1C1917] mb-3">Analyses récentes</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mb-3">Analyses récentes</h2>
             <div className="space-y-2">
               {history.map((h) => (
                 <button
                   key={h.id}
                   onClick={() => navigate(`/niches/analysis/${h.id}`)}
-                  className="w-full bg-white rounded-xl border border-[#E7E5E4] hover:border-[#B84B31] p-4 flex items-center gap-4 transition text-left"
+                  className="w-full bg-zinc-950 rounded-xl border border-zinc-800 hover:border-[#B84B31] p-4 flex items-center gap-4 transition text-left"
                   data-testid={`history-${h.id}`}
                 >
                   <div className="text-2xl">{h.analysis_summary?.emoji || "📦"}</div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-[#1C1917] truncate">
+                    <div className="font-medium text-zinc-100 truncate">
                       {h.analysis_summary?.name || h.product_input}
                     </div>
-                    <div className="text-xs text-[#78716C] flex items-center gap-2 mt-0.5">
+                    <div className="text-xs text-zinc-500 flex items-center gap-2 mt-0.5">
                       <span>{h.analysis_summary?.category}</span>
                       <span>·</span>
                       <span>{(h.analysis_summary?.total_volume_monthly || 0).toLocaleString("fr-FR")} rech/mois</span>
                       {h.analysis_summary?.go_countries?.length > 0 && (
                         <>
                           <span>·</span>
-                          <span className="text-[#047857] font-medium">
+                          <span className="text-emerald-400 font-medium">
                             GO : {h.analysis_summary.go_countries.join(", ")}
                           </span>
                         </>
@@ -261,10 +261,10 @@ function ProgressPanel({ job }) {
   ];
   const current = job.step || 0;
   return (
-    <div className="bg-white rounded-2xl border border-[#E7E5E4] p-6 mb-8" data-testid="progress-panel">
+    <div className="bg-zinc-950 rounded-md border border-zinc-800 p-6 mb-8" data-testid="progress-panel">
       <div className="flex items-center gap-2 mb-4">
-        <Spinner size={16} className="animate-spin text-[#B84B31]" />
-        <div className="font-heading text-lg font-semibold text-[#1C1917]">
+        <Spinner size={16} className="animate-spin text-zinc-100" />
+        <div className="font-heading text-lg font-semibold text-zinc-100">
           Analyse en profondeur…
         </div>
       </div>
@@ -277,7 +277,7 @@ function ProgressPanel({ job }) {
             <div
               key={idx}
               className={`flex items-center gap-3 py-2.5 px-3 rounded-lg border transition ${
-                done ? "bg-[#DCF5E7] border-[#86EFAC]" : active ? "bg-[#FEF3C7] border-[#FDE68A]" : "bg-[#FDFBF7] border-[#E7E5E4]"
+                done ? "bg-[#DCF5E7] border-[#86EFAC]" : active ? "bg-amber-500/10 border-[#FDE68A]" : "bg-black border-zinc-800"
               }`}
               data-testid={`progress-step-${stepNum}`}
             >
@@ -287,16 +287,16 @@ function ProgressPanel({ job }) {
               }}>
                 {done ? <CheckCircle size={14} weight="fill" /> : active ? <Spinner size={12} className="animate-spin" /> : stepNum}
               </div>
-              <div className="flex-1 text-sm font-medium text-[#1C1917]">
+              <div className="flex-1 text-sm font-medium text-zinc-100">
                 {stepNum}. {label}
               </div>
               {active && <div className="text-xs text-[#854D0E]">En cours…</div>}
-              {done && <div className="text-xs text-[#047857]">✓ Terminé</div>}
+              {done && <div className="text-xs text-emerald-400">✓ Terminé</div>}
             </div>
           );
         })}
       </div>
-      <div className="mt-4 text-xs text-[#78716C] flex items-center gap-1.5">
+      <div className="mt-4 text-xs text-zinc-500 flex items-center gap-1.5">
         <Clock size={12} /> Durée totale estimée : 2-4 min · Tu peux laisser cette page ouverte
       </div>
     </div>

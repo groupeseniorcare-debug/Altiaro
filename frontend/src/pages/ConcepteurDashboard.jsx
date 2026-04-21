@@ -6,8 +6,6 @@ import {
   CurrencyEur,
   ShoppingBag,
   TrendUp,
-  Bank,
-  CreditCard,
   Warning,
   CheckCircle,
   Rocket,
@@ -23,8 +21,7 @@ import {
 const fmtEur = (n) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(n || 0);
 
-const fmtNum = (n) =>
-  Number(n || 0).toLocaleString("fr-FR").replace(/,/g, " ");
+const fmtNum = (n) => Number(n || 0).toLocaleString("fr-FR").replace(/,/g, " ");
 
 const fmtDate = (iso) => {
   if (!iso) return "—";
@@ -53,8 +50,8 @@ export default function ConcepteurDashboard() {
   if (loading) {
     return (
       <Layout>
-        <div className="p-8 flex items-center gap-3 text-[#78716C]">
-          <ArrowClockwise size={16} className="animate-spin" /> Chargement du tableau de bord…
+        <div className="p-8 flex items-center gap-2 text-zinc-500 text-sm">
+          <ArrowClockwise size={14} className="animate-spin" /> Chargement du tableau de bord…
         </div>
       </Layout>
     );
@@ -63,7 +60,7 @@ export default function ConcepteurDashboard() {
   if (!data) {
     return (
       <Layout>
-        <div className="p-8 text-[#BE123C]">Impossible de charger les KPIs.</div>
+        <div className="p-8 text-red-400">Impossible de charger les KPIs.</div>
       </Layout>
     );
   }
@@ -73,15 +70,15 @@ export default function ConcepteurDashboard() {
 
   return (
     <Layout>
-      <div className="p-8 md:p-12 max-w-[1400px]">
+      <div className="p-8 md:p-10 max-w-[1400px]">
         {/* Header */}
-        <div className="flex items-start justify-between mb-10 flex-wrap gap-4">
+        <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
           <div>
-            <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-2">
-              Vue globale · Concepteur
+            <div className="text-[10px] uppercase tracking-[0.12em] text-zinc-500 font-medium mb-1.5">
+              Vue globale
             </div>
-            <h1 className="font-heading text-4xl font-semibold text-[#1C1917]">Dashboard</h1>
-            <p className="text-[#57534E] mt-1">
+            <h1 className="text-3xl font-semibold text-zinc-100 tracking-tight">Dashboard</h1>
+            <p className="text-zinc-500 text-sm mt-1">
               {hasSites
                 ? `${data.sites.total} site${data.sites.total > 1 ? "s" : ""} · ${data.orders.paid} commande${data.orders.paid > 1 ? "s" : ""} payée${data.orders.paid > 1 ? "s" : ""}`
                 : "Lance ton premier site en quelques minutes."}
@@ -90,51 +87,47 @@ export default function ConcepteurDashboard() {
           <button
             onClick={() => navigate("/sites/new")}
             data-testid="dash-launch-site"
-            className="h-12 px-5 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:brightness-110 text-white font-medium text-sm flex items-center gap-2 shadow-sm"
+            className="h-9 px-4 rounded-md bg-zinc-950 hover:bg-zinc-200 text-black text-[13px] font-medium flex items-center gap-1.5 transition-colors"
           >
-            <Rocket size={16} weight="fill" /> Lancer un site
+            <Rocket size={14} weight="fill" /> Lancer un site
           </button>
         </div>
 
         {/* Setup banner */}
         {!setupComplete && (
           <div
-            className="bg-gradient-to-r from-[#FEF3C7] to-[#FEFCE8] border border-[#FDE68A] rounded-2xl p-5 mb-6 flex items-start gap-4"
+            className="bg-zinc-950 border border-zinc-800 rounded-md p-4 mb-5 flex items-start gap-3"
             data-testid="setup-banner"
           >
-            <div className="w-10 h-10 rounded-full bg-[#D97706]/10 flex items-center justify-center shrink-0">
-              <Warning size={20} weight="fill" className="text-[#D97706]" />
-            </div>
-            <div className="flex-1">
-              <div className="font-medium text-[#78350F] mb-1">
-                Finalise ta configuration pour toucher tes versements
-              </div>
-              <div className="flex items-center gap-4 text-sm text-[#92400E] flex-wrap">
-                {!data.setup.has_card && <span>❌ Carte bancaire manquante (prélèvement Ads)</span>}
-                {data.setup.has_card && <span>✓ Carte OK</span>}
-                {!data.setup.has_iban && <span>❌ IBAN manquant (virement versements)</span>}
-                {data.setup.has_iban && <span>✓ IBAN OK</span>}
+            <Warning size={16} weight="fill" className="text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex-1 text-sm">
+              <div className="font-medium text-zinc-100 mb-1">Finalise ta configuration</div>
+              <div className="flex items-center gap-4 text-xs text-zinc-400 flex-wrap">
+                {!data.setup.has_card && <span>Carte bancaire manquante (prélèvement Ads)</span>}
+                {data.setup.has_card && <span className="text-emerald-400">✓ Carte OK</span>}
+                <span className="text-zinc-700">·</span>
+                {!data.setup.has_iban && <span>IBAN manquant (virement versements)</span>}
+                {data.setup.has_iban && <span className="text-emerald-400">✓ IBAN OK</span>}
               </div>
             </div>
             <Link
               to="/billing"
               data-testid="setup-goto-account"
-              className="h-10 px-4 rounded-full bg-[#D97706] hover:bg-[#B45309] text-white text-sm font-medium flex items-center gap-1 shrink-0"
+              className="h-8 px-3 rounded-md bg-zinc-950 text-black text-xs font-medium flex items-center gap-1 shrink-0 hover:bg-zinc-200 transition"
             >
-              Compléter <ArrowRight size={14} />
+              Compléter <ArrowRight size={12} />
             </Link>
           </div>
         )}
 
         {/* KPI Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
           <KpiCard
             testId="kpi-revenue"
             label="Chiffre d'affaires"
             value={fmtEur(data.revenue.total_eur)}
-            sub={`${fmtEur(data.revenue.last_30d_eur)} ces 30j`}
+            sub={`${fmtEur(data.revenue.last_30d_eur)} · 30j`}
             icon={CurrencyEur}
-            accent="#EA580C"
           />
           <KpiCard
             testId="kpi-orders"
@@ -142,38 +135,35 @@ export default function ConcepteurDashboard() {
             value={fmtNum(data.orders.paid)}
             sub={`${data.orders.pending} en attente · ${data.orders.refunded} remboursées`}
             icon={ShoppingBag}
-            accent="#2563EB"
           />
           <KpiCard
             testId="kpi-margin"
-            label="Part Concepteur reçue"
+            label="Part reçue"
             value={fmtEur(data.balance.order_share_paid_eur)}
-            sub={`Net à virer : ${fmtEur(data.balance.net_due_eur)}`}
+            sub={`Net à virer · ${fmtEur(data.balance.net_due_eur)}`}
             icon={TrendUp}
-            accent="#047857"
           />
           <KpiCard
             testId="kpi-refunds"
-            label="Retours"
+            label="Taux retours"
             value={`${data.refunds.rate_pct}%`}
             sub={`${data.refunds.count} · ${fmtEur(data.refunds.amount_eur)}`}
             icon={Receipt}
-            accent={data.refunds.rate_pct > 8 ? "#BE123C" : "#78716C"}
+            alert={data.refunds.rate_pct > 8}
           />
         </div>
 
         {/* Next events */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-8">
           <NextEventCard
             testId="next-payout"
-            label="Prochain versement Mollie"
+            label="Prochain versement"
             date={data.next_events.payout.date}
             amount={data.next_events.payout.amount_eur}
             status={data.next_events.payout.status}
-            statusOkLabel="Programmé"
             statusBlockedLabel="IBAN manquant"
             icon={ArrowDown}
-            color="#047857"
+            flow="in"
           />
           <NextEventCard
             testId="next-debit"
@@ -181,67 +171,75 @@ export default function ConcepteurDashboard() {
             date={data.next_events.debit.date}
             amount={data.next_events.debit.amount_eur}
             status={data.next_events.debit.status}
-            statusOkLabel="Programmé"
             statusBlockedLabel="Carte manquante"
             icon={ArrowUp}
-            color="#BE123C"
+            flow="out"
           />
         </div>
 
         {/* Sites list */}
-        <div className="bg-white rounded-2xl border border-[#E7E5E4] p-6">
-          <div className="flex items-center justify-between mb-5">
+        <div className="bg-zinc-950 border border-zinc-900 rounded-md p-5">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <div className="text-[11px] uppercase tracking-widest text-[#78716C]">Mes sites</div>
-              <h2 className="font-heading text-xl font-semibold text-[#1C1917]">
-                {data.sites.total} site{data.sites.total > 1 ? "s" : ""} ({data.sites.active} actif
-                {data.sites.active > 1 ? "s" : ""})
+              <div className="text-[10px] uppercase tracking-[0.12em] text-zinc-500 font-medium mb-0.5">
+                Mes sites
+              </div>
+              <h2 className="text-lg font-semibold text-zinc-100 tracking-tight">
+                {data.sites.total} site{data.sites.total > 1 ? "s" : ""}
+                {data.sites.total > 0 && (
+                  <span className="text-zinc-500 text-sm font-normal ml-2">
+                    · {data.sites.active} actif{data.sites.active > 1 ? "s" : ""}
+                  </span>
+                )}
               </h2>
             </div>
-            <Link
-              to="/sites"
-              data-testid="dash-goto-sites"
-              className="text-sm text-[#EA580C] hover:underline font-medium"
-            >
-              Voir tout →
-            </Link>
+            {data.sites.total > 0 && (
+              <Link
+                to="/sites"
+                data-testid="dash-goto-sites"
+                className="text-xs text-zinc-400 hover:text-zinc-100 font-medium"
+              >
+                Voir tout →
+              </Link>
+            )}
           </div>
 
           {data.sites.total === 0 ? (
-            <div className="py-12 text-center border-2 border-dashed border-[#E7E5E4] rounded-xl">
-              <Storefront size={40} weight="thin" className="mx-auto text-[#D6D3D1] mb-3" />
-              <div className="text-[#78716C] mb-4">Aucun site pour l'instant.</div>
+            <div className="py-12 text-center rounded-md border border-dashed border-zinc-800">
+              <Storefront size={32} weight="thin" className="mx-auto text-zinc-700 mb-3" />
+              <div className="text-sm text-zinc-400 mb-1">Aucun site pour l'instant</div>
+              <div className="text-xs text-zinc-600 mb-5">Lance ton 1er site en 3 étapes</div>
               <Link
                 to="/sites/new"
                 data-testid="dash-empty-launch"
-                className="inline-flex items-center gap-2 h-11 px-5 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] text-white font-medium text-sm"
+                className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-zinc-950 hover:bg-zinc-200 text-black text-[13px] font-medium"
               >
-                <Rocket size={16} weight="fill" /> Lancer ton 1er site
+                <Rocket size={14} weight="fill" /> Lancer
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
               {data.sites.items.slice(0, 9).map((s) => (
                 <Link
                   key={s.id}
                   to={`/sites/${s.id}`}
                   data-testid={`dash-site-${s.id}`}
-                  className="block p-4 rounded-xl border border-[#E7E5E4] bg-[#FAF7F2] hover:border-[#EA580C] hover:bg-white transition"
+                  className="block p-3 rounded-md border border-zinc-800 bg-zinc-900/30 hover:border-zinc-700 hover:bg-zinc-900 transition-colors"
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="font-medium text-[#1C1917] truncate pr-2">{s.name}</div>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <div className="font-medium text-sm text-zinc-100 truncate pr-2">{s.name}</div>
                     {s.ads_active ? (
-                      <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-[#D1FAE5] text-[#047857]">
+                      <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                         ● Actif
                       </span>
                     ) : (
-                      <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-[#F5F2EB] text-[#78716C]">
-                        En pause
+                      <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 border border-zinc-800">
+                        Pause
                       </span>
                     )}
                   </div>
                   {s.domain && (
-                    <div className="font-mono text-xs text-[#78716C] truncate">{s.domain}</div>
+                    <div className="font-mono text-[11px] text-zinc-500 truncate">{s.domain}</div>
                   )}
                 </Link>
               ))}
@@ -253,69 +251,64 @@ export default function ConcepteurDashboard() {
   );
 }
 
-function KpiCard({ label, value, sub, icon: Icon, accent = "#EA580C", testId }) {
+function KpiCard({ label, value, sub, icon: Icon, alert = false, testId }) {
   return (
     <div
-      className="bg-white rounded-2xl border border-[#E7E5E4] p-5 hover:border-[#D6D3D1] transition"
+      className="bg-zinc-950 rounded-md border border-zinc-900 p-4 hover:border-zinc-800 transition-colors"
       data-testid={testId}
     >
-      <div className="flex items-start justify-between mb-4">
-        <div className="text-[11px] uppercase tracking-widest text-[#78716C] font-medium">
+      <div className="flex items-start justify-between mb-3">
+        <div className="text-[10px] uppercase tracking-[0.12em] text-zinc-500 font-medium">
           {label}
         </div>
-        <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center"
-          style={{ background: `${accent}14` }}
-        >
-          <Icon size={18} weight="duotone" color={accent} />
-        </div>
+        <Icon size={14} className={alert ? "text-red-400" : "text-zinc-600"} weight="duotone" />
       </div>
       <div
-        className="text-3xl font-semibold tracking-tight leading-tight"
-        style={{ fontFamily: 'Georgia, serif' }}
+        className={`text-2xl font-semibold tracking-tight leading-none font-mono tabular-nums ${
+          alert ? "text-red-400" : "text-zinc-100"
+        }`}
       >
         {value}
       </div>
-      {sub && <div className="text-xs text-[#78716C] mt-1.5">{sub}</div>}
+      {sub && <div className="text-xs text-zinc-500 mt-2">{sub}</div>}
     </div>
   );
 }
 
-function NextEventCard({ label, date, amount, status, statusOkLabel, statusBlockedLabel, icon: Icon, color, testId }) {
+function NextEventCard({ label, date, amount, status, statusBlockedLabel, icon: Icon, flow, testId }) {
   const blocked = status && status.startsWith("blocked");
   return (
-    <div className="bg-white rounded-2xl border border-[#E7E5E4] p-5" data-testid={testId}>
+    <div className="bg-zinc-950 rounded-md border border-zinc-900 p-4" data-testid={testId}>
       <div className="flex items-start justify-between mb-3">
-        <div className="text-[11px] uppercase tracking-widest text-[#78716C] font-medium">
+        <div className="text-[10px] uppercase tracking-[0.12em] text-zinc-500 font-medium">
           {label}
         </div>
-        <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center"
-          style={{ background: `${color}14` }}
-        >
-          <Icon size={18} weight="bold" color={color} />
-        </div>
+        <Icon
+          size={14}
+          weight="bold"
+          className={flow === "in" ? "text-emerald-400" : "text-zinc-500"}
+        />
       </div>
-      <div className="flex items-baseline gap-3 mb-2">
-        <div
-          className="text-3xl font-semibold tracking-tight"
-          style={{ fontFamily: 'Georgia, serif', color }}
-        >
-          {fmtEur(amount)}
-        </div>
+      <div
+        className={`text-2xl font-semibold tracking-tight leading-none font-mono tabular-nums mb-2 ${
+          flow === "in" ? "text-emerald-400" : "text-zinc-100"
+        }`}
+      >
+        {flow === "in" ? "+" : "−"}
+        {fmtEur(amount)}
       </div>
       <div className="flex items-center gap-2 text-xs">
-        <Clock size={12} weight="bold" className="text-[#78716C]" />
-        <span className="text-[#57534E]">{fmtDate(date)}</span>
+        <Clock size={10} weight="bold" className="text-zinc-600" />
+        <span className="text-zinc-400">{fmtDate(date)}</span>
         {blocked ? (
-          <span className="ml-auto font-semibold text-[#BE123C] flex items-center gap-1">
-            <Warning size={11} weight="fill" />
+          <span className="ml-auto font-medium text-red-400 flex items-center gap-1 text-[11px]">
+            <Warning size={10} weight="fill" />
             {statusBlockedLabel}
           </span>
         ) : (
-          <span className="ml-auto font-medium text-[#047857] flex items-center gap-1">
-            <CheckCircle size={11} weight="fill" />
-            {statusOkLabel}
+          <span className="ml-auto text-zinc-500 flex items-center gap-1 text-[11px]">
+            <CheckCircle size={10} weight="fill" className="text-emerald-400" />
+            Programmé
           </span>
         )}
       </div>

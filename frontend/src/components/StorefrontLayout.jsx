@@ -48,7 +48,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
 
   return (
     <div
-      className="min-h-screen flex flex-col"
+      className="storefront-root min-h-screen flex flex-col"
       style={{ ...cssVars, background: bg, color: textCol, fontFamily: `"${fontBody}", system-ui, sans-serif` }}
       data-testid="storefront-layout"
     >

@@ -153,23 +153,23 @@ export default function Domains() {
         <button
           onClick={() => navigate(`/sites/${siteId}`)}
           data-testid="domains-back"
-          className="flex items-center gap-2 text-sm text-[#78716C] hover:text-[#1C1917] mb-6 transition"
+          className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-100 mb-6 transition"
         >
           <ArrowLeft size={16} /> Retour au site
         </button>
 
         <div className="flex items-start gap-3 mb-6">
-          <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-[#2563EB] to-[#7C3AED] flex items-center justify-center">
+          <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-zinc-200 to-white flex items-center justify-center">
             <Globe size={22} weight="fill" color="#fff" />
           </div>
           <div>
-            <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-1">
+            <div className="text-[11px] uppercase tracking-widest text-zinc-500 mb-1">
               Nom de domaine · OVH
             </div>
-            <h1 className="font-heading text-4xl font-semibold text-[#1C1917]">
+            <h1 className="text-3xl font-semibold text-zinc-100">
               Choisis ton nom de domaine
             </h1>
-            <p className="text-[#57534E] mt-1">
+            <p className="text-zinc-400 mt-1">
               Paiement sécurisé via Mollie, DNS auto-configuré sur ta boutique.
               {site?.name && <> Site : <strong>{site.name}</strong></>}
             </p>
@@ -195,13 +195,13 @@ export default function Domains() {
                 <ArrowClockwise size={22} className="animate-spin" color={STATUS_LABEL[returnStatus.status]?.color || "#D97706"} />
               )}
               <div>
-                <div className="font-medium text-[#1C1917]">
+                <div className="font-medium text-zinc-100">
                   {returnStatus.domain} —{" "}
                   <span style={{ color: STATUS_LABEL[returnStatus.status]?.color }}>
                     {STATUS_LABEL[returnStatus.status]?.label || returnStatus.status}
                   </span>
                 </div>
-                <div className="text-xs text-[#57534E] mt-1">
+                <div className="text-xs text-zinc-400 mt-1">
                   {returnStatus.status === "pending_payment" && "En attente de confirmation Mollie…"}
                   {returnStatus.status === "paid_pending_ovh" && "Paiement confirmé, OVH est en train d'acheter le domaine."}
                   {returnStatus.status === "purchased" && "Parfait ! Prochaine étape : configurer les DNS (bouton plus bas)."}
@@ -218,10 +218,10 @@ export default function Domains() {
 
         {/* Existing domains on this site */}
         {mine.length > 0 && (
-          <div className="bg-white rounded-xl border border-[#D1FAE5] p-5 mb-6">
+          <div className="bg-zinc-950 rounded-xl border border-[#D1FAE5] p-5 mb-6">
             <div className="flex items-center gap-2 mb-3">
-              <CheckCircle size={18} weight="fill" className="text-[#047857]" />
-              <div className="font-medium text-[#1C1917]">
+              <CheckCircle size={18} weight="fill" className="text-emerald-400" />
+              <div className="font-medium text-zinc-100">
                 Domaines liés à ce site
               </div>
             </div>
@@ -232,13 +232,13 @@ export default function Domains() {
                   <div
                     key={d.id}
                     data-testid={`domain-mine-${d.domain}`}
-                    className="flex items-center justify-between bg-[#FAF7F2] rounded-lg p-3"
+                    className="flex items-center justify-between bg-zinc-900/40 rounded-lg p-3"
                   >
                     <div className="flex items-center gap-3">
-                      <Globe size={16} className="text-[#047857]" />
+                      <Globe size={16} className="text-emerald-400" />
                       <div>
                         <div className="font-mono font-medium text-sm">{d.domain}</div>
-                        <div className="text-xs text-[#78716C]">
+                        <div className="text-xs text-zinc-500">
                           <span
                             className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold mr-2"
                             style={{ background: statusMeta.bg, color: statusMeta.color }}
@@ -255,7 +255,7 @@ export default function Domains() {
                         <button
                           onClick={() => configureDns(d.domain)}
                           data-testid={`dns-${d.domain}`}
-                          className="h-8 px-3 rounded-lg bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-medium"
+                          className="h-8 px-3 rounded-lg bg-zinc-200 hover:bg-white text-black text-xs font-medium"
                         >
                           Configurer DNS
                         </button>
@@ -264,13 +264,13 @@ export default function Domains() {
                         <a
                           href={d.mollie_checkout_url}
                           data-testid={`pay-${d.domain}`}
-                          className="h-8 px-3 rounded-lg bg-[#D97706] hover:bg-[#B45309] text-white text-xs font-medium flex items-center gap-1"
+                          className="h-8 px-3 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium flex items-center gap-1"
                         >
                           <CreditCard size={12} weight="fill" /> Payer
                         </a>
                       )}
                       {(d.status === "dns_configured" || d.status === "active") && (
-                        <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-[#D1FAE5] text-[#047857] font-semibold">
+                        <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold">
                           ✓ Actif
                         </span>
                       )}
@@ -291,15 +291,15 @@ export default function Domains() {
         )}
 
         {/* Search */}
-        <div className="bg-white rounded-xl border border-[#E7E5E4] p-5 mb-5">
-          <label className="block text-xs font-semibold text-[#57534E] mb-1.5 uppercase tracking-wider">
+        <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5 mb-5">
+          <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">
             Nom souhaité (sans extension)
           </label>
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <MagnifyingGlass
                 size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-[#78716C]"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500"
               />
               <input
                 type="text"
@@ -310,14 +310,14 @@ export default function Domains() {
                 onKeyDown={(e) => e.key === "Enter" && runSearch()}
                 placeholder="maboutique-senior"
                 data-testid="domain-search-input"
-                className="w-full h-12 pl-10 pr-3 rounded-xl border border-[#E7E5E4] bg-white text-sm focus:outline-none focus:border-[#2563EB]"
+                className="w-full h-12 pl-10 pr-3 rounded-xl border border-zinc-800 bg-zinc-950 text-sm focus:outline-none focus:border-[#2563EB]"
               />
             </div>
             <button
               onClick={runSearch}
               disabled={loading || !base.trim()}
               data-testid="domain-search-btn"
-              className="h-12 px-5 rounded-xl bg-[#1C1917] hover:bg-[#44403C] disabled:opacity-50 text-white text-sm font-medium flex items-center gap-2"
+              className="h-12 px-5 rounded-xl bg-white hover:bg-zinc-200 disabled:opacity-50 text-black text-sm font-medium flex items-center gap-2"
             >
               {loading ? (
                 <>
@@ -330,7 +330,7 @@ export default function Domains() {
               )}
             </button>
           </div>
-          <div className="text-[11px] text-[#78716C] mt-2">
+          <div className="text-[11px] text-zinc-500 mt-2">
             On vérifie la dispo sur {TLD_SUGGESTIONS.length} extensions en parallèle.
           </div>
         </div>
@@ -347,33 +347,33 @@ export default function Domains() {
                 <div
                   key={r.tld}
                   data-testid={`domain-result-${r.tld}`}
-                  className={`bg-white rounded-xl border p-4 flex items-center gap-4 transition ${
-                    isAvail ? "border-[#D1FAE5]" : "border-[#E7E5E4] opacity-60"
+                  className={`bg-zinc-950 rounded-xl border p-4 flex items-center gap-4 transition ${
+                    isAvail ? "border-[#D1FAE5]" : "border-zinc-800 opacity-60"
                   }`}
                 >
                   <div
                     className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      isAvail ? "bg-[#D1FAE5]" : "bg-[#F5F2EB]"
+                      isAvail ? "bg-emerald-500/10" : "bg-zinc-800"
                     }`}
                   >
                     {isAvail ? (
-                      <CheckCircle size={20} weight="fill" className="text-[#047857]" />
+                      <CheckCircle size={20} weight="fill" className="text-emerald-400" />
                     ) : (
-                      <XCircle size={20} weight="fill" className="text-[#78716C]" />
+                      <XCircle size={20} weight="fill" className="text-zinc-500" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-mono text-lg font-medium text-[#1C1917]">
+                    <div className="font-mono text-lg font-medium text-zinc-100">
                       {fullDomain}
                     </div>
-                    <div className="text-xs text-[#78716C]">
+                    <div className="text-xs text-zinc-500">
                       {r.error ? (
-                        <span className="text-[#BE123C]">Erreur : {r.error}</span>
+                        <span className="text-red-400">Erreur : {r.error}</span>
                       ) : isAvail ? (
                         <>
                           Disponible · Prix TTC année 1 :{" "}
-                          <strong className="text-[#047857]">{price}€</strong>
-                          <span className="text-[#A8A29E]">
+                          <strong className="text-emerald-400">{price}€</strong>
+                          <span className="text-zinc-600">
                             {" "}(coût OVH {r.data.ovh_price_ttc_eur}€ + frais plateforme {r.data.markup_eur}€)
                           </span>
                         </>
@@ -387,7 +387,7 @@ export default function Domains() {
                       onClick={() => purchase(fullDomain, price)}
                       disabled={isBuying}
                       data-testid={`buy-${r.tld}`}
-                      className="h-10 px-4 rounded-xl bg-gradient-to-r from-[#2563EB] to-[#7C3AED] text-white text-sm font-medium flex items-center gap-2 disabled:opacity-60"
+                      className="h-10 px-4 rounded-xl bg-white hover:bg-zinc-200 text-black text-sm font-medium flex items-center gap-2 disabled:opacity-60"
                     >
                       {isBuying ? (
                         <>
@@ -407,10 +407,10 @@ export default function Domains() {
           </div>
         )}
 
-        <div className="mt-6 p-4 rounded-xl bg-[#FAF7F2] border border-[#E7E5E4]">
+        <div className="mt-6 p-4 rounded-xl bg-zinc-900/40 border border-zinc-800">
           <div className="flex items-start gap-2">
             <Info size={16} className="text-[#2563EB] shrink-0 mt-0.5" />
-            <div className="text-xs text-[#57534E] leading-relaxed">
+            <div className="text-xs text-zinc-400 leading-relaxed">
               <strong>Comment ça marche :</strong> tu paies via Mollie (CB, iDEAL, Bancontact…), on achète le domaine chez OVH et on le configure pour pointer vers ta boutique. La propagation DNS prend 5 à 30 minutes. Renouvellement automatique chaque année au même prix.
             </div>
           </div>

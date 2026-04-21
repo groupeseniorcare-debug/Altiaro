@@ -57,29 +57,29 @@ export default function NewSite() {
       <div className="p-8 md:p-12 max-w-3xl">
         <button
           onClick={() => navigate("/sites")}
-          className="flex items-center gap-2 text-sm text-[#78716C] hover:text-[#1C1917] mb-6 transition"
+          className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-100 mb-6 transition"
           data-testid="back-to-sites"
         >
           <ArrowLeft size={16} /> Retour aux sites
         </button>
 
         <div className="mb-10 animate-fade-up">
-          <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-2">Nouveau projet</div>
-          <h1 className="font-heading text-4xl font-semibold text-[#1C1917]">Lancer un nouveau site</h1>
-          <p className="text-[#57534E] mt-2 max-w-xl">
+          <div className="text-[11px] uppercase tracking-widest text-zinc-500 mb-2">Nouveau projet</div>
+          <h1 className="text-3xl font-semibold text-zinc-100">Lancer un nouveau site</h1>
+          <p className="text-zinc-400 mt-2 max-w-xl">
             Remplissez les informations de base. Les 50 étapes du playbook seront
             automatiquement chargées et l'opérateur assigné pourra commencer la Phase A.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-[#E7E5E4] p-8 space-y-6" data-testid="new-site-form">
+        <form onSubmit={handleSubmit} className="bg-zinc-950 rounded-xl border border-zinc-800 p-8 space-y-6" data-testid="new-site-form">
           {form.niche_slug && (
             <div className="px-4 py-3 rounded-lg bg-[#FDF4E7] border border-[#F5E0C3] text-sm text-[#854D0E]" data-testid="niche-prefill-banner">
               🎯 Pré-rempli depuis le <strong>Niche Engine</strong> — niche « {form.niche} »
             </div>
           )}
           <div>
-            <label className="block text-[13px] font-medium text-[#1C1917] mb-1.5">
+            <label className="block text-[13px] font-medium text-zinc-100 mb-1.5">
               Nom de la marque *
             </label>
             <input
@@ -89,13 +89,13 @@ export default function NewSite() {
               onChange={handleChange}
               placeholder="Ex : Luméa Confort"
               data-testid="new-site-name"
-              className="w-full h-12 px-4 rounded-xl border border-[#E7E5E4] bg-white focus:outline-none focus:ring-2 focus:ring-[#B84B31]/30 focus:border-[#B84B31]"
+              className="w-full h-12 px-4 rounded-xl border border-zinc-800 bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-zinc-500/30 focus:border-zinc-500"
             />
-            <div className="text-xs text-[#78716C] mt-1">Utilisé pour substituer [NOM_MARQUE] dans tous les prompts.</div>
+            <div className="text-xs text-zinc-500 mt-1">Utilisé pour substituer [NOM_MARQUE] dans tous les prompts.</div>
           </div>
 
           <div>
-            <label className="block text-[13px] font-medium text-[#1C1917] mb-1.5">
+            <label className="block text-[13px] font-medium text-zinc-100 mb-1.5">
               Niche ciblée *
             </label>
             <input
@@ -105,14 +105,14 @@ export default function NewSite() {
               onChange={handleChange}
               placeholder="Ex : équipements de confort pour seniors (non-médicaux), max 20kg"
               data-testid="new-site-niche"
-              className="w-full h-12 px-4 rounded-xl border border-[#E7E5E4] bg-white focus:outline-none focus:ring-2 focus:ring-[#B84B31]/30 focus:border-[#B84B31]"
+              className="w-full h-12 px-4 rounded-xl border border-zinc-800 bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-zinc-500/30 focus:border-zinc-500"
             />
-            <div className="text-xs text-[#78716C] mt-1">Substitue [NICHE] dans les prompts d'étude marché et SEO.</div>
+            <div className="text-xs text-zinc-500 mt-1">Substitue [NICHE] dans les prompts d'étude marché et SEO.</div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-[13px] font-medium text-[#1C1917] mb-1.5">
+              <label className="block text-[13px] font-medium text-zinc-100 mb-1.5">
                 Nom de domaine (optionnel)
               </label>
               <input
@@ -121,11 +121,11 @@ export default function NewSite() {
                 onChange={handleChange}
                 placeholder="lumeaconfort.fr"
                 data-testid="new-site-domain"
-                className="w-full h-12 px-4 rounded-xl border border-[#E7E5E4] bg-white focus:outline-none focus:ring-2 focus:ring-[#B84B31]/30 focus:border-[#B84B31]"
+                className="w-full h-12 px-4 rounded-xl border border-zinc-800 bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-zinc-500/30 focus:border-zinc-500"
               />
             </div>
             <div>
-              <label className="block text-[13px] font-medium text-[#1C1917] mb-1.5">
+              <label className="block text-[13px] font-medium text-zinc-100 mb-1.5">
                 URL Shopify admin (optionnel)
               </label>
               <input
@@ -134,14 +134,14 @@ export default function NewSite() {
                 onChange={handleChange}
                 placeholder="https://xxx.myshopify.com"
                 data-testid="new-site-shopify"
-                className="w-full h-12 px-4 rounded-xl border border-[#E7E5E4] bg-white focus:outline-none focus:ring-2 focus:ring-[#B84B31]/30 focus:border-[#B84B31]"
+                className="w-full h-12 px-4 rounded-xl border border-zinc-800 bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-zinc-500/30 focus:border-zinc-500"
               />
             </div>
           </div>
 
           {user?.role === "admin" && (
             <div>
-              <label className="block text-[13px] font-medium text-[#1C1917] mb-1.5">
+              <label className="block text-[13px] font-medium text-zinc-100 mb-1.5">
                 Opérateur assigné
               </label>
               <select
@@ -149,7 +149,7 @@ export default function NewSite() {
                 value={form.operator_id}
                 onChange={handleChange}
                 data-testid="new-site-operator"
-                className="w-full h-12 px-4 rounded-xl border border-[#E7E5E4] bg-white focus:outline-none focus:ring-2 focus:ring-[#B84B31]/30 focus:border-[#B84B31]"
+                className="w-full h-12 px-4 rounded-xl border border-zinc-800 bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-zinc-500/30 focus:border-zinc-500"
               >
                 <option value="">Aucun (admin uniquement)</option>
                 {users.map((u) => (
@@ -158,12 +158,12 @@ export default function NewSite() {
                   </option>
                 ))}
               </select>
-              <div className="text-xs text-[#78716C] mt-1">Seul cet opérateur (et les admins) verra ce site.</div>
+              <div className="text-xs text-zinc-500 mt-1">Seul cet opérateur (et les admins) verra ce site.</div>
             </div>
           )}
 
           <div>
-            <label className="block text-[13px] font-medium text-[#1C1917] mb-1.5">
+            <label className="block text-[13px] font-medium text-zinc-100 mb-1.5">
               Notes internes (optionnel)
             </label>
             <textarea
@@ -173,22 +173,22 @@ export default function NewSite() {
               rows={3}
               placeholder="Objectif CA, angle de marque, spécificités..."
               data-testid="new-site-notes"
-              className="w-full px-4 py-3 rounded-xl border border-[#E7E5E4] bg-white focus:outline-none focus:ring-2 focus:ring-[#B84B31]/30 focus:border-[#B84B31] resize-none"
+              className="w-full px-4 py-3 rounded-xl border border-zinc-800 bg-zinc-950 focus:outline-none focus:ring-2 focus:ring-zinc-500/30 focus:border-zinc-500 resize-none"
             />
           </div>
 
           {error && (
-            <div className="p-3.5 rounded-lg bg-[#FFE4E6] text-[#BE123C] text-sm" data-testid="new-site-error">
+            <div className="p-3.5 rounded-lg bg-red-500/10 text-red-400 text-sm" data-testid="new-site-error">
               {error}
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E7E5E4]">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-800">
             <button
               type="button"
               onClick={() => navigate("/sites")}
               data-testid="new-site-cancel"
-              className="h-11 px-5 rounded-xl border border-[#E7E5E4] text-[#57534E] hover:bg-[#FDFBF7] transition"
+              className="h-11 px-5 rounded-xl border border-zinc-800 text-zinc-400 hover:bg-black transition"
             >
               Annuler
             </button>
@@ -196,7 +196,7 @@ export default function NewSite() {
               type="submit"
               disabled={submitting}
               data-testid="new-site-submit"
-              className="h-11 px-5 rounded-xl bg-[#B84B31] hover:bg-[#993D26] text-white font-medium transition-all duration-200 flex items-center gap-2 active:scale-[0.98] disabled:opacity-60"
+              className="h-11 px-5 rounded-xl bg-white hover:bg-zinc-200 text-black font-medium transition-all duration-200 flex items-center gap-2 active:scale-[0.98] disabled:opacity-60"
             >
               {submitting ? (
                 <>

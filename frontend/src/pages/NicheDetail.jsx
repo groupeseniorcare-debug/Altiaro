@@ -25,8 +25,8 @@ const COUNTRY_META = {
 
 const kdColor = (kd) => {
   if (kd < 30) return "text-[#166534] bg-[#DCF5E7]";
-  if (kd < 50) return "text-[#854D0E] bg-[#FEF3C7]";
-  return "text-[#9F1239] bg-[#FFE4E6]";
+  if (kd < 50) return "text-[#854D0E] bg-amber-500/10";
+  return "text-[#9F1239] bg-red-500/10";
 };
 
 export default function NicheDetail() {
@@ -47,7 +47,7 @@ export default function NicheDetail() {
   if (loading) {
     return (
       <Layout>
-        <div className="p-8 text-[#78716C]">Chargement…</div>
+        <div className="p-8 text-zinc-500">Chargement…</div>
       </Layout>
     );
   }
@@ -59,7 +59,7 @@ export default function NicheDetail() {
           <div className="text-[#9F1239]">Niche introuvable.</div>
           <button
             onClick={() => navigate("/niches")}
-            className="mt-4 text-[#B84B31] hover:underline"
+            className="mt-4 text-zinc-100 hover:underline"
           >
             ← Retour au catalogue
           </button>
@@ -85,7 +85,7 @@ export default function NicheDetail() {
       <div className="p-8 md:p-12 max-w-6xl">
         <button
           onClick={() => navigate("/niches")}
-          className="flex items-center gap-2 text-sm text-[#78716C] hover:text-[#1C1917] mb-6 transition"
+          className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-100 mb-6 transition"
           data-testid="back-to-niches"
         >
           <ArrowLeft size={16} /> Retour au catalogue
@@ -94,25 +94,25 @@ export default function NicheDetail() {
         <div className="flex items-start gap-6 mb-10 animate-fade-up">
           <div className="text-6xl">{niche.emoji}</div>
           <div className="flex-1">
-            <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-2">
+            <div className="text-[11px] uppercase tracking-widest text-zinc-500 mb-2">
               Niche #{niche.rank} · {niche.category}
             </div>
-            <h1 className="font-heading text-4xl font-semibold text-[#1C1917]">{niche.name}</h1>
-            <p className="text-[#57534E] mt-2 text-lg italic">« {niche.tagline} »</p>
-            <p className="text-[#57534E] mt-3 max-w-3xl">{niche.description}</p>
+            <h1 className="text-3xl font-semibold text-zinc-100">{niche.name}</h1>
+            <p className="text-zinc-400 mt-2 text-lg italic">« {niche.tagline} »</p>
+            <p className="text-zinc-400 mt-3 max-w-3xl">{niche.description}</p>
 
             <div className="flex items-center gap-2 mt-5">
-              <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-white border border-[#E7E5E4]">
+              <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-zinc-950 border border-zinc-800">
                 ECF {niche.ecf_score}/100
               </span>
-              <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-white border border-[#E7E5E4]">
+              <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-zinc-950 border border-zinc-800">
                 Marge {niche.margin_pct}%
               </span>
-              <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-white border border-[#E7E5E4]">
+              <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-zinc-950 border border-zinc-800">
                 Meilleur pays {COUNTRY_META[niche.best_country]?.flag} {niche.best_country}
               </span>
               {niche.hero && (
-                <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-[#FEF3C7] text-[#854D0E]">
+                <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-500/10 text-[#854D0E]">
                   <Target size={12} weight="fill" /> HERO produit
                 </span>
               )}
@@ -123,7 +123,7 @@ export default function NicheDetail() {
             <button
               onClick={launchSite}
               data-testid="launch-from-niche"
-              className="h-12 px-5 rounded-xl bg-[#B84B31] hover:bg-[#993D26] text-white font-medium flex items-center gap-2 transition active:scale-[0.98]"
+              className="h-12 px-5 rounded-xl bg-white hover:bg-[#993D26] text-black font-medium flex items-center gap-2 transition active:scale-[0.98]"
             >
               <Rocket size={18} weight="fill" /> Lancer un site
             </button>
@@ -139,19 +139,19 @@ export default function NicheDetail() {
         </div>
 
         {/* Country Metrics Table */}
-        <div className="bg-white rounded-2xl border border-[#E7E5E4] overflow-hidden mb-10">
-          <div className="px-6 py-4 border-b border-[#E7E5E4]">
-            <div className="font-heading text-xl font-semibold text-[#1C1917]">
+        <div className="bg-zinc-950 rounded-md border border-zinc-800 overflow-hidden mb-10">
+          <div className="px-6 py-4 border-b border-zinc-800">
+            <div className="text-lg font-semibold text-zinc-100">
               Analyse par pays — 6 marchés
             </div>
-            <div className="text-sm text-[#78716C] mt-1">
+            <div className="text-sm text-zinc-500 mt-1">
               Les CPA sont calculés pour garantir ~40% de marge nette après pub.
             </div>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm" data-testid="country-metrics-table">
-              <thead className="bg-[#FDFBF7] text-[11px] uppercase tracking-widest text-[#78716C]">
+              <thead className="bg-black text-[11px] uppercase tracking-widest text-zinc-500">
                 <tr>
                   <th className="text-left px-6 py-3 font-medium">Pays</th>
                   <th className="text-right px-6 py-3 font-medium">Volume/mois</th>
@@ -168,15 +168,15 @@ export default function NicheDetail() {
                   return (
                     <tr
                       key={code}
-                      className={`border-t border-[#F5F2EB] ${best ? "bg-[#FDFBF7]" : ""}`}
+                      className={`border-t border-zinc-900 ${best ? "bg-black" : ""}`}
                       data-testid={`row-${code}`}
                     >
                       <td className="px-6 py-3.5">
                         <div className="flex items-center gap-2">
                           <span className="text-lg">{COUNTRY_META[code]?.flag}</span>
-                          <span className="font-medium text-[#1C1917]">{COUNTRY_META[code]?.name}</span>
+                          <span className="font-medium text-zinc-100">{COUNTRY_META[code]?.name}</span>
                           {best && (
-                            <span className="text-[10px] uppercase tracking-wider text-[#B84B31] font-semibold">
+                            <span className="text-[10px] uppercase tracking-wider text-zinc-100 font-semibold">
                               ★ Leader
                             </span>
                           )}
@@ -190,7 +190,7 @@ export default function NicheDetail() {
                         </span>
                       </td>
                       <td className="px-6 py-3.5 text-right tabular-nums">{m.cpa_target}€</td>
-                      <td className="px-6 py-3.5 text-[#57534E]">{m.seasonality}</td>
+                      <td className="px-6 py-3.5 text-zinc-400">{m.seasonality}</td>
                     </tr>
                   );
                 })}
@@ -201,16 +201,16 @@ export default function NicheDetail() {
 
         {/* Keywords + suppliers */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div className="bg-white rounded-2xl border border-[#E7E5E4] p-6">
+          <div className="bg-zinc-950 rounded-md border border-zinc-800 p-6">
             <div className="flex items-center gap-2 mb-3">
-              <TrendUp size={18} className="text-[#B84B31]" />
-              <div className="font-heading text-lg font-semibold text-[#1C1917]">Mots-clés principaux</div>
+              <TrendUp size={18} className="text-zinc-100" />
+              <div className="font-heading text-lg font-semibold text-zinc-100">Mots-clés principaux</div>
             </div>
             <div className="flex flex-wrap gap-2">
               {niche.keywords?.map((kw) => (
                 <span
                   key={kw}
-                  className="px-3 py-1.5 rounded-full text-xs bg-[#FDFBF7] border border-[#E7E5E4] text-[#57534E]"
+                  className="px-3 py-1.5 rounded-full text-xs bg-black border border-zinc-800 text-zinc-400"
                 >
                   {kw}
                 </span>
@@ -218,15 +218,15 @@ export default function NicheDetail() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-[#E7E5E4] p-6">
+          <div className="bg-zinc-950 rounded-md border border-zinc-800 p-6">
             <div className="flex items-center gap-2 mb-3">
-              <Package size={18} className="text-[#B84B31]" />
-              <div className="font-heading text-lg font-semibold text-[#1C1917]">Fournisseurs recommandés</div>
+              <Package size={18} className="text-zinc-100" />
+              <div className="font-heading text-lg font-semibold text-zinc-100">Fournisseurs recommandés</div>
             </div>
             <ul className="space-y-2">
               {niche.suppliers?.map((s) => (
-                <li key={s} className="flex items-start gap-2 text-sm text-[#57534E]">
-                  <span className="text-[#B84B31] mt-0.5">•</span>
+                <li key={s} className="flex items-start gap-2 text-sm text-zinc-400">
+                  <span className="text-zinc-100 mt-0.5">•</span>
                   {s}
                 </li>
               ))}
@@ -240,12 +240,12 @@ export default function NicheDetail() {
 
 function Kpi({ icon, label, value }) {
   return (
-    <div className="bg-white rounded-xl border border-[#E7E5E4] p-5">
-      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-widest text-[#78716C]">
+    <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
+      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-widest text-zinc-500">
         {icon}
         {label}
       </div>
-      <div className="font-heading text-2xl font-semibold text-[#1C1917] mt-2 tabular-nums">
+      <div className="text-xl font-semibold text-zinc-100 mt-2 tabular-nums">
         {value}
       </div>
     </div>

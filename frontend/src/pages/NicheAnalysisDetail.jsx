@@ -53,7 +53,7 @@ export default function AnalysisDetail() {
   }, [id]);
 
   if (!data) {
-    return <Layout><div className="p-8 text-[#78716C]">Chargement…</div></Layout>;
+    return <Layout><div className="p-8 text-zinc-500">Chargement…</div></Layout>;
   }
 
   const a = data.analysis || {};
@@ -84,27 +84,27 @@ export default function AnalysisDetail() {
   return (
     <Layout>
       <div className="p-6 md:p-10 max-w-6xl mx-auto">
-        <button onClick={() => navigate("/niches")} data-testid="back-btn" className="text-sm text-[#78716C] hover:text-[#1C1917] flex items-center gap-1 mb-4">
+        <button onClick={() => navigate("/niches")} data-testid="back-btn" className="text-sm text-zinc-500 hover:text-zinc-100 flex items-center gap-1 mb-4">
           <CaretLeft size={14} /> Retour aux analyses
         </button>
 
         {/* Hero verdict */}
-        <div className="bg-white rounded-2xl border border-[#E7E5E4] p-7 mb-6">
+        <div className="bg-zinc-950 rounded-md border border-zinc-800 p-7 mb-6">
           <div className="flex items-start gap-5 flex-wrap">
             <div className="text-6xl">{a.emoji || "📦"}</div>
             <div className="flex-1 min-w-[280px]">
-              <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-1">{a.category}</div>
-              <h1 className="font-heading text-3xl md:text-4xl font-semibold text-[#1C1917]">{a.name || data.product_input}</h1>
-              <p className="text-[#57534E] mt-2 max-w-2xl">{a.description}</p>
-              {a.tagline && <p className="text-sm italic text-[#B84B31] mt-2">« {a.tagline} »</p>}
+              <div className="text-[11px] uppercase tracking-widest text-zinc-500 mb-1">{a.category}</div>
+              <h1 className="text-2xl md:text-4xl font-semibold text-zinc-100">{a.name || data.product_input}</h1>
+              <p className="text-zinc-400 mt-2 max-w-2xl">{a.description}</p>
+              {a.tagline && <p className="text-sm italic text-zinc-100 mt-2">« {a.tagline} »</p>}
             </div>
             <div className="text-right">
               <VerdictBigPill verdict={a.overall_verdict} />
-              <div className="text-xs text-[#78716C] mt-2">Score ECF : <span className="font-semibold text-[#1C1917]">{a.ecf_score || 0}/100</span></div>
+              <div className="text-xs text-zinc-500 mt-2">Score ECF : <span className="font-semibold text-zinc-100">{a.ecf_score || 0}/100</span></div>
             </div>
           </div>
           {a.verdict_reasoning && (
-            <div className="mt-4 text-sm bg-[#FDFBF7] rounded-xl p-4 border border-[#E7E5E4]">
+            <div className="mt-4 text-sm bg-black rounded-xl p-4 border border-zinc-800">
               <strong>Verdict :</strong> {a.verdict_reasoning}
             </div>
           )}
@@ -136,39 +136,39 @@ export default function AnalysisDetail() {
 
         {/* Launch strategy */}
         {a.launch_strategy && (
-          <div className="bg-white rounded-2xl border border-[#E7E5E4] p-5 mb-6">
+          <div className="bg-zinc-950 rounded-md border border-zinc-800 p-5 mb-6">
             <div className="flex items-center gap-2 mb-2">
-              <Sparkle size={16} weight="fill" className="text-[#B84B31]" />
-              <div className="font-heading font-semibold text-[#1C1917]">Stratégie de lancement recommandée</div>
+              <Sparkle size={16} weight="fill" className="text-zinc-100" />
+              <div className="font-heading font-semibold text-zinc-100">Stratégie de lancement recommandée</div>
             </div>
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               {(a.launch_strategy.priority_order || []).map((c, i) => (
                 <React.Fragment key={c}>
-                  <span className="px-3 py-1.5 rounded-lg bg-[#B84B31]/10 text-[#B84B31] font-medium text-sm flex items-center gap-1.5">
+                  <span className="px-3 py-1.5 rounded-lg bg-white/10 text-zinc-100 font-medium text-sm flex items-center gap-1.5">
                     {i + 1}. {COUNTRY_FLAGS[c] || "🌍"} {COUNTRY_NAMES[c] || c}
                   </span>
-                  {i < (a.launch_strategy.priority_order?.length || 0) - 1 && <ArrowRight size={14} className="text-[#78716C]" />}
+                  {i < (a.launch_strategy.priority_order?.length || 0) - 1 && <ArrowRight size={14} className="text-zinc-500" />}
                 </React.Fragment>
               ))}
             </div>
-            <p className="text-sm text-[#57534E]">{a.launch_strategy.reasoning}</p>
+            <p className="text-sm text-zinc-400">{a.launch_strategy.reasoning}</p>
           </div>
         )}
 
         {/* Country selector */}
-        <div className="bg-white rounded-2xl border border-[#E7E5E4] p-5 mb-6 sticky top-4 z-10 shadow-sm">
+        <div className="bg-zinc-950 rounded-md border border-zinc-800 p-5 mb-6 sticky top-4 z-10 shadow-sm">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <div className="font-heading font-semibold text-[#1C1917]">
+              <div className="font-heading font-semibold text-zinc-100">
                 Pays à lancer ({selectedCountries.length} sélectionné{selectedCountries.length > 1 ? "s" : ""})
               </div>
-              <div className="text-xs text-[#78716C]">Les pays en verdict GO sont cochés par défaut</div>
+              <div className="text-xs text-zinc-500">Les pays en verdict GO sont cochés par défaut</div>
             </div>
             <button
               onClick={createSite}
               disabled={selectedCountries.length === 0}
               data-testid="create-site-btn"
-              className="h-11 px-5 rounded-xl bg-[#B84B31] hover:bg-[#A33E26] text-white text-sm font-medium flex items-center gap-2 transition disabled:opacity-40"
+              className="h-11 px-5 rounded-xl bg-white hover:bg-[#A33E26] text-black text-sm font-medium flex items-center gap-2 transition disabled:opacity-40"
             >
               <Storefront size={16} weight="fill" /> Créer mon site sur ces pays
             </button>
@@ -183,7 +183,7 @@ export default function AnalysisDetail() {
                   onClick={() => toggle(c)}
                   data-testid={`toggle-${c}`}
                   className={`h-10 px-3 rounded-lg border text-sm flex items-center gap-2 transition ${
-                    sel ? "border-[#B84B31] bg-[#B84B31]/5" : "border-[#E7E5E4] hover:border-[#B84B31]/40"
+                    sel ? "border-[#B84B31] bg-white/5" : "border-zinc-800 hover:border-[#B84B31]/40"
                   }`}
                 >
                   <span>{COUNTRY_FLAGS[c]}</span>
@@ -196,15 +196,15 @@ export default function AnalysisDetail() {
         </div>
 
         {/* Country tabs */}
-        <div className="bg-white rounded-2xl border border-[#E7E5E4] mb-6 overflow-hidden">
-          <div className="border-b border-[#E7E5E4] flex overflow-x-auto">
+        <div className="bg-zinc-950 rounded-md border border-zinc-800 mb-6 overflow-hidden">
+          <div className="border-b border-zinc-800 flex overflow-x-auto">
             {countries.map((c) => (
               <button
                 key={c}
                 onClick={() => setActiveTab(c)}
                 data-testid={`tab-${c}`}
                 className={`px-5 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap flex items-center gap-1.5 ${
-                  activeTab === c ? "border-[#B84B31] text-[#1C1917]" : "border-transparent text-[#78716C] hover:text-[#1C1917]"
+                  activeTab === c ? "border-[#B84B31] text-zinc-100" : "border-transparent text-zinc-500 hover:text-zinc-100"
                 }`}
               >
                 <span>{COUNTRY_FLAGS[c]}</span> {COUNTRY_NAMES[c] || c}
@@ -228,30 +228,30 @@ export default function AnalysisDetail() {
         {/* Risks & Opportunities */}
         <div className="grid md:grid-cols-2 gap-4 mb-6">
           {a.risks?.length > 0 && (
-            <div className="bg-white rounded-2xl border border-[#E7E5E4] p-5">
+            <div className="bg-zinc-950 rounded-md border border-zinc-800 p-5">
               <div className="flex items-center gap-2 mb-3">
-                <Warning size={16} weight="fill" className="text-[#BE123C]" />
-                <div className="font-heading font-semibold text-[#1C1917]">Risques identifiés</div>
+                <Warning size={16} weight="fill" className="text-red-400" />
+                <div className="font-heading font-semibold text-zinc-100">Risques identifiés</div>
               </div>
               <ul className="space-y-2">
                 {a.risks.map((r, i) => (
-                  <li key={i} className="text-sm text-[#57534E] flex gap-2">
-                    <span className="text-[#BE123C] mt-0.5">•</span> {r}
+                  <li key={i} className="text-sm text-zinc-400 flex gap-2">
+                    <span className="text-red-400 mt-0.5">•</span> {r}
                   </li>
                 ))}
               </ul>
             </div>
           )}
           {a.opportunities?.length > 0 && (
-            <div className="bg-white rounded-2xl border border-[#E7E5E4] p-5">
+            <div className="bg-zinc-950 rounded-md border border-zinc-800 p-5">
               <div className="flex items-center gap-2 mb-3">
-                <Target size={16} weight="fill" className="text-[#047857]" />
-                <div className="font-heading font-semibold text-[#1C1917]">Opportunités de différenciation</div>
+                <Target size={16} weight="fill" className="text-emerald-400" />
+                <div className="font-heading font-semibold text-zinc-100">Opportunités de différenciation</div>
               </div>
               <ul className="space-y-2">
                 {a.opportunities.map((o, i) => (
-                  <li key={i} className="text-sm text-[#57534E] flex gap-2">
-                    <span className="text-[#047857] mt-0.5">•</span> {o}
+                  <li key={i} className="text-sm text-zinc-400 flex gap-2">
+                    <span className="text-emerald-400 mt-0.5">•</span> {o}
                   </li>
                 ))}
               </ul>
@@ -261,19 +261,19 @@ export default function AnalysisDetail() {
 
         {/* Suppliers */}
         {a.suppliers?.length > 0 && (
-          <div className="bg-white rounded-2xl border border-[#E7E5E4] p-5 mb-6">
+          <div className="bg-zinc-950 rounded-md border border-zinc-800 p-5 mb-6">
             <div className="flex items-center gap-2 mb-3">
-              <Package size={16} weight="fill" className="text-[#B84B31]" />
-              <div className="font-heading font-semibold text-[#1C1917]">Fournisseurs suggérés</div>
+              <Package size={16} weight="fill" className="text-zinc-100" />
+              <div className="font-heading font-semibold text-zinc-100">Fournisseurs suggérés</div>
             </div>
             <div className="grid md:grid-cols-3 gap-3">
               {a.suppliers.map((s, i) => (
-                <div key={i} className="border border-[#E7E5E4] rounded-xl p-3" data-testid={`supplier-${i}`}>
+                <div key={i} className="border border-zinc-800 rounded-xl p-3" data-testid={`supplier-${i}`}>
                   <div className="flex items-center justify-between mb-1">
-                    <div className="font-semibold text-[#1C1917]">{s.name}</div>
+                    <div className="font-semibold text-zinc-100">{s.name}</div>
                     <RelevancePill level={s.relevance} />
                   </div>
-                  <div className="text-xs text-[#57534E]">{s.reasoning}</div>
+                  <div className="text-xs text-zinc-400">{s.reasoning}</div>
                 </div>
               ))}
             </div>
@@ -282,12 +282,12 @@ export default function AnalysisDetail() {
 
         {/* Positioning matrix */}
         {a.positioning_matrix?.white_space && (
-          <div className="bg-gradient-to-br from-[#FEF3C7] to-[#FDFBF7] rounded-2xl border border-[#FDE68A] p-5 mb-6">
+          <div className="bg-gradient-to-br from-[#FEF3C7] to-[#FDFBF7] rounded-md border border-[#FDE68A] p-5 mb-6">
             <div className="flex items-center gap-2 mb-2">
               <Sparkle size={14} weight="fill" className="text-[#854D0E]" />
-              <div className="font-heading font-semibold text-[#1C1917]">White space — positionnement libre</div>
+              <div className="font-heading font-semibold text-zinc-100">White space — positionnement libre</div>
             </div>
-            <p className="text-sm text-[#57534E]">{a.positioning_matrix.white_space}</p>
+            <p className="text-sm text-zinc-400">{a.positioning_matrix.white_space}</p>
           </div>
         )}
       </div>
@@ -297,11 +297,11 @@ export default function AnalysisDetail() {
 
 function Kpi({ icon: Icon, label, value, color }) {
   return (
-    <div className="bg-white rounded-xl border border-[#E7E5E4] p-4">
-      <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-[#78716C] mb-1">
+    <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-4">
+      <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-zinc-500 mb-1">
         <Icon size={12} style={{ color }} /> {label}
       </div>
-      <div className="font-heading text-xl font-semibold text-[#1C1917] tabular-nums">{value}</div>
+      <div className="text-lg font-semibold text-zinc-100 tabular-nums">{value}</div>
     </div>
   );
 }
@@ -346,14 +346,14 @@ function CountryPanel({ code, verdict, sizing, competitors, legal, keywords, pri
     <div className="p-6 space-y-6" data-testid={`panel-${code}`}>
       {/* Verdict */}
       {verdict && (
-        <div className="flex items-start gap-3 bg-[#FDFBF7] rounded-xl p-4 border border-[#E7E5E4]">
+        <div className="flex items-start gap-3 bg-black rounded-xl p-4 border border-zinc-800">
           <div className="text-3xl">{COUNTRY_FLAGS[code]}</div>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              <div className="font-heading font-semibold text-[#1C1917]">{COUNTRY_NAMES[code] || code}</div>
+              <div className="font-heading font-semibold text-zinc-100">{COUNTRY_NAMES[code] || code}</div>
               <VerdictSmall verdict={verdict.verdict} />
             </div>
-            <p className="text-sm text-[#57534E]">{verdict.reasoning}</p>
+            <p className="text-sm text-zinc-400">{verdict.reasoning}</p>
           </div>
         </div>
       )}
@@ -383,7 +383,7 @@ function CountryPanel({ code, verdict, sizing, competitors, legal, keywords, pri
             <MiniKpi label="Pénétration e-com" value={`${sizing.ecommerce_penetration_pct || 0}%`} />
             <MiniKpi label="Saisonnalité" value={sizing.seasonality || "—"} />
           </div>
-          {sizing.commentary && <p className="text-sm text-[#57534E] italic">{sizing.commentary}</p>}
+          {sizing.commentary && <p className="text-sm text-zinc-400 italic">{sizing.commentary}</p>}
         </Section>
       )}
 
@@ -412,16 +412,16 @@ function CountryPanel({ code, verdict, sizing, competitors, legal, keywords, pri
         <Section title={`Concurrence (${competitors.length})`} icon={Storefront}>
           <div className="space-y-2">
             {competitors.map((c, i) => (
-              <div key={i} className="border border-[#E7E5E4] rounded-lg p-3 flex gap-3 items-start" data-testid={`competitor-${i}`}>
+              <div key={i} className="border border-zinc-800 rounded-lg p-3 flex gap-3 items-start" data-testid={`competitor-${i}`}>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold text-[#1C1917]">{c.name}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#F5F2EB] text-[#57534E] uppercase tracking-wider">{c.type}</span>
-                    <span className="text-xs text-[#78716C]">· {c.price_range}</span>
-                    {c.market_share_pct !== undefined && <span className="text-xs text-[#78716C]">· {c.market_share_pct}% PDM</span>}
+                    <span className="font-semibold text-zinc-100">{c.name}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400 uppercase tracking-wider">{c.type}</span>
+                    <span className="text-xs text-zinc-500">· {c.price_range}</span>
+                    {c.market_share_pct !== undefined && <span className="text-xs text-zinc-500">· {c.market_share_pct}% PDM</span>}
                   </div>
-                  <div className="text-xs text-[#57534E]">
-                    <span className="text-[#047857]">✓ {c.strength}</span> · <span className="text-[#BE123C]">✗ {c.weakness}</span>
+                  <div className="text-xs text-zinc-400">
+                    <span className="text-emerald-400">✓ {c.strength}</span> · <span className="text-red-400">✗ {c.weakness}</span>
                   </div>
                 </div>
               </div>
@@ -444,7 +444,7 @@ function CountryPanel({ code, verdict, sizing, competitors, legal, keywords, pri
             <LegalRow icon={CurrencyEur} label="Paiements préférés" value={legal.preferred_payment_methods?.join(", ") || "—"} />
           </div>
           {legal.specific_regulations?.length > 0 && (
-            <div className="mt-3 text-sm text-[#57534E]">
+            <div className="mt-3 text-sm text-zinc-400">
               <strong>Réglementation particulière :</strong> {legal.specific_regulations.join(" · ")}
             </div>
           )}
@@ -458,8 +458,8 @@ function Section({ title, icon: Icon, children }) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Icon size={14} weight="fill" className="text-[#B84B31]" />
-        <div className="font-heading font-semibold text-[#1C1917]">{title}</div>
+        <Icon size={14} weight="fill" className="text-zinc-100" />
+        <div className="font-heading font-semibold text-zinc-100">{title}</div>
       </div>
       {children}
     </div>
@@ -468,8 +468,8 @@ function Section({ title, icon: Icon, children }) {
 
 function MiniKpi({ label, value, color }) {
   return (
-    <div className="bg-[#FDFBF7] rounded-lg border border-[#E7E5E4] p-3">
-      <div className="text-[10px] uppercase tracking-wider text-[#78716C]">{label}</div>
+    <div className="bg-black rounded-lg border border-zinc-800 p-3">
+      <div className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</div>
       <div className="font-heading font-semibold text-sm tabular-nums mt-0.5" style={{ color: color || "#1C1917" }}>{value}</div>
     </div>
   );
@@ -479,7 +479,7 @@ function KeywordBlock({ label, items, color }) {
   if (!items?.length) return null;
   return (
     <div className="mb-3">
-      <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-1.5">{label}</div>
+      <div className="text-[11px] uppercase tracking-widest text-zinc-500 mb-1.5">{label}</div>
       <div className="flex flex-wrap gap-1.5">
         {items.map((k, i) => (
           <span key={i} className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: `${color}15`, color }}>
@@ -494,10 +494,10 @@ function KeywordBlock({ label, items, color }) {
 function LegalRow({ icon: Icon, label, value }) {
   return (
     <div className="flex gap-2 items-start">
-      <Icon size={13} className="text-[#78716C] flex-shrink-0 mt-0.5" />
+      <Icon size={13} className="text-zinc-500 flex-shrink-0 mt-0.5" />
       <div className="min-w-0 flex-1">
-        <div className="text-[11px] uppercase tracking-wider text-[#78716C]">{label}</div>
-        <div className="text-sm text-[#1C1917] break-words">{value}</div>
+        <div className="text-[11px] uppercase tracking-wider text-zinc-500">{label}</div>
+        <div className="text-sm text-zinc-100 break-words">{value}</div>
       </div>
     </div>
   );

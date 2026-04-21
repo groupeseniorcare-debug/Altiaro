@@ -21,34 +21,10 @@ const COUNTRY_FLAG = {
 };
 
 const VERDICT_META = {
-  GO: {
-    label: "GO",
-    color: "#047857",
-    bg: "#D1FAE5",
-    borderColor: "#A7F3D0",
-    icon: CheckCircle,
-  },
-  GO_WITH_RESERVE: {
-    label: "GO avec réserve",
-    color: "#B45309",
-    bg: "#FEF3C7",
-    borderColor: "#FDE68A",
-    icon: Warning,
-  },
-  NO_GO: {
-    label: "NO-GO",
-    color: "#BE123C",
-    bg: "#FFE4E6",
-    borderColor: "#FECDD3",
-    icon: XCircle,
-  },
-  ERROR: {
-    label: "Erreur",
-    color: "#78716C",
-    bg: "#F5F2EB",
-    borderColor: "#E7E5E4",
-    icon: Warning,
-  },
+  GO: { label: "GO", color: "#10B981", bg: "rgba(16,185,129,0.08)", borderColor: "rgba(16,185,129,0.4)", icon: CheckCircle },
+  GO_WITH_RESERVE: { label: "RESERVE", color: "#F59E0B", bg: "rgba(245,158,11,0.08)", borderColor: "rgba(245,158,11,0.4)", icon: Warning },
+  NO_GO: { label: "NO-GO", color: "#EF4444", bg: "rgba(239,68,68,0.05)", borderColor: "rgba(239,68,68,0.25)", icon: XCircle },
+  ERROR: { label: "ERR", color: "#71717A", bg: "rgba(63,63,70,0.3)", borderColor: "rgba(63,63,70,0.5)", icon: Warning },
 };
 
 const fmtNum = (n) =>
@@ -149,74 +125,69 @@ export default function LaunchSite() {
 
   return (
     <Layout>
-      <div className="p-8 md:p-12 max-w-[1200px]">
-        <div className="flex items-start gap-3 mb-8">
-          <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-[#F59E0B] to-[#EA580C] flex items-center justify-center">
-            <Rocket size={22} weight="fill" color="#fff" />
+      <div className="p-8 md:p-10 max-w-[1200px]">
+        <div className="mb-8">
+          <div className="text-[10px] uppercase tracking-[0.12em] text-zinc-500 font-medium mb-1.5">
+            Lancer un site
           </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-1">
-              Lancer un site · Analyse multi-marché
-            </div>
-            <h1 className="font-heading text-4xl font-semibold text-[#1C1917]">
-              Quelle niche veux-tu tester ?
-            </h1>
-            <p className="text-[#57534E] mt-1">
-              Une seule idée, analysée en parallèle sur 6 marchés UE. Tu sélectionnes ensuite
-              ceux qui valent le coup et le site est prêt à être designé.
-            </p>
-          </div>
+          <h1 className="text-3xl font-semibold text-zinc-100 tracking-tight">
+            Quelle niche veux-tu tester ?
+          </h1>
+          <p className="text-zinc-500 text-sm mt-1 max-w-xl">
+            Une seule idée, analysée en parallèle sur 6 marchés UE. Les cartes apparaissent au fur
+            et à mesure — sélectionne celles qui valent le coup.
+          </p>
         </div>
 
         {/* Step 1 — Input */}
-        <div className="bg-white rounded-2xl border border-[#E7E5E4] p-6 mb-6" data-testid="launch-input">
-          <div className="text-xs uppercase tracking-widest text-[#EA580C] font-bold mb-3">
-            Étape 1 · Ton idée
+        <div className="bg-zinc-950 rounded-md border border-zinc-900 p-5 mb-4" data-testid="launch-input">
+          <div className="text-[10px] uppercase tracking-[0.12em] text-zinc-500 font-medium mb-2">
+            01 · Ton idée
           </div>
-          <label className="block text-xs font-semibold text-[#57534E] mb-1.5 uppercase tracking-wider">
-            Produit ou niche
-          </label>
-          <div className="flex flex-col md:flex-row gap-3">
+          <div className="flex flex-col md:flex-row gap-2">
             <div className="flex-1 relative">
               <MagnifyingGlass
-                size={18}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-[#78716C]"
+                size={16}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-600"
               />
               <input
                 type="text"
                 value={product}
                 onChange={(e) => setProduct(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !loading && runMulti()}
-                placeholder="ex: fauteuil releveur électrique, monte-escalier, lit médicalisé…"
+                placeholder="fauteuil releveur électrique, monte-escalier, lit médicalisé…"
                 data-testid="launch-product"
                 disabled={loading}
-                className="w-full h-14 pl-11 pr-4 rounded-xl border border-[#E7E5E4] bg-white text-[15px] focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/20 disabled:opacity-60"
+                className="w-full h-11 pl-10 pr-4 rounded-md border border-zinc-800 bg-black text-zinc-100 text-sm placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-400 disabled:opacity-60"
               />
             </div>
             <button
               onClick={runMulti}
               disabled={loading || product.trim().length < 3}
               data-testid="launch-scan"
-              className="h-14 px-6 rounded-xl bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:brightness-110 disabled:opacity-50 text-white font-medium text-sm flex items-center gap-2 shadow-sm"
+              className="h-11 px-4 rounded-md bg-white hover:bg-zinc-200 disabled:opacity-50 text-black font-medium text-sm flex items-center gap-1.5 transition-colors"
             >
               {loading ? (
                 <>
-                  <ArrowClockwise size={16} className="animate-spin" />
+                  <ArrowClockwise size={14} className="animate-spin" />
                   {scan?.progress ? (
-                    <>Scan… {scan.progress.done}/{scan.progress.total}</>
+                    <>Scan · {scan.progress.done}/{scan.progress.total}</>
                   ) : (
-                    <>Scan en cours…</>
+                    <>Analyse…</>
                   )}
                 </>
               ) : (
                 <>
-                  <Lightning size={16} weight="fill" /> Analyser les 6 marchés
+                  <Lightning size={14} weight="fill" /> Analyser les 6 marchés
                 </>
               )}
             </button>
           </div>
           {error && (
-            <div className="mt-3 p-3 rounded-lg bg-[#FFE4E6] text-[#BE123C] text-sm" data-testid="launch-error">
+            <div
+              className="mt-3 px-3 py-2 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-xs"
+              data-testid="launch-error"
+            >
               {error}
             </div>
           )}
@@ -224,36 +195,44 @@ export default function LaunchSite() {
 
         {/* Step 2 — Loading state */}
         {loading && (!scan || (scan.results || []).length === 0) && (
-          <div className="bg-white rounded-2xl border border-[#E7E5E4] p-8 mb-6 text-center">
-            <ArrowClockwise size={32} className="animate-spin mx-auto text-[#EA580C] mb-4" />
-            <div className="font-medium text-[#1C1917]">6 marchés en cours d'analyse en parallèle…</div>
-            <div className="text-sm text-[#78716C] mt-1">
-              Chaque marché met 10-15s (Claude + Google Ads). Les cartes apparaîtront au fur et à mesure.
+          <div className="bg-zinc-950 rounded-md border border-zinc-900 p-8 mb-4 text-center">
+            <ArrowClockwise size={24} className="animate-spin mx-auto text-zinc-400 mb-3" />
+            <div className="text-sm font-medium text-zinc-200">6 marchés en analyse parallèle</div>
+            <div className="text-xs text-zinc-500 mt-1">
+              Chaque marché met 10-15s · Claude + Google Ads
             </div>
           </div>
         )}
 
-        {/* Step 2 bis — Results (partial or complete) */}
+        {/* Step 2 bis — Results */}
         {scan && (scan.results || []).length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-baseline justify-between mb-4">
+          <div className="mb-4">
+            <div className="flex items-baseline justify-between mb-3">
               <div>
-                <div className="text-xs uppercase tracking-widest text-[#EA580C] font-bold">
-                  Étape 2 · {loading ? "Résultats partiels" : "Résultats par marché"}
+                <div className="text-[10px] uppercase tracking-[0.12em] text-zinc-500 font-medium">
+                  02 · Résultats
                 </div>
-                <div className="text-lg font-semibold text-[#1C1917] mt-1">
-                  {scan.summary.go} GO · {scan.summary.go_with_reserve} GO avec réserve ·{" "}
-                  {scan.summary.no_go} NO-GO
-                  {scan.summary.error > 0 && <> · {scan.summary.error} erreur</>}
+                <div className="text-sm text-zinc-300 mt-1 font-mono">
+                  <span className="text-emerald-400">{scan.summary.go} GO</span>
+                  <span className="text-zinc-700 mx-2">·</span>
+                  <span className="text-amber-400">{scan.summary.go_with_reserve} RESERVE</span>
+                  <span className="text-zinc-700 mx-2">·</span>
+                  <span className="text-red-400">{scan.summary.no_go} NO-GO</span>
+                  {scan.summary.error > 0 && (
+                    <>
+                      <span className="text-zinc-700 mx-2">·</span>
+                      <span className="text-zinc-500">{scan.summary.error} err</span>
+                    </>
+                  )}
                   {loading && scan.progress && (
-                    <span className="text-[#78716C] font-normal ml-2">
-                      ({scan.progress.done}/{scan.progress.total} marchés analysés)
+                    <span className="text-zinc-500 ml-3">
+                      {scan.progress.done}/{scan.progress.total}
                     </span>
                   )}
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="launch-results">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" data-testid="launch-results">
               {scan.results.map((r) => (
                 <MarketCard
                   key={r.country}
@@ -269,10 +248,10 @@ export default function LaunchSite() {
                 Array.from({ length: scan.progress.total - scan.progress.done }).map((_, i) => (
                   <div
                     key={`pending-${i}`}
-                    className="rounded-2xl border-2 border-dashed border-[#E7E5E4] p-5 flex flex-col items-center justify-center gap-2 min-h-[200px] bg-[#FAF7F2]"
+                    className="rounded-md border border-dashed border-zinc-800 p-5 flex flex-col items-center justify-center gap-2 min-h-[200px] bg-zinc-950"
                   >
-                    <ArrowClockwise size={22} className="animate-spin text-[#EA580C]" />
-                    <div className="text-xs text-[#78716C]">Marché en cours…</div>
+                    <ArrowClockwise size={18} className="animate-spin text-zinc-500" />
+                    <div className="text-[11px] text-zinc-500">Analyse en cours…</div>
                   </div>
                 ))
               )}
@@ -282,30 +261,26 @@ export default function LaunchSite() {
 
         {/* Step 3 — Launch */}
         {scan && !loading && (scan.summary.go + scan.summary.go_with_reserve) > 0 && (
-          <div className="bg-white rounded-2xl border-2 border-[#EA580C]/20 p-6 mb-6" data-testid="launch-step3">
-            <div className="text-xs uppercase tracking-widest text-[#EA580C] font-bold mb-3">
-              Étape 3 · Lance ton site
+          <div className="bg-zinc-950 rounded-md border border-zinc-700 p-5" data-testid="launch-step3">
+            <div className="text-[10px] uppercase tracking-[0.12em] text-zinc-300 font-medium mb-2">
+              03 · Lance ton site
             </div>
-            <label className="block text-xs font-semibold text-[#57534E] mb-1.5 uppercase tracking-wider">
-              Nom du site (optionnel — on utilisera ta niche sinon)
-            </label>
             <input
               type="text"
               value={siteName}
               onChange={(e) => setSiteName(e.target.value)}
-              placeholder={`ex: ${product} Confort, Luméa Senior…`}
+              placeholder={`Nom du site (par défaut : ${product})`}
               data-testid="launch-site-name"
-              className="w-full h-12 px-4 rounded-xl border border-[#E7E5E4] bg-white text-[15px] focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/20 mb-4"
+              className="w-full h-10 px-3 rounded-md border border-zinc-800 bg-black text-zinc-100 text-sm placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-400 mb-3"
             />
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="text-sm text-[#57534E]">
+              <div className="text-xs text-zinc-500">
                 {selectedCountries.length === 0 ? (
-                  <span className="text-[#BE123C]">Aucun marché sélectionné — coche au moins un GO ↑</span>
+                  <span className="text-red-400">Sélectionne au moins 1 marché GO ↑</span>
                 ) : (
                   <>
-                    <strong>{selectedCountries.length}</strong> marché
-                    {selectedCountries.length > 1 ? "s" : ""} sélectionné
-                    {selectedCountries.length > 1 ? "s" : ""} ·{" "}
+                    <span className="text-zinc-300 font-medium">{selectedCountries.length}</span>{" "}
+                    marché{selectedCountries.length > 1 ? "s" : ""} ·{" "}
                     {selectedCountries.map((c) => COUNTRY_FLAG[c] || c).join(" ")}
                   </>
                 )}
@@ -314,16 +289,16 @@ export default function LaunchSite() {
                 onClick={createSite}
                 disabled={creating || selectedCountries.length === 0}
                 data-testid="launch-create"
-                className="h-12 px-6 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:brightness-110 disabled:opacity-50 text-white font-medium text-sm flex items-center gap-2 shadow-md"
+                className="h-9 px-4 rounded-md bg-white hover:bg-zinc-200 disabled:opacity-50 text-black font-medium text-sm flex items-center gap-1.5 transition-colors"
               >
                 {creating ? (
                   <>
-                    <ArrowClockwise size={16} className="animate-spin" /> Création…
+                    <ArrowClockwise size={14} className="animate-spin" /> Création…
                   </>
                 ) : (
                   <>
-                    <Rocket size={16} weight="fill" /> Créer le site &amp; lancer le studio IA
-                    <ArrowRight size={14} weight="bold" />
+                    <Rocket size={14} weight="fill" /> Créer &amp; lancer le studio
+                    <ArrowRight size={12} weight="bold" />
                   </>
                 )}
               </button>
@@ -333,16 +308,14 @@ export default function LaunchSite() {
 
         {/* Methodology */}
         {!scan && !loading && (
-          <div className="p-4 rounded-xl bg-[#FAF7F2] border border-[#E7E5E4]">
-            <div className="flex items-start gap-3">
-              <Info size={18} className="text-[#78716C] shrink-0 mt-0.5" />
-              <div className="text-xs text-[#57534E] leading-relaxed">
-                <strong>Comment ça marche</strong> — On interroge Claude + Google Keyword Planner en
-                parallèle sur les 6 marchés (France, Allemagne, Belgique, Pays-Bas, Suisse, Italie).
-                Un verdict GO/NO-GO par marché selon 3 critères obligatoires (prix ≥ 50€, volume ≥
-                5 000/mois, CPA Ads ≤ 40%) + concurrence (soft ≤ 75/100, au-delà warning
-                "concurrence élevée"). Tu sélectionnes les marchés rentables et le Prompt Studio
-                génère le site en un clic.
+          <div className="p-4 rounded-md border border-zinc-900 bg-zinc-950">
+            <div className="flex items-start gap-2.5">
+              <Info size={14} className="text-zinc-600 shrink-0 mt-0.5" />
+              <div className="text-[11px] text-zinc-500 leading-relaxed">
+                <span className="text-zinc-300 font-medium">Comment ça marche</span> — Claude +
+                Google Keyword Planner en parallèle sur 6 marchés (FR / DE / BE / NL / CH / IT). Un
+                verdict par marché sur 3 critères obligatoires (prix ≥ 50€, volume ≥ 5 000/mois, CPA
+                Ads ≤ 40%) + concurrence (soft ≤ 75/100, au-delà warning "concurrence élevée").
               </div>
             </div>
           </div>
@@ -364,92 +337,90 @@ function MarketCard({ result, selected, onToggle }) {
     <div
       onClick={onToggle}
       data-testid={`market-${result.country}`}
-      className={`group relative rounded-2xl border-2 p-5 transition ${
-        canSelect ? "cursor-pointer hover:shadow-md" : "cursor-not-allowed opacity-80"
-      }`}
+      className={`group relative rounded-md border p-4 transition-colors ${
+        canSelect ? "cursor-pointer hover:border-zinc-600" : "cursor-not-allowed opacity-70"
+      } ${selected ? "bg-zinc-900" : "bg-zinc-950"}`}
       style={{
-        background: selected ? meta.bg : "#ffffff",
-        borderColor: selected ? meta.color : meta.borderColor,
+        borderColor: selected ? meta.color : "#27272A",
       }}
     >
       {/* Selector */}
       {canSelect && (
-        <div className="absolute top-4 right-4">
+        <div className="absolute top-3 right-3">
           <div
-            className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition ${
-              selected ? "" : "bg-white"
-            }`}
+            className="w-5 h-5 rounded border flex items-center justify-center transition-colors"
             style={{
-              background: selected ? meta.color : "#ffffff",
-              borderColor: meta.color,
+              background: selected ? meta.color : "transparent",
+              borderColor: selected ? meta.color : "#3F3F46",
             }}
           >
-            {selected && <CheckCircle size={14} weight="bold" color="#ffffff" />}
+            {selected && <CheckCircle size={12} weight="bold" color="#000000" />}
           </div>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="text-3xl">{COUNTRY_FLAG[result.country] || "🌍"}</div>
+      <div className="flex items-center gap-2.5 mb-4">
+        <div className="text-2xl">{COUNTRY_FLAG[result.country] || "🌍"}</div>
         <div className="flex-1 min-w-0">
-          <div className="font-heading text-lg font-semibold text-[#1C1917]">
+          <div className="font-medium text-zinc-100 text-sm">
             {result.country_name || result.country}
           </div>
-          <div className="flex items-center gap-1.5">
-            <meta.icon size={12} weight="fill" color={meta.color} />
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: meta.color }}>
+          <div className="flex items-center gap-1 mt-0.5">
+            <meta.icon size={10} weight="fill" color={meta.color} />
+            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: meta.color }}>
               {meta.label}
-              {result.score !== undefined && <> · {result.score}/100</>}
+              {result.score !== undefined && (
+                <span className="text-zinc-600"> · {result.score}</span>
+              )}
             </span>
           </div>
         </div>
       </div>
 
       {result.verdict === "ERROR" ? (
-        <div className="text-xs text-[#BE123C] bg-[#FFE4E6] p-2 rounded-lg">
+        <div className="text-[11px] text-red-400 bg-red-500/5 border border-red-500/20 p-2 rounded">
           {result.error || "Erreur inconnue"}
         </div>
       ) : (
         <>
-          {/* Metrics */}
-          <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 mb-3">
             <Stat label="Prix moyen" value={`${Math.round(m.avg_price_median || 0)}€`} />
-            <Stat label="Volume / mois" value={fmtNum(m.volume_total)} />
+            <Stat label="Volume/mois" value={fmtNum(m.volume_total)} />
             <Stat
               label="Concurrence"
               value={`${m.competition_weighted}/100`}
               warn={m.competition_weighted > 75}
             />
             <Stat
-              label="CPA / prix"
+              label="CPA/prix"
               value={`${Math.round(m.acq_cost_pct || 0)}%`}
               warn={m.acq_cost_pct > 40}
             />
           </div>
 
-          {/* Competition high warning */}
           {result.competition_high && (
-            <div className="flex items-start gap-1.5 text-[11px] text-[#B45309] bg-[#FEF3C7] p-2 rounded-lg mb-2">
-              <Warning size={12} weight="fill" className="shrink-0 mt-0.5" />
-              <span>Concurrence très élevée — budget Ads à prévoir ×2</span>
+            <div className="flex items-start gap-1.5 text-[10px] text-amber-300 bg-amber-500/5 border border-amber-500/20 p-1.5 rounded mb-2">
+              <Warning size={10} weight="fill" className="shrink-0 mt-0.5" />
+              <span>Concurrence élevée · budget Ads ×2</span>
             </div>
           )}
 
-          {/* Reason */}
           <div
-            className="text-xs text-[#57534E] leading-relaxed mt-3"
+            className="text-[11px] text-zinc-400 leading-relaxed mt-2"
             dangerouslySetInnerHTML={{
-              __html: (result.reason || "").replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'),
+              __html: (result.reason || "").replace(
+                /\*\*(.*?)\*\*/g,
+                '<strong class="text-zinc-200 font-medium">$1</strong>'
+              ),
             }}
           />
 
-          {/* Top competitors */}
           {result.market?.top_competitors?.length > 0 && (
-            <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-[#E7E5E4]">
-              <Globe size={10} className="text-[#78716C] shrink-0" />
-              <div className="text-[10px] text-[#78716C] truncate">
-                vs {result.market.top_competitors.slice(0, 3).join(" · ")}
+            <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-zinc-800">
+              <Globe size={9} className="text-zinc-600 shrink-0" />
+              <div className="text-[10px] text-zinc-500 truncate font-mono">
+                {result.market.top_competitors.slice(0, 3).join(" · ")}
               </div>
             </div>
           )}
@@ -462,10 +433,11 @@ function MarketCard({ result, selected, onToggle }) {
 function Stat({ label, value, warn = false }) {
   return (
     <div>
-      <div className="text-[10px] text-[#78716C] uppercase tracking-wider">{label}</div>
+      <div className="text-[9px] text-zinc-500 uppercase tracking-wider font-medium">{label}</div>
       <div
-        className="text-sm font-semibold font-mono"
-        style={{ color: warn ? "#BE123C" : "#1C1917" }}
+        className={`text-xs font-mono font-semibold tabular-nums mt-0.5 ${
+          warn ? "text-red-400" : "text-zinc-200"
+        }`}
       >
         {value}
       </div>

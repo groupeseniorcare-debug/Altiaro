@@ -126,7 +126,7 @@ export default function CommandPalette() {
         onClick={() => setOpen(true)}
         data-testid="open-command-palette"
         aria-label="Recherche globale"
-        className="fixed bottom-6 right-6 w-12 h-12 rounded-full bg-[#1C1917] hover:bg-[#44403C] text-white shadow-lg flex items-center justify-center transition z-30 hover:scale-105 active:scale-95"
+        className="fixed bottom-6 right-6 w-12 h-12 rounded-full bg-white hover:bg-[#44403C] text-black shadow-lg flex items-center justify-center transition z-30 hover:scale-105 active:scale-95"
         title="Recherche globale (⌘K)"
       >
         <MagnifyingGlass size={20} weight="bold" />
@@ -153,11 +153,11 @@ export default function CommandPalette() {
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-[#E7E5E4] animate-fade-up"
+        className="relative w-full max-w-xl bg-zinc-950 rounded-md shadow-2xl overflow-hidden border border-zinc-800 animate-fade-up"
       >
         {/* Input */}
-        <div className="flex items-center gap-3 px-5 h-14 border-b border-[#E7E5E4]">
-          <MagnifyingGlass size={18} className="text-[#78716C] flex-shrink-0" />
+        <div className="flex items-center gap-3 px-5 h-14 border-b border-zinc-800">
+          <MagnifyingGlass size={18} className="text-zinc-500 flex-shrink-0" />
           <input
             ref={inputRef}
             value={q}
@@ -165,14 +165,14 @@ export default function CommandPalette() {
             onKeyDown={onInputKey}
             placeholder="Rechercher sites, produits, commandes, niches..."
             data-testid="command-palette-input"
-            className="flex-1 h-full bg-transparent outline-none text-[15px] text-[#1C1917] placeholder:text-[#A8A29E]"
+            className="flex-1 h-full bg-transparent outline-none text-[15px] text-zinc-100 placeholder:text-[#A8A29E]"
           />
-          <kbd className="hidden md:inline-flex items-center px-1.5 py-0.5 rounded border border-[#E7E5E4] text-[10px] uppercase tracking-widest text-[#78716C] font-mono">
+          <kbd className="hidden md:inline-flex items-center px-1.5 py-0.5 rounded border border-zinc-800 text-[10px] uppercase tracking-widest text-zinc-500 font-mono">
             ESC
           </kbd>
           <button
             onClick={() => setOpen(false)}
-            className="p-1 rounded hover:bg-[#F5F2EB] md:hidden"
+            className="p-1 rounded hover:bg-zinc-800 md:hidden"
             aria-label="Fermer"
           >
             <X size={16} />
@@ -182,7 +182,7 @@ export default function CommandPalette() {
         {/* Results */}
         <div className="max-h-[60vh] overflow-y-auto">
           {loading && (
-            <div className="px-5 py-8 text-sm text-center text-[#78716C]">Recherche...</div>
+            <div className="px-5 py-8 text-sm text-center text-zinc-500">Recherche...</div>
           )}
 
           {!loading && q.trim().length < 2 && (
@@ -203,7 +203,7 @@ export default function CommandPalette() {
                 if (!items.length) return null;
                 return (
                   <div key={key}>
-                    <div className="px-5 pt-3 pb-1 text-[10px] uppercase tracking-widest text-[#78716C] flex items-center gap-1.5">
+                    <div className="px-5 pt-3 pb-1 text-[10px] uppercase tracking-widest text-zinc-500 flex items-center gap-1.5">
                       <Icon size={11} /> {title} <span className="text-[#D6D3D1]">· {items.length}</span>
                     </div>
                     {items.map((r) => {
@@ -217,24 +217,24 @@ export default function CommandPalette() {
                           onMouseEnter={() => setCursor(flat.indexOf(item))}
                           data-testid={`cmd-result-${item.kind}-${item.id}`}
                           className={`w-full text-left px-5 py-2.5 flex items-center gap-3 transition ${
-                            isCursor ? "bg-[#FDF4E7]" : "hover:bg-[#FDFBF7]"
+                            isCursor ? "bg-[#FDF4E7]" : "hover:bg-black"
                           }`}
                         >
-                          <div className="w-8 h-8 rounded-lg bg-[#F5F2EB] flex items-center justify-center flex-shrink-0 overflow-hidden">
+                          <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center flex-shrink-0 overflow-hidden">
                             {item.image ? (
                               <img src={item.image} alt="" className="w-full h-full object-cover" />
                             ) : (
-                              <item.icon size={14} className="text-[#B84B31]" />
+                              <item.icon size={14} className="text-zinc-100" />
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="text-[14px] font-medium text-[#1C1917] truncate">
+                            <div className="text-[14px] font-medium text-zinc-100 truncate">
                               {item.label}
                             </div>
-                            <div className="text-[12px] text-[#78716C] truncate">{item.sub}</div>
+                            <div className="text-[12px] text-zinc-500 truncate">{item.sub}</div>
                           </div>
                           {isCursor && (
-                            <CornersOut size={14} weight="bold" className="text-[#B84B31]" />
+                            <CornersOut size={14} weight="bold" className="text-zinc-100" />
                           )}
                         </button>
                       );
@@ -247,8 +247,8 @@ export default function CommandPalette() {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-5 h-10 border-t border-[#E7E5E4] bg-[#FDFBF7]">
-          <div className="flex items-center gap-3 text-[11px] text-[#78716C]">
+        <div className="flex items-center justify-between px-5 h-10 border-t border-zinc-800 bg-black">
+          <div className="flex items-center gap-3 text-[11px] text-zinc-500">
             <span className="flex items-center gap-1">
               <KBD>↑</KBD> <KBD>↓</KBD> Naviguer
             </span>
@@ -256,7 +256,7 @@ export default function CommandPalette() {
               <KBD>↵</KBD> Ouvrir
             </span>
           </div>
-          <div className="text-[11px] text-[#78716C]">
+          <div className="text-[11px] text-zinc-500">
             {results?.total ? `${results.total} résultat${results.total > 1 ? "s" : ""}` : ""}
           </div>
         </div>
@@ -267,7 +267,7 @@ export default function CommandPalette() {
 
 function KBD({ children }) {
   return (
-    <kbd className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded border border-[#E7E5E4] bg-white text-[10px] font-mono text-[#57534E]">
+    <kbd className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded border border-zinc-800 bg-zinc-950 text-[10px] font-mono text-zinc-400">
       {children}
     </kbd>
   );
@@ -277,7 +277,7 @@ function Empty({ title, subtitle }) {
   return (
     <div className="py-16 text-center">
       <MagnifyingGlass size={28} weight="thin" className="mx-auto text-[#D6D3D1] mb-3" />
-      <div className="text-sm font-medium text-[#57534E]">{title}</div>
+      <div className="text-sm font-medium text-zinc-400">{title}</div>
       <div className="text-xs text-[#A8A29E] mt-0.5">{subtitle}</div>
     </div>
   );

@@ -169,7 +169,7 @@ export default function QuickScan() {
               onClick={run}
               disabled={loading || product.trim().length < 3}
               data-testid="qs-run"
-              className="h-14 px-6 rounded-xl bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:brightness-110 disabled:opacity-50 text-white font-medium text-sm flex items-center gap-2 shadow-sm"
+              className="h-14 px-6 rounded-xl bg-gradient-to-r from-[#F59E0B] to-[#EA580C] disabled:opacity-50 text-black font-medium text-sm flex items-center gap-2 shadow-sm"
             >
               {loading ? (
                 <>

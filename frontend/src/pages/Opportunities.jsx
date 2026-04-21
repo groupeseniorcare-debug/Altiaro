@@ -70,7 +70,7 @@ export default function Opportunities() {
       <div className="p-8 md:p-12 max-w-[1200px]">
         <button
           onClick={() => navigate("/")}
-          className="flex items-center gap-2 text-sm text-[#78716C] hover:text-[#1C1917] mb-6 transition"
+          className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-100 mb-6 transition"
           data-testid="opp-back"
         >
           <ArrowLeft size={16} /> Tableau de bord
@@ -82,14 +82,14 @@ export default function Opportunities() {
               <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-[#F97316] to-[#EF4444] flex items-center justify-center">
                 <Fire size={22} weight="fill" color="#fff" />
               </div>
-              <span className="text-[11px] uppercase tracking-widest text-[#78716C]">
+              <span className="text-[11px] uppercase tracking-widest text-zinc-500">
                 Sprint 21 · Admin only
               </span>
             </div>
-            <h1 className="font-heading text-4xl font-semibold text-[#1C1917] mb-1">
+            <h1 className="text-3xl font-semibold text-zinc-100 mb-1">
               Opportunités détectées
             </h1>
-            <p className="text-[#57534E]">
+            <p className="text-zinc-400">
               Chaque lundi 5h UTC, on re-scanne les niches analysées et on te signale les{" "}
               <strong>spikes de volume Google &gt; 30%</strong> en temps réel.
             </p>
@@ -117,8 +117,8 @@ export default function Opportunities() {
             data-testid="opp-scan-result"
             className={`mb-4 p-3 rounded-lg text-sm flex items-start gap-2 ${
               scanResult.error
-                ? "bg-[#FFE4E6] text-[#BE123C]"
-                : "bg-[#D1FAE5] text-[#047857]"
+                ? "bg-red-500/10 text-red-400"
+                : "bg-emerald-500/10 text-emerald-400"
             }`}
           >
             {scanResult.error ? (
@@ -145,8 +145,8 @@ export default function Opportunities() {
             data-testid="opp-filter-all"
             className={`h-8 px-3 rounded-full text-xs font-medium transition ${
               filter === "all"
-                ? "bg-[#1C1917] text-white"
-                : "bg-white border border-[#E7E5E4] text-[#57534E] hover:border-[#1C1917]"
+                ? "bg-white text-white"
+                : "bg-zinc-950 border border-zinc-800 text-zinc-400 hover:border-[#1C1917]"
             }`}
           >
             Toutes ({alerts.length})
@@ -157,12 +157,12 @@ export default function Opportunities() {
             className={`h-8 px-3 rounded-full text-xs font-medium transition flex items-center gap-1.5 ${
               filter === "unread"
                 ? "bg-[#F97316] text-white"
-                : "bg-white border border-[#E7E5E4] text-[#57534E] hover:border-[#F97316]"
+                : "bg-zinc-950 border border-zinc-800 text-zinc-400 hover:border-[#F97316]"
             }`}
           >
             Non lues{" "}
             {unreadCount > 0 && (
-              <span className="bg-white/30 px-1.5 rounded-full text-[10px] font-bold">
+              <span className="bg-zinc-950/30 px-1.5 rounded-full text-[10px] font-bold">
                 {unreadCount}
               </span>
             )}
@@ -170,12 +170,12 @@ export default function Opportunities() {
         </div>
 
         {loading ? (
-          <div className="py-12 text-center text-sm text-[#78716C]">Chargement…</div>
+          <div className="py-12 text-center text-sm text-zinc-500">Chargement…</div>
         ) : alerts.length === 0 ? (
-          <div className="bg-white rounded-xl border border-dashed border-[#E7E5E4] p-12 text-center">
-            <TrendUp size={32} weight="duotone" className="mx-auto mb-3 text-[#A8A29E]" />
-            <div className="font-medium text-[#1C1917] mb-1">Aucune alerte pour l'instant</div>
-            <p className="text-sm text-[#78716C] max-w-md mx-auto">
+          <div className="bg-zinc-950 rounded-xl border border-dashed border-zinc-800 p-12 text-center">
+            <TrendUp size={32} weight="duotone" className="mx-auto mb-3 text-zinc-600" />
+            <div className="font-medium text-zinc-100 mb-1">Aucune alerte pour l'instant</div>
+            <p className="text-sm text-zinc-500 max-w-md mx-auto">
               Dès qu'une niche déjà analysée voit son volume Google grimper de +30% ou plus, tu la
               verras ici. Clique "Scanner maintenant" pour forcer un scan immédiat.
             </p>
@@ -186,20 +186,20 @@ export default function Opportunities() {
               <div
                 key={alert.id}
                 data-testid={`opp-alert-${alert.id}`}
-                className={`bg-white rounded-xl border p-5 transition ${
-                  alert.acknowledged ? "border-[#E7E5E4] opacity-70" : "border-[#F97316]/40 shadow-sm"
+                className={`bg-zinc-950 rounded-xl border p-5 transition ${
+                  alert.acknowledged ? "border-zinc-800 opacity-70" : "border-[#F97316]/40 shadow-sm"
                 }`}
               >
                 <div className="flex items-start gap-4">
                   <div
                     className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
                       alert.acknowledged
-                        ? "bg-[#F5F2EB]"
+                        ? "bg-zinc-800"
                         : "bg-gradient-to-br from-[#F97316] to-[#EF4444]"
                     }`}
                   >
                     {alert.acknowledged ? (
-                      <CheckCircle size={22} weight="fill" className="text-[#78716C]" />
+                      <CheckCircle size={22} weight="fill" className="text-zinc-500" />
                     ) : (
                       <Fire size={22} weight="fill" className="text-white" />
                     )}
@@ -208,7 +208,7 @@ export default function Opportunities() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <span className="text-2xl">{COUNTRY_FLAGS[alert.country] || "🌍"}</span>
-                      <div className="font-heading text-lg font-semibold text-[#1C1917]">
+                      <div className="text-base font-semibold text-zinc-100">
                         {alert.product_input}
                       </div>
                       <span
@@ -222,14 +222,14 @@ export default function Opportunities() {
                       </span>
                     </div>
 
-                    <div className="flex flex-wrap gap-4 text-sm text-[#57534E] mb-3">
+                    <div className="flex flex-wrap gap-4 text-sm text-zinc-400 mb-3">
                       <div>
                         Volume :{" "}
-                        <span className="font-mono text-[#78716C]">
+                        <span className="font-mono text-zinc-500">
                           {alert.volume_before.toLocaleString("fr-FR")}
                         </span>{" "}
                         →{" "}
-                        <span className="font-mono font-semibold text-[#1C1917]">
+                        <span className="font-mono font-semibold text-zinc-100">
                           {alert.volume_now.toLocaleString("fr-FR")}
                         </span>{" "}
                         /mois
@@ -244,11 +244,11 @@ export default function Opportunities() {
                         {alert.top_keywords.slice(0, 5).map((k, i) => (
                           <span
                             key={i}
-                            className="text-[11px] px-2 py-0.5 rounded-full bg-[#FAF7F2] border border-[#E7E5E4] text-[#57534E]"
+                            className="text-[11px] px-2 py-0.5 rounded-full bg-zinc-900/40 border border-zinc-800 text-zinc-400"
                             title={`${k.volume.toLocaleString("fr-FR")} recherches/mois · ${k.competition}`}
                           >
                             {k.keyword}{" "}
-                            <span className="text-[#A8A29E]">
+                            <span className="text-zinc-600">
                               ({k.volume.toLocaleString("fr-FR")})
                             </span>
                           </span>
@@ -260,7 +260,7 @@ export default function Opportunities() {
                       <button
                         onClick={() => navigate(`/niches/analysis/${alert.analysis_id}`)}
                         data-testid={`opp-open-analysis-${alert.id}`}
-                        className="h-8 px-3 rounded-lg bg-[#1C1917] hover:bg-[#44403C] text-white font-medium flex items-center gap-1.5 transition"
+                        className="h-8 px-3 rounded-lg bg-white hover:bg-zinc-200 text-black font-medium flex items-center gap-1.5 transition"
                       >
                         Voir l'analyse <ArrowRight size={12} weight="bold" />
                       </button>
@@ -268,12 +268,12 @@ export default function Opportunities() {
                         <button
                           onClick={() => handleAck(alert.id)}
                           data-testid={`opp-ack-${alert.id}`}
-                          className="h-8 px-3 rounded-lg bg-white border border-[#E7E5E4] hover:border-[#047857] text-[#57534E] font-medium flex items-center gap-1.5 transition"
+                          className="h-8 px-3 rounded-lg bg-zinc-950 border border-zinc-800 hover:border-[#047857] text-zinc-400 font-medium flex items-center gap-1.5 transition"
                         >
                           <CheckCircle size={12} /> Marquer vue
                         </button>
                       )}
-                      <span className="text-[11px] text-[#78716C] ml-auto">
+                      <span className="text-[11px] text-zinc-500 ml-auto">
                         Détectée le {alert.detected_at?.slice(0, 16).replace("T", " ")}
                       </span>
                     </div>
