@@ -176,6 +176,27 @@ async def startup():
         )
         logger.info(f"Updated admin password for {ADMIN_EMAIL}")
 
+    # Seed demo Concepteur user (idempotent)
+    CONCEPTEUR_EMAIL = os.environ.get("CONCEPTEUR_EMAIL", "concepteur@conceptfactory.fr")
+    CONCEPTEUR_PASSWORD = os.environ.get("CONCEPTEUR_PASSWORD", "Concepteur2026!")
+    existing_c = await db.users.find_one({"email": CONCEPTEUR_EMAIL})
+    if existing_c is None:
+        await db.users.insert_one({
+            "email": CONCEPTEUR_EMAIL,
+            "password_hash": hash_password(CONCEPTEUR_PASSWORD),
+            "name": "Marie Concepteur",
+            "role": "operator",
+            "status": "active",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        logger.info(f"Seeded Concepteur user {CONCEPTEUR_EMAIL}")
+    elif not verify_password(CONCEPTEUR_PASSWORD, existing_c["password_hash"]):
+        await db.users.update_one(
+            {"email": CONCEPTEUR_EMAIL},
+            {"$set": {"password_hash": hash_password(CONCEPTEUR_PASSWORD), "status": "active"}},
+        )
+        logger.info(f"Updated Concepteur password for {CONCEPTEUR_EMAIL}")
+
     # ---------- APScheduler : weekly debits + bi-monthly payouts ---------- #
     try:
         from apscheduler.schedulers.asyncio import AsyncIOScheduler
