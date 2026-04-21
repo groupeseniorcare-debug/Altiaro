@@ -108,39 +108,27 @@ PROMPTS = [
     {
         "number": 1,
         "phase": "A",
-        "title": "Matrice produits quantifiée (30 candidats)",
-        "summary": "Produire une matrice de 30 produits candidats avec volumes de recherche FR, CPC Google Ads, prix d'achat Chine/EU, prix de vente, marges, angles marketing et score GO.",
-        "prompt": """Tu es expert en product research e-commerce drop-shipping. Je lance une boutique Shopify FR/EU sur la niche: [NICHE]. Budget Google Ads 30€/jour. Cible CPC < 1€ OU marge absolue > 400€/vente.
+        "title": "Matrice produits quantifiée (15 candidats)",
+        "summary": "Produire une matrice de 15 produits candidats avec volumes de recherche FR, CPC Google Ads, prix, marges, score GO — assez pour identifier le TOP 5.",
+        "prompt": """Tu es product researcher e-commerce drop-shipping FR (10 ans d'exp senior/silver economy).
 
-Produis une MATRICE de 30 produits candidats. Critères d'entrée obligatoires:
-- Pas dispositif médical MDR
+Je lance une boutique Shopify FR/EU sur la niche : **[NICHE]**.
+Contraintes : budget Google Ads 30€/jour · CPC cible < 1€ OU marge absolue > 400€/vente.
+
+**Critères d'entrée obligatoires** :
+- Pas de dispositif médical MDR (classe I accepté si auto-déclaration OK)
 - Dispo dropship (Alibaba/AliExpress/CJ/Zendrop/Spocket/BigBuy)
-- Poids < 20kg
-- Marge brute >= 70%
-- Conforme import EU
+- Poids < 20 kg · conforme import EU · marge brute ≥ 70%
 
-Pour chaque produit, fournir:
-| Colonne | Description |
-| Nom produit FR commercial | Rassurant, benefit-first |
-| KW principal FR | Requête d'intention d'achat la plus tapée |
-| Volume recherche FR/mois | Estimation réaliste |
-| Volume longue-traîne | Somme variantes |
-| CPC moyen Google Ads (€) | Keyword Planner |
-| Compétition SEO 🟢🟡🟠🔴 | Analyse SERP |
-| KD /100 | Difficulté ranking |
-| Prix achat Chine FOB (€) | Alibaba 1 unité + port |
-| Prix achat EU (€) | CJ/BigBuy si dispo |
-| Prix vente marché FR | Médian concurrents |
-| Prix vente recommandé | Optimum conv × marge |
-| Marge brute % et € | |
-| LTV potentielle | Cross-sell |
-| Saisonnalité | Google Trends |
-| Angle marketing | Accroche forte |
-| UGC faisable ? | O/N |
-| Objection principale | Frein d'achat |
-| Score GO /10 | Synthèse |
+**Livre une matrice de 15 produits candidats** dans ce format tableau markdown **STRICT** (8 colonnes, concis) :
 
-Livre la matrice en tableau markdown + CSV. Après la matrice, classe le TOP 10 avec justification budget 30€/j.""",
+| # | Produit (nom FR commercial) | KW principal FR | Volume/mois FR | CPC (€) | Prix achat Chine (€) | Prix vente conseillé (€) | Marge % | Score GO /10 |
+
+Après le tableau, ajoute un bloc court :
+- **TOP 3 retenus** avec 2 lignes de justification chacun (angle marketing + pourquoi ça rentre dans budget 30€/j)
+- **1 warning** : le produit le plus risqué de la liste et pourquoi.
+
+**Sois synthétique** — la matrice doit tenir en 1 écran. Pas de blabla, pas de variations. Cible : 1200-1800 mots MAX.""",
     },
     {
         "number": 2,

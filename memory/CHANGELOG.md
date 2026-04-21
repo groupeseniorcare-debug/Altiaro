@@ -3,6 +3,18 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 30 : Fix 4 bugs bloquants du flow Concepteur + UX guidage
+- **Bug redirection** : `LaunchSite.jsx:createSite` renvoyait sur `/sites/:id/studio` (route supprimée au Sprint 26) → corrigé en `/sites/:id` (cockpit unifié).
+- **Bug "Erreur est survenue" à l'exécution** : l'ingress Kubernetes coupe les requêtes > 60s. Le prompt #1 demandait 30 produits × 15 colonnes → output >5000 tokens → Anthropic/LiteLLM timeout > 60s → 502. **Fix** :
+  - **Architecture async** : `POST /api/steps/:id/execute` passe en fire-and-forget. Le backend marque `ai_executing=true` puis `asyncio.create_task()` lance Claude en background. L'endpoint répond 200 en <200ms. Le frontend poll `GET /api/steps/:id` toutes les 2.5s pendant max 3 min, récupère `ai_response` ou `ai_error` quand prêt.
+  - **Retry** : 1 retry automatique sur erreurs transientes (502/503/504/timeout/overloaded) avec backoff 1.5s. Timeout Claude étendu à 180s.
+  - **Messages d'erreur clairs** : distinction budget épuisé / clé invalide / upstream surchargé / timeout.
+  - **Prompt #1 raccourci** : matrice **15 produits × 8 colonnes** (était 30 × 15), demande explicite "1200-1800 mots MAX, synthétique" → output ~4000 chars, généré en 30-40s. Testé E2E : matrice complète (coussin lombaire chauffant, télécommande universelle, accoudoirs mémoire...) avec TOP 3 argumenté + warning réglementaire sur le kit transformateur.
+- **Bug "Valider & continuer" rien ne se passe** : le backend exigeait au moins un livrable (URL/notes/fichier/ai_response) et retournait 400 silencieusement. **Fix** : le bouton est désormais **disabled tant qu'aucun livrable n'est renseigné**, avec tooltip explicatif. Feedback clair : "Exécutez le prompt IA ou renseignez un livrable pour pouvoir valider". Après submit réussi, le panneau se ferme automatiquement.
+- **UX guidage ajouté** : bandeau "Comment ça marche" en haut du panneau latéral avec 4 étapes numérotées (lis le prompt → exécute → affine les livrables → valide). Chaque champ Livrable (URL externe / Notes internes / Fichiers joints) est explicité avec son usage concret. Fin du "je fais quoi ?".
+- **Persistance state** : `ai_executing` et `ai_error` stockés dans le step document. Si le Concepteur ferme puis rouvre le panneau pendant une exécution en cours, il voit immédiatement le spinner reprendre et l'erreur s'afficher si échec.
+
+
 ## 2026-04-21 · Sprint 29 : Nettoyage UI + Claude 4.5 forcé + audit prompts
 - **"Made with Emergent"** masqué via `src/App.css` (CSS `display:none` sur `#emergent-badge`). Supprimé aussi du source `public/index.html` (ré-injecté par l'ingress Emergent sur les previews, disparaît nativement sur altiaro.com après deploy).
 - **"Copilot IA" FAB** retiré du `Layout.jsx` (Cmd+K admin conservé).

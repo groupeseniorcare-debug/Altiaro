@@ -131,7 +131,7 @@ export default function LaunchSite() {
       setError(err);
       return;
     }
-    navigate(`/sites/${data.id}/studio`);
+    navigate(`/sites/${data.id}`);
   };
 
   return (

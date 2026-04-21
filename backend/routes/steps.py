@@ -155,6 +155,72 @@ async def reject_step(step_id: str, data: StepRejectInput, admin: dict = Depends
     return await db.steps.find_one({"id": step_id}, {"_id": 0})
 
 
+async def _execute_step_background(step_id: str, prompt_text: str, provider: str, model: str) -> None:
+    """Runs Claude in background, writes result back to step document. Never raises."""
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        system_msg = (
+            "Tu es un expert e-commerce, SEO, copywriting et ops. Tu réponds en français. "
+            "Tu fournis des livrables concrets, structurés, prêts à l'emploi. "
+            "Tu utilises des tableaux markdown, des listes, et des exemples chiffrés quand pertinent."
+        )
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"step-{step_id}",
+            system_message=system_msg,
+        ).with_model(provider, model)
+        message = UserMessage(text=prompt_text)
+        last_exc = None
+        ai_text = None
+        for attempt in range(2):
+            try:
+                response = await asyncio.wait_for(chat.send_message(message), timeout=180)
+                ai_text = response if isinstance(response, str) else str(response)
+                break
+            except Exception as e:
+                last_exc = e
+                err_low = str(e).lower()
+                if attempt == 0 and any(s in err_low for s in ("502", "503", "504", "bad gateway", "timeout", "overloaded", "rate limit")):
+                    logger.warning(f"[bg-exec] transient error, retrying once: {str(e)[:150]}")
+                    await asyncio.sleep(2)
+                    continue
+                raise
+        if ai_text is None and last_exc is not None:
+            raise last_exc
+
+        now = datetime.now(timezone.utc).isoformat()
+        await db.steps.update_one(
+            {"id": step_id},
+            {"$set": {
+                "ai_response": ai_text,
+                "ai_model_used": f"{provider}/{model}",
+                "ai_executed_at": now,
+                "ai_executing": False,
+                "ai_error": None,
+                "updated_at": now,
+            }},
+        )
+        logger.info(f"[bg-exec] step {step_id} completed ({len(ai_text)} chars)")
+    except Exception as e:
+        logger.exception(f"[bg-exec] step {step_id} failed")
+        err_str = str(e)
+        if "budget" in err_str.lower():
+            msg = "Budget Emergent LLM Key épuisé. Rechargez depuis Profile → Universal Key → Add Balance."
+        elif any(s in err_str.lower() for s in ("502", "503", "504", "overloaded", "bad gateway")):
+            msg = "Claude est momentanément surchargé. Cliquez à nouveau sur Exécuter — c'est passager."
+        elif "timeout" in err_str.lower():
+            msg = "Timeout : Claude n'a pas répondu dans les 3 minutes. Réessayez."
+        else:
+            msg = f"Erreur IA : {err_str[:250]}"
+        try:
+            await db.steps.update_one(
+                {"id": step_id},
+                {"$set": {"ai_executing": False, "ai_error": msg, "updated_at": datetime.now(timezone.utc).isoformat()}},
+            )
+        except Exception:
+            pass
+
+
 @router.post("/steps/{step_id}/execute")
 async def execute_step_with_ai(step_id: str, data: StepExecuteInput, user: dict = Depends(get_current_user)):
     step = await db.steps.find_one({"id": step_id}, {"_id": 0})
@@ -163,6 +229,8 @@ async def execute_step_with_ai(step_id: str, data: StepExecuteInput, user: dict 
     site = await _check_site_access(step["site_id"], user)
     if step["status"] == "locked":
         raise HTTPException(status_code=400, detail="Étape verrouillée")
+    if step.get("ai_executing"):
+        raise HTTPException(status_code=409, detail="Une exécution IA est déjà en cours pour cette étape")
 
     variables = data.user_variables or {}
     prompt_text = step["prompt"]
@@ -181,52 +249,14 @@ async def execute_step_with_ai(step_id: str, data: StepExecuteInput, user: dict 
     for k, v in variables.items():
         prompt_text = prompt_text.replace(f"[{k}]", str(v)).replace(f"{{{k}}}", str(v))
 
-    try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        system_msg = (
-            "Tu es un expert e-commerce, SEO, copywriting et ops. Tu réponds en français. "
-            "Tu fournis des livrables concrets, structurés, prêts à l'emploi. "
-            "Tu utilises des tableaux markdown, des listes, et des exemples chiffrés quand pertinent."
-        )
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"step-{step_id}",
-            system_message=system_msg,
-        ).with_model(data.model_provider, data.model_name)
-        message = UserMessage(text=prompt_text)
-        response = await asyncio.wait_for(chat.send_message(message), timeout=50)
-        ai_text = response if isinstance(response, str) else str(response)
-    except asyncio.TimeoutError:
-        raise HTTPException(
-            status_code=504,
-            detail="Le modèle met trop de temps à répondre (>50s). Réessayez ou changez de modèle."
-        )
-    except Exception as e:
-        logger.exception("LLM execution failed")
-        err_str = str(e)
-        if "Budget has been exceeded" in err_str or "budget" in err_str.lower():
-            raise HTTPException(
-                status_code=402,
-                detail="Budget Emergent LLM Key épuisé. Allez dans Profile → Universal Key → Add Balance pour recharger, puis réessayez."
-            )
-        if "invalid_api_key" in err_str.lower() or "unauthorized" in err_str.lower():
-            raise HTTPException(
-                status_code=401,
-                detail="Clé LLM invalide ou expirée. Contactez l'administrateur."
-            )
-        raise HTTPException(status_code=500, detail=f"Erreur LLM : {err_str[:300]}")
-
+    # Mark the step as executing and fire-and-forget background task
     now = datetime.now(timezone.utc).isoformat()
     await db.steps.update_one(
         {"id": step_id},
-        {"$set": {
-            "ai_response": ai_text,
-            "ai_model_used": f"{data.model_provider}/{data.model_name}",
-            "ai_executed_at": now,
-            "updated_at": now,
-        }},
+        {"$set": {"ai_executing": True, "ai_error": None, "ai_executing_started_at": now, "updated_at": now}},
     )
-    return {"ai_response": ai_text, "model": f"{data.model_provider}/{data.model_name}"}
+    asyncio.create_task(_execute_step_background(step_id, prompt_text, data.model_provider, data.model_name))
+    return {"status": "executing", "message": "Génération en cours — la réponse apparaîtra sous 30-90 secondes."}
 
 
 @router.post("/steps/{step_id}/upload")

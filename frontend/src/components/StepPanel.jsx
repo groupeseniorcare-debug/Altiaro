@@ -32,7 +32,7 @@ export default function StepPanel({ step: initialStep, site, isAdmin, onClose, o
   const [notes, setNotes] = useState(step.deliverable_notes || "");
   const [aiResponse, setAiResponse] = useState(step.ai_response || "");
   const [aiModel, setAiModel] = useState("anthropic/claude-sonnet-4-5-20250929");
-  const [executing, setExecuting] = useState(false);
+  const [executing, setExecuting] = useState(Boolean(initialStep.ai_executing));
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -90,22 +90,37 @@ export default function StepPanel({ step: initialStep, site, isAdmin, onClose, o
     setExecuting(true);
     setError("");
     const [provider, model] = aiModel.split("/");
-    const { data, error: err } = await apiCall(() =>
+    const { error: err } = await apiCall(() =>
       api.post(`/steps/${step.id}/execute`, {
         model_provider: provider,
         model_name: model,
       })
     );
-    setExecuting(false);
     if (err) {
+      setExecuting(false);
       setError(err);
       return;
     }
-    if (data?.ai_response) {
-      setAiResponse(data.ai_response);
+    // Fire-and-forget launched on backend — poll the step every 2.5s for up to 3 minutes
+    const startTs = Date.now();
+    const pollInterval = setInterval(async () => {
       const { data: refreshed } = await apiCall(() => api.get(`/steps/${step.id}`));
-      if (refreshed) refreshStep(refreshed);
-    }
+      if (!refreshed) return;
+      if (refreshed.ai_executing === false && (refreshed.ai_response || refreshed.ai_error)) {
+        clearInterval(pollInterval);
+        setExecuting(false);
+        if (refreshed.ai_error) {
+          setError(refreshed.ai_error);
+        } else if (refreshed.ai_response) {
+          setAiResponse(refreshed.ai_response);
+          refreshStep(refreshed);
+        }
+      } else if (Date.now() - startTs > 180000) {
+        clearInterval(pollInterval);
+        setExecuting(false);
+        setError("Timeout : l'IA n'a pas répondu dans les 3 minutes. Réessayez.");
+      }
+    }, 2500);
   };
 
   const handleUpload = async (e) => {
@@ -125,13 +140,18 @@ export default function StepPanel({ step: initialStep, site, isAdmin, onClose, o
   };
 
   const handleSubmit = async () => {
+    setError("");
     // save first
     await handleSave();
     setSubmitting(true);
     const { data, error: err } = await apiCall(() => api.post(`/steps/${step.id}/submit`));
     setSubmitting(false);
-    if (err) setError(err);
-    else if (data) refreshStep(data);
+    if (err) {
+      setError(err);
+    } else if (data) {
+      refreshStep(data);
+      onClose();
+    }
   };
 
   const handleValidate = async () => {
@@ -189,11 +209,39 @@ export default function StepPanel({ step: initialStep, site, isAdmin, onClose, o
           </button>
         </div>
 
-        <div className="p-8 space-y-8">
+        <div className="p-8 space-y-6">
           {/* Summary */}
           <div className="p-4 rounded-xl bg-[#F5F2EB] text-[#57534E] text-sm leading-relaxed">
             {step.summary}
           </div>
+
+          {/* How it works help banner */}
+          {!readOnly && (
+            <div className="p-4 rounded-xl bg-white border border-[#E7E5E4]">
+              <div className="text-[11px] uppercase tracking-widest text-[#B84B31] font-semibold mb-2">
+                Comment ça marche
+              </div>
+              <ol className="space-y-1.5 text-sm text-[#57534E] leading-relaxed list-decimal pl-5">
+                <li>
+                  <strong className="text-[#1C1917]">Lis le prompt</strong> ci-dessous (l'expertise de Claude 4.5 pour cette étape).
+                </li>
+                <li>
+                  Clique <strong className="text-[#1C1917]">« Exécuter le prompt »</strong> pour générer un premier livrable via l'IA.
+                </li>
+                <li>
+                  Affine la réponse dans les <strong className="text-[#1C1917]">champs Livrables</strong> :
+                  <ul className="list-disc pl-5 mt-1 text-xs text-[#78716C] space-y-0.5">
+                    <li><strong>URL externe</strong> : lien vers un Google Doc / Figma / page Shopify si tu as travaillé en dehors</li>
+                    <li><strong>Notes internes</strong> : décisions prises, points clés du livrable</li>
+                    <li><strong>Fichiers joints</strong> : PDF, images, CSV (max 15 Mo)</li>
+                  </ul>
+                </li>
+                <li>
+                  Clique <strong className="text-[#1C1917]">« Valider & continuer »</strong> pour acter l'étape et débloquer la suivante. La validation peut déclencher des automatismes (injection légal / import produits / renommage du site selon l'étape).
+                </li>
+              </ol>
+            </div>
+          )}
 
           {/* Prompt */}
           <div>
@@ -405,33 +453,39 @@ export default function StepPanel({ step: initialStep, site, isAdmin, onClose, o
             </div>
           )}
 
-          {(step.status === "in_progress" || step.status === "rejected") && !readOnly && (
-            <div className="flex items-center justify-between">
-              <div className="text-xs text-[#78716C]">
-                Renseignez vos livrables puis validez pour passer à l'étape suivante.
+          {(step.status === "in_progress" || step.status === "rejected") && !readOnly && (() => {
+            const hasDeliverable = !!(url?.trim() || notes?.trim() || aiResponse?.trim() || (step.deliverable_files?.length > 0));
+            return (
+              <div className="flex items-center justify-between gap-4">
+                <div className="text-xs text-[#78716C] flex-1">
+                  {hasDeliverable
+                    ? "Renseignez vos livrables puis validez pour passer à l'étape suivante."
+                    : "Exécutez le prompt IA ou renseignez un livrable (URL / notes / fichier) pour pouvoir valider."}
+                </div>
+                <div className="flex gap-3 shrink-0">
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    data-testid="step-save-btn"
+                    className="h-11 px-4 rounded-xl border border-[#E7E5E4] text-[#57534E] hover:bg-[#FDFBF7] font-medium transition flex items-center gap-2 disabled:opacity-60"
+                  >
+                    {saving ? <Spinner size={16} className="animate-spin" /> : <FloppyDisk size={16} />}
+                    Enregistrer brouillon
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={submitting || !hasDeliverable}
+                    title={!hasDeliverable ? "Génère un livrable via l'IA ou remplis un champ avant de valider" : "Valide l'étape et passe à la suivante"}
+                    data-testid="step-submit-btn"
+                    className="h-11 px-5 rounded-xl bg-[#047857] hover:bg-[#065F46] text-white font-medium transition flex items-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {submitting ? <Spinner size={16} className="animate-spin" /> : <CheckCircle size={16} weight="fill" />}
+                    Valider & continuer
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  data-testid="step-save-btn"
-                  className="h-11 px-4 rounded-xl border border-[#E7E5E4] text-[#57534E] hover:bg-[#FDFBF7] font-medium transition flex items-center gap-2 disabled:opacity-60"
-                >
-                  {saving ? <Spinner size={16} className="animate-spin" /> : <FloppyDisk size={16} />}
-                  Enregistrer brouillon
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  data-testid="step-submit-btn"
-                  className="h-11 px-5 rounded-xl bg-[#047857] hover:bg-[#065F46] text-neutral-900 font-medium transition flex items-center gap-2 active:scale-[0.98] disabled:opacity-60"
-                >
-                  {submitting ? <Spinner size={16} className="animate-spin" /> : <CheckCircle size={16} weight="fill" />}
-                  Valider & continuer
-                </button>
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           {step.status === "awaiting_validation" && !isAdmin && (
             <div className="flex items-center gap-3 text-sm text-[#0369A1]">
