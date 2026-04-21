@@ -2,8 +2,9 @@
 import secrets
 import uuid
 from datetime import datetime, timezone, timedelta
+from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Query
 
 from deps import db
 from models_shop import OrderCreateInput
@@ -34,15 +35,102 @@ async def public_site(site_id: str):
 
 
 @router.get("/sites/{site_id}/products")
-async def public_products(site_id: str):
+async def public_products(
+    site_id: str,
+    collection: Optional[str] = Query(None, description="Slug de collection"),
+    tag: Optional[List[str]] = Query(None, description="Tag(s) à filtrer"),
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    in_stock: Optional[bool] = None,
+    on_sale: Optional[bool] = None,
+    sort: str = "featured",
+):
     site = await db.sites.find_one({"id": site_id}, {"_id": 0, "id": 1})
     if not site:
         raise HTTPException(status_code=404, detail="Site introuvable")
-    items = await db.products.find(
-        {"site_id": site_id, "status": "active"},
-        {"_id": 0}
-    ).sort([("featured", -1), ("created_at", -1)]).to_list(500)
+
+    q: dict = {"site_id": site_id, "status": "active"}
+    if collection:
+        q["category"] = collection
+    if tag:
+        q["tags"] = {"$in": tag}
+    price_q: dict = {}
+    if min_price is not None:
+        price_q["$gte"] = min_price
+    if max_price is not None:
+        price_q["$lte"] = max_price
+    if price_q:
+        q["price"] = price_q
+    if in_stock:
+        q["$or"] = [{"stock": None}, {"stock": {"$gt": 0}}]
+    if on_sale:
+        q["compare_at_price"] = {"$gt": 0, "$exists": True}
+
+    sort_map = {
+        "featured": [("featured", -1), ("created_at", -1)],
+        "newest": [("created_at", -1)],
+        "price_asc": [("price", 1)],
+        "price_desc": [("price", -1)],
+        "bestsellers": [("sales_count", -1), ("featured", -1), ("created_at", -1)],
+    }
+    sort_spec = sort_map.get(sort, sort_map["featured"])
+
+    items = await db.products.find(q, {"_id": 0}).sort(sort_spec).to_list(500)
     return items
+
+
+@router.get("/sites/{site_id}/collections")
+async def public_collections(site_id: str):
+    """Liste des collections du site + compte produits par collection."""
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "design": 1})
+    if not site:
+        raise HTTPException(status_code=404, detail="Site introuvable")
+    collections = (site.get("design") or {}).get("collections") or []
+
+    # Fallback générique pour que la page soit toujours démontrable
+    if not collections:
+        collections = [
+            {"slug": "mobilite", "title": "Mobilité & confort", "description": "Fauteuils releveurs, déambulateurs, aides à la marche.",
+             "image": "https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=900&auto=format&fit=crop"},
+            {"slug": "sommeil", "title": "Sommeil & récupération", "description": "Matelas médicaux, lits électriques, linge adapté.",
+             "image": "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=900&auto=format&fit=crop"},
+            {"slug": "quotidien", "title": "Quotidien serein", "description": "Alarmes, éclairages, ustensiles ergonomiques.",
+             "image": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=900&auto=format&fit=crop"},
+        ]
+
+    # enrichir avec le nombre de produits réels (category == slug)
+    out = []
+    for c in collections:
+        slug = c.get("slug") or ""
+        count = 0
+        if slug:
+            count = await db.products.count_documents({"site_id": site_id, "status": "active", "category": slug})
+        out.append({**{k: v for k, v in c.items() if k != "_id"}, "products_count": count})
+    return out
+
+
+@router.get("/sites/{site_id}/collections/{slug}")
+async def public_collection_detail(site_id: str, slug: str):
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "design": 1})
+    if not site:
+        raise HTTPException(status_code=404, detail="Site introuvable")
+    collections = (site.get("design") or {}).get("collections") or []
+    found = next((c for c in collections if c.get("slug") == slug), None)
+
+    if not found:
+        # Fallback: on renvoie une collection "virtuelle" basée sur le slug
+        fallback = {
+            "mobilite": {"title": "Mobilité & confort", "description": "Fauteuils releveurs, déambulateurs, aides à la marche, cannes et rollators."},
+            "sommeil": {"title": "Sommeil & récupération", "description": "Matelas médicaux, lits électriques, linge de lit adapté, oreillers ergonomiques."},
+            "quotidien": {"title": "Quotidien serein", "description": "Alarmes, éclairages automatiques, ustensiles ergonomiques, téléphones simplifiés."},
+        }
+        if slug in fallback:
+            found = {"slug": slug, **fallback[slug]}
+        else:
+            raise HTTPException(status_code=404, detail="Collection introuvable")
+
+    count = await db.products.count_documents({"site_id": site_id, "status": "active", "category": slug})
+    return {**{k: v for k, v in found.items() if k != "_id"}, "products_count": count}
 
 
 @router.get("/sites/{site_id}/products/{product_id}")

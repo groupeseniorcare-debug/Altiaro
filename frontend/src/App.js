@@ -40,6 +40,10 @@ import {
   StorefrontConfirmation,
 } from "./pages/Storefront";
 import {
+  StorefrontCollections,
+  StorefrontCollection,
+} from "./pages/StorefrontCollection";
+import {
   StorefrontAbout,
   StorefrontFAQ,
   StorefrontContact,
@@ -189,6 +193,8 @@ function App() {
 
           {/* Public Storefront (no auth) */}
           <Route path="/shop/:siteId" element={<StorefrontHome />} />
+          <Route path="/shop/:siteId/collections" element={<StorefrontCollections />} />
+          <Route path="/shop/:siteId/collection/:slug" element={<StorefrontCollection />} />
           <Route path="/shop/:siteId/product/:productId" element={<StorefrontProduct />} />
           <Route path="/shop/:siteId/cart" element={<StorefrontCart />} />
           <Route path="/shop/:siteId/checkout" element={<StorefrontCheckout />} />

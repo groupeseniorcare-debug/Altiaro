@@ -16,7 +16,7 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 /* ------- Nav items (pages naturelles du template) ------- */
 const navItems = (shopRoot) => [
   { label: "Boutique", href: `${shopRoot}` },
-  { label: "Collections", href: `${shopRoot}#collections` },
+  { label: "Collections", href: `${shopRoot}/collections` },
   { label: "Journal", href: `${shopRoot}/blog` },
   { label: "À propos", href: `${shopRoot}/about` },
   { label: "Contact", href: `${shopRoot}/contact` },
@@ -386,7 +386,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
 
           <FooterCol title="Boutique" items={[
             { label: "Tous les produits", href: `${shopRoot}` },
-            { label: "Collections", href: `${shopRoot}#collections` },
+            { label: "Collections", href: `${shopRoot}/collections` },
             { label: "Nouveautés", href: `${shopRoot}?sort=new` },
             { label: "Meilleures ventes", href: `${shopRoot}?sort=bestsellers` },
           ]} />

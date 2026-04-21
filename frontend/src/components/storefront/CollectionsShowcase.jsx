@@ -18,22 +18,22 @@ export default function CollectionsShowcase({ collections, lang = "fr", design }
     ? collections
     : [
         {
+          slug: "mobilite",
           title: "Mobilité & confort",
           description: "Fauteuils releveurs, déambulateurs, aides à la marche.",
           image: "https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=900&auto=format&fit=crop",
-          href: "?category=mobilite",
         },
         {
+          slug: "sommeil",
           title: "Sommeil & récupération",
           description: "Matelas médicaux, lits électriques, linge adapté.",
           image: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=900&auto=format&fit=crop",
-          href: "?category=sommeil",
         },
         {
+          slug: "quotidien",
           title: "Quotidien serein",
           description: "Alarmes, éclairages, ustensiles ergonomiques.",
           image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=900&auto=format&fit=crop",
-          href: "?category=quotidien",
         },
       ];
 
@@ -61,7 +61,9 @@ export default function CollectionsShowcase({ collections, lang = "fr", design }
           {list.slice(0, 3).map((c, i) => {
             const title = pickLang(c.title, lang) || c.title;
             const desc = pickLang(c.description, lang) || c.description;
-            const href = c.href?.startsWith("/") ? c.href : `/shop/${siteId}${c.href || ""}`;
+            const href = c.slug
+              ? `/shop/${siteId}/collection/${c.slug}`
+              : (c.href?.startsWith("/") ? c.href : `/shop/${siteId}${c.href || ""}`);
             return (
               <Link
                 key={i}

@@ -3,6 +3,24 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 38 : Pages Collection (index + détail) avec filtres et SEO
+- **Backend** :
+  - Ajout des champs `category: str` et `tags: List[str]` dans `ProductCreateInput` + `ProductUpdateInput` (taxonomie produit complète).
+  - `GET /api/public/sites/{site_id}/collections` — liste des collections du site (depuis `design.collections`, fallback silver-eco 3 collections) enrichie avec `products_count`.
+  - `GET /api/public/sites/{site_id}/collections/{slug}` — détail d'une collection (fallback virtuel pour `mobilite`/`sommeil`/`quotidien`).
+  - `GET /api/public/sites/{site_id}/products` étendu avec query params : `collection`, `tag` (multi), `min_price`, `max_price`, `in_stock`, `on_sale`, `sort` (featured/newest/price_asc/price_desc/bestsellers).
+- **Frontend** — nouvelle page `/app/frontend/src/pages/StorefrontCollection.jsx` :
+  - `StorefrontCollections` (`/shop/:siteId/collections`) — index avec 3 cartes univers (image + title + count).
+  - `StorefrontCollection` (`/shop/:siteId/collection/:slug`) — page détail avec :
+    - **Hero banner minimaliste** (breadcrumb + eyebrow + titre + description + count).
+    - **Barre de filtres horizontale sticky** : Prix (panel min/max), En stock (toggle), En promo (toggle), Catégories (tags multi-select), Trier par (select 5 options). Compteur de filtres actifs. Bouton "Effacer".
+    - **Mobile drawer** full-screen pour les filtres avec CTA "Voir les produits".
+    - **Grille produits** 2/3/4 colonnes responsive avec badges "Phare" + "-%".
+    - **SEO block** en bas (description éditoriale + 4 trust bullets).
+  - Routes câblées dans `App.js`. Liens header "Collections" et `CollectionsShowcase` pointent vers les vraies routes.
+- **SEO** : schemas `BreadcrumbList` + `ItemList` sur la page collection. Hreflangs corrects.
+
+
 ## 2026-04-21 · Sprint 37 : Homepage Storefront ultra-optimisée (Hero visuel + 3 nouvelles sections + fallbacks premium)
 - **Hero premium avec image** (`Hero.jsx` réécrit) : split layout desktop (copy à gauche, image à droite avec carte flottante "Satisfait ou remboursé"), pill eyebrow avec dot animé, titre 68px serif, 2 CTAs (primary vers `#collections`, secondary vers `#story`), trust row (rating 4.8/5 avec étoiles + 2143 avis · livraison · garantie · conseillers).
 - **3 nouveaux composants** :

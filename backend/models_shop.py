@@ -28,6 +28,8 @@ class ProductCreateInput(BaseModel):
     sku: str = ""
     status: str = "active"                     # active | draft | archived
     featured: bool = False
+    category: str = ""                          # slug de la collection principale
+    tags: List[str] = Field(default_factory=list)  # tags secondaires (matière, couleur, etc.)
 
 
 class ProductUpdateInput(BaseModel):
@@ -44,6 +46,8 @@ class ProductUpdateInput(BaseModel):
     sku: Optional[str] = None
     status: Optional[str] = None
     featured: Optional[bool] = None
+    category: Optional[str] = None
+    tags: Optional[List[str]] = None
 
 
 class OrderItem(BaseModel):
