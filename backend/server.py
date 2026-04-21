@@ -45,6 +45,7 @@ from routes import billing as billing_routes
 from routes import design as design_routes
 from routes import sourcing as sourcing_routes
 from routes import seo as seo_routes
+from routes import wizard as wizard_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -76,6 +77,7 @@ api.include_router(billing_routes.router)
 api.include_router(design_routes.router)
 api.include_router(sourcing_routes.router)
 api.include_router(seo_routes.router)
+api.include_router(wizard_routes.router)
 api.include_router(niches_routes.router)
 api.include_router(dashboard_routes.router)
 api.include_router(meta_routes.router)

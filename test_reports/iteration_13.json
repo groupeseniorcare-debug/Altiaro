@@ -1,0 +1,40 @@
+{
+  "summary": "Sprint 16 (Sourcing CJ/AE + Wizard 10 steps) et Sprint 17 (SEO sitemap/robots/merchant-feed) testés end-to-end. Backend 19/19 pytest réussis. Frontend validé : Wizard 10 étapes avec mark-done/reopen + re-polling OK, Sourcing 2 cards providers avec setup steps OK, Storefront SEO meta + Organization/WebSite JSON-LD injectés OK. Aucune régression constatée.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration13_sourcing_wizard_seo.py",
+    "/app/test_reports/pytest/iter13.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "sourcing.py import_product : OK, exclut bien _id via doc.pop('_id', None) après insert. cost_price_ht correctement arrondi.",
+    "sourcing.py search : gestion dégradée propre - si provider non configuré (pas de clé), il est simplement skippé, pas de 503 levé, count:0 retourné. Conforme au brief.",
+    "wizard.py _auto_mark : logique d'auto-détection solide (niche/countries/products/design/seo/legal/published). Un seul bémol : si un site a design.seo mais que la step 'seo' a été manuellement passée à 'pending', elle repassera à 'done' au prochain GET wizard. Comportement acceptable pour auto-mark mais à documenter.",
+    "seo.py merchant_feed : itère tous les produits status='active'. OK. Item XML Google Shopping conforme (g:id, g:title, g:description, g:price, g:availability, g:shipping).",
+    "seo.py _origin() : hardcode une URL de fallback 'https://senior-france.preview.emergentagent.com' - acceptable car PUBLIC_ORIGIN peut override via env, mais idéalement le fallback devrait être supprimé et laisser échouer si non défini.",
+    "Storefront.jsx : JSON-LD Product injecté avec Offer/price/availability sur page produit (ligne 402+). Organization + WebSite sur home (lignes 122, 132). Conforme SEO.",
+    "Search button Sourcing désactivé quand aucun provider enabled + keyword vide : bonne UX mais empêche de tester le fallback 'providers_available:false' côté UI. Considérer un message plus explicite à côté du bouton.",
+    "hreflang sur sitemap : bien généré, mais site de test n'a que FR dans selected_countries donc on ne voit que 1-2 langues. Tester avec un site multi-pays aurait été plus exhaustif."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration13_sourcing_wizard_seo.py"
+  ],
+  "success_rate": {
+    "backend": "100% (19/19)",
+    "frontend": "100% (tous les flux critiques testés : wizard, sourcing, SEO storefront)"
+  },
+  "test_credentials": "admin@conceptfactory.fr / Factory2026! (login via /api/auth/login avec cookies httpOnly)",
+  "seed_data_creation": "Produit TEST Seat Cushion Premium créé via POST /api/sites/{id}/sourcing/import (SKU TEST-CJ-1, cost_price_ht=12.50, price=49.90, provider=cj, status=draft). Auto-marque 'sourcing' et 'pricing' steps du wizard.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Les Sprint 16 (Sourcing CJ/AE + Wizard) et Sprint 17 (SEO) sont pleinement fonctionnels. Test file /app/backend/tests/test_iteration13_sourcing_wizard_seo.py peut servir de regression. Site test utilisé : 7e23868b-96f1-4e03-a761-e3a419f5f4de (Luméa Confort). Clés CJ et AliExpress volontairement non configurées (.env), donc search retourne toujours count:0 - comportement attendu. Pour tester hreflang multi-pays, utiliser un site avec selected_countries contenant plusieurs codes (FR/DE/BE/NL/UK/CH).",
+  "rca of the issue": "Aucun bug détecté. Dégradation propre observée sur sourcing quand clés API manquantes (expected)."
+}

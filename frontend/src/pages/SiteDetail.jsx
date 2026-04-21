@@ -298,6 +298,21 @@ export default function SiteDetail() {
                   <Sparkle size={16} weight="fill" /> Design IA
                 </button>
                 <button
+                  onClick={() => navigate(`/sites/${id}/wizard`)}
+                  data-testid="nav-wizard"
+                  className="h-10 px-4 rounded-xl text-white text-sm font-medium flex items-center gap-2 transition"
+                  style={{ background: "linear-gradient(135deg, #7C3AED 0%, #2563EB 100%)" }}
+                >
+                  <Rocket size={16} weight="fill" /> Wizard 10 étapes
+                </button>
+                <button
+                  onClick={() => navigate(`/sites/${id}/sourcing`)}
+                  data-testid="nav-sourcing"
+                  className="h-10 px-4 rounded-xl bg-white border border-[#E7E5E4] hover:border-[#F97316] text-[#1C1917] text-sm font-medium flex items-center gap-2 transition"
+                >
+                  <Package size={16} weight="duotone" /> Sourcing CJ/AE
+                </button>
+                <button
                   onClick={() => navigate(`/sites/${id}/ads-copy`)}
                   data-testid="ads-copy-link"
                   className="h-10 px-4 rounded-xl bg-white border border-[#E7E5E4] hover:border-[#B84B31] text-[#1C1917] text-sm font-medium flex items-center gap-2 transition"

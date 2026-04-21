@@ -12,8 +12,26 @@ import {
   clearCart,
 } from "../lib/cart";
 import { ArrowRight, CheckCircle, Trash, ShoppingBagOpen, Sparkle, ShieldCheck } from "@phosphor-icons/react";
+import SEOHead from "../components/SEOHead";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+
+// Map selected_countries → storefront langs for hreflang
+const LANG_BY_COUNTRY = {
+  FR: "fr", BE: "fr", LU: "fr", CH: "fr",
+  DE: "de", AT: "de",
+  UK: "en", IE: "en",
+  NL: "nl", IT: "it", ES: "es",
+};
+
+function buildHreflangs(site, path) {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const base = `${origin}/shop/${site?.id || ""}${path}`;
+  const codes = Array.from(
+    new Set((site?.selected_countries || ["FR"]).map((c) => LANG_BY_COUNTRY[(c || "").toUpperCase()] || "fr"))
+  );
+  return codes.map((c) => ({ code: c, href: `${base}?lang=${c}` }));
+}
 
 function useSiteAndLang() {
   const { siteId } = useParams();
@@ -90,8 +108,48 @@ export function StorefrontHome() {
   const primary = design?.brand?.primary_color || "#B84B31";
   const fontHeading = design?.brand?.font_heading || "Fraunces";
 
+  const seoTitle =
+    designText(design, "seo.title", lang) || `${site?.name || ""} · ${heroTitle}`;
+  const seoDesc =
+    designText(design, "seo.description", lang) || heroSub;
+  const canonical =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/shop/${siteId}`
+      : undefined;
+  const orgSchema = site
+    ? {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        name: site.name,
+        url: canonical,
+        logo: design?.brand?.logo_url,
+        description: seoDesc,
+      }
+    : null;
+  const websiteSchema = site
+    ? {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        name: site.name,
+        url: canonical,
+        potentialAction: {
+          "@type": "SearchAction",
+          target: `${canonical}?q={search_term_string}`,
+          "query-input": "required name=search_term_string",
+        },
+      }
+    : null;
+
   return (
     <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+      <SEOHead
+        title={seoTitle}
+        description={seoDesc}
+        canonical={canonical}
+        image={design?.brand?.logo_url}
+        langs={buildHreflangs(site, "")}
+        schema={[orgSchema, websiteSchema].filter(Boolean)}
+      />
       <section className="max-w-6xl mx-auto px-6 pt-12 pb-6">
         <div className="max-w-2xl">
           <div className="text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2" style={{ color: primary }}>
@@ -328,6 +386,40 @@ export function StorefrontProduct() {
 
   return (
     <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+      <SEOHead
+        title={`${pickLang(p.name, lang)} · ${site?.name || ""}`}
+        description={pickLang(p.description, lang) || pickLang(p.name, lang)}
+        canonical={
+          typeof window !== "undefined"
+            ? `${window.location.origin}/shop/${siteId}/product/${p.id}`
+            : undefined
+        }
+        image={p.images?.[0]}
+        type="product"
+        langs={buildHreflangs(site, `/product/${p.id}`)}
+        schema={{
+          "@context": "https://schema.org",
+          "@type": "Product",
+          name: pickLang(p.name, lang),
+          description: pickLang(p.description, lang),
+          image: p.images || [],
+          sku: p.sku,
+          brand: { "@type": "Brand", name: site?.name },
+          offers: {
+            "@type": "Offer",
+            priceCurrency: p.currency || "EUR",
+            price: p.price,
+            availability:
+              p.stock === null || p.stock > 0
+                ? "https://schema.org/InStock"
+                : "https://schema.org/OutOfStock",
+            url:
+              typeof window !== "undefined"
+                ? `${window.location.origin}/shop/${siteId}/product/${p.id}`
+                : undefined,
+          },
+        }}
+      />
       <div className="max-w-6xl mx-auto px-6 py-8 md:py-12">
         <button
           onClick={() => navigate(`/shop/${siteId}`)}

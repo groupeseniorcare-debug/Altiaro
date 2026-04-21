@@ -18,6 +18,8 @@ import Billing from "./pages/Billing";
 import Orders from "./pages/Orders";
 import AdminPayouts from "./pages/AdminPayouts";
 import SiteDesign from "./pages/SiteDesign";
+import Sourcing from "./pages/Sourcing";
+import Wizard from "./pages/Wizard";
 import {
   StorefrontHome,
   StorefrontProduct,
@@ -123,6 +125,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <SiteDesign />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites/:id/sourcing"
+            element={
+              <ProtectedRoute>
+                <Sourcing />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites/:id/wizard"
+            element={
+              <ProtectedRoute>
+                <Wizard />
               </ProtectedRoute>
             }
           />
