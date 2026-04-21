@@ -4,6 +4,7 @@ import axios from "axios";
 import { LANGUAGES, t } from "../lib/i18n";
 import { readCart, cartTotals } from "../lib/cart";
 import { getCustomer } from "../lib/customerAuth";
+import CartDrawer from "./CartDrawer";
 import { ShoppingBag, Phone, ShieldCheck, Truck, MagnifyingGlass, User } from "@phosphor-icons/react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -149,8 +150,9 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
                 {customer ? (customer.first_name || "Mon compte") : "Se connecter"}
               </span>
             </Link>
-            <Link
-              to={`${shopRoot}/cart`}
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event("cf_cart_open"))}
               data-testid="cart-button"
               className="relative flex items-center gap-2 h-11 px-4 rounded-full border transition group"
               style={{ background: accent, borderColor: "#E7E5E4" }}
@@ -166,12 +168,14 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
                   {cartCount}
                 </span>
               )}
-            </Link>
+            </button>
           </div>
         </div>
       </header>
 
       <main className="flex-1">{children}</main>
+
+      <CartDrawer design={design} />
 
       <footer className="border-t bg-white mt-20" style={{ borderColor: "#E7E5E4" }}>
         <div className="max-w-6xl mx-auto px-6 py-10 grid grid-cols-1 md:grid-cols-4 gap-8">

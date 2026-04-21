@@ -149,6 +149,8 @@ export function StorefrontProduct() {
   const handleAdd = () => {
     addToCart(siteId, p, lang, qty);
     setAdded(true);
+    // Auto-open the cart drawer to confirm
+    window.dispatchEvent(new Event("cf_cart_open"));
     setTimeout(() => setAdded(false), 1500);
   };
 
