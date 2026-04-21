@@ -3,6 +3,18 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 29 : Nettoyage UI + Claude 4.5 forcé + audit prompts
+- **"Made with Emergent"** masqué via `src/App.css` (CSS `display:none` sur `#emergent-badge`). Supprimé aussi du source `public/index.html` (ré-injecté par l'ingress Emergent sur les previews, disparaît nativement sur altiaro.com après deploy).
+- **"Copilot IA" FAB** retiré du `Layout.jsx` (Cmd+K admin conservé).
+- **Claude 4.5 forcé** dans `StepPanel.jsx` : le sélecteur de modèle multi-providers (Haiku / GPT-5.1 / GPT-4o / Gemini 2.5 Pro) est supprimé. Affichage fixe "Claude Sonnet 4.5" en label mono + bouton exécution. Par ailleurs le state `aiModel` reste à `"anthropic/claude-sonnet-4-5-20250929"` donc les appels backend restent cohérents.
+- **Audit complet des 50 prompts** : 47/50 étaient déjà au niveau expert (longueur >500 chars, structure détaillée). Les 3 prompts trop courts ont été enrichis au format "expert + critères d'acceptation" :
+  - **#7 Voix de marque + manifesto** : passé de 374 → 1700+ chars (rôle Head of Brand Content agence top 10 Paris, manifesto structuré, voix 10 règles on dit/pas, 20 accroches ventilées 4 angles, storytelling fondateur, mission statement, tagline)
+  - **#24 Recherche interne** : passé de 466 → 2000+ chars (rôle Senior Frontend ex-Shopify Plus, composant Search complet avec Cmd+K, 4 sections résultats, états vides, Shopify predictive search + Algolia fallback, accessibilité clavier, perf debounce)
+  - **#27 30 articles satellites SEO** : passé de 497 → 2500+ chars (rôle Head of SEO Content ex-Hubspot/Semrush, structure imposée 6 sections par article, maillage cocon obligatoire, schemas JSON-LD, principe intent match)
+- **Migration auto** : au démarrage backend, `server.py` re-synchronise `title/summary/prompt` des 50 steps depuis `seed_prompts.PROMPTS` vers la BDD. Log : "Block mapping synchronized + 50 prompts refreshed."
+- **Audit StepPanel** vérifié visuellement : header (#N + status pill + Phase), summary, prompt complet (bouton Copier), exec IA avec Claude 4.5 fixe, réponse IA rendue en markdown, livrables (URL + notes + upload 15Mo), refus/validation avec permissions admin/concepteur, footer sticky dynamique selon status.
+
+
 ## 2026-04-21 · Sprint 28 : Hook #5 — Renommage automatique du site
 - Ajout d'un 5e handler dans `step_side_effects.py` : **#5 Génération nom de marque + domaine + INPI** → déclenche un appel Claude qui extrait du livrable markdown le nom final retenu + tagline + domaine, puis met à jour `sites.name`, `sites.niche_slug` (slugifié via `_slugify`), `sites.target_domain`, `sites.design.brand.tagline` et `sites.design.brand.logo_text`.
 - Testé E2E sur site fauteuil releveur éléctrique : provisoire "fauteuil releveur éléctrique" → **"Sereniva"** (avec slug `sereniva`, domaine `sereniva.fr`, tagline "L'art de vieillir sereinement"). Visible immédiatement dans la liste `/sites`.

@@ -228,23 +228,15 @@ export default function StepPanel({ step: initialStep, site, isAdmin, onClose, o
                 Générez un livrable initial. Vous pourrez l'affiner puis le soumettre à validation.
               </p>
               <div className="flex items-center gap-3 mb-4">
-                <select
-                  value={aiModel}
-                  onChange={(e) => setAiModel(e.target.value)}
-                  data-testid="step-ai-model"
-                  className="h-10 px-3 rounded-lg border border-[#E7E5E4] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#B84B31]/30"
-                >
-                  <option value="anthropic/claude-sonnet-4-5-20250929">Claude Sonnet 4.5 (recommandé)</option>
-                  <option value="anthropic/claude-haiku-4-5-20251001">Claude Haiku 4.5 (rapide)</option>
-                  <option value="openai/gpt-5.1">GPT-5.1</option>
-                  <option value="openai/gpt-4o">GPT-4o</option>
-                  <option value="gemini/gemini-2.5-pro">Gemini 2.5 Pro</option>
-                </select>
+                <div className="h-10 px-3 rounded-lg border border-[#E7E5E4] bg-neutral-50 text-xs text-neutral-700 font-mono flex items-center gap-2">
+                  <Sparkle size={12} weight="fill" color="#B84B31" />
+                  Claude Sonnet 4.5
+                </div>
                 <button
                   onClick={handleExecute}
                   disabled={executing}
                   data-testid="step-execute-ai"
-                  className="h-10 px-4 rounded-lg bg-[#1C1917] hover:bg-[#2A2421] text-neutral-900 text-sm font-medium flex items-center gap-2 disabled:opacity-60 transition active:scale-[0.98]"
+                  className="h-10 px-4 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium flex items-center gap-2 disabled:opacity-60 transition active:scale-[0.98]"
                 >
                   {executing ? (
                     <>

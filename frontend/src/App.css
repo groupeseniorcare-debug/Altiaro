@@ -1,1 +1,11 @@
 /* Premium warm theme for Launch OS - overrides old defaults */
+
+/* Hide Emergent preview badges (per user request) */
+#emergent-badge,
+a[id="emergent-badge"],
+a[href*="emergent-badge"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

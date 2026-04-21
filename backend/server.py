@@ -163,7 +163,18 @@ async def startup():
                     "block_emoji": meta["emoji"],
                 }},
             )
-        logger.info("Block mapping synchronized.")
+        # Re-sync prompt/title/summary from seed_prompts.PROMPTS (keeps enriched prompts in sync)
+        from seed_prompts import PROMPTS
+        for p in PROMPTS:
+            await db.steps.update_many(
+                {"number": p["number"]},
+                {"$set": {
+                    "title": p["title"],
+                    "summary": p["summary"],
+                    "prompt": p["prompt"],
+                }},
+            )
+        logger.info(f"Block mapping synchronized + {len(PROMPTS)} prompts refreshed.")
     except Exception:
         logger.exception("Failed block migration")
 

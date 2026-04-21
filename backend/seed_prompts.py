@@ -239,15 +239,32 @@ Livrable: brand_book.md + design_tokens.css""",
         "phase": "B",
         "title": "Voix de marque + manifesto + 20 accroches",
         "summary": "Manifesto 120 mots, voix de marque (vouvoiement, 10 règles on dit/pas, 15 mots signature), 20 accroches testables, storytelling fondateur 450 mots.",
-        "prompt": """Pour [NOM], définis:
+        "prompt": """Tu es Head of Brand Content dans une agence de naming/branding top 10 Paris (clients : Lancôme, Petit Bateau, Nature & Découvertes).
 
-1. MANIFESTO 120 mots — émotionnel, humain, dignité, longévité
-2. VOIX DE MARQUE 2 pages: vouvoiement, 10 règles on dit/on ne dit pas, 15 mots-signature, exemples email/SAV
-3. 20 ACCROCHES puissantes réutilisables
-4. STORYTELLING fondateur 450 mots authentique
-5. MISSION STATEMENT 1 phrase
+Pour la marque [NOM] positionnée sur [NICHE], niche Silver Economy, cible senior 60-80 ans + leurs aidants (enfants 45-65 ans), définis :
 
-Livrable: brand_voice.md + manifesto.md + about_page_copy.md""",
+1. **MANIFESTO** 120 mots — émotionnel, humain, articulé autour de : dignité, longévité, autonomie, confort. À publier en page About. Ton qui fait pleurer les aidants.
+
+2. **VOIX DE MARQUE** (2 pages .md) :
+   - Principes : vouvoiement systématique, chaleur sans infantilisation
+   - 10 règles "on dit / on ne dit pas" (ex: on dit "solution", pas "produit" ; on dit "vous accompagner", pas "vous aider")
+   - 15 mots-signature à utiliser en priorité (confort, sérénité, ingéniosité...)
+   - 10 mots à BANNIR (vieux, handicapé, invalide, sénile...)
+   - Exemples avant/après : email bienvenue (bad vs good) · SAV (bad vs good) · fiche produit (bad vs good)
+
+3. **20 ACCROCHES** testables en Ads (20-35 caractères), structurées par angle :
+   - 5 bénéfice (confort/autonomie)
+   - 5 preuve (garantie 2 ans, livraison France, 10000 clients)
+   - 5 urgence douce (fête des mères, hiver, retraite)
+   - 5 émotion (souvenir, famille, tendresse)
+
+4. **STORYTELLING FONDATEUR** 450 mots authentique — origin story déclencheur (grand-mère chez soi, accident, aidance). Narré à la 1re personne.
+
+5. **MISSION STATEMENT** en 1 phrase qui tient sur une tasse.
+
+6. **TAGLINE** 3-6 mots pour le header (différent du mission statement).
+
+Livrables : brand_voice.md + manifesto.md + about_page_copy.md + taglines.csv (20 lignes)""",
     },
     # PHASE C — Sourcing
     {
@@ -577,16 +594,44 @@ Bouton flottant bas-droit Accessibilité depuis toutes pages.""",
         "phase": "F",
         "title": "Recherche interne + suggestions",
         "summary": "Composant Search avec modal Cmd+K, suggestions instantanées (produits, collections, articles, FAQ), historique, populaires, Shopify predictive search API.",
-        "prompt": """Composant Search:
-- Input header + Cmd+K shortcut
-- Modal plein écran résultats instantanés debounce 300ms
-- Suggestions: produits top match, collections, articles blog, FAQ (image + titre + prix + preview)
-- Historique localStorage
-- Recherches populaires quand vide
-- Source: Shopify predictive search API (fallback) + Algolia optionnel (catalogue >200)
-- Tracking search events (KW vides = gold pour catalogue gaps)
+        "prompt": """Tu es Senior Frontend Engineer (ex-Shopify Plus), 10 ans d'exp sur des e-commerces FR > 5M€/an.
 
-Livrable: SearchModal.tsx + hooks/useSearch.ts""",
+Implémente la recherche interne complète du site Altiaro.
+
+**Composant Search** :
+- Input dans le header (icône loupe à droite) + raccourci **Cmd+K / Ctrl+K** (écoute globale)
+- Clic ou raccourci → modal plein écran avec overlay dark semi-transparent
+- Input auto-focus + placeholder contextuel ("Fauteuil releveur, coussin anti-escarres...")
+- **Debounce 300ms** avant d'envoyer la requête (évite le spam)
+
+**Résultats en 4 sections** (chaque item : image 40x40 + titre + meta preview + prix si produit) :
+1. **Produits** (top 5 match) — image + nom + prix + disponibilité stock
+2. **Collections** (top 3 match) — image + nombre de produits
+3. **Articles blog** (top 3 match) — image + temps de lecture
+4. **FAQ** (top 3 match) — question + début de réponse tronqué
+
+**États vides** :
+- Input vide → "Recherches populaires" (5 termes hardcodés + top 5 derniers cherchés de l'user)
+- Aucun résultat → message empathique + suggestion de catégories + CTA contact
+- Historique localStorage limité à 10 items, clearable
+
+**Sources** :
+- Shopify **predictive search API** en priorité (rapide, natif)
+- Algolia DocSearch en fallback si catalogue > 200 produits
+- Tracking events (Mixpanel/GA4) : `search_performed`, `search_result_clicked`, `search_empty`
+- **Les recherches vides sont GOLD** pour détecter les gaps catalogue → export CSV mensuel
+
+**Accessibilité** :
+- Navigation clavier (↑↓ pour naviguer, Enter pour ouvrir, Esc pour fermer)
+- Lecteur d'écran : aria-live="polite" pour annoncer les résultats
+- Focus trap dans la modal (Radix UI Dialog recommandé)
+
+**Performance** :
+- Requête debounced + abort controller (annule si user tape vite)
+- Skeletons loading animés (pas de spinner brutal)
+- Cache des 20 dernières requêtes (in-memory, TTL 5min)
+
+Livrable : `/components/SearchModal.tsx` + `/hooks/useSearch.ts` + `/lib/searchTracking.ts` + tests Playwright (ouvre Cmd+K, tape "fauteuil", clique 1er résultat)""",
     },
     # PHASE G — SEO (Prompts 25-29)
     {
@@ -635,19 +680,36 @@ Livrable: 15 fichiers .md prêts import Shopify Blog""",
         "phase": "G",
         "title": "30 articles satellites + maillage interne intelligent",
         "summary": "30 articles satellites 1000-1500 mots longue-traîne, principe intent match, maillage cocon vers piliers et satellites voisins.",
-        "prompt": """Rédige 30 articles satellites longue-traîne 1000-1500 mots, maillage cocon sémantique.
+        "prompt": """Tu es Head of SEO Content (ex-Hubspot, ex-Semrush agency lead). Tu rédiges pour des queries longue-traîne commerciales avec conversion > 3%.
 
-Pour chaque:
-- Réponse ultra-focalisée à UNE intention longue-traîne précise
-- Lien pilier du cluster (2 min texte ancre varié)
-- Lien 2 autres satellites voisins
-- Lien 1-2 fiches produit contextuelles
-- Schema Article + FAQPage si applicable
-- Format: intro courte + sections H2 ciblées + FAQ fin
+Rédige 30 articles satellites (**1200-1500 mots chacun**), maillés en cocon sémantique autour des 15 piliers du prompt #26. Chaque satellite cible UNE intention ultra-précise (ex : "quel fauteuil releveur pour personne 90 kg avec arthrose").
 
-Principe: intent match parfait (rien de +, rien de -).
+**Structure par article** (respectée à la lettre) :
+1. **Intro 80-120 mots** — contextualise le problème, empathie, promesse de réponse
+2. **Réponse directe 150 mots** (pour AEO / featured snippet) — résume la solution en 3 phrases + 1 tableau comparatif 3 colonnes
+3. **3-5 sections H2** ciblées sur les sous-intentions du mot-clé principal (pas de remplissage)
+4. **Section expert** (H2) — citation d'un gériatre/ergothérapeute (nom fictif plausible + credentials)
+5. **FAQ finale 4-6 questions** (H3 chacune, réponses 50-80 mots)
+6. **Encadré CTA produit** en milieu d'article + en fin (lien vers fiche produit Altiaro)
 
-Livrable: 30 fichiers .md + internal_linking_map.xlsx""",
+**Maillage obligatoire par article** :
+- **1 lien vers le pilier du cluster** (ancre variée, contextuelle)
+- **2 liens vers satellites voisins** du même cluster
+- **1-2 liens vers fiches produit** Altiaro pertinentes (ancre = intention d'achat)
+- **0 lien externe** vers concurrents ; 1-2 liens sources autoritaires (INSERM, HAS, Que Choisir)
+
+**Schemas JSON-LD** à injecter :
+- `Article` (headline, author Person, datePublished, image)
+- `FAQPage` (si section FAQ présente)
+- `HowTo` (si article de méthode)
+- `BreadcrumbList`
+
+**Principe absolu** : intent match parfait. Rien de plus, rien de moins que ce que l'utilisateur cherche. Zéro remplissage SEO 2015.
+
+**Livrables** :
+- 30 fichiers `.md` dans `/content/blog/satellites/` avec frontmatter YAML (title, slug, cluster, pilier_parent, meta_description 155 car max, keywords, targeted_intent, image_hero, read_time_min)
+- `internal_linking_map.xlsx` : matrice 30×30 montrant tous les liens internes
+- `editorial_calendar.csv` : planning de publication sur 90 jours (3-4 articles/semaine)""",
     },
     {
         "number": 28,
