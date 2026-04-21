@@ -35,6 +35,10 @@ import { ProductGrid } from "../components/storefront/ProductGrid";
 import { Testimonials } from "../components/storefront/Testimonials";
 import { FAQSection } from "../components/storefront/FAQSection";
 import { FinalCTA } from "../components/storefront/FinalCTA";
+import ValuesSection from "../components/storefront/ValuesSection";
+import FounderStory from "../components/storefront/FounderStory";
+import PressLogos from "../components/storefront/PressLogos";
+import NewsletterCTA from "../components/storefront/NewsletterCTA";
 import {
   NarrativeSections,
   TechSpecs,
@@ -109,6 +113,7 @@ export function StorefrontHome() {
         schema={[orgSchema, websiteSchema].filter(Boolean)}
       />
       <Hero site={site} design={design} lang={lang} />
+      <PressLogos mentions={design?.press_mentions} design={design} />
       <Benefits design={design} lang={lang} />
       <ProductGrid
         siteId={siteId}
@@ -117,8 +122,11 @@ export function StorefrontHome() {
         design={design}
         lang={lang}
       />
+      <ValuesSection values={design?.values} lang={lang} design={design} />
+      <FounderStory story={design?.founder_story} lang={lang} design={design} />
       <Testimonials design={design} lang={lang} />
       <FAQSection design={design} lang={lang} />
+      <NewsletterCTA design={design} />
       <FinalCTA design={design} lang={lang} />
     </StorefrontLayout>
   );

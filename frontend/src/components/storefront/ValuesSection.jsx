@@ -1,6 +1,6 @@
 import React from "react";
 import { Heart, UsersThree, Lightbulb, HandHeart, Leaf, ShieldCheck } from "@phosphor-icons/react";
-import { pickLang } from "./storefrontUtils";
+import { pickLang } from "../../lib/i18n";
 
 const ICON_POOL = { Heart, UsersThree, Lightbulb, HandHeart, Leaf, ShieldCheck };
 

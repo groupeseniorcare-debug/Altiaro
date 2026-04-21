@@ -1,5 +1,5 @@
 import React from "react";
-import { pickLang } from "./storefrontUtils";
+import { pickLang } from "../../lib/i18n";
 
 /**
  * Founder's story / manifesto section.

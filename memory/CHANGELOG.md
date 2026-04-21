@@ -3,6 +3,14 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 35 : Homepage Storefront premium finalisée (4 nouvelles sections)
+- **Intégration dans `/app/frontend/src/pages/Storefront.jsx`** des 4 composants créés au sprint précédent : `PressLogos`, `ValuesSection`, `FounderStory`, `NewsletterCTA`.
+- **Nouvel ordre** de la homepage (schéma conversion orienté silver-eco) : Hero → PressLogos → Benefits → ProductGrid → ValuesSection → FounderStory → Testimonials → FAQ → NewsletterCTA → FinalCTA.
+- **Fix import `pickLang`** : corrigé dans `ValuesSection.jsx` et `FounderStory.jsx` (import depuis `../../lib/i18n` au lieu de `./storefrontUtils`).
+- **Alimentation future via hooks** : chaque section consomme le champ équivalent dans `site.design` (`design.press_mentions`, `design.values`, `design.founder_story`) et affiche un fallback "silver economy" par défaut — prêt à être écrasé par les hooks des prompts #5/#6/#38.
+- **Vérif** : screenshot plein page confirme les 4 `data-testid` rendus correctement sur le site de démo `Sereniva`.
+
+
 ## 2026-04-21 · Sprint 34 : Correction stratégique — politique Altiaro centralisée (non modifiable par Concepteur)
 - **Suppression du backend `settings.py`** : j'avais initialement donné aux Concepteurs la possibilité de modifier TVA/livraison/paiement par site, ce qui était une erreur stratégique (Altiaro doit garantir la cohérence entre tous les sites).
 - **Nouveau module `backend/platform_policy.py`** : dict `PLATFORM_POLICY` central qui définit UNE FOIS pour toutes les 7 marchés Altiaro :
