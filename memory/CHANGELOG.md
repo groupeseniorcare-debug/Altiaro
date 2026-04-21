@@ -3,6 +3,18 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 37 : Homepage Storefront ultra-optimisée (Hero visuel + 3 nouvelles sections + fallbacks premium)
+- **Hero premium avec image** (`Hero.jsx` réécrit) : split layout desktop (copy à gauche, image à droite avec carte flottante "Satisfait ou remboursé"), pill eyebrow avec dot animé, titre 68px serif, 2 CTAs (primary vers `#collections`, secondary vers `#story`), trust row (rating 4.8/5 avec étoiles + 2143 avis · livraison · garantie · conseillers).
+- **3 nouveaux composants** :
+  - `FeaturedProduct.jsx` — spotlight du best-seller (ou 1er produit) avec image, rating, bullets checklist, prix + compare-at + badge -%, 2 CTAs. Affiche un produit démo si catalogue vide pour que le template soit visible.
+  - `LifestyleEditorial.jsx` — section full-bleed avec image large + panneau éditorial dark à côté (eyebrow + titre serif + body + CTA blanc).
+  - `InstagramGrid.jsx` — 6 tuiles carrées UGC avec hover likes counter, handle `@...` cliquable vers profil IG.
+- **ProductGrid enrichi** : titre `text-5xl`, badges `PRODUIT PHARE` + discount `-X%`, 6 produits démo par défaut (Fauteuil / Déambulateur / Matelas / Barres / Pilulier / Téléphone) pour montrer le template avant import catalogue.
+- **Fallbacks premium** ajoutés dans `Benefits`, `Testimonials`, `FAQSection` — les blocs ne disparaissent plus si les données ne sont pas encore remplies par les hooks IA (3 témoignages, 6 FAQ, 4 bénéfices par défaut).
+- **SEO renforcé** : schemas `Organization` avec `sameAs` social, `WebSite` avec SearchAction, **nouveau `ItemList` des 12 premiers produits**, **nouveau `FAQPage` schema** injecté depuis les items FAQ (fallback inclus).
+- **Nouvel ordre (16 sections)** : Hero → Press → Benefits → Collections → Products → **FeaturedProduct** → **LifestyleEditorial** → Values → BuyingGuide → Testimonials → FounderStory → **InstagramGrid** → BlogTeaser → FAQ → Newsletter → FinalCTA. Ancres `#collections`, `#products`, `#story`, `#faq` pour la nav.
+
+
 ## 2026-04-21 · Sprint 36 : Homepage ultra-complète (Header nav + Footer premium + 3 sections)
 - **Header enrichi** (`StorefrontLayout.jsx`) : nav desktop (Boutique · Collections · Journal · À propos · Contact), menu mobile full-screen avec search intégré + contact footer, barre de confiance (livraison / paiement / support / langue), logo + tagline à gauche, search + compte + panier + hamburger à droite.
 - **Footer 3 niveaux** : (1) bande réassurance 4 piliers avec icônes Phosphor (Livraison offerte / Paiement sécurisé / Conseiller humain / Retour 14j), (2) 5 colonnes (logo + contact + social Facebook/Instagram/YouTube/LinkedIn, Boutique, Nous connaître, Service client, Légal), (3) méthodes de paiement (Visa / Mastercard / CB / PayPal / Apple Pay / iDEAL / Bancontact) + copyright. Fond `neutral-900`, typo cohérente.

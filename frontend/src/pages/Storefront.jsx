@@ -42,6 +42,9 @@ import NewsletterCTA from "../components/storefront/NewsletterCTA";
 import CollectionsShowcase from "../components/storefront/CollectionsShowcase";
 import BlogTeaser from "../components/storefront/BlogTeaser";
 import BuyingGuide from "../components/storefront/BuyingGuide";
+import LifestyleEditorial from "../components/storefront/LifestyleEditorial";
+import FeaturedProduct from "../components/storefront/FeaturedProduct";
+import InstagramGrid from "../components/storefront/InstagramGrid";
 import {
   NarrativeSections,
   TechSpecs,
@@ -89,6 +92,12 @@ export function StorefrontHome() {
         url: canonical,
         logo: design?.brand?.logo_url,
         description: seoDesc,
+        sameAs: [
+          design?.social?.facebook,
+          design?.social?.instagram,
+          design?.social?.youtube,
+          design?.social?.linkedin,
+        ].filter(Boolean),
       }
     : null;
   const websiteSchema = site
@@ -104,6 +113,35 @@ export function StorefrontHome() {
         },
       }
     : null;
+  const itemListSchema = products?.length
+    ? {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        itemListElement: products.slice(0, 12).map((p, idx) => ({
+          "@type": "ListItem",
+          position: idx + 1,
+          url: `${canonical}/product/${p.id}`,
+          name: pickLang(p.name, lang),
+        })),
+      }
+    : null;
+  const faqFromDesign = design?.faq?.items || design?.faq;
+  const faqArray = Array.isArray(faqFromDesign) && faqFromDesign.length > 0
+    ? faqFromDesign
+    : [
+        { question: "Sous quel délai serai-je livré ?", answer: "Les commandes sont expédiées sous 24h ouvrées. Réception sous 48 à 72h partout en France métropolitaine." },
+        { question: "Puis-je retourner un produit ?", answer: "Oui, 14 jours à réception pour changer d'avis. Frais de retour à notre charge, remboursement sous 5 jours." },
+        { question: "Comment contacter un conseiller ?", answer: "Par téléphone Lun–Ven 9h–18h ou par email, réponse moyenne en 2h ouvrées. Un vrai humain, jamais de chatbot." },
+      ];
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqArray.slice(0, 8).map((it) => {
+      const q = typeof it.question === "string" ? it.question : (it.q?.[lang] || it.q?.fr || "");
+      const a = typeof it.answer === "string" ? it.answer : (it.a?.[lang] || it.a?.fr || "");
+      return { "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } };
+    }),
+  };
 
   return (
     <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
@@ -113,7 +151,7 @@ export function StorefrontHome() {
         canonical={canonical}
         image={design?.brand?.logo_url}
         langs={buildHreflangs(site, "")}
-        schema={[orgSchema, websiteSchema].filter(Boolean)}
+        schema={[orgSchema, websiteSchema, itemListSchema, faqSchema].filter(Boolean)}
       />
       <Hero site={site} design={design} lang={lang} />
       <div id="press"><PressLogos mentions={design?.press_mentions} design={design} /></div>
@@ -126,10 +164,13 @@ export function StorefrontHome() {
         design={design}
         lang={lang}
       /></div>
-      <BuyingGuide guide={design?.buying_guide} design={design} />
+      <FeaturedProduct products={products} design={design} lang={lang} />
+      <LifestyleEditorial editorial={design?.editorial} lang={lang} design={design} />
       <ValuesSection values={design?.values} lang={lang} design={design} />
-      <FounderStory story={design?.founder_story} lang={lang} design={design} />
+      <BuyingGuide guide={design?.buying_guide} design={design} />
       <Testimonials design={design} lang={lang} />
+      <div id="story"><FounderStory story={design?.founder_story} lang={lang} design={design} /></div>
+      <InstagramGrid instagram={design?.instagram} design={design} />
       <BlogTeaser posts={design?.blog_posts} lang={lang} design={design} />
       <div id="faq"><FAQSection design={design} lang={lang} /></div>
       <NewsletterCTA design={design} />

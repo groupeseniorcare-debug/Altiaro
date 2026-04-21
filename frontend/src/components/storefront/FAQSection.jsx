@@ -3,7 +3,14 @@ import { designAccents } from "./storefrontUtils";
 
 export function FAQSection({ design, lang }) {
   const items = design?.faq?.items || design?.faq;
-  if (!items || items.length === 0) return null;
+  const finalItems = Array.isArray(items) && items.length > 0 ? items : [
+    { question: "Sous quel délai serai-je livré ?", answer: "Les commandes sont expédiées sous 24h ouvrées. Vous recevez votre colis en 48 à 72h partout en France métropolitaine, avec un numéro de suivi dès l'expédition." },
+    { question: "Puis-je retourner un produit qui ne me convient pas ?", answer: "Oui, vous avez 14 jours à réception pour changer d'avis. Les frais de retour sont à notre charge et vous êtes remboursé sous 5 jours après réception." },
+    { question: "Comment puis-je contacter un conseiller ?", answer: "Par téléphone du lundi au vendredi de 9h à 18h, ou par email 7j/7 — nous répondons en moyenne en 2h ouvrées. Pas de chatbot : un vrai humain à votre écoute." },
+    { question: "Les produits sont-ils remboursés par la Sécurité sociale ?", answer: "Certains équipements sont pris en charge partiellement par la Sécu ou par votre mutuelle (LPPR). Demandez-nous un devis, nous vous aiderons à constituer le dossier." },
+    { question: "Proposez-vous l'installation à domicile ?", answer: "Sur les produits volumineux (fauteuils releveurs, lits médicaux), un technicien peut se déplacer pour l'installation et la prise en main. Détail lors de la commande." },
+    { question: "Mes données personnelles sont-elles protégées ?", answer: "Nous ne partageons jamais vos coordonnées avec des tiers à des fins commerciales. Nos serveurs sont hébergés en France, conforme RGPD." },
+  ];
   const { primary, fontHeading } = designAccents(design);
 
   return (
@@ -23,7 +30,7 @@ export function FAQSection({ design, lang }) {
         </h2>
       </div>
       <div className="space-y-3">
-        {items.map((it, i) => {
+        {finalItems.map((it, i) => {
           const q = typeof it.question === "string"
             ? it.question
             : (it.q?.[lang] || it.q?.fr || "");
