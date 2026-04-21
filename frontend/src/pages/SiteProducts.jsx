@@ -19,6 +19,8 @@ import {
   ArrowsClockwise,
   Warning,
   TrendUp,
+  Sparkle as SparkleIcon,
+  Package,
 } from "@phosphor-icons/react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -57,6 +59,9 @@ export default function SiteProducts() {
   const [importError, setImportError] = useState("");
   const [syncing, setSyncing] = useState(null); // product.id currently syncing
   const [syncResult, setSyncResult] = useState(null); // {product, diff}
+  const [enriching, setEnriching] = useState(null); // product.id being AI-enriched
+  const [bundling, setBundling] = useState(false); // bulk bundles generation in progress
+  const [aiToast, setAiToast] = useState(null);
 
   const load = useCallback(async () => {
     const [sRes, pRes] = await Promise.all([
@@ -125,6 +130,47 @@ export default function SiteProducts() {
     load();
   };
 
+  const handleEnrichNarrative = async (p) => {
+    setEnriching(p.id);
+    setAiToast(null);
+    const { data, error } = await apiCall(() =>
+      api.post(`/products/${p.id}/enrich-narrative?force=true`)
+    );
+    setEnriching(null);
+    if (error) {
+      setAiToast({ type: "error", msg: error });
+    } else if (data?.status === "ok") {
+      setAiToast({ type: "ok", msg: `Narratif IA régénéré pour « ${p.name?.fr || "produit"} »` });
+      load();
+    } else {
+      setAiToast({ type: "error", msg: "Budget LLM insuffisant ou timeout. Réessayez." });
+    }
+    setTimeout(() => setAiToast(null), 5000);
+  };
+
+  const handleAutoBundles = async () => {
+    setBundling(true);
+    setAiToast(null);
+    const { data, error } = await apiCall(() =>
+      api.post(`/sites/${siteId}/bundles/auto-generate`)
+    );
+    setBundling(false);
+    if (error) {
+      setAiToast({ type: "error", msg: error });
+    } else if (data?.status === "ok") {
+      setAiToast({
+        type: "ok",
+        msg: `${data.products_updated} produits mis à jour avec ${data.total_links} liens cross-sell`
+      });
+      load();
+    } else if (data?.status === "not_enough_products") {
+      setAiToast({ type: "error", msg: "Il faut au moins 2 produits actifs pour générer des bundles." });
+    } else {
+      setAiToast({ type: "error", msg: "Budget LLM insuffisant. Rechargez votre Universal Key." });
+    }
+    setTimeout(() => setAiToast(null), 6000);
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -165,6 +211,18 @@ export default function SiteProducts() {
             >
               <Eye size={16} /> Voir la boutique
             </a>
+            {products.length >= 2 && (
+              <button
+                onClick={handleAutoBundles}
+                disabled={bundling}
+                data-testid="auto-bundles"
+                className="h-11 px-4 rounded-xl bg-white border border-neutral-200 hover:border-[#B84B31] text-neutral-900 text-sm font-medium flex items-center gap-2 transition disabled:opacity-60"
+                title="L'IA analyse tout votre catalogue et génère les cross-sells pertinents pour chaque produit"
+              >
+                <Package size={16} weight="duotone" className={bundling ? "animate-pulse" : ""} />
+                {bundling ? "Analyse IA…" : "Auto-bundles IA"}
+              </button>
+            )}
             <button
               onClick={() => setEditing(emptyProduct())}
               data-testid="add-product"
@@ -174,6 +232,20 @@ export default function SiteProducts() {
             </button>
           </div>
         </div>
+
+        {aiToast && (
+          <div
+            data-testid="ai-toast"
+            className={`mb-5 px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2 ${
+              aiToast.type === "ok"
+                ? "bg-emerald-50 text-emerald-900 border border-emerald-200"
+                : "bg-rose-50 text-rose-900 border border-rose-200"
+            }`}
+          >
+            {aiToast.type === "ok" ? <CheckCircle size={16} weight="fill" /> : <Warning size={16} weight="fill" />}
+            {aiToast.msg}
+          </div>
+        )}
 
         {/* Import from URL bar */}
         <div className="bg-white rounded-md border border-neutral-200 p-5 mb-6" data-testid="import-url-bar">
@@ -293,6 +365,19 @@ export default function SiteProducts() {
                       className="flex-1 h-9 rounded-lg bg-white border border-neutral-200 hover:border-[#B84B31] text-[13px] text-neutral-900 flex items-center justify-center gap-1.5 transition"
                     >
                       <PencilSimple size={14} /> Éditer
+                    </button>
+                    <button
+                      onClick={() => handleEnrichNarrative(p)}
+                      disabled={enriching === p.id}
+                      data-testid={`enrich-narrative-${p.id}`}
+                      title={p.narrative ? "Régénérer le narratif IA (écrase l'existant)" : "Générer le narratif IA (sections, specs, FAQ)"}
+                      className={`h-9 w-9 rounded-lg border flex items-center justify-center transition disabled:opacity-50 ${
+                        p.narrative
+                          ? "border-emerald-200 text-emerald-700 hover:border-emerald-400"
+                          : "border-neutral-200 text-neutral-500 hover:border-[#B84B31] hover:text-neutral-900"
+                      }`}
+                    >
+                      <SparkleIcon size={14} weight={p.narrative ? "fill" : "regular"} className={enriching === p.id ? "animate-pulse" : ""} />
                     </button>
                     {p.supplier_url && (
                       <button

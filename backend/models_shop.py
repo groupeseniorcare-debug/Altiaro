@@ -30,6 +30,7 @@ class ProductCreateInput(BaseModel):
     featured: bool = False
     category: str = ""                          # slug de la collection principale
     tags: List[str] = Field(default_factory=list)  # tags secondaires (matière, couleur, etc.)
+    bundles_with: List[str] = Field(default_factory=list)  # IDs de produits complémentaires pour cross-sell
 
 
 class ProductUpdateInput(BaseModel):
@@ -48,6 +49,7 @@ class ProductUpdateInput(BaseModel):
     featured: Optional[bool] = None
     category: Optional[str] = None
     tags: Optional[List[str]] = None
+    bundles_with: Optional[List[str]] = None
 
 
 class OrderItem(BaseModel):

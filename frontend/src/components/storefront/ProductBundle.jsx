@@ -22,6 +22,23 @@ export default function ProductBundle({ currentProduct, lang = "fr", design }) {
 
   useEffect(() => {
     if (!siteId || !currentProduct) return;
+
+    // Priority 1 : explicit bundles_with configured (AI-suggested or manual)
+    const bundleIds = currentProduct.bundles_with || [];
+    if (bundleIds.length > 0) {
+      Promise.all(
+        bundleIds.slice(0, 2).map((pid) =>
+          axios.get(`${BACKEND_URL}/api/public/sites/${siteId}/products/${pid}`)
+            .then(({ data }) => data)
+            .catch(() => null)
+        )
+      ).then((res) => {
+        setCandidates(res.filter(Boolean));
+      });
+      return;
+    }
+
+    // Priority 2 : same category fallback
     const params = new URLSearchParams();
     if (currentProduct.category) params.set("collection", currentProduct.category);
     params.set("sort", "featured");

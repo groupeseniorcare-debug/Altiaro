@@ -44,6 +44,10 @@ import {
   StorefrontCollection,
 } from "./pages/StorefrontCollection";
 import {
+  StorefrontBlog,
+  StorefrontBlogPost,
+} from "./pages/StorefrontBlog";
+import {
   StorefrontAbout,
   StorefrontFAQ,
   StorefrontContact,
@@ -207,6 +211,8 @@ function App() {
           <Route path="/shop/:siteId/contact" element={<StorefrontContact />} />
           <Route path="/shop/:siteId/livraison" element={<StorefrontLivraison />} />
           <Route path="/shop/:siteId/retours" element={<StorefrontRetours />} />
+          <Route path="/shop/:siteId/blog" element={<StorefrontBlog />} />
+          <Route path="/shop/:siteId/blog/:slug" element={<StorefrontBlogPost />} />
           <Route path="/shop/:siteId/cgv" element={<StorefrontCGV />} />
           <Route path="/shop/:siteId/mentions" element={<StorefrontMentions />} />
           <Route path="/shop/:siteId/confidentialite" element={<StorefrontConfidentialite />} />

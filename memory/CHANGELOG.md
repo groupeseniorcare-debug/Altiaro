@@ -3,6 +3,31 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 42 : Bundles IA intelligents + Blog + UI Cockpit pour narrative
+### Volet 1 — Bundles IA intelligents
+- **Backend** : nouveau champ `bundles_with: List[str]` sur produits + module `/app/backend/routes/product_bundles.py` avec endpoint `POST /api/sites/{id}/bundles/auto-generate` — Claude 4.5 analyse tout le catalogue et propose 2-4 cross-sells pertinents par produit (jamais de substituts, jamais aléatoire).
+- **Frontend** : `ProductBundle.jsx` utilise `bundles_with` en priorité (si l'IA a analysé), sinon fallback sur la même category. Les bundles AI sont plus pertinents que la catégorie simple.
+- **Test e2e réel** : sur Sereniva (2 produits), l'IA a identifié que Déambulateur est cross-sell du Fauteuil releveur mais pas l'inverse — comportement intelligent non-symétrique.
+
+### Volet 2 — Blog Storefront (routes `/blog` + `/blog/:slug`)
+- **Nouveau fichier** `/app/frontend/src/pages/StorefrontBlog.jsx` avec :
+  - `StorefrontBlog` — index éditorial avec hero banner + grille 3 cols d'articles (category/read-time/excerpt/CTA).
+  - `StorefrontBlogPost` — page article avec hero banner + image 16:9 XL + contenu markdown light (h2/h3/bold/ul) + metadata auteur + bloc "D'autres articles" en bas.
+- **Fallback** : 3 articles SEO silver-eco complets (Bien choisir son fauteuil releveur, Maintien à domicile, Nuits réparatrices) rédigés premium — le template est visible même sans le hook #27-32.
+- **SEO** : schemas `Blog` sur l'index, `BlogPosting` + `BreadcrumbList` sur la page article. Meta og:type="article" sur le détail.
+- **Routes câblées** dans `App.js`.
+
+### Volet 3 — UI Cockpit produits
+- **SiteProducts.jsx** enrichi avec 2 actions IA :
+  - **Bouton header "Auto-bundles IA"** (visible si ≥ 2 produits) — déclenche la génération bulk, affiche un toast avec le nombre de produits mis à jour.
+  - **Bouton sparkle par produit** "Régénérer narrative IA" — écrase la narrative existante avec un nouveau call Claude. Badge vert si le produit a déjà une narrative, neutre sinon.
+  - **Toast AI** (succès/erreur) en haut de page, auto-dismiss 5-6s.
+- Tests validés : `auto-bundles`, `enrich-narrative-{id}`, `ai-toast` tous FOUND.
+
+### SEO bonus
+- Sitemap.xml inclut maintenant `/blog` + chaque `/blog/:slug`.
+
+
 ## 2026-04-21 · Sprint 41 : Page Produit marketing premium + IndexNow (AEO boost)
 ### Volet UX Produit — 6 composants ajoutés/refondus
 - **`DeliveryEstimate.jsx`** — carte grise premium qui calcule et affiche la date de livraison estimée **J+3 ouvré** (en français complet « vendredi 24 avril »), saute les week-ends, affiche « Commandez avant 14h pour un envoi aujourd'hui » si avant cutoff en semaine.
