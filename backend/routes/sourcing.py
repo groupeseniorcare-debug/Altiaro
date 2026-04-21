@@ -68,15 +68,37 @@ async def _cj_search(keyword: str, page: int = 1, size: int = 20) -> list:
         if r.status_code != 200:
             return []
         items = (r.json().get("data") or {}).get("list") or []
+
+    def _to_float(v) -> float:
+        """CJ renvoie parfois des prix 'range' ex '0.48 -- 0.67'. On prend le low."""
+        if v is None:
+            return 0.0
+        s = str(v).strip()
+        if not s:
+            return 0.0
+        # Split sur -- / - / ~ / , / ' to ' → low price
+        for sep in ("--", "~", " to ", ","):
+            if sep in s:
+                s = s.split(sep, 1)[0].strip()
+                break
+        # enlève devise
+        s = s.replace("$", "").replace("€", "").replace("US", "").strip()
+        try:
+            return float(s)
+        except (ValueError, TypeError):
+            return 0.0
+
     out = []
     for it in items:
+        sell = _to_float(it.get("sellPrice"))
+        ship = _to_float(it.get("cheapestShippingPrice"))
         out.append({
             "provider": "cj",
             "product_id": str(it.get("pid") or it.get("productId") or ""),
             "title": it.get("productNameEn") or it.get("productName") or "",
             "image": it.get("productImage") or (it.get("productImageSet") or [None])[0],
-            "price_usd": float(it.get("sellPrice") or 0),
-            "cost_usd": float(it.get("cheapestShippingPrice") or it.get("sellPrice") or 0),
+            "price_usd": sell,
+            "cost_usd": sell or ship,  # sellPrice est le coût fournisseur CJ
             "supplier_url": f"https://cjdropshipping.com/product/{it.get('pid','')}",
             "sku": it.get("productSku") or "",
             "category": it.get("categoryName") or "",
