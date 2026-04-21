@@ -97,7 +97,7 @@ export default function Legal({ slug }) {
       {/* Footer */}
       <footer className="border-t border-neutral-200 mt-24">
         <div className="max-w-5xl mx-auto px-6 py-10 flex flex-wrap gap-x-8 gap-y-3 items-center justify-between text-sm text-neutral-500">
-          <div>© {new Date().getFullYear()} Altiora SAS — Tous droits réservés</div>
+          <div>© {new Date().getFullYear()} Altiora — Tous droits réservés</div>
           <div className="flex flex-wrap gap-x-6 gap-y-2">
             <Link to="/mentions-legales" className="hover:text-neutral-900">
               Mentions légales

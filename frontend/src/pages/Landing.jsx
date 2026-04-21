@@ -277,7 +277,8 @@ export default function Landing() {
             <AltioraLogo variant="horizontal" size={22} color="#0A0A0A" />
             <p className="text-neutral-500 mt-4 max-w-sm">
               La plateforme e-commerce des partenariats éclairés. <br />
-              Édité par Altiora SAS.
+              Édité par Robin Zuchiatti (entrepreneur individuel), exerçant sous
+              le nom commercial Altiora.
             </p>
           </div>
           <div>
@@ -315,7 +316,7 @@ export default function Landing() {
         </div>
         <div className="border-t border-neutral-200">
           <div className="max-w-6xl mx-auto px-6 py-6 text-xs text-neutral-500">
-            © {new Date().getFullYear()} Altiora SAS — SIREN XXX XXX XXX
+            © {new Date().getFullYear()} Altiora — SIREN 883 803 967 · TVA FR42883803967
           </div>
         </div>
       </footer>

@@ -6,19 +6,24 @@ Exposed publicly (no auth) so Google / Mollie / partners can crawl them."""
 from datetime import datetime
 
 PLATFORM_COMPANY = {
-    "nom": "Altiora SAS",
-    "forme_juridique": "SAS (Société par Actions Simplifiée)",
-    "siren": "XXX XXX XXX",  # À compléter par user
-    "siret": "XXX XXX XXX 00000",
-    "capital": "10 000 €",
-    "rcs": "Paris",
-    "tva_intra": "FR XX XXXXXXXXX",
-    "adresse": "À compléter — siège social",
+    # Nom commercial (apparaît dans tout le branding)
+    "nom": "Altiora",
+    # Informations légales réelles de l'éditeur (entrepreneur individuel)
+    "forme_juridique": "Entrepreneur individuel",
+    "dirigeant_nom": "Robin Zuchiatti",  # Requis par la LCEN pour un EI
+    "siren": "883 803 967",
+    "siret": "883 803 967 00016",
+    "date_creation": "30/05/2020",
+    "rne_inscription": "Inscrit au RNE le 30/05/2020",
+    "tva_intra": "FR42883803967",
+    "code_naf": "47.82Z",
+    "activite": "Commerce de détail et services e-commerce — plateforme SaaS multi-marques",
+    "adresse": "4 impasse du Clos Fleuri, 42320 Farnay, France",
     "email": "contact@altiora.com",
     "telephone": "À compléter",
-    "directeur_publication": "À compléter",
-    "hebergeur_nom": "Emergent Labs / Kubernetes Cloud",
-    "hebergeur_adresse": "À compléter",
+    "directeur_publication": "Robin Zuchiatti",
+    "hebergeur_nom": "Emergent Labs",
+    "hebergeur_adresse": "Infrastructure Kubernetes — à compléter avec l'adresse de l'hébergeur",
     "site_web": "https://altiora.com",
 }
 
@@ -35,12 +40,16 @@ def render_mentions_legales():
         "content": f"""
 ## 1. Éditeur du site
 
-**{c['nom']}** — {c['forme_juridique']}
-- Siège social : {c['adresse']}
-- Capital social : {c['capital']}
-- RCS {c['rcs']} — SIREN : {c['siren']}
-- SIRET : {c['siret']}
+**Altiora** est le nom commercial sous lequel **{c['dirigeant_nom']}**, entrepreneur
+individuel, édite et exploite la plateforme accessible à l'adresse {c['site_web']}.
+
+- Forme juridique : {c['forme_juridique']}
+- SIREN : **{c['siren']}**
+- SIRET (siège) : {c['siret']}
+- Inscription : {c['rne_inscription']}
 - N° TVA intracommunautaire : {c['tva_intra']}
+- Code NAF / APE : {c['code_naf']}
+- Siège social : {c['adresse']}
 - Directeur de la publication : {c['directeur_publication']}
 - E-mail : {c['email']}
 - Téléphone : {c['telephone']}
@@ -54,17 +63,18 @@ Le site **{c['site_web']}** est hébergé par :
 ## 3. Propriété intellectuelle
 
 L'ensemble du contenu de ce site (textes, logo, images, code, marque « Altiora »)
-est la propriété exclusive de {c['nom']} et est protégé par les lois françaises et
-internationales relatives à la propriété intellectuelle.
+est la propriété exclusive de {c['dirigeant_nom']} (exerçant sous le nom
+commercial Altiora) et est protégé par les lois françaises et internationales
+relatives à la propriété intellectuelle.
 
-Toute reproduction, représentation, modification, publication, adaptation totale ou
-partielle des éléments du site, quel que soit le moyen ou le procédé utilisé, est
-interdite sans autorisation écrite préalable de {c['nom']}.
+Toute reproduction, représentation, modification, publication, adaptation totale
+ou partielle des éléments du site, quel que soit le moyen ou le procédé utilisé,
+est interdite sans autorisation écrite préalable.
 
 ## 4. Responsabilité
 
-{c['nom']} s'efforce de fournir des informations aussi précises que possible.
-Toutefois, elle ne pourra être tenue responsable des omissions, inexactitudes ou
+L'éditeur s'efforce de fournir des informations aussi précises que possible.
+Toutefois, il ne pourra être tenu responsable des omissions, inexactitudes ou
 carences dans la mise à jour, qu'elles soient de son fait ou du fait de tiers
 partenaires qui lui fournissent ces informations.
 
@@ -72,7 +82,7 @@ partenaires qui lui fournissent ces informations.
 
 Tout litige en relation avec l'utilisation du site **{c['site_web']}** est soumis
 au droit français. Il est fait attribution exclusive de juridiction aux tribunaux
-compétents de Paris.
+compétents du ressort du siège social de l'éditeur.
 """.strip(),
     }
 
@@ -86,8 +96,9 @@ def render_cgu():
 ## Préambule
 
 Les présentes Conditions Générales d'Utilisation (CGU) régissent l'accès et
-l'utilisation de la plateforme Altiora (ci-après « la Plateforme ») éditée par
-{c['nom']}.
+l'utilisation de la plateforme **Altiora** (ci-après « la Plateforme »), éditée
+par {c['dirigeant_nom']} (entrepreneur individuel, SIREN {c['siren']}),
+exerçant sous le nom commercial Altiora.
 
 ## 1. Définitions
 
@@ -95,7 +106,8 @@ l'utilisation de la plateforme Altiora (ci-après « la Plateforme ») éditée 
 - **Utilisateur** : toute personne physique ou morale utilisant la Plateforme.
 - **Concepteur** : Utilisateur inscrit exploitant un ou plusieurs sites e-commerce
   via la Plateforme, selon un modèle de partenariat 50/50 sur la marge brute.
-- **Administrateur** : collaborateur de {c['nom']} disposant de droits étendus.
+- **Éditeur** : {c['dirigeant_nom']} exerçant sous le nom commercial Altiora.
+- **Administrateur** : collaborateur de l'Éditeur disposant de droits étendus.
 
 ## 2. Inscription et compte
 
@@ -124,14 +136,14 @@ Le Concepteur s'engage à :
 ## 5. Partage de la marge brute (50/50)
 
 La marge brute hors taxes de chaque commande est partagée à parts égales entre
-le Concepteur et {c['nom']}. Les versements sont effectués les 1er et 15 de
+le Concepteur et l'Éditeur. Les versements sont effectués les 1er et 15 de
 chaque mois par virement bancaire (SEPA).
 
 ## 6. Propriété intellectuelle
 
-Les contenus générés par le Concepteur (textes, visuels, catalogue) restent
-sa propriété. {c['nom']} conserve la propriété de la Plateforme, de sa marque et
-de son code source.
+Les contenus générés par le Concepteur (textes, visuels, catalogue) restent sa
+propriété. L'Éditeur conserve la propriété de la Plateforme, de la marque
+Altiora et de son code source.
 
 ## 7. Résiliation
 
@@ -141,7 +153,7 @@ par e-mail à {c['email']}. Les soldes dus sont réglés sous 15 jours.
 ## 8. Droit applicable
 
 Les présentes CGU sont soumises au droit français. Tout litige relève de la
-compétence exclusive des tribunaux de Paris.
+compétence exclusive des tribunaux du ressort du siège social de l'Éditeur.
 
 ## 9. Contact
 
@@ -158,7 +170,8 @@ def render_confidentialite():
         "content": f"""
 ## 1. Responsable du traitement
 
-{c['nom']} — {c['adresse']} — {c['email']}.
+**{c['dirigeant_nom']}**, exerçant sous le nom commercial Altiora
+(entrepreneur individuel, SIREN {c['siren']}) — {c['adresse']} — {c['email']}.
 
 ## 2. Données collectées
 
@@ -197,7 +210,7 @@ Nous collectons les données suivantes :
 
 ## 6. Destinataires
 
-- Équipes internes {c['nom']} (support, comptabilité).
+- L'éditeur lui-même (support, comptabilité).
 - Sous-traitants techniques (Mollie pour les paiements, Resend pour les e-mails,
   MongoDB Atlas pour l'hébergement des données, Emergent Labs pour l'infrastructure).
 - Autorités publiques sur réquisition légale.
