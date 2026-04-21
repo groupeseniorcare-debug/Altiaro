@@ -3,31 +3,36 @@
 Backlog priorisé.
 
 ## ✅ Livré
-Auth · Sites CRUD · Analyseur deep v2 (5 étapes, 8 pays, langue native) · Catalogue i18n + cost_price_ht · Storefront dynamique · Orders + snapshot HT · Niche Analyzer ouvert à tous produits · Ops Center · Ads Copy · Duplication · Multi-domain · Scale 6 pays · Empire Dashboard · Mega-Blocks · AI Copilot · Mollie Checkout + CB + IBAN · **Virements 50% marge brute HT (1er/15)** · **Site Designer IA-first** · **Pages légales auto** · **Sprint 16 : Sourcing CJ Dropshipping + AliExpress Affiliate (backend + UI)** · **Sprint 16bis : Wizard 10 étapes guidées avec auto-détection d'avancement** · **Sprint 17 : SEO avancé (sitemap multi-pays avec hreflang, robots.txt, Google Merchant Feed RSS 2.0 par pays, Schema.org JSON-LD Organization/WebSite/Product, Open Graph, Twitter Cards, canonical)**
+Auth · Sites CRUD · Quick Scan Go/No-Go multi-marchés async · Analyseur deep v2 · Catalogue i18n + cost_price_ht · Storefront dynamique (composants modulaires) · Orders + snapshot HT · Ads Copy · Duplication · Multi-domain · Scale 6 pays · Empire Dashboard · Mega-Blocks · AI Copilot · Mollie Checkout + CB + IBAN · Virements 50% marge brute HT (1er/15) · Site Designer IA-first (Prompt Studio 7 sections) · Pages légales auto · Sourcing CJ + AliExpress backend · Wizard 10 étapes guidées · SEO avancé (sitemap multi-pays hreflang, robots.txt, merchant-feed.xml RSS 2.0 par pays, Schema.org JSON-LD, Open Graph) · OVH domain purchase flow via Mollie (10€ markup) · Google Ads OAuth + Keyword Planner + Campaigns read · APScheduler cron auto-DNS · Thème UI Light (Ultra Premium Digital 2.0 light variant)
 
 ## 🔴 P0 — Prochaine session
 
-### Sprint 18 : Activation providers sourcing (user fournit clés)
-- [ ] Obtenir clé CJ Dropshipping (gratuite, https://developers.cjdropshipping.com)
-- [ ] Obtenir App Key + Secret + Tracking ID AliExpress Affiliate (gratuit, https://portals.aliexpress.com)
-- [ ] Tester les imports réels en environnement de production
-- [ ] BigBuy (optionnel si abonnement Admin)
+### Google Merchant Center OAuth + push feed auto
+**Blocké sur actions user Google (voir CHANGELOG 2026-04-21 Sprint 22 pour checklist)**
+- [ ] User : créer GMC account + demander conversion MCA
+- [ ] User : activer Content API dans Google Cloud Console
+- [ ] User : ajouter scope `content` au OAuth consent screen + re-soumission vérification (3-5j)
+- [ ] User : vérifier domaine + lier à Google Ads
+- [ ] User : fournir Merchant ID
+- [ ] **Puis côté code** : OAuth flow GMC (même pattern que Google Ads), sub-account management, push auto feed via APScheduler, UI Admin `/admin/merchant-center`, meta tag domain verification injecté auto dans storefront
 
-### Sprint 19 : Google Ads Center (Admin only)
-- [ ] Interface Admin pour gérer campagnes Google Ads via API
-- [ ] Génération copy automatique depuis Ads Copy existant
-- [ ] Reporting perf par site/pays
-- [ ] **Attente clé Google Ads Keyword Planner API**
+### Marketplace des analyses (P1)
+- [ ] Afficher toutes les deep analyses globalement aux Concepteurs
+- [ ] Lock niche 7 jours par Concepteur
+- [ ] UI browse + filter + "Réserver cette niche"
 
-## 🟡 P1 — Optimisations template vente
+## 🟡 P1
+- [ ] Fix CJ search : UX pour forcer les mots-clés en anglais côté UI (le user gère lui-même le sourcing, mais le frontend gagne à avertir)
+- [ ] Sourcing alternatif pour matériel médicalisé senior (Spocket/Syncee/Modalyst EU) si la verticale fauteuil releveur reste cible
 - [ ] Trust badges dynamiques, scarcity countdown, social proof (nb commandes 7j), upsell cart, exit-intent popup
-- [ ] DeepL API pour traduction pro (alternative à Claude)
+- [ ] DeepL API pour traduction pro (alternative à Claude translate)
 
-## 🟡 P2 — Communication
-- [ ] Resend emails transactionnels (confirmation, expédition, notif payout)
-- [ ] Notification email Admin 1er/15 payouts
-- [ ] Page Leads Concepteur (formulaire contact reçu)
+## 🟡 P2
+- [ ] Page Leads Concepteur (formulaires contact storefront)
 - [ ] Mollie Refunds depuis Ops Center
+- [ ] Notification email Admin 1er/15 payouts (Resend)
+- [ ] AliExpress Affiliate API integration (en attente validation compte)
+- [ ] Fix OVH `"Your preferred payment method is not valid"` : le compte OVH plateforme doit avoir une CB par défaut (action infra, pas code)
 
 ## 🟢 P3 — Extensions
 - [ ] API bancaire (Wise/GoCardless/Qonto) pour virements 100% auto
@@ -36,7 +41,10 @@ Auth · Sites CRUD · Analyseur deep v2 (5 étapes, 8 pays, langue native) · Ca
 - [ ] Copilot tools étendus
 - [ ] Webhooks Concepteurs (Zapier)
 
+## ❌ Retiré (décision user)
+- ~~Google Ads Campaign Management depuis UI Admin~~ — user ne veut pas gérer les ads depuis l'admin (Google Ads OAuth reste en place pour Keyword Planner + lecture campagnes)
+
 ## 🚀 Next action items
-1. **Sprint 16** : sourcing CJ + AE + wizard 10 étapes
-2. Obtenir clé Google Ads Keyword Planner (guide à fournir au user)
-3. Wizard construction site avec contexte analyseur
+1. **User-side Google Merchant Center setup** (checklist ci-dessus) — pré-requis bloquant
+2. Implémenter GMC OAuth + push feed dès user ready
+3. Marketplace des analyses

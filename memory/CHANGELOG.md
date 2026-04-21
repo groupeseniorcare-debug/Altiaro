@@ -3,6 +3,21 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 22 : Nettoyage DB + checklist Merchant Center
+- **🧹 Table rase** du site démo Levio (`dbf77f87-d603-44d3-adfd-b44f596e138a`) à la demande du user : site + 3 produits + 2 commandes test + 50 steps + 1 domain record (pending OVH) + 68 quick_scans + 7 scan_groups supprimés de MongoDB. Assets Concepteur conservés : carte Mollie (mdt_ciGgZkbB5t Mastercard ••••0005), IBAN, infos société.
+- **📋 Checklist Google Merchant Center livrée au user** (playbook via integration_playbook_expert_v2) :
+  1. Créer compte GMC (même compte Google que Google Ads)
+  2. Demander conversion Advanced / Multi-Client Account (délai 3-5j)
+  3. Activer Content API for Shopping dans Google Cloud Console
+  4. Ajouter scope `https://www.googleapis.com/auth/content` au OAuth consent screen + re-soumission vérification (3-5j, scope "sensitive")
+  5. Vérifier domaine (meta tag HTML auto-injecté futur)
+  6. Lier GMC ↔ Google Ads
+  7. Fournir Merchant ID
+- **🚫 Google Ads Campaign Management (P2) retiré** du backlog : user ne veut pas gérer les ads depuis l'admin. L'OAuth Google Ads reste actif pour Keyword Planner + lecture campagnes uniquement.
+- **📝 Note CJ Dropshipping** : le catalogue CJ ne couvre pas la verticale fauteuil médicalisé (résultats = trottinettes/cuiseurs/ponceuses). Sourcing sera géré par le user lui-même en interne (il a ses fournisseurs). Piste alternative future : Spocket/Syncee pour matériel senior EU.
+- **⚠️ OVH Mollie payment** : 14,99€ encaissés pour `levio-fauteuils.fr` mais achat OVH refusé (`"Your preferred payment method is not valid"` — user a ajouté la CB OVH depuis, mais refuse tout achat pour l'instant → domain record supprimé). Pour plus tard : documenter dans le flow `/domains/purchase` un meilleur message d'erreur côté UI quand OVH retourne cette erreur.
+
+
 ## 2026-04-21 · Sprint 21 : UI Light Mode (Ultra Premium Digital 2.0 — Light variant)
 - **🎨 Bascule complète dark → light** suite au feedback user ("fond noir trop agressif → fond blanc éléments noirs")
 - **`index.css`** réécrit : CSS vars light mode (background 0% 100%, foreground 240 10% 4%, border 240 6% 90%), body `bg-white text-neutral-900`, scrollbar (#E4E4E7), selection, markdown rebaselined clair
