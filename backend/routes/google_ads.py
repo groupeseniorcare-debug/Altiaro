@@ -113,6 +113,17 @@ async def oauth_start(user: dict = Depends(get_current_user)):
         prompt="consent",
         include_granted_scopes="true",
     )
+    # Persist code_verifier (PKCE) pour pouvoir le réutiliser dans le callback
+    await db.google_ads_oauth_state.update_one(
+        {"state": state},
+        {"$set": {
+            "state": state,
+            "admin_user_id": user.get("id"),
+            "code_verifier": getattr(flow, "code_verifier", None),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
     return {"authorization_url": auth_url, "state": state}
 
 
@@ -128,7 +139,13 @@ async def oauth_callback(code: Optional[str] = None, state: Optional[str] = None
         )
     _require_config()
     try:
+        # Retrieve code_verifier (PKCE) stored at oauth/start
+        state_doc = await db.google_ads_oauth_state.find_one(
+            {"state": state}, {"_id": 0}
+        )
         flow = _build_flow(state=state)
+        if state_doc and state_doc.get("code_verifier"):
+            flow.code_verifier = state_doc["code_verifier"]
         flow.fetch_token(code=code)
         creds_obj = flow.credentials
         await db.google_ads_credentials.update_one(
@@ -144,6 +161,8 @@ async def oauth_callback(code: Optional[str] = None, state: Optional[str] = None
             }},
             upsert=True,
         )
+        # Cleanup OAuth state
+        await db.google_ads_oauth_state.delete_one({"state": state})
         return RedirectResponse(f"{frontend_base}/admin/google-ads?status=connected", status_code=302)
     except Exception as e:
         logger.exception("Google Ads OAuth callback failed")
