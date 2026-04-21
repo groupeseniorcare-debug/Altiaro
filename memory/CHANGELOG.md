@@ -3,6 +3,16 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 27 : Hooks automatiques de validation d'étape (#6/#9/#16/#17)
+- **Nouveau module** `backend/routes/step_side_effects.py` : quand un Concepteur valide une étape clé, Claude Sonnet 4.5 est rappelé pour extraire le livrable en JSON structuré et l'appliquer automatiquement au site.
+- **Hook #6 Identité visuelle** → `sites.design.brand` (primary_color, accent_color, background_color, text_color, font_heading, font_body, tagline, logo_text, voice_keywords). Le storefront reflète immédiatement la nouvelle charte.
+- **Hook #9 Documents légaux** → `sites.design.legal_pages.{cgv,mentions_legales,confidentialite}` en markdown propre. Testé sur Luméa Confort : CGV 2863 car (6 articles dont rétractation 14j, garantie 2 ans), mentions 2005 car, RGPD 3388 car. Visibles sur `/shop/{id}/cgv` sans redéploiement.
+- **Hook #16 Import catalogue** → insertion directe dans la collection `products` avec statut `draft`, SKU auto-généré, marge recalculée. Testé : 5 produits sur 5 (fauteuil releveur, coussin anti-escarres, barre d'appui, monte-escalier, lit médicalisé) avec marges 61-63%.
+- **Hook #17 Scaffold template** → `design.template_applied=true`, `template_name="altiaro-premium-light"`, + merge des couleurs du brand book #6 avec les defaults Altiaro (évite storefront sans design si #6 skipé).
+- **Fire-and-forget** : `schedule_side_effect(step)` appelle `loop.create_task` ; la validation HTTP répond instantanément au user, le hook Claude (60-90s) tourne en arrière-plan. Erreurs loggées mais jamais fatales.
+- **Branché dans** `routes/steps.py` sur `submit_step` + `validate_step` — le hook se déclenche peu importe qui valide (Concepteur ou Admin).
+
+
 ## 2026-04-21 · Sprint 26 : Refonte cockpit Concepteur (1 seule vue, 8 blocs, flow unifié)
 - **🗑️ Suppression des 3 pages doublons** qui créaient un chaos visuel : `/sites/:id/studio` (Prompt Studio avec 7 prompts bâtards), `/sites/:id/wizard` (Wizard 10 étapes), `/sites/:id/design` (Design IA). Fichiers `PromptStudio.jsx`, `Wizard.jsx`, `SiteDesign.jsx` supprimés, routes retirées d'App.js.
 - **🏗️ Cockpit unique `/sites/:id`** : plus de boutons violets moches dans le bandeau. Seuls les CTA utiles restent (Gérer produits, Sourcing, Google Ads Copy, Voir la boutique, Domaine, Dupliquer, Scaler).

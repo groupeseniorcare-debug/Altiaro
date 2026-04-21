@@ -13,6 +13,7 @@ from deps import (
     db, get_current_user, require_admin, _check_site_access,
     EMERGENT_LLM_KEY, UPLOAD_DIR,
 )
+from routes.step_side_effects import schedule_side_effect
 
 router = APIRouter()
 logger = logging.getLogger("conceptfactory.steps")
@@ -101,7 +102,11 @@ async def submit_step(step_id: str, user: dict = Depends(get_current_user)):
             {"id": next_step["id"]},
             {"$set": {"status": "in_progress", "updated_at": now}},
         )
-    return await db.steps.find_one({"id": step_id}, {"_id": 0})
+    updated_step = await db.steps.find_one({"id": step_id}, {"_id": 0})
+    # Fire-and-forget : apply automatic side effects for key steps (#6/#9/#16/#17)
+    if updated_step:
+        schedule_side_effect(updated_step)
+    return updated_step
 
 
 @router.post("/steps/{step_id}/validate")
@@ -126,7 +131,10 @@ async def validate_step(step_id: str, data: StepValidateInput, admin: dict = Dep
             {"id": next_step["id"]},
             {"$set": {"status": "in_progress", "updated_at": now}},
         )
-    return await db.steps.find_one({"id": step_id}, {"_id": 0})
+    updated_step = await db.steps.find_one({"id": step_id}, {"_id": 0})
+    if updated_step:
+        schedule_side_effect(updated_step)
+    return updated_step
 
 
 @router.post("/steps/{step_id}/reject")
