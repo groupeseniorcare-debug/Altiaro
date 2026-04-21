@@ -29,6 +29,8 @@ STATUS_TRANSITIONS = {
 class OrderStatusUpdate(BaseModel):
     status: str
     note: Optional[str] = ""
+    tracking_number: Optional[str] = ""
+    carrier: Optional[str] = ""
 
 
 @router.get("/sites/{site_id}/orders")
@@ -128,13 +130,31 @@ async def admin_update_order_status(
         "by": admin["id"],
         "note": data.note or "",
     }
+    set_fields = {"status": new_status, "updated_at": now}
+    if data.tracking_number:
+        set_fields["tracking_number"] = data.tracking_number
+    if data.carrier:
+        set_fields["carrier"] = data.carrier
     await db.orders.update_one(
         {"id": order_id},
         {
-            "$set": {"status": new_status, "updated_at": now},
+            "$set": set_fields,
             "$push": {"status_history": history_entry},
         },
     )
+    # Send shipping update email on transition → shipped if we have a tracking number
+    if new_status == "shipped" and data.tracking_number:
+        try:
+            from routes.emails import send_shipping_update
+            refreshed = await db.orders.find_one({"id": order_id}, {"_id": 0})
+            if refreshed and refreshed.get("site_id"):
+                site = await db.sites.find_one({"id": refreshed["site_id"]}, {"_id": 0})
+                if site:
+                    await send_shipping_update(refreshed, site,
+                                               data.tracking_number, data.carrier or "")
+        except Exception:
+            import logging
+            logging.getLogger("conceptfactory").exception("Failed to send shipping email")
     return await db.orders.find_one({"id": order_id}, {"_id": 0, "_meta_ip": 0})
 
 

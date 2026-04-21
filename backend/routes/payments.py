@@ -197,6 +197,19 @@ async def mollie_webhook(request: Request):
                         await log_order_share_on_paid(refreshed)
                 except Exception:
                     logger.exception("Failed to log order_share to ledger")
+                # Send confirmation emails (client + admin) — non-blocking
+                try:
+                    from routes.emails import send_order_confirmation, send_admin_new_order
+                    refreshed = await db.orders.find_one({"id": order["id"]}, {"_id": 0})
+                    if refreshed and refreshed.get("site_id"):
+                        site = await db.sites.find_one(
+                            {"id": refreshed["site_id"]}, {"_id": 0}
+                        )
+                        if site:
+                            await send_order_confirmation(refreshed, site)
+                            await send_admin_new_order(refreshed, site)
+                except Exception:
+                    logger.exception("Failed to send confirmation emails")
         else:
             await db.orders.update_one({"id": order["id"]}, {"$set": updates})
 
