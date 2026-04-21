@@ -32,6 +32,9 @@ from routes import dashboard as dashboard_routes
 from routes import meta as meta_routes
 from routes import uploads as uploads_routes
 from routes import search as search_routes
+from routes import settings as settings_routes
+from routes import customers as customers_routes
+from routes import storefront_search as storefront_search_routes
 from routes import analyzer as analyzer_routes
 from routes import ads_copy as ads_copy_routes
 from routes import duplicate as duplicate_routes
@@ -99,6 +102,9 @@ api.include_router(dashboard_routes.router)
 api.include_router(meta_routes.router)
 api.include_router(uploads_routes.router)
 api.include_router(search_routes.router)
+api.include_router(settings_routes.router)
+api.include_router(customers_routes.router)
+api.include_router(storefront_search_routes.router)
 
 
 @app.on_event("startup")

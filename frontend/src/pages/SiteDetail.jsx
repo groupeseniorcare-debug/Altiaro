@@ -23,6 +23,7 @@ import {
   X as XIcon,
   Rocket,
   Sparkle,
+  Gear,
 } from "@phosphor-icons/react";
 
 const COUNTRIES = [
@@ -324,6 +325,13 @@ export default function SiteDetail() {
                       ✓
                     </span>
                   )}
+                </button>
+                <button
+                  onClick={() => navigate(`/sites/${id}/settings`)}
+                  data-testid="nav-settings"
+                  className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
+                >
+                  <Gear size={16} weight="duotone" /> Paramètres
                 </button>
                 <button
                   onClick={() => {

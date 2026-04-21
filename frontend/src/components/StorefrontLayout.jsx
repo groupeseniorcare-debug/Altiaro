@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { LANGUAGES, t } from "../lib/i18n";
 import { readCart, cartTotals } from "../lib/cart";
-import { ShoppingBag, Phone, ShieldCheck, Truck } from "@phosphor-icons/react";
+import { getCustomer } from "../lib/customerAuth";
+import { ShoppingBag, Phone, ShieldCheck, Truck, MagnifyingGlass, User } from "@phosphor-icons/react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -112,24 +113,52 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
             </div>
           </Link>
 
-          <Link
-            to={`${shopRoot}/cart`}
-            data-testid="cart-button"
-            className="relative flex items-center gap-2 h-11 px-4 rounded-full border transition group"
-            style={{ background: accent, borderColor: "#E7E5E4" }}
-          >
-            <ShoppingBag size={20} weight="regular" style={{ color: textCol }} />
-            <span className="text-sm font-medium" style={{ color: textCol }}>{t(lang, "cart")}</span>
-            {cartCount > 0 && (
-              <span
-                data-testid="cart-count"
-                className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] rounded-full text-neutral-900 text-[11px] font-semibold flex items-center justify-center px-1.5"
-                style={{ background: primary }}
-              >
-                {cartCount}
+          <div className="flex items-center gap-2">
+            {/* Search */}
+            <form onSubmit={(e) => { e.preventDefault(); if (searchQ.trim().length >= 2) navigate(`${shopRoot}/search?q=${encodeURIComponent(searchQ)}`); }}
+              className="hidden md:flex relative">
+              <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#78716C" }} />
+              <input
+                value={searchQ}
+                onChange={(e) => setSearchQ(e.target.value)}
+                placeholder="Rechercher…"
+                data-testid="header-search"
+                className="h-11 pl-9 pr-3 w-48 rounded-full border text-sm focus:outline-none focus:ring-1 focus:ring-neutral-400"
+                style={{ borderColor: "#E7E5E4", background: "#fff", color: textCol }}
+              />
+            </form>
+            {/* Account */}
+            <Link
+              to={customer ? `${shopRoot}/account` : `${shopRoot}/account/login`}
+              data-testid="header-account"
+              className="flex items-center gap-2 h-11 px-3 rounded-full border transition hover:bg-neutral-50"
+              style={{ borderColor: "#E7E5E4" }}
+              title={customer ? `${customer.first_name} ${customer.last_name}` : "Se connecter"}
+            >
+              <User size={18} weight="regular" style={{ color: textCol }} />
+              <span className="text-sm font-medium hidden lg:inline" style={{ color: textCol }}>
+                {customer ? (customer.first_name || "Mon compte") : "Se connecter"}
               </span>
-            )}
-          </Link>
+            </Link>
+            <Link
+              to={`${shopRoot}/cart`}
+              data-testid="cart-button"
+              className="relative flex items-center gap-2 h-11 px-4 rounded-full border transition group"
+              style={{ background: accent, borderColor: "#E7E5E4" }}
+            >
+              <ShoppingBag size={20} weight="regular" style={{ color: textCol }} />
+              <span className="text-sm font-medium" style={{ color: textCol }}>{t(lang, "cart")}</span>
+              {cartCount > 0 && (
+                <span
+                  data-testid="cart-count"
+                  className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] rounded-full text-white text-[11px] font-semibold flex items-center justify-center px-1.5"
+                  style={{ background: primary }}
+                >
+                  {cartCount}
+                </span>
+              )}
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -185,7 +214,16 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
   );
 }
 
-export async function fetchPublicSite(siteId) {
-  const { data } = await axios.get(`${BACKEND_URL}/api/public/sites/${siteId}`);
+export async function fetchPublicSite(siteId) {  const { data } = await axios.get(`${BACKEND_URL}/api/public/sites/${siteId}`);
   return data;
+}
+
+
+export function useSiteData(siteId) {
+  const [site, setSite] = useState(null);
+  useEffect(() => {
+    if (!siteId) return;
+    fetchPublicSite(siteId).then(setSite).catch(() => setSite(null));
+  }, [siteId]);
+  return site;
 }

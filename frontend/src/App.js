@@ -19,6 +19,11 @@ import Orders from "./pages/Orders";
 import AdminPayouts from "./pages/AdminPayouts";
 import Sourcing from "./pages/Sourcing";
 import Domains from "./pages/Domains";
+import SiteSettings from "./pages/SiteSettings";
+import StorefrontRegister from "./pages/StorefrontRegister";
+import StorefrontLogin from "./pages/StorefrontLogin";
+import StorefrontAccount from "./pages/StorefrontAccount";
+import StorefrontSearch from "./pages/StorefrontSearch";
 import GoogleAds from "./pages/GoogleAds";
 import Opportunities from "./pages/Opportunities";
 import QuickScan from "./pages/QuickScan";
@@ -168,6 +173,19 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/sites/:id/settings"
+            element={
+              <ProtectedRoute>
+                <SiteSettings />
+              </ProtectedRoute>
+            }
+          />
+          {/* Storefront public pages — customer accounts + search */}
+          <Route path="/shop/:siteId/account/register" element={<StorefrontRegister />} />
+          <Route path="/shop/:siteId/account/login" element={<StorefrontLogin />} />
+          <Route path="/shop/:siteId/account" element={<StorefrontAccount />} />
+          <Route path="/shop/:siteId/search" element={<StorefrontSearch />} />
 
           {/* Public Storefront (no auth) */}
           <Route path="/shop/:siteId" element={<StorefrontHome />} />

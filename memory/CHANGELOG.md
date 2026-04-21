@@ -3,6 +3,25 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 33 : 3 features natives ajoutées au template (paramétrage + comptes clients + recherche)
+- **Paramétrage admin** (`/sites/:id/settings`) : nouvelle page 4 onglets pour la config business du site, accessible via bouton "Paramètres" dans le cockpit.
+  - **Taxes** : régime (franchise / TVA standard / OSS) + taux TVA éditables par pays (FR/BE/LU/DE/NL/CH/UK) + IOSS toggle
+  - **Livraison** : zones éditables (nom, pays, transporteur, délai, paliers tarifaires JSON, franco de port) + ajout/suppression de zones. 2 zones seedées par défaut (France métro, BE+LU).
+  - **Paiement** : toggles Mollie par méthode (CB, Bancontact, iDEAL, Apple Pay, Google Pay, PayPal) + seuil virement B2B
+  - **Emails** : nom expéditeur, reply-to, support email/phone, signature
+  - Backend `routes/settings.py` : GET/PUT `/api/sites/:id/settings` (avec deep-merge des `rates_by_country`) + GET public `/api/public/sites/:id/settings` (subset exposé au storefront)
+- **Comptes clients** sur le storefront — collection `customers` scoped par site, auth JWT 30j (pas cookies, token dans localStorage par site).
+  - Backend `routes/customers.py` : `POST /public/sites/:id/customers/register` · `/login` · `GET /me` · `PATCH /me` · `GET /orders`
+  - Pages frontend : `StorefrontRegister.jsx`, `StorefrontLogin.jsx`, `StorefrontAccount.jsx` (profil + historique commandes avec status badges colorés)
+  - Lib `customerAuth.js` : getToken/getCustomer/setSession/clearSession/authHeaders, event `alt_cust_session` pour sync multi-onglets
+  - Suivi commande public (sans compte) : `GET /public/sites/:id/orders/:order_number?email=xxx` (vérif ownership par email)
+- **Recherche storefront** — endpoint + page dédiée.
+  - Backend `routes/storefront_search.py` : `GET /public/sites/:id/storefront-search?q=xxx` (regex case-insensitive sur name/description/tags/category, top 30 résultats)
+  - Page frontend `StorefrontSearch.jsx` : input auto-focus, grille produits 3 colonnes, états vides empathiques
+- **Header storefront enrichi** : barre de recherche desktop + bouton "Mon compte / Se connecter" (affiche prénom si connecté) + panier — tout branché sur les CSS vars du brand book (cohérence visuelle).
+- **Testé E2E** (cURL) : GET/PUT settings OK, register + JWT + /me OK, search "fauteuil" → 2 résultats.
+
+
 ## 2026-04-21 · Sprint 32 : Branchement visuel du brand book au storefront
 - **3 hooks mis à jour** dans `step_side_effects.py` pour set automatiquement `design.published = true` à la validation : #6 (brand), #9 (légal), #17 (scaffold). Avant, `/api/public/sites/{id}/design` renvoyait `null` tant que `design.published` n'était pas explicitement flippé par l'admin → aucun rendu ne changeait sur le storefront. Maintenant, dès qu'un hook tourne, le storefront est visible et reflète les nouveaux paramètres.
 - **Fix tagline string vs dict** dans `StorefrontLayout.jsx` : le hook #6 stocke `tagline` en string simple, mais le layout le lisait comme dict multilingue `{fr: "..."}` → tagline invisible. Fix : cast type runtime pour accepter string OU dict `{lang: string}`.
