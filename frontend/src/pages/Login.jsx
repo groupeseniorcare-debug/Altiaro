@@ -21,6 +21,15 @@ export default function Login() {
     if (ok) navigate("/");
   };
 
+  const handleQuickLogin = async (quickEmail, quickPassword) => {
+    setSubmitting(true);
+    setEmail(quickEmail);
+    setPassword(quickPassword);
+    const ok = await login(quickEmail, quickPassword);
+    setSubmitting(false);
+    if (ok) navigate("/");
+  };
+
   return (
     <div className="min-h-screen flex items-stretch bg-[#FDFBF7]">
       <div className="flex-1 hidden lg:block relative overflow-hidden">
@@ -120,12 +129,39 @@ export default function Login() {
             </button>
           </form>
 
-          <div className="mt-8 p-4 rounded-xl bg-[#F5F2EB] border border-[#E7E5E4]">
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => handleQuickLogin("admin@conceptfactory.fr", "Factory2026!")}
+              disabled={submitting}
+              data-testid="login-quick-admin"
+              className="h-11 rounded-xl border border-[#E7E5E4] bg-white hover:border-[#B84B31] hover:bg-[#FAF7F2] text-sm font-medium text-[#1C1917] transition-all duration-200 disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              <Rocket size={14} weight="fill" className="text-[#B84B31]" />
+              Admin (demo)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickLogin("concepteur@conceptfactory.fr", "Concepteur2026!")}
+              disabled={submitting}
+              data-testid="login-quick-concepteur"
+              className="h-11 rounded-xl border border-[#E7E5E4] bg-white hover:border-[#7C3AED] hover:bg-[#FAF7F2] text-sm font-medium text-[#1C1917] transition-all duration-200 disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              <SignIn size={14} className="text-[#7C3AED]" />
+              Concepteur (demo)
+            </button>
+          </div>
+
+          <div className="mt-4 p-4 rounded-xl bg-[#F5F2EB] border border-[#E7E5E4]">
             <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-1.5">
-              Accès administrateur (seed)
+              Comptes de démonstration
             </div>
-            <div className="font-mono text-[13px] text-[#1C1917]">admin@conceptfactory.fr</div>
-            <div className="font-mono text-[13px] text-[#1C1917]">Factory2026!</div>
+            <div className="font-mono text-[12px] text-[#57534E]">
+              admin@conceptfactory.fr · Factory2026!
+            </div>
+            <div className="font-mono text-[12px] text-[#57534E]">
+              concepteur@conceptfactory.fr · Concepteur2026!
+            </div>
           </div>
         </div>
       </div>
