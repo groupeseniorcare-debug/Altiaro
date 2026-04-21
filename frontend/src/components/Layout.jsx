@@ -18,6 +18,7 @@ import {
   CreditCard,
   Bank,
   GoogleLogo,
+  Fire,
 } from "@phosphor-icons/react";
 
 export default function Layout({ children }) {
@@ -35,6 +36,7 @@ export default function Layout({ children }) {
           { to: "/orders", label: "Commandes", icon: Package, testId: "nav-orders" },
           { to: "/admin/payouts", label: "Virements", icon: Bank, testId: "nav-admin-payouts" },
           { to: "/admin/google-ads", label: "Google Ads", icon: GoogleLogo, testId: "nav-google-ads" },
+          { to: "/admin/opportunities", label: "Opportunités", icon: Fire, testId: "nav-opportunities" },
           { to: "/validations", label: "Activité", icon: CheckSquare, testId: "nav-validations" },
           { to: "/finances", label: "Finances", icon: ChartLineUp, testId: "nav-finances" },
           { to: "/billing", label: "Paiements", icon: CreditCard, testId: "nav-billing" },

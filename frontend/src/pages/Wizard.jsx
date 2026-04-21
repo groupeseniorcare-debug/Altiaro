@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, apiCall } from "../lib/api";
 import Layout from "../components/Layout";
+import KeywordFinder from "../components/KeywordFinder";
 import {
   ArrowLeft,
   CheckCircle,
@@ -24,7 +25,7 @@ const ACTION_BY_STEP = {
   pricing: { label: "Gérer les produits & prix", icon: Package, path: "/sites/{id}/products" },
   positioning: { label: "Définir positionnement", icon: PencilSimple, path: "/sites/{id}/design" },
   identity: { label: "Générer design + logo IA", icon: Sparkle, path: "/sites/{id}/design" },
-  seo: { label: "Éditer SEO", icon: MagnifyingGlass, path: "/sites/{id}/design" },
+  seo: { label: "Recherche mots-clés Google", icon: MagnifyingGlass, action: "keywordFinder" },
   content: { label: "Vérifier le contenu", icon: Eye, path: "/sites/{id}/design" },
   legal: { label: "Vérifier pages légales", icon: Eye, path: "/sites/{id}/design" },
   publish: { label: "Publier la boutique", icon: Rocket, path: "/sites/{id}/design" },
@@ -37,6 +38,7 @@ export default function Wizard() {
   const [site, setSite] = useState(null);
   const [loading, setLoading] = useState(true);
   const [marking, setMarking] = useState(null);
+  const [showKeywordFinder, setShowKeywordFinder] = useState(false);
 
   const load = useCallback(async () => {
     const [wRes, sRes] = await Promise.all([
@@ -197,6 +199,15 @@ export default function Wizard() {
                         <ActionIcon size={12} weight="bold" /> {Action.label}
                       </button>
                     )}
+                    {Action.action === "keywordFinder" && (
+                      <button
+                        onClick={() => setShowKeywordFinder(true)}
+                        data-testid={`wizard-action-${d.id}`}
+                        className="h-9 px-3 rounded-lg bg-gradient-to-r from-[#4285F4] to-[#6D28D9] hover:opacity-90 text-white text-xs font-medium flex items-center gap-1.5 transition whitespace-nowrap"
+                      >
+                        <ActionIcon size={12} weight="bold" /> {Action.label}
+                      </button>
+                    )}
                     {!done ? (
                       <button
                         onClick={() =>
@@ -258,6 +269,25 @@ export default function Wizard() {
           </div>
         )}
       </div>
+
+      {/* Floating Keyword Finder button — always accessible */}
+      <button
+        onClick={() => setShowKeywordFinder(true)}
+        data-testid="wizard-floating-kwfinder"
+        title="Recherche de mots-clés Google"
+        className="fixed bottom-24 right-6 h-12 px-4 rounded-full bg-gradient-to-r from-[#4285F4] to-[#6D28D9] text-white text-sm font-medium flex items-center gap-2 shadow-lg hover:shadow-xl transition z-40"
+      >
+        <MagnifyingGlass size={16} weight="bold" />
+        Mots-clés Google
+      </button>
+
+      {showKeywordFinder && (
+        <KeywordFinder
+          initialSeed={site?.niche || ""}
+          initialCountry={(site?.selected_countries || ["FR"])[0]}
+          onClose={() => setShowKeywordFinder(false)}
+        />
+      )}
     </Layout>
   );
 }

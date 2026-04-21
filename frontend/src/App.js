@@ -21,6 +21,7 @@ import SiteDesign from "./pages/SiteDesign";
 import Sourcing from "./pages/Sourcing";
 import Wizard from "./pages/Wizard";
 import GoogleAds from "./pages/GoogleAds";
+import Opportunities from "./pages/Opportunities";
 import {
   StorefrontHome,
   StorefrontProduct,
@@ -204,6 +205,14 @@ function App() {
             element={
               <ProtectedRoute adminOnly>
                 <GoogleAds />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/opportunities"
+            element={
+              <ProtectedRoute adminOnly>
+                <Opportunities />
               </ProtectedRoute>
             }
           />

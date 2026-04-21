@@ -271,20 +271,47 @@ export default function GoogleAds() {
               {customers.length > 0 && (
                 <div className="mb-3">
                   <label className="block text-xs font-semibold text-[#57534E] mb-1.5 uppercase tracking-wider">
-                    Compte Google Ads (Customer ID)
+                    Compte Google Ads cible (Customer ID)
                   </label>
-                  <select
-                    value={selectedCid}
-                    onChange={(e) => setSelectedCid(e.target.value)}
-                    data-testid="gads-customer-select"
-                    className="w-full h-11 px-3 rounded-lg border border-[#E7E5E4] bg-white text-sm focus:outline-none focus:border-[#4285F4]"
-                  >
-                    {customers.map((c) => (
-                      <option key={c.customer_id} value={c.customer_id}>
-                        {c.customer_id_pretty} ({c.customer_id})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex gap-2">
+                    <select
+                      value={selectedCid}
+                      onChange={(e) => setSelectedCid(e.target.value)}
+                      data-testid="gads-customer-select"
+                      className="flex-1 h-11 px-3 rounded-lg border border-[#E7E5E4] bg-white text-sm focus:outline-none focus:border-[#4285F4]"
+                    >
+                      {customers.map((c) => (
+                        <option key={c.customer_id} value={c.customer_id}>
+                          {c.customer_id_pretty} ({c.customer_id}){" "}
+                          {status.preferred_customer_id === c.customer_id ? " · ✓ cible" : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={async () => {
+                        setBusy(true);
+                        const { error } = await apiCall(() =>
+                          api.post("/google-ads/preferred-customer-id", {
+                            preferred_customer_id: selectedCid,
+                          })
+                        );
+                        setBusy(false);
+                        if (error) setMsg({ kind: "err", text: error });
+                        else {
+                          setMsg({ kind: "ok", text: "Compte cible enregistré. Les recherches utiliseront désormais ce compte." });
+                          loadStatus();
+                        }
+                      }}
+                      disabled={busy || !selectedCid}
+                      data-testid="gads-save-preferred-cid"
+                      className="h-11 px-4 rounded-lg bg-[#4285F4] hover:bg-[#1C70E1] text-white text-xs font-medium disabled:opacity-50 whitespace-nowrap"
+                    >
+                      Définir comme cible
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-[#78716C] mt-1">
+                    💡 Choisis le compte qui a des campagnes actives (pas un MCC). Requis pour le Keyword Planner.
+                  </p>
                 </div>
               )}
 

@@ -184,6 +184,7 @@ async def status(user: dict = Depends(get_current_user)):
         "connected": bool(creds and creds.get("refresh_token") and creds.get("is_active")),
         "updated_at": creds.get("updated_at") if creds else None,
         "login_customer_id": creds.get("login_customer_id") if creds else None,
+        "preferred_customer_id": creds.get("preferred_customer_id") if creds else None,
     }
 
 
@@ -215,6 +216,25 @@ async def set_login_cid(data: SetLoginCidInput, user: dict = Depends(get_current
                   "updated_at": datetime.now(timezone.utc).isoformat()}},
     )
     return {"ok": True, "login_customer_id": cid}
+
+
+class SetPreferredCidInput(BaseModel):
+    preferred_customer_id: str
+
+
+@router.post("/google-ads/preferred-customer-id")
+async def set_preferred_cid(data: SetPreferredCidInput, user: dict = Depends(get_current_user)):
+    """Définit le compte Google Ads à utiliser comme cible (celui qui a les campagnes actives)."""
+    _require_admin(user)
+    cid = _norm_cid(data.preferred_customer_id)
+    if not cid.isdigit() or len(cid) != 10:
+        raise HTTPException(400, "Customer ID invalide (doit être 10 chiffres).")
+    await db.google_ads_credentials.update_one(
+        {"admin_user_id": user["id"]},
+        {"$set": {"preferred_customer_id": cid,
+                  "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    return {"ok": True, "preferred_customer_id": cid}
 
 
 # ====================== LIST CUSTOMERS ====================== #
@@ -362,6 +382,8 @@ async def list_markets(user: dict = Depends(get_current_user)):
 # ====================== PUBLIC HELPER (for analyzer) ====================== #
 async def _get_platform_client():
     """Trouve n'importe quel Admin ayant connecté Google Ads et renvoie son client.
+    Préfère : le `preferred_customer_id` stocké (configuré manuellement), sinon
+    premier compte accessible non-manager, sinon premier accessible.
     Retourne (client, customer_id) ou (None, None) si aucune connexion.
     """
     if not (DEV_TOKEN and CLIENT_ID and CLIENT_SECRET):
@@ -380,22 +402,43 @@ async def _get_platform_client():
         "refresh_token": creds["refresh_token"],
         "use_proto_plus": True,
     }
-    login_cid = creds.get("login_customer_id")
+    login_cid = (creds.get("login_customer_id") or "").replace("-", "")
     if login_cid:
-        cfg["login_customer_id"] = login_cid.replace("-", "")
+        cfg["login_customer_id"] = login_cid
     try:
         client = GoogleAdsClient.load_from_dict(cfg, version="v21")
     except Exception as e:
         logger.warning(f"Google Ads client init failed: {e}")
         return None, None
 
-    # Take first accessible customer as default
+    # 1) preferred_customer_id (manually picked by admin) wins
+    preferred = (creds.get("preferred_customer_id") or "").replace("-", "")
+    if preferred:
+        return client, preferred
+
+    # 2) login_customer_id is typically the MCC → we must find a child non-manager
     try:
         cs = client.get_service("CustomerService")
         accessible = cs.list_accessible_customers()
-        if accessible.resource_names:
-            cid = accessible.resource_names[0].split("/")[-1]
-            return client, cid
+        rns = list(accessible.resource_names)
+        if not rns:
+            return None, None
+        # Try to find a non-manager via GoogleAdsService.search on each
+        ga = client.get_service("GoogleAdsService")
+        for rn in rns:
+            cid = rn.split("/")[-1]
+            try:
+                req = client.get_type("SearchGoogleAdsRequest")
+                req.customer_id = cid
+                req.query = "SELECT customer.id, customer.manager, customer.status FROM customer LIMIT 1"
+                resp = ga.search(request=req)
+                for row in resp:
+                    if not row.customer.manager:
+                        return client, cid
+            except Exception:
+                continue
+        # Fallback: first one anyway
+        return client, rns[0].split("/")[-1]
     except Exception as e:
         logger.warning(f"list_accessible_customers failed: {e}")
     return None, None
@@ -476,3 +519,88 @@ async def fetch_keyword_volumes(keywords_by_country: dict) -> dict:
     if not out["available"]:
         out["reason"] = "no_volumes_returned"
     return out
+
+
+
+# ====================== SHARED KEYWORD IDEAS (accessible Concepteurs) ====================== #
+class SharedKeywordIdeasInput(BaseModel):
+    seed_keywords: list[str]
+    country: str = "FR"
+    page_url: Optional[str] = None
+    limit: int = 80
+
+
+@router.post("/keywords/ideas")
+async def shared_keyword_ideas(data: SharedKeywordIdeasInput,
+                               user: dict = Depends(get_current_user)):
+    """Recherche de mots-clés similaires via Google Keyword Planner.
+    Utilise le compte Google Ads connecté au niveau plateforme (Admin).
+    Accessible à tous les utilisateurs authentifiés (Admin + Concepteurs).
+
+    Exemple d'usage : Concepteur tape "fauteuil senior" → 80 idées avec
+    volume/competition/CPC pour rédiger son SEO + Ads Copy.
+    """
+    market = MARKETS.get(data.country.upper())
+    if not market:
+        raise HTTPException(400, f"Pays non supporté : {data.country}. Valides : {list(MARKETS.keys())}")
+    seeds = [k.strip() for k in (data.seed_keywords or []) if k and k.strip()]
+    if not seeds and not data.page_url:
+        raise HTTPException(400, "seed_keywords ou page_url requis")
+
+    client, customer_id = await _get_platform_client()
+    if not client or not customer_id:
+        raise HTTPException(503,
+            "Google Keyword Planner non disponible. Aucun Admin n'a connecté "
+            "son compte Google Ads. Demande à ton administrateur de se connecter "
+            "depuis /admin/google-ads.")
+
+    try:
+        svc = client.get_service("KeywordPlanIdeaService")
+        req = client.get_type("GenerateKeywordIdeasRequest")
+        req.customer_id = customer_id
+        req.language = f"languageConstants/{market['lang']}"
+        req.geo_target_constants.append(f"geoTargetConstants/{market['geo']}")
+        req.include_adult_keywords = False
+        req.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH
+
+        if seeds and data.page_url:
+            seed_obj = client.get_type("KeywordAndUrlSeed")
+            seed_obj.keywords.extend(seeds)
+            seed_obj.url = data.page_url
+            req.keyword_and_url_seed = seed_obj
+        elif seeds:
+            seed_obj = client.get_type("KeywordSeed")
+            seed_obj.keywords.extend(seeds)
+            req.keyword_seed = seed_obj
+        else:
+            seed_obj = client.get_type("UrlSeed")
+            seed_obj.url = data.page_url
+            req.url_seed = seed_obj
+
+        response = svc.generate_keyword_ideas(request=req)
+        out = []
+        for idea in response:
+            m = idea.keyword_idea_metrics
+            out.append({
+                "keyword": idea.text,
+                "avg_monthly_searches": int(m.avg_monthly_searches or 0),
+                "competition": str(m.competition).split(".")[-1] if m.competition else "UNKNOWN",
+                "competition_index": int(m.competition_index or 0),
+                "cpc_low_eur": round((m.low_top_of_page_bid_micros or 0) / 1_000_000, 2),
+                "cpc_high_eur": round((m.high_top_of_page_bid_micros or 0) / 1_000_000, 2),
+            })
+            if len(out) >= data.limit:
+                break
+        out.sort(key=lambda x: x["avg_monthly_searches"], reverse=True)
+        return {
+            "country": data.country,
+            "market": market["name"],
+            "seeds": seeds,
+            "count": len(out),
+            "ideas": out,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("shared_keyword_ideas failed")
+        raise HTTPException(502, f"Google Keyword Planner error: {str(e)[:300]}")

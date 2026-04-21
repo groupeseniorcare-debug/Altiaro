@@ -47,6 +47,7 @@ from routes import sourcing as sourcing_routes
 from routes import seo as seo_routes
 from routes import wizard as wizard_routes
 from routes import google_ads as google_ads_routes
+from routes import opportunity as opportunity_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -80,6 +81,7 @@ api.include_router(sourcing_routes.router)
 api.include_router(seo_routes.router)
 api.include_router(wizard_routes.router)
 api.include_router(google_ads_routes.router)
+api.include_router(opportunity_routes.router)
 api.include_router(niches_routes.router)
 api.include_router(dashboard_routes.router)
 api.include_router(meta_routes.router)
@@ -212,9 +214,25 @@ async def startup():
             CronTrigger(day="1,15", hour=3, minute=0),
             id="bimonthly_payouts", replace_existing=True, misfire_grace_time=3600,
         )
+
+        # Monday 05:00 UTC — Scan opportunités Google (détection spikes)
+        async def _scheduled_opportunity_scan():
+            logger.info("[scheduler] opportunity scan start")
+            try:
+                from routes.opportunity import scan_opportunities
+                result = await scan_opportunities()
+                logger.info(f"[scheduler] opportunity scan done : {result}")
+            except Exception:
+                logger.exception("[scheduler] opportunity scan failed")
+
+        scheduler.add_job(
+            _scheduled_opportunity_scan,
+            CronTrigger(day_of_week="mon", hour=5, minute=0),
+            id="opportunity_scan", replace_existing=True, misfire_grace_time=3600,
+        )
         scheduler.start()
         app.state.scheduler = scheduler
-        logger.info("APScheduler started : weekly_debits (Mon 03:00 UTC) + bimonthly_payouts (1st/15th 03:00 UTC)")
+        logger.info("APScheduler started : weekly_debits (Mon 03h) + bimonthly_payouts (1st/15th 03h) + opportunity_scan (Mon 05h UTC)")
     except Exception:
         logger.exception("Failed to start APScheduler")
 
