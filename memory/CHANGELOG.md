@@ -3,6 +3,24 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 19 : Google Ads Center (Admin only) + activation CJ
+- **🔑 CJ Dropshipping activée** avec la vraie clé user (`CJ135808@api@...`). Sourcing opérationnel : recherche + import 1-clic avec `cost_price_ht` snapshot. Fix parsing prix ranges (ex "0.48 -- 0.67").
+- **🎯 Sprint 19 — Google Ads Center** (`routes/google_ads.py` + `pages/GoogleAds.jsx`) — Admin only :
+  - **OAuth2 Web Flow** complet : `GET /api/google-ads/oauth/start` + `GET /api/google-ads/oauth/callback` (redirect vers frontend avec status)
+  - Refresh tokens stockés dans `db.google_ads_credentials` par `admin_user_id`
+  - `GET /api/google-ads/status` · `POST /api/google-ads/disconnect` · `POST /api/google-ads/login-customer-id` (support MCC)
+  - `GET /api/google-ads/customers` : ListAccessibleCustomers
+  - **`POST /api/google-ads/keyword-ideas`** : GenerateKeywordIdeas avec volumes mensuels Google réels + competition index + fourchette CPC pour 8 pays (FR/DE/BE/NL/UK/CH/ES/IT)
+  - `POST /api/google-ads/campaigns` : SearchStream GAQL read-only sur last 7/14/30 jours (impressions, clicks, cost, conversions, CTR, CPC)
+  - Frontend `/admin/google-ads` : 3 cartes — Connexion · Keyword Planner (table) · Campaigns (table)
+  - Route protégée `adminOnly`, lien sidebar Admin uniquement
+- Sécurité RBAC : 403 pour Concepteur, 401 pour anonyme, 503 si clés backend manquantes
+- Package Python ajoutés : `google-ads==30.0.0` + `google-auth-oauthlib==1.3.1`
+- Variables `.env` : `GOOGLE_ADS_DEVELOPER_TOKEN`, `GOOGLE_ADS_CLIENT_ID`, `GOOGLE_ADS_CLIENT_SECRET`, `GOOGLE_ADS_REDIRECT_URI`
+- Tests : 27/27 pytest backend réussis (iteration_14.json), 0 régression
+
+
+
 ## 2026-04-21 · Sprints 16+17 : Sourcing CJ/AE + Wizard 10 étapes + SEO avancé
 - **📦 Sprint 16 Backend + Frontend** — Sourcing unifié CJ Dropshipping + AliExpress Affiliate :
   - `GET /api/sourcing/providers` : statut activation + steps setup

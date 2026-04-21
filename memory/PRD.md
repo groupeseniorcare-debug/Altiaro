@@ -65,8 +65,10 @@ Les 50 étapes du playbook sont regroupées en 4 blocs :
 | 29 | **Sourcing CJ Dropshipping + AliExpress Affiliate (search + import 1-clic)** | ✅ |
 | 30 | **Wizard 10 étapes guidées avec auto-détection d'avancement** | ✅ |
 | 31 | **SEO avancé (sitemap hreflang, robots, Merchant Feed RSS, Schema.org, OG, canonical)** | ✅ |
-| 32 | Resend (emails transactionnels) | ⏳ (attente clé) |
-| 33 | Google Ads Center READ-ONLY sync | ⏳ (attente clé) |
+| 32 | **CJ Dropshipping API activée (clé user) — recherche + import 1-clic fonctionnel** | ✅ |
+| 33 | **Google Ads Center Admin only (OAuth2 + Keyword Planner + Campaigns list)** | ✅ |
+| 34 | AliExpress Affiliate API activée | ⏳ (attente clés user) |
+| 35 | Resend (emails transactionnels) | ⏳ (attente clé) |
 
 ## Règles critiques
 - Pas de Shopify — tout custom React/FastAPI.
