@@ -48,6 +48,8 @@ const DICT = {
     secure_checkout: "Paiement 100% sécurisé",
     support_seniors: "Service client français · 7j/7",
     no_products: "Aucun produit n'est disponible pour l'instant.",
+    our_collection: "Notre sélection",
+    shop_now: "Découvrir la collection",
   },
   en: {
     shop_title: "Our shop",
@@ -88,6 +90,8 @@ const DICT = {
     secure_checkout: "100% secure checkout",
     support_seniors: "Customer support · 7 days a week",
     no_products: "No products available yet.",
+    our_collection: "Our selection",
+    shop_now: "Discover the collection",
   },
   de: {
     shop_title: "Unser Shop",
@@ -128,6 +132,8 @@ const DICT = {
     secure_checkout: "100% sicherer Zahlungsvorgang",
     support_seniors: "Kundenservice · 7 Tage die Woche",
     no_products: "Noch keine Produkte verfügbar.",
+    our_collection: "Unsere Auswahl",
+    shop_now: "Kollektion entdecken",
   },
   nl: {
     shop_title: "Onze winkel",
@@ -168,6 +174,8 @@ const DICT = {
     secure_checkout: "100% veilig afrekenen",
     support_seniors: "Klantenservice · 7 dagen per week",
     no_products: "Nog geen producten beschikbaar.",
+    our_collection: "Onze selectie",
+    shop_now: "Ontdek de collectie",
   },
 };
 

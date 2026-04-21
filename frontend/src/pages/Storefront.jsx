@@ -795,7 +795,7 @@ function designAccents(design) {
  * CART
  * ========================================================= */
 export function StorefrontCart() {
-  const { siteId, site, lang, setLang } = useSiteAndLang();
+  const { siteId, site, design, lang, setLang } = useSiteAndLang();
   const navigate = useNavigate();
   const [items, setItems] = useState(() => readCart(siteId));
 
@@ -929,7 +929,7 @@ export function StorefrontCart() {
  * CHECKOUT
  * ========================================================= */
 export function StorefrontCheckout() {
-  const { siteId, site, lang, setLang } = useSiteAndLang();
+  const { siteId, site, design, lang, setLang } = useSiteAndLang();
   const navigate = useNavigate();
   const [items] = useState(() => readCart(siteId));
   const [form, setForm] = useState({
@@ -1120,7 +1120,7 @@ export function StorefrontCheckout() {
  * CONFIRMATION
  * ========================================================= */
 export function StorefrontConfirmation() {
-  const { siteId, site, lang, setLang } = useSiteAndLang();
+  const { siteId, site, design, lang, setLang } = useSiteAndLang();
   const [search] = useSearchParams();
   const orderNumber = search.get("order");
   const isSuccessPage = window.location.pathname.includes("/checkout/success");

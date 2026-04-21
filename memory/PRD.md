@@ -68,7 +68,10 @@ Les 50 étapes du playbook sont regroupées en 4 blocs :
 | 32 | **CJ Dropshipping API activée (clé user) — recherche + import 1-clic fonctionnel** | ✅ |
 | 33 | **Google Ads Center Admin only (OAuth2 + Keyword Planner + Campaigns list)** | ✅ |
 | 34 | AliExpress Affiliate API activée | ⏳ (attente clés user) |
-| 35 | Resend (emails transactionnels) | ⏳ (attente clé) |
+| 35 | Resend (emails transactionnels) | ✅ |
+| 36 | **Storefront Apple/Dyson (narrative scroll + typographie premium)** | ✅ |
+| 37 | OVH Domaines (recherche + achat) | ✅ (markup Mollie à brancher) |
+| 38 | Prompt Studio (remplace Wizard) | ✅ |
 
 ## Règles critiques
 - Pas de Shopify — tout custom React/FastAPI.
