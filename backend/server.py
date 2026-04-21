@@ -1,5 +1,5 @@
 """
-Concept Factory — FastAPI orchestrator.
+Altiora — FastAPI orchestrator.
 Monte les routers modulaires définis dans /app/backend/routes/.
 """
 import os
@@ -52,6 +52,7 @@ from routes import emails as emails_routes
 from routes import domains as domains_routes
 from routes import quick_scan as quick_scan_routes
 from routes import concepteur_cockpit as concepteur_cockpit_routes
+from routes import platform as platform_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,7 +60,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("conceptfactory")
 
-app = FastAPI(title="Concept Factory API")
+app = FastAPI(title="Altiora API")
 api = APIRouter(prefix="/api")
 
 # Mount all routers
@@ -90,6 +91,7 @@ api.include_router(emails_routes.router)
 api.include_router(domains_routes.router)
 api.include_router(quick_scan_routes.router)
 api.include_router(concepteur_cockpit_routes.router)
+api.include_router(platform_routes.router)
 api.include_router(niches_routes.router)
 api.include_router(dashboard_routes.router)
 api.include_router(meta_routes.router)

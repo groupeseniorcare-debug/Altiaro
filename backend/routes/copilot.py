@@ -297,7 +297,7 @@ def _tools_catalog_for_prompt(user_role: str) -> str:
     return "\n".join(lines)
 
 
-SYSTEM_PROMPT_TEMPLATE = """Tu es CONCEPT COPILOT, l'assistant IA de Concept Factory (SaaS e-commerce multi-tenant Silver Economy EU).
+SYSTEM_PROMPT_TEMPLATE = """Tu es CONCEPT COPILOT, l'assistant IA de Altiora (SaaS e-commerce multi-tenant Silver Economy EU).
 
 Rôle utilisateur : {role}
 Utilisateur : {user_name} ({user_email})

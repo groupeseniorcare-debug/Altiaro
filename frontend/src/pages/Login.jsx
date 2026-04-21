@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { Rocket, SignIn, Spinner } from "@phosphor-icons/react";
+import { AltioraLogo } from "../components/AltioraLogo";
 
 export default function Login() {
   const { user, login, error } = useAuth();
@@ -44,9 +45,9 @@ export default function Login() {
         <div className="relative h-full flex flex-col justify-between p-12 text-white">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center">
-              <Rocket size={20} weight="fill" color="#B84B31" />
+              <AltioraLogo variant="icon-only" size={22} color="#0A0A0A" />
             </div>
-            <span className="text-lg font-semibold">Concept Factory</span>
+            <span className="text-lg font-semibold">Altiora</span>
           </div>
           <div className="max-w-md">
             <h1 className="text-4xl font-heading font-semibold leading-tight mb-4">

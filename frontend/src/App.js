@@ -26,6 +26,8 @@ import GoogleAds from "./pages/GoogleAds";
 import Opportunities from "./pages/Opportunities";
 import QuickScan from "./pages/QuickScan";
 import LaunchSite from "./pages/LaunchSite";
+import Landing from "./pages/Landing";
+import Legal from "./pages/Legal";
 import {
   StorefrontHome,
   StorefrontProduct,
@@ -56,19 +58,34 @@ function ProtectedRoute({ children, adminOnly = false }) {
   return children;
 }
 
+function HomeRoute() {
+  // Public landing when not authed, Dashboard when authed
+  const { user } = useAuth();
+  if (user === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-neutral-500">Chargement...</div>
+      </div>
+    );
+  }
+  if (!user) return <Landing />;
+  return <Dashboard />;
+}
+
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          {/* Public platform pages — no auth required, crawlable by Google */}
+          <Route path="/mentions-legales" element={<Legal slug="mentions-legales" />} />
+          <Route path="/cgu" element={<Legal slug="cgu" />} />
+          <Route path="/confidentialite" element={<Legal slug="confidentialite" />} />
+          <Route path="/cookies" element={<Legal slug="cookies" />} />
           <Route
             path="/"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
+            element={<HomeRoute />}
           />
           <Route
             path="/sites"

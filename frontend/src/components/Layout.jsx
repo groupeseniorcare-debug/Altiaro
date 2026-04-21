@@ -4,6 +4,7 @@ import { useAuth } from "../lib/auth";
 import CommandPalette from "./CommandPalette";
 import CopilotFab from "./CopilotFab";
 import { List, X } from "@phosphor-icons/react";
+import { AltioraLogo } from "./AltioraLogo";
 import {
   House,
   SquaresFour,
@@ -85,11 +86,11 @@ export default function Layout({ children }) {
         <div className="px-5 py-5 border-b border-neutral-200">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-md bg-neutral-900 flex items-center justify-center">
-              <Rocket size={16} weight="fill" color="#FFFFFF" />
+              <AltioraLogo variant="icon-only" size={18} color="#FFFFFF" />
             </div>
             <div>
               <div className="font-semibold text-[15px] leading-tight text-neutral-900 tracking-tight">
-                Concept Factory
+                Altiora
               </div>
               <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-500 font-medium">
                 E-commerce Machine

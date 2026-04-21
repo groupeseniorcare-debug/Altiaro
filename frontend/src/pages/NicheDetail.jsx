@@ -75,7 +75,7 @@ export default function NicheDetail() {
     const params = new URLSearchParams({
       niche_slug: niche.slug,
       niche: niche.name,
-      name: `${niche.name} — Concept Factory`,
+      name: `${niche.name} — Altiora`,
     });
     navigate(`/sites/new?${params.toString()}`);
   };

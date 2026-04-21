@@ -1,7 +1,22 @@
-# Concept Factory — CHANGELOG
+# Altiora — CHANGELOG
 
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
+
+## 2026-04-21 · Sprint 23 : Rebrand "Altiora" + domaine + logo + pages publiques
+- **🏢 Nouveau nom de plateforme** : "Concept Factory" → **Altiora** (latin « plus haut »). 32 remplacements dans 20 fichiers code (frontend JSX + backend routes + HTML/SEO meta). Emails techniques `@conceptfactory.fr` conservés (credentials login).
+- **🌐 Domaine `altiora.com` acheté** via OVH direct (order #248781829, **7,99 € TTC** prélevés sur CB OVH par défaut). Bypass du flow Mollie puisque domaine platform-level.
+- **🎨 Logo Altiora** généré via Gemini Nano Banana (1024x1024 JPEG) + composant React `<AltioraLogo>` SVG vectoriel (horizontal / icon-only / wordmark-only variantes, 3 tailles) — crisp à toute taille sans dépendance image. Injecté dans sidebar cockpit + login + landing + footers légaux.
+- **🏗 Landing page publique `/`** (non-authed) : hero premium "La plateforme e-commerce des partenariats éclairés", KPI band (6 marchés, <2min scan, 50/50 marge, 0€ frais), section "Comment ça marche" en 4 steps, section "Partenariat 50/50" avec exemple concret de marge, section Trust (Mollie, SEO, RGPD), CTA "Demander un accès" contact@altiora.com, footer 4 colonnes.
+- **📜 4 pages légales publiques** (sous `/api/platform/legal/{slug}` non-authed, exposées via `/mentions-legales`, `/cgu`, `/confidentialite`, `/cookies`) :
+  - Mentions légales (éditeur, hébergement, PI, responsabilité, droit applicable)
+  - CGU (définitions, services, obligations, partage 50/50, résiliation)
+  - Politique de confidentialité RGPD complète (données, finalités, bases légales, durées, destinataires, droits, CNIL)
+  - Politique des cookies (strictement nécessaires / analytics / tiers)
+  - Templates dans `/app/backend/altiora_legal.py` — champs `XXX` à compléter par user (SIREN, adresse, RCS, n° TVA, directeur de publication)
+- **🤖 SEO** : `index.html` réécrit (title, description, Open Graph, Twitter Card, canonical, theme-color, favicon Altiora), `robots.txt` créé (allow public + disallow cockpit), `manifest.json` rebrand.
+- **🔐 `App.js` routes publiques** : `/` = Landing (non-authed) | Dashboard (authed) ; `/mentions-legales`, `/cgu`, `/confidentialite`, `/cookies` crawlables par Google/Mollie sans authentification.
+- **Tests** : smoke tests Playwright OK sur landing + 4 pages légales + login + dashboard. Aucune console error.
 
 ## 2026-04-21 · Sprint 22 : Nettoyage DB + checklist Merchant Center
 - **🧹 Table rase** du site démo Levio (`dbf77f87-d603-44d3-adfd-b44f596e138a`) à la demande du user : site + 3 produits + 2 commandes test + 50 steps + 1 domain record (pending OVH) + 68 quick_scans + 7 scan_groups supprimés de MongoDB. Assets Concepteur conservés : carte Mollie (mdt_ciGgZkbB5t Mastercard ••••0005), IBAN, infos société.

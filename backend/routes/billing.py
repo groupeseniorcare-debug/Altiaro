@@ -1,5 +1,5 @@
 """
-Billing module pour Concept Factory.
+Billing module pour Altiora.
 
 Gère :
 - Mandats CB (via Mollie "first payment" 0.01€ + sequenceType=first → mandate_id stocké)
@@ -91,7 +91,7 @@ async def billing_card_setup(request: Request, user: dict = Depends(get_current_
     try:
         payment = client.payments.create({
             "amount": {"currency": "EUR", "value": "0.01"},
-            "description": f"Autorisation CB Concept Factory — {user.get('email')}",
+            "description": f"Autorisation CB Altiora — {user.get('email')}",
             "customerId": customer_id,
             "sequenceType": "first",
             "method": "creditcard",
@@ -692,7 +692,7 @@ async def admin_payouts_sepa_xml(admin: dict = Depends(require_admin)):
         {"<CdtrAgt><FinInstnId><BIC>" + bic + "</BIC></FinInstnId></CdtrAgt>" if bic else ""}
         <Cdtr><Nm>{holder}</Nm></Cdtr>
         <CdtrAcct><Id><IBAN>{iban}</IBAN></Id></CdtrAcct>
-        <RmtInf><Ustrd>Concept Factory - Part Concepteur</Ustrd></RmtInf>
+        <RmtInf><Ustrd>Altiora - Part Concepteur</Ustrd></RmtInf>
       </CdtTrfTxInf>""".strip())
 
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -703,7 +703,7 @@ async def admin_payouts_sepa_xml(admin: dict = Depends(require_admin)):
       <CreDtTm>{now.isoformat()}</CreDtTm>
       <NbOfTxs>{len(payouts)}</NbOfTxs>
       <CtrlSum>{total:.2f}</CtrlSum>
-      <InitgPty><Nm>Concept Factory</Nm></InitgPty>
+      <InitgPty><Nm>Altiora</Nm></InitgPty>
     </GrpHdr>
     <PmtInf>
       <PmtInfId>{pmt_id}</PmtInfId>
@@ -711,7 +711,7 @@ async def admin_payouts_sepa_xml(admin: dict = Depends(require_admin)):
       <NbOfTxs>{len(payouts)}</NbOfTxs>
       <CtrlSum>{total:.2f}</CtrlSum>
       <ReqdExctnDt>{execution_date}</ReqdExctnDt>
-      <Dbtr><Nm>Concept Factory</Nm></Dbtr>
+      <Dbtr><Nm>Altiora</Nm></Dbtr>
       <DbtrAcct><Id><IBAN>FR0000000000000000000000000</IBAN></Id></DbtrAcct>
       <DbtrAgt><FinInstnId><BIC>BNPAFRPPXXX</BIC></FinInstnId></DbtrAgt>
       {''.join(tx_xml)}

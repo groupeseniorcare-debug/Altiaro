@@ -1,5 +1,5 @@
 """
-Google Ads Copy Generator pour Concept Factory.
+Google Ads Copy Generator pour Altiora.
 Le Concepteur sélectionne un pays + une langue, on génère :
 - 15 headlines (≤30 chars) prêts pour une Responsive Search Ad
 - 4 descriptions (≤90 chars)

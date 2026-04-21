@@ -136,7 +136,7 @@ export default function SiteDetail() {
   };
 
   const handleClearDomain = async () => {
-    if (!window.confirm("Supprimer le domaine custom et revenir sur l'URL Concept Factory ?")) return;
+    if (!window.confirm("Supprimer le domaine custom et revenir sur l'URL Altiora ?")) return;
     await apiCall(() => api.delete(`/sites/${id}/domain`));
     setDomainInput("");
     setDomainMsg(null);

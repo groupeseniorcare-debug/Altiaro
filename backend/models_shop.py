@@ -1,5 +1,5 @@
 """
-Catalogue produits & commandes pour Concept Factory.
+Catalogue produits & commandes pour Altiora.
 Séparé du server.py pour garder la modularité.
 """
 

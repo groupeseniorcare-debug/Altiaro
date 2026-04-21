@@ -248,7 +248,7 @@ async def build_order_confirmation_html(order: dict, site: dict) -> str:
 </table>
 
 <p style="color:#78716C;font-size:12px;line-height:1.6;margin:24px 0 0 0;">
-  Paiement opéré par Concept Factory SAS (France) pour le compte de {brand}.<br>
+  Paiement opéré par Altiora SAS (France) pour le compte de {brand}.<br>
   Cet email est envoyé à l'adresse indiquée lors du paiement. Si vous ne reconnaissez pas cette commande, contactez-nous immédiatement.
 </p>
 """
@@ -321,7 +321,7 @@ async def build_admin_new_order_html(order: dict, site: dict) -> str:
   50% de la marge sera virée au Concepteur lors du prochain virement (1er/15 du mois).
 </p>
 """
-    return _email_shell("Concept Factory Admin", "", primary, site_url, inner,
+    return _email_shell("Altiora Admin", "", primary, site_url, inner,
                         preheader=f"Nouvelle commande #{order_number} — {_eur(total)}")
 
 
@@ -372,7 +372,7 @@ async def _build_domain_email_html(*, domain: str, site: dict, title: str,
                                    intro: str, body_html: str,
                                    cta_label: str = "", cta_url: str = "",
                                    preheader: str = "") -> str:
-    brand = site.get("name") or "Concept Factory"
+    brand = site.get("name") or "Altiora"
     design = site.get("design") or {}
     logo = (design.get("brand") or {}).get("logo_url") or ""
     primary = (design.get("brand") or {}).get("primary_color") or "#2563EB"
@@ -399,7 +399,7 @@ async def _build_domain_email_html(*, domain: str, site: dict, title: str,
 {cta_block}
 
 <p style="color:#A8A29E;font-size:11px;line-height:1.6;margin:32px 0 0 0;">
-  Concept Factory facture et gère pour toi l'achat chez OVH. Renouvellement automatique chaque année au même prix.
+  Altiora facture et gère pour toi l'achat chez OVH. Renouvellement automatique chaque année au même prix.
 </p>
 """
     return _email_shell(brand, logo, primary, site_url, inner, preheader=preheader)
@@ -417,7 +417,7 @@ async def send_domain_purchased(domain_record: dict, site: dict, user: dict) -> 
 <div style="background:#D1FAE5;border:1px solid #A7F3D0;border-radius:8px;padding:14px 16px;margin:16px 0;">
   <div style="font-size:13px;color:#065F46;line-height:1.5;">
     ✅ <strong>Paiement confirmé</strong> — {_eur(price)} facturés via Mollie.<br>
-    ✅ <strong>Achat OVH</strong> effectué sous ton compte Concept Factory.<br>
+    ✅ <strong>Achat OVH</strong> effectué sous ton compte Altiora.<br>
     ⏳ <strong>DNS</strong> : la zone se crée chez OVH dans 5 à 15 minutes. Dès qu'elle est prête, clique sur <em>"Configurer DNS"</em> depuis la console et ton site <strong>{site.get('name','')}</strong> sera en ligne sur <strong>{domain}</strong>.
   </div>
 </div>
@@ -458,7 +458,7 @@ async def send_domain_purchase_failed(domain_record: dict, site: dict, user: dic
   </div>
 </div>
 <p style="color:#57534E;font-size:14px;line-height:1.6;margin:16px 0;">
-  <strong>Pas de panique</strong> : on a tout loggé, ton paiement est sécurisé. L'équipe Concept Factory va :
+  <strong>Pas de panique</strong> : on a tout loggé, ton paiement est sécurisé. L'équipe Altiora va :
 </p>
 <ol style="color:#57534E;font-size:14px;line-height:1.8;padding-left:20px;margin:0 0 16px 0;">
   <li>Relancer manuellement l'achat OVH dans les 24 h,</li>

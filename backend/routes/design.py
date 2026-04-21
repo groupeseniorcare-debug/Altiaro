@@ -518,7 +518,7 @@ DEFAULT_PROMPTS = {
                     "(jamais feature). Ton premium mais accessible. USPs spécifiques à "
                     "cette niche. Voix de marque : 3-4 adjectifs cohérents."),
     "identity": ("Propose un NOUVEAU nom de marque unique, prononçable, mémorable "
-                 "(pas 'Concept Factory'), un tagline bénéfice <60 chars, et une "
+                 "(pas 'Altiora'), un tagline bénéfice <60 chars, et une "
                  "brand story en 2-3 phrases."),
     "hero": ("Rédige le hero homepage, style Apple/Dyson : headline punchy bénéfice "
              "principal, subtitle explicative, CTA action courte, trust line."),

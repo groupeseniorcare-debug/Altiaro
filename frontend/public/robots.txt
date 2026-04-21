@@ -1,0 +1,25 @@
+User-agent: *
+Allow: /
+
+# Public platform pages
+Allow: /mentions-legales
+Allow: /cgu
+Allow: /confidentialite
+Allow: /cookies
+
+# Storefronts of Concepteur sites
+Allow: /shop/
+
+# Disallow protected cockpit routes
+Disallow: /sites
+Disallow: /finances
+Disallow: /billing
+Disallow: /users
+Disallow: /admin/
+Disallow: /validations
+Disallow: /ads
+Disallow: /niches
+Disallow: /domains
+Disallow: /empire
+
+Sitemap: https://altiora.com/sitemap.xml

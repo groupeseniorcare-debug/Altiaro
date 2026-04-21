@@ -1,4 +1,4 @@
-"""TVA & marges bruttes pour Concept Factory.
+"""TVA & marges bruttes pour Altiora.
 
 Règle unique : le prix de vente produit est TTC (ce que le client paye).
 Le prix d'achat fournisseur est HT (déclaré par le Concepteur).

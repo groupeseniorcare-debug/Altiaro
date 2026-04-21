@@ -1,5 +1,5 @@
 """
-Mollie payments for Concept Factory storefront.
+Mollie payments for Altiora storefront.
 Flow :
   1. Frontend calls POST /api/public/payments/create with order_id → on crée un paiement Mollie et on renvoie checkout_url.
   2. Client paie sur Mollie → redirigé sur /shop/{site_id}/checkout/success?order={order_number}

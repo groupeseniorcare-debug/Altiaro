@@ -149,7 +149,7 @@ Vous pouvez gérer vos préférences à tout moment depuis le bandeau cookies.
 
 
 DEFAULT_LEGAL_VARS = {
-    "raison_sociale": "Concept Factory SAS",
+    "raison_sociale": "Altiora SAS",
     "siren": "[À COMPLÉTER]",
     "tva_intracom": "[À COMPLÉTER]",
     "adresse": "[À COMPLÉTER]",
