@@ -3,6 +3,22 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 34 : Correction stratégique — politique Altiaro centralisée (non modifiable par Concepteur)
+- **Suppression du backend `settings.py`** : j'avais initialement donné aux Concepteurs la possibilité de modifier TVA/livraison/paiement par site, ce qui était une erreur stratégique (Altiaro doit garantir la cohérence entre tous les sites).
+- **Nouveau module `backend/platform_policy.py`** : dict `PLATFORM_POLICY` central qui définit UNE FOIS pour toutes les 7 marchés Altiaro :
+  - `taxes` : régime OSS UE + taux TVA appliqués auto selon pays livraison (FR 20% / BE 21% / LU 17% / DE 19% / NL 21% / CH 0% / UK 20%)
+  - `shipping` : **livraison offerte** partout (frais absorbés par la marge plateforme) + ETA par pays
+  - `payment` : stack Mollie unique (CB/Bancontact/iDEAL/Apple Pay/Google Pay/PayPal) + virement B2B auto >= 500€
+  - `returns` : rétractation 14j + frais retour pris en charge par Altiaro
+  - `warranty` : garantie légale 2 ans incluse
+  - `customer_service` : SLA 2h ouvrées, 9h-18h Lun-Ven
+- **2 endpoints publics** dans `routes/platform.py` :
+  - `GET /api/platform/policy` — visible par Concepteurs (lecture seule)
+  - `GET /api/platform/public/policy` — subset exposé aux storefronts (FAQ, footer, checkout)
+- **Page `/sites/:id/policy`** entièrement refondue : affichage **lecture seule** avec badges "Non modifiable" sur chaque bloc (TVA / Livraison / Paiement / Retour / Garantie / Service client). Bouton cockpit renommé "Paramètres" → "Politique plateforme". Icône 🔒 cadenas en titre + message "Rien à configurer de ton côté".
+- **Migration** : suppression de `sites.settings` sur les sites existants (`update_many unset`).
+
+
 ## 2026-04-21 · Sprint 33 : 3 features natives ajoutées au template (paramétrage + comptes clients + recherche)
 - **Paramétrage admin** (`/sites/:id/settings`) : nouvelle page 4 onglets pour la config business du site, accessible via bouton "Paramètres" dans le cockpit.
   - **Taxes** : régime (franchise / TVA standard / OSS) + taux TVA éditables par pays (FR/BE/LU/DE/NL/CH/UK) + IOSS toggle

@@ -3,6 +3,7 @@ No auth required — crawlable by Google, Mollie reviewers, etc."""
 
 from fastapi import APIRouter, HTTPException
 from altiaro_legal import get_legal_page
+from platform_policy import get_platform_policy
 
 router = APIRouter(prefix="/platform", tags=["platform"])
 
@@ -35,3 +36,30 @@ async def platform_info():
         "founded": 2026,
         "markets": ["FR", "DE", "BL", "NL", "CH", "UK"],
     }
+
+
+@router.get("/policy")
+async def platform_policy_admin():
+    """Politique plateforme Altiaro exposée aux Concepteurs (lecture seule)."""
+    return get_platform_policy()
+
+
+@router.get("/public/policy")
+async def platform_policy_public():
+    """Subset de la politique exposé sur tous les storefronts (FAQ, checkout, footer)."""
+    p = get_platform_policy()
+    return {
+        "shipping": {
+            "label": p["shipping"]["label"],
+            "covered_countries": p["shipping"]["covered_countries"],
+            "delivery_estimate": p["shipping"]["delivery_estimate"],
+        },
+        "payment": {
+            "provider": p["payment"]["provider"],
+            "methods_enabled": p["payment"]["methods_enabled"],
+        },
+        "returns": {"label": p["returns"]["label"]},
+        "warranty": {"label": p["warranty"]["label"], "years": p["warranty"]["years"]},
+        "customer_service": p["customer_service"],
+    }
+

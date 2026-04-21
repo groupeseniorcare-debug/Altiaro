@@ -327,11 +327,11 @@ export default function SiteDetail() {
                   )}
                 </button>
                 <button
-                  onClick={() => navigate(`/sites/${id}/settings`)}
+                  onClick={() => navigate(`/sites/${id}/policy`)}
                   data-testid="nav-settings"
                   className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
                 >
-                  <Gear size={16} weight="duotone" /> Paramètres
+                  <Gear size={16} weight="duotone" /> Politique plateforme
                 </button>
                 <button
                   onClick={() => {

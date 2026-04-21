@@ -174,7 +174,7 @@ function App() {
             }
           />
           <Route
-            path="/sites/:id/settings"
+            path="/sites/:id/policy"
             element={
               <ProtectedRoute>
                 <SiteSettings />
