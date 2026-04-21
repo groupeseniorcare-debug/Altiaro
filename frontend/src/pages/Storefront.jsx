@@ -11,10 +11,15 @@ import {
   cartTotals,
   clearCart,
 } from "../lib/cart";
-import { ArrowRight, CheckCircle, Trash, ShoppingBagOpen, Sparkle, ShieldCheck } from "@phosphor-icons/react";
+import { ArrowRight, CheckCircle, Trash, ShoppingBagOpen, Sparkle, ShieldCheck, Truck, Clock, Heart, Star, Leaf, Package, Headset } from "@phosphor-icons/react";
 import SEOHead from "../components/SEOHead";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+
+// Icon name (from Prompt Studio schema) → Phosphor component
+const BENEFIT_ICON = {
+  ShieldCheck, Truck, Clock, Heart, Star, Leaf, Package, Headset,
+};
 
 // Map selected_countries → storefront langs for hreflang
 const LANG_BY_COUNTRY = {
@@ -150,57 +155,100 @@ export function StorefrontHome() {
         langs={buildHreflangs(site, "")}
         schema={[orgSchema, websiteSchema].filter(Boolean)}
       />
-      <section className="max-w-6xl mx-auto px-6 pt-12 pb-6">
-        <div className="max-w-2xl">
-          <div className="text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2" style={{ color: primary }}>
-            <Sparkle size={12} weight="fill" /> {site?.niche_data?.category || t(lang, "featured")}
-          </div>
+
+      {/* ====== HERO — Apple/Dyson: huge type, whitespace, 1 CTA ====== */}
+      <section
+        className="relative overflow-hidden"
+        style={{
+          background: design?.brand?.background_color || "#FDFBF7",
+          color: design?.brand?.text_color || "#1C1917",
+        }}
+      >
+        <div className="max-w-6xl mx-auto px-6 md:px-10 pt-20 md:pt-28 pb-16 md:pb-24 text-center">
+          {(design?.brand?.tagline || site?.niche) && (
+            <div
+              className="text-[11px] uppercase tracking-[0.25em] mb-6 font-medium"
+              style={{ color: primary }}
+            >
+              {design?.brand?.tagline || site?.niche}
+            </div>
+          )}
           <h1
-            className="text-4xl md:text-5xl font-semibold leading-[1.05]"
-            style={{ fontFamily: `"${fontHeading}", serif` }}
+            className="text-[40px] md:text-[64px] lg:text-[80px] font-semibold leading-[1.02] tracking-[-0.02em] max-w-4xl mx-auto"
+            style={{ fontFamily: `"${fontHeading}", Georgia, serif` }}
           >
             {heroTitle}
           </h1>
-          <p className="text-[17px] mt-3" style={{ color: "#57534E" }}>{heroSub}</p>
-          {heroTrust && (
-            <div className="text-sm mt-3 flex items-center gap-1.5" style={{ color: "#78716C" }}>
-              <ShieldCheck size={14} /> {heroTrust}
-            </div>
+          {heroSub && (
+            <p
+              className="text-lg md:text-xl mt-6 max-w-2xl mx-auto leading-relaxed"
+              style={{ color: design?.brand?.text_color ? `${design.brand.text_color}cc` : "#57534E" }}
+            >
+              {heroSub}
+            </p>
           )}
-          {heroCta && (
+          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
             <a
               href="#products"
-              className="inline-flex items-center gap-2 mt-6 h-12 px-6 rounded-full text-white font-medium transition hover:opacity-90"
+              data-testid="hero-cta"
+              className="inline-flex items-center gap-2 h-14 px-8 rounded-full text-white font-medium transition-all hover:opacity-90 active:scale-[0.98] text-[15px]"
               style={{ background: primary }}
             >
-              {heroCta} <ArrowRight size={16} />
+              {heroCta || t(lang, "shop_now") || "Découvrir la collection"}
+              <ArrowRight size={16} weight="bold" />
             </a>
-          )}
+            {heroTrust && (
+              <div
+                className="inline-flex items-center gap-1.5 text-sm"
+                style={{ color: design?.brand?.text_color ? `${design.brand.text_color}99` : "#78716C" }}
+              >
+                <ShieldCheck size={14} weight="fill" /> {heroTrust}
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Decorative: gradient fade bottom */}
+        <div
+          className="absolute inset-x-0 bottom-0 h-32 pointer-events-none"
+          style={{ background: `linear-gradient(to bottom, transparent, ${design?.brand?.background_color || "#FDFBF7"})` }}
+        />
       </section>
 
-      {/* Benefits */}
-      {design?.benefits?.length > 0 && (
-        <section className="max-w-6xl mx-auto px-6 py-10">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {design.benefits.map((b, i) => {
-              const title = b.title?.[lang] || b.title?.fr || "";
-              const desc = b.desc?.[lang] || b.desc?.fr || "";
+      {/* ====== BENEFITS — Dyson-style clean cards, big icon ====== */}
+      {(design?.benefits?.items?.length > 0 || design?.benefits?.length > 0) && (
+        <section className="max-w-6xl mx-auto px-6 md:px-10 py-16 md:py-24">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {(design.benefits.items || design.benefits).map((b, i) => {
+              // New schema (Prompt Studio) vs old
+              const title = typeof b.title === "string"
+                ? b.title
+                : (b.title?.[lang] || b.title?.fr || "");
+              const desc = typeof b.description === "string"
+                ? b.description
+                : (b.desc?.[lang] || b.desc?.fr || b.description?.[lang] || "");
+              const Icon = BENEFIT_ICON[b.icon] || ShieldCheck;
               return (
                 <div
                   key={i}
-                  className="bg-white rounded-2xl border p-5"
-                  style={{ borderColor: "#E7E5E4" }}
+                  className="text-center"
                   data-testid={`benefit-${i}`}
                 >
                   <div
-                    className="w-10 h-10 rounded-lg flex items-center justify-center mb-3"
-                    style={{ background: `${primary}18`, color: primary }}
+                    className="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-5"
+                    style={{ background: `${primary}14`, color: primary }}
                   >
-                    <ShieldCheck size={20} weight="fill" />
+                    <Icon size={28} weight="duotone" />
                   </div>
-                  <div className="font-semibold" style={{ fontFamily: `"${fontHeading}", serif` }}>{title}</div>
-                  <div className="text-sm mt-1" style={{ color: "#78716C" }}>{desc}</div>
+                  <div
+                    className="font-semibold text-lg mb-2"
+                    style={{ fontFamily: `"${fontHeading}", serif` }}
+                  >
+                    {title}
+                  </div>
+                  <div className="text-sm leading-relaxed" style={{ color: "#78716C" }}>
+                    {desc}
+                  </div>
                 </div>
               );
             })}
@@ -208,31 +256,41 @@ export function StorefrontHome() {
         </section>
       )}
 
-      <section id="products" className="max-w-6xl mx-auto px-6 pb-16">
+      {/* ====== PRODUCTS GRID — Dyson-style clean minimal cards ====== */}
+      <section id="products" className="max-w-6xl mx-auto px-6 md:px-10 pb-24">
+        <div className="flex items-baseline justify-between mb-10">
+          <h2
+            className="text-3xl md:text-4xl font-semibold tracking-tight"
+            style={{ fontFamily: `"${fontHeading}", serif` }}
+          >
+            {t(lang, "our_collection") || "Notre sélection"}
+          </h2>
+          <div className="text-sm text-[#78716C]">
+            {products.length} {products.length > 1 ? "produits" : "produit"}
+          </div>
+        </div>
+
         {loading ? (
           <div className="py-20 text-center text-[#78716C]">…</div>
         ) : products.length === 0 ? (
-          <div className="py-20 text-center text-[#78716C] bg-white rounded-2xl border border-[#E7E5E4]">
-            {t(lang, "no_products")}
+          <div className="py-20 text-center text-[#78716C] bg-white rounded-2xl border border-dashed border-[#E7E5E4]">
+            {t(lang, "no_products") || "Bientôt en ligne"}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="products-grid">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8" data-testid="products-grid">
             {products.map((p) => (
               <Link
                 key={p.id}
                 to={`/shop/${siteId}/product/${p.id}`}
                 data-testid={`product-card-${p.id}`}
-                className="group bg-white rounded-2xl border overflow-hidden hover:shadow-lg transition-all duration-300"
-                style={{ borderColor: "#E7E5E4" }}
-                onMouseEnter={(e) => (e.currentTarget.style.borderColor = primary)}
-                onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#E7E5E4")}
+                className="group block"
               >
-                <div className="aspect-square bg-[#F5F2EB] overflow-hidden relative">
+                <div className="aspect-square bg-[#F5F2EB] rounded-2xl overflow-hidden relative mb-4">
                   {p.images?.[0] ? (
                     <img
                       src={p.images[0]}
                       alt={pickLang(p.name, lang)}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700 ease-out"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-[#D6D3D1]">
@@ -241,24 +299,26 @@ export function StorefrontHome() {
                   )}
                   {p.featured && (
                     <div
-                      className="absolute top-3 left-3 text-white text-[10px] uppercase tracking-widest font-semibold px-2.5 py-1 rounded-full"
-                      style={{ background: primary }}
+                      className="absolute top-4 left-4 text-white text-[10px] uppercase tracking-widest font-semibold px-3 py-1.5 rounded-full backdrop-blur-sm"
+                      style={{ background: `${primary}dd` }}
                     >
-                      ★ {t(lang, "featured")}
+                      ★ {t(lang, "featured") || "Best-seller"}
                     </div>
                   )}
                 </div>
-                <div className="p-5">
+                <div>
                   <div
-                    className="text-lg font-semibold transition"
+                    className="text-lg font-semibold leading-tight mb-1 group-hover:opacity-70 transition"
                     style={{ fontFamily: `"${fontHeading}", serif` }}
                   >
                     {pickLang(p.name, lang)}
                   </div>
                   <div className="flex items-baseline gap-2 mt-2">
-                    <span className="text-xl font-semibold">{formatPrice(p.price, p.currency, lang)}</span>
+                    <span className="text-xl font-semibold" style={{ color: primary }}>
+                      {formatPrice(p.price, p.currency, lang)}
+                    </span>
                     {p.compare_at_price && (
-                      <span className="text-sm line-through text-[#78716C]">
+                      <span className="text-sm line-through text-[#A8A29E]">
                         {formatPrice(p.compare_at_price, p.currency, lang)}
                       </span>
                     )}
@@ -270,70 +330,129 @@ export function StorefrontHome() {
         )}
       </section>
 
-      {/* Testimonials */}
-      {design?.testimonials?.length > 0 && (
-        <section className="max-w-6xl mx-auto px-6 pb-16">
-          <h2
-            className="text-2xl font-semibold mb-6"
-            style={{ fontFamily: `"${fontHeading}", serif` }}
-          >
-            Ils nous font confiance
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {design.testimonials.slice(0, 3).map((tt, i) => {
-              const quote = tt.quote?.[lang] || tt.quote?.fr || "";
-              return (
-                <div
-                  key={i}
-                  className="bg-white rounded-2xl border p-5"
-                  style={{ borderColor: "#E7E5E4" }}
-                  data-testid={`testimonial-${i}`}
-                >
-                  <div className="flex gap-1 mb-2" style={{ color: primary }}>
-                    {"★".repeat(tt.rating || 5)}
+      {/* ====== TESTIMONIALS ====== */}
+      {(design?.testimonials?.items?.length > 0 || design?.testimonials?.length > 0) && (
+        <section
+          className="py-20 md:py-28"
+          style={{ background: `${primary}08` }}
+        >
+          <div className="max-w-6xl mx-auto px-6 md:px-10">
+            <div className="text-center mb-12">
+              <div
+                className="text-[11px] uppercase tracking-[0.25em] mb-3 font-medium"
+                style={{ color: primary }}
+              >
+                Avis clients
+              </div>
+              <h2
+                className="text-3xl md:text-4xl font-semibold"
+                style={{ fontFamily: `"${fontHeading}", serif` }}
+              >
+                Ils en parlent mieux que nous
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {(design.testimonials.items || design.testimonials).slice(0, 6).map((tt, i) => {
+                const text = typeof tt.text === "string"
+                  ? tt.text
+                  : (tt.quote?.[lang] || tt.quote?.fr || "");
+                const loc = tt.location || tt.city || "";
+                const rating = tt.rating || 5;
+                return (
+                  <div
+                    key={i}
+                    className="bg-white rounded-2xl p-6 md:p-8 border border-[#E7E5E4]"
+                    data-testid={`testimonial-${i}`}
+                  >
+                    <div className="flex gap-0.5 mb-4" style={{ color: primary }}>
+                      {Array.from({ length: rating }).map((_, j) => (
+                        <Star key={j} size={16} weight="fill" />
+                      ))}
+                    </div>
+                    <p className="text-[15px] leading-relaxed mb-5" style={{ color: "#44403C" }}>
+                      "{text}"
+                    </p>
+                    <div className="text-sm font-medium text-[#1C1917]">{tt.name}</div>
+                    {loc && <div className="text-xs text-[#78716C]">{loc}</div>}
                   </div>
-                  <p className="text-[15px] italic" style={{ color: "#44403C" }}>« {quote} »</p>
-                  <div className="text-xs mt-3" style={{ color: "#78716C" }}>
-                    — {tt.name}, {tt.age} ans, {tt.city}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </section>
       )}
 
-      {/* FAQ */}
-      {design?.faq?.length > 0 && (
-        <section className="max-w-3xl mx-auto px-6 pb-20">
-          <h2
-            className="text-2xl font-semibold mb-6"
-            style={{ fontFamily: `"${fontHeading}", serif` }}
-          >
-            Questions fréquentes
-          </h2>
-          <div className="space-y-2">
-            {design.faq.map((it, i) => {
-              const q = it.q?.[lang] || it.q?.fr;
-              const a = it.a?.[lang] || it.a?.fr;
+      {/* ====== FAQ ====== */}
+      {(design?.faq?.items?.length > 0 || design?.faq?.length > 0) && (
+        <section className="max-w-3xl mx-auto px-6 md:px-10 py-20 md:py-28">
+          <div className="text-center mb-12">
+            <div
+              className="text-[11px] uppercase tracking-[0.25em] mb-3 font-medium"
+              style={{ color: primary }}
+            >
+              FAQ
+            </div>
+            <h2
+              className="text-3xl md:text-4xl font-semibold"
+              style={{ fontFamily: `"${fontHeading}", serif` }}
+            >
+              Questions fréquentes
+            </h2>
+          </div>
+          <div className="space-y-3">
+            {(design.faq.items || design.faq).map((it, i) => {
+              const q = typeof it.question === "string"
+                ? it.question
+                : (it.q?.[lang] || it.q?.fr || "");
+              const a = typeof it.answer === "string"
+                ? it.answer
+                : (it.a?.[lang] || it.a?.fr || "");
               return (
                 <details
                   key={i}
-                  className="bg-white rounded-xl border p-4 group"
-                  style={{ borderColor: "#E7E5E4" }}
+                  className="bg-white rounded-xl border border-[#E7E5E4] p-5 group hover:border-[#D6D3D1] transition"
                   data-testid={`faq-${i}`}
                 >
-                  <summary className="cursor-pointer font-medium list-none flex items-center justify-between">
-                    <span>{q}</span>
-                    <span className="text-xs opacity-50 group-open:rotate-180 transition">▼</span>
+                  <summary className="cursor-pointer font-medium list-none flex items-center justify-between text-[#1C1917]">
+                    <span className="pr-4">{q}</span>
+                    <span
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-xs group-open:rotate-45 transition-transform shrink-0"
+                      style={{ background: `${primary}14`, color: primary }}
+                    >
+                      +
+                    </span>
                   </summary>
-                  <p className="text-sm mt-3" style={{ color: "#57534E" }}>{a}</p>
+                  <p className="text-[15px] mt-4 leading-relaxed" style={{ color: "#57534E" }}>
+                    {a}
+                  </p>
                 </details>
               );
             })}
           </div>
         </section>
       )}
+
+      {/* ====== FINAL CTA ====== */}
+      <section
+        className="py-20 md:py-28 text-center"
+        style={{ background: primary, color: "#ffffff" }}
+      >
+        <div className="max-w-3xl mx-auto px-6">
+          <h2
+            className="text-3xl md:text-5xl font-semibold mb-6"
+            style={{ fontFamily: `"${fontHeading}", serif` }}
+          >
+            {design?.brand?.tagline || heroTitle}
+          </h2>
+          <a
+            href="#products"
+            className="inline-flex items-center gap-2 h-14 px-8 rounded-full bg-white font-medium transition-all hover:scale-[1.02] active:scale-[0.98] text-[15px]"
+            style={{ color: primary }}
+          >
+            {heroCta || "Découvrir la collection"} <ArrowRight size={16} weight="bold" />
+          </a>
+        </div>
+      </section>
     </StorefrontLayout>
   );
 }
@@ -349,6 +468,8 @@ export function StorefrontProduct() {
   const [loading, setLoading] = useState(true);
   const [added, setAdded] = useState(false);
   const [qty, setQty] = useState(1);
+
+  const { primary, fontHeading } = designAccents(design);
 
   useEffect(() => {
     axios
@@ -420,40 +541,68 @@ export function StorefrontProduct() {
           },
         }}
       />
-      <div className="max-w-6xl mx-auto px-6 py-8 md:py-12">
+      <div className="max-w-7xl mx-auto px-6 md:px-10 py-6 md:py-10">
         <button
           onClick={() => navigate(`/shop/${siteId}`)}
-          className="text-sm text-[#78716C] hover:text-[#1C1917] mb-6"
+          className="text-sm text-[#78716C] hover:text-[#1C1917] mb-6 inline-flex items-center gap-1"
           data-testid="back-to-shop"
         >
           ← {t(lang, "back_to_shop")}
         </button>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16">
-          <div className="aspect-square bg-white rounded-2xl overflow-hidden border border-[#E7E5E4]">
-            {p.images?.[0] ? (
-              <img
-                src={p.images[0]}
-                alt={pickLang(p.name, lang)}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-[#D6D3D1]">
-                <ShoppingBagOpen size={80} weight="thin" />
+        {/* ====== HERO PRODUCT (Apple-style split) ====== */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-20 mb-16 md:mb-24 items-start">
+          {/* Gallery */}
+          <div className="sticky top-24">
+            <div className="aspect-square bg-[#F5F2EB] rounded-2xl overflow-hidden mb-3">
+              {p.images?.[0] ? (
+                <img
+                  src={p.images[0]}
+                  alt={pickLang(p.name, lang)}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-[#D6D3D1]">
+                  <ShoppingBagOpen size={80} weight="thin" />
+                </div>
+              )}
+            </div>
+            {p.images?.length > 1 && (
+              <div className="grid grid-cols-4 gap-2">
+                {p.images.slice(0, 4).map((img, i) => (
+                  <div key={i} className="aspect-square bg-[#F5F2EB] rounded-lg overflow-hidden">
+                    <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  </div>
+                ))}
               </div>
             )}
           </div>
 
-          <div>
+          {/* Buy panel */}
+          <div className="md:pt-4">
+            {p.narrative?.headline && (
+              <div
+                className="text-[11px] uppercase tracking-[0.25em] mb-3 font-medium"
+                style={{ color: primary }}
+              >
+                {site?.name}
+              </div>
+            )}
             <h1
-              className="font-heading text-3xl md:text-4xl font-semibold text-[#1C1917] leading-tight"
+              className="text-3xl md:text-5xl font-semibold text-[#1C1917] leading-[1.05] tracking-tight"
+              style={{ fontFamily: `"${fontHeading}", Georgia, serif` }}
               data-testid="product-name"
             >
-              {pickLang(p.name, lang)}
+              {p.narrative?.headline || pickLang(p.name, lang)}
             </h1>
+            {p.narrative?.subheadline && (
+              <p className="text-lg mt-4 leading-relaxed text-[#57534E]">
+                {p.narrative.subheadline}
+              </p>
+            )}
 
-            <div className="flex items-baseline gap-3 mt-4" data-testid="product-price">
-              <span className="text-3xl font-semibold text-[#1C1917]">
+            <div className="flex items-baseline gap-3 mt-8" data-testid="product-price">
+              <span className="text-3xl md:text-4xl font-semibold" style={{ color: primary }}>
                 {formatPrice(p.price, p.currency, lang)}
               </span>
               {p.compare_at_price && p.compare_at_price > p.price && (
@@ -463,18 +612,12 @@ export function StorefrontProduct() {
               )}
             </div>
 
-            {pickLang(p.description, lang) && (
-              <p className="text-[16px] leading-relaxed text-[#57534E] mt-6 whitespace-pre-line">
-                {pickLang(p.description, lang)}
-              </p>
-            )}
-
             <div className="mt-8 flex items-center gap-4">
               <div className="flex items-center border border-[#E7E5E4] rounded-full overflow-hidden bg-white">
                 <button
                   onClick={() => setQty(Math.max(1, qty - 1))}
                   data-testid="qty-minus"
-                  className="w-11 h-11 hover:bg-[#FDFBF7] text-[#1C1917]"
+                  className="w-12 h-12 hover:bg-[#FDFBF7] text-[#1C1917]"
                 >
                   −
                 </button>
@@ -482,7 +625,7 @@ export function StorefrontProduct() {
                 <button
                   onClick={() => setQty(qty + 1)}
                   data-testid="qty-plus"
-                  className="w-11 h-11 hover:bg-[#FDFBF7] text-[#1C1917]"
+                  className="w-12 h-12 hover:bg-[#FDFBF7] text-[#1C1917]"
                 >
                   +
                 </button>
@@ -491,37 +634,161 @@ export function StorefrontProduct() {
               <button
                 onClick={handleAdd}
                 data-testid="add-to-cart"
-                className={`flex-1 h-12 rounded-full font-medium text-[15px] transition-all duration-200 active:scale-[0.98] ${
-                  added
-                    ? "bg-[#047857] text-white"
-                    : "bg-[#B84B31] hover:bg-[#993D26] text-white"
-                }`}
+                className={`flex-1 h-12 rounded-full font-medium text-[15px] transition-all duration-200 active:scale-[0.98] text-white`}
+                style={{ background: added ? "#047857" : primary }}
               >
                 {added ? (
                   <span className="flex items-center justify-center gap-2">
                     <CheckCircle size={18} weight="fill" /> {t(lang, "added_to_cart")}
                   </span>
                 ) : (
-                  t(lang, "add_to_cart")
+                  t(lang, "add_to_cart") || "Ajouter au panier"
                 )}
               </button>
             </div>
 
-            <div className="mt-8 space-y-2 text-sm text-[#57534E]">
-              <div className="flex items-center gap-2">
-                <ShieldCheck size={16} weight="bold" className="text-[#B84B31]" />{" "}
-                {t(lang, "secure_checkout")}
+            <div className="mt-8 grid grid-cols-2 gap-3 text-sm">
+              <div className="bg-[#FAF7F2] rounded-xl p-3 flex items-center gap-2">
+                <ShieldCheck size={16} weight="fill" style={{ color: primary }} />
+                <span className="text-[#57534E]">{t(lang, "secure_checkout") || "Paiement sécurisé"}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle size={16} weight="bold" className="text-[#B84B31]" />{" "}
-                {t(lang, "free_shipping_above")}
+              <div className="bg-[#FAF7F2] rounded-xl p-3 flex items-center gap-2">
+                <Truck size={16} weight="fill" style={{ color: primary }} />
+                <span className="text-[#57534E]">{t(lang, "free_shipping_above") || "Livraison offerte"}</span>
               </div>
             </div>
+
+            {/* Fallback description if no narrative */}
+            {!p.narrative && pickLang(p.description, lang) && (
+              <p className="text-[15px] leading-relaxed text-[#57534E] mt-8 whitespace-pre-line">
+                {pickLang(p.description, lang)}
+              </p>
+            )}
           </div>
         </div>
+
+        {/* ====== NARRATIVE SECTIONS (Apple-style long scroll) ====== */}
+        {p.narrative?.sections?.length > 0 && (
+          <div className="space-y-16 md:space-y-24 mb-20">
+            {p.narrative.sections.map((s, i) => (
+              <section
+                key={i}
+                data-testid={`product-section-${i}`}
+                className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12 items-start"
+              >
+                <div className="md:col-span-5">
+                  <div
+                    className="text-[11px] uppercase tracking-[0.25em] mb-3 font-medium"
+                    style={{ color: primary }}
+                  >
+                    {String(i + 1).padStart(2, "0")} · Section
+                  </div>
+                  <h2
+                    className="text-2xl md:text-3xl font-semibold leading-tight"
+                    style={{ fontFamily: `"${fontHeading}", serif` }}
+                  >
+                    {s.title}
+                  </h2>
+                </div>
+                <div className="md:col-span-7">
+                  <p className="text-[16px] md:text-[17px] leading-relaxed text-[#44403C]">
+                    {s.body}
+                  </p>
+                  {s.bullet_points?.length > 0 && (
+                    <ul className="mt-6 space-y-3">
+                      {s.bullet_points.map((bp, j) => (
+                        <li key={j} className="flex items-start gap-3 text-[15px] text-[#57534E]">
+                          <CheckCircle size={18} weight="fill" className="shrink-0 mt-0.5" style={{ color: primary }} />
+                          <span>{bp}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+
+        {/* ====== TECH SPECS ====== */}
+        {p.narrative?.tech_specs?.length > 0 && (
+          <section className="mb-20 bg-[#FAF7F2] rounded-3xl p-8 md:p-12">
+            <h2
+              className="text-2xl md:text-3xl font-semibold mb-8"
+              style={{ fontFamily: `"${fontHeading}", serif` }}
+            >
+              Caractéristiques techniques
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+              {p.narrative.tech_specs.map((t, i) => (
+                <div key={i} className="flex items-baseline justify-between border-b border-[#E7E5E4] pb-3">
+                  <span className="text-sm text-[#78716C]">{t.label}</span>
+                  <span className="text-sm font-medium text-[#1C1917] text-right">{t.value}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ====== PRODUCT FAQ ====== */}
+        {p.narrative?.faq?.length > 0 && (
+          <section className="mb-20">
+            <h2
+              className="text-2xl md:text-3xl font-semibold mb-8"
+              style={{ fontFamily: `"${fontHeading}", serif` }}
+            >
+              Questions sur ce produit
+            </h2>
+            <div className="space-y-3 max-w-3xl">
+              {p.narrative.faq.map((it, i) => (
+                <details
+                  key={i}
+                  data-testid={`product-faq-${i}`}
+                  className="bg-white rounded-xl border border-[#E7E5E4] p-5 group"
+                >
+                  <summary className="cursor-pointer font-medium list-none flex items-center justify-between text-[#1C1917]">
+                    <span className="pr-4">{it.question}</span>
+                    <span
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-xs group-open:rotate-45 transition-transform shrink-0"
+                      style={{ background: `${primary}14`, color: primary }}
+                    >
+                      +
+                    </span>
+                  </summary>
+                  <p className="text-[15px] mt-4 leading-relaxed text-[#57534E]">{it.answer}</p>
+                </details>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+
+      {/* Sticky mobile CTA */}
+      <div className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-[#E7E5E4] p-3 flex items-center gap-3 z-40">
+        <div className="flex-1">
+          <div className="text-xs text-[#78716C]">{pickLang(p.name, lang).slice(0, 25)}…</div>
+          <div className="font-semibold" style={{ color: primary }}>
+            {formatPrice(p.price, p.currency, lang)}
+          </div>
+        </div>
+        <button
+          onClick={handleAdd}
+          className="h-11 px-5 rounded-full text-white text-sm font-medium"
+          style={{ background: added ? "#047857" : primary }}
+        >
+          {added ? "Ajouté ✓" : "Ajouter"}
+        </button>
       </div>
     </StorefrontLayout>
   );
+}
+
+// Helper: compute `primary` and `fontHeading` in product page scope
+function designAccents(design) {
+  return {
+    primary: design?.brand?.primary_color || "#B84B31",
+    fontHeading: design?.brand?.font_heading || "Fraunces",
+  };
 }
 
 /* =========================================================
