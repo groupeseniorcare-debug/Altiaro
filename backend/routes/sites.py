@@ -22,6 +22,7 @@ class SiteCreateInput(BaseModel):
     shopify_url: Optional[str] = ""
     operator_id: Optional[str] = None
     notes: Optional[str] = ""
+    vat_rate: Optional[float] = None
 
 
 class SiteUpdateInput(BaseModel):

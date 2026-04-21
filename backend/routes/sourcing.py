@@ -237,26 +237,157 @@ class ImportInput(BaseModel):
     sku: Optional[str] = ""
 
 
+# Country → language mapping for translation targets
+LANG_BY_COUNTRY = {
+    "FR": "fr", "BE": "fr", "LU": "fr", "CH": "fr",
+    "DE": "de", "AT": "de",
+    "UK": "en", "IE": "en",
+    "NL": "nl", "IT": "it", "ES": "es",
+}
+
+
+async def _cj_product_detail(product_id: str) -> dict:
+    """Fetch detailed product info (description, images, variants) from CJ."""
+    if not CJ_API_KEY or not product_id:
+        return {}
+    try:
+        token = await _cj_auth()
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.get(f"{CJ_BASE}/product/query",
+                            params={"pid": product_id},
+                            headers={"CJ-Access-Token": token})
+            if r.status_code != 200:
+                return {}
+            return (r.json().get("data") or {}) or {}
+    except Exception:
+        return {}
+
+
+async def _translate_product(title_en: str, desc_en: str, target_langs: list) -> dict:
+    """Use Claude (via Emergent LLM key) to translate a product title + description
+    into the target languages. Returns {fr: {...}, de: {...}, ...}.
+    Never raises — returns original text as fallback on error.
+    """
+    from routes.design import _claude_json  # reuse existing plumbing
+    from deps import EMERGENT_LLM_KEY
+    if not EMERGENT_LLM_KEY or not target_langs:
+        return {}
+    # Only the languages we haven't already
+    langs = [lg for lg in target_langs if lg in ("fr", "de", "nl", "it", "es", "en")]
+    if not langs:
+        return {}
+    system = ("You are a senior e-commerce copywriter translating dropshipping product "
+              "listings for a premium French e-shop. Write fluent, benefit-driven copy "
+              "(never literal translation). Respect the target language's tone and "
+              "shopping conventions. Never invent specs that aren't in the source. "
+              "Output STRICT JSON only.")
+    langs_desc = ", ".join([{
+        "fr": "French (senior-friendly, rassurant, jamais de jargon US)",
+        "de": "German (clear, precise, professional)",
+        "nl": "Dutch (direct, friendly)",
+        "it": "Italian (warm, persuasive)",
+        "es": "Spanish (Spain, cordial, clear)",
+        "en": "English (UK, clean, benefit-focused)",
+    }[lg] for lg in langs])
+    user_prompt = f"""Translate and adapt the following product into these languages: {langs_desc}.
+
+SOURCE (English, from CJ Dropshipping, may be poor/literal):
+Title: {title_en[:300]}
+Description: {desc_en[:2500] if desc_en else '(none — infer from title)'}
+
+Rules:
+- Keep title < 70 chars, persuasive but honest
+- Description : 2-3 short paragraphs, bullet-points welcome, focus on benefits for the end-user (seniors / home / autonomy)
+- Remove CJ jargon, shipping mentions, Chinese brand hints
+- Use the target language's punctuation conventions
+
+Return STRICT JSON with one key per target language, each containing {{title, description}}. Example structure:
+{{"fr": {{"title": "...", "description": "..."}}, "de": {{"title": "...", "description": "..."}}}}
+
+Languages to produce: {", ".join(langs)}
+"""
+    try:
+        res = await _claude_json(system, user_prompt, f"translate-{uuid.uuid4().hex[:8]}", timeout=90)
+        # Validate structure
+        out = {}
+        for lg in langs:
+            block = res.get(lg) or {}
+            if isinstance(block, dict) and block.get("title"):
+                out[lg] = {
+                    "title": str(block.get("title") or "")[:250],
+                    "description": str(block.get("description") or "")[:3000],
+                }
+        return out
+    except Exception:
+        return {}
+
+
 @router.post("/sites/{site_id}/sourcing/import")
 async def import_product(site_id: str, data: ImportInput, user: dict = Depends(get_current_user)):
     await _check_site_access(site_id, user)
+    # Load site to determine target translation languages
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "selected_countries": 1})
+    countries = (site or {}).get("selected_countries") or ["FR"]
+    target_langs = list(set(LANG_BY_COUNTRY.get((c or "").upper(), "fr") for c in countries))
+    if "fr" not in target_langs:
+        target_langs.append("fr")
+
+    # Fetch CJ detail for richer description + better images
+    detail = {}
+    raw_desc = ""
+    extra_images = []
+    if data.provider == "cj" and data.product_id:
+        detail = await _cj_product_detail(data.product_id)
+        raw_desc = detail.get("description") or detail.get("productDescription") or ""
+        # Extra images from CJ detail
+        imgs = detail.get("productImageSet") or detail.get("productImages") or []
+        if isinstance(imgs, list):
+            extra_images = [i for i in imgs if isinstance(i, str)][:5]
+
+    # Strip HTML from CJ description
+    import re as _re
+    if raw_desc:
+        raw_desc = _re.sub(r"<[^>]+>", " ", raw_desc)
+        raw_desc = _re.sub(r"\s+", " ", raw_desc).strip()[:3000]
+
+    # Translate via Claude (non-blocking error)
+    translations = await _translate_product(data.title, raw_desc, target_langs)
+
+    # Build i18n dicts — fallback to original if a lang wasn't translated
+    name_dict = {}
+    desc_dict = {}
+    for lg in ["fr", "de", "nl", "it", "es", "en"]:
+        if lg in translations:
+            name_dict[lg] = translations[lg]["title"]
+            desc_dict[lg] = translations[lg]["description"]
+        else:
+            name_dict[lg] = data.title
+            desc_dict[lg] = raw_desc if lg == "en" else ""
+
     pid = str(uuid.uuid4())
+    images = [data.image] if data.image else []
+    for i in extra_images:
+        if i and i not in images:
+            images.append(i)
+
     doc = {
         "id": pid,
         "site_id": site_id,
-        "name": {"fr": data.title, "en": data.title, "de": data.title, "nl": data.title},
-        "description": {"fr": "", "en": "", "de": "", "nl": ""},
+        "name": name_dict,
+        "description": desc_dict,
         "price": round(data.price_eur, 2),
         "cost_price_ht": round(data.cost_eur, 2),
         "compare_at_price": None,
         "currency": "EUR",
-        "images": [data.image] if data.image else [],
+        "images": images[:6],
         "stock": None,
         "supplier_url": data.supplier_url or "",
         "sku": data.sku or f"{data.provider.upper()}-{data.product_id[:12]}",
         "status": "draft",
         "featured": False,
         "source": {"provider": data.provider, "product_id": data.product_id},
+        "translation_status": "translated" if translations else "fallback_original",
+        "translated_langs": list(translations.keys()),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.products.insert_one(dict(doc))

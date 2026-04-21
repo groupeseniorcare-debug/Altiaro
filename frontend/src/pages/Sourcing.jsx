@@ -91,23 +91,32 @@ export default function Sourcing() {
     // Retail based on margin multiplier
     const priceEur = Math.round(costEur * margin * 100) / 100;
     const { data, error } = await apiCall(() =>
-      api.post(`/sites/${siteId}/sourcing/import`, {
-        provider: item.provider,
-        product_id: item.product_id,
-        title: item.title,
-        image: item.image || "",
-        price_eur: priceEur,
-        cost_eur: costEur,
-        supplier_url: item.supplier_url || "",
-        sku: item.sku || "",
-      })
+      api.post(
+        `/sites/${siteId}/sourcing/import`,
+        {
+          provider: item.provider,
+          product_id: item.product_id,
+          title: item.title,
+          image: item.image || "",
+          price_eur: priceEur,
+          cost_eur: costEur,
+          supplier_url: item.supplier_url || "",
+          sku: item.sku || "",
+        },
+        { timeout: 90000 }
+      )
     );
     if (error) {
       setImported((prev) => ({ ...prev, [key]: "error" }));
       window.alert(`Import impossible : ${error}`);
       return;
     }
-    setImported((prev) => ({ ...prev, [key]: "ok", [`${key}_id`]: data.product.id }));
+    setImported((prev) => ({
+      ...prev,
+      [key]: "ok",
+      [`${key}_id`]: data.product.id,
+      [`${key}_langs`]: data.product.translated_langs || [],
+    }));
   };
 
   const anyProviderEnabled = providers.some((p) => p.enabled);
@@ -342,7 +351,8 @@ export default function Sourcing() {
               1. Tape un mot-clé (idéalement celui validé par l'<strong>analyse deep</strong>) ·
               2. On cherche en parallèle sur CJ + AliExpress · 3. Choisis le multiplicateur de marge
               (le <strong>cost_price_ht</strong> sera bien sauvegardé pour calculer ta marge HT
-              automatiquement). Import en 1 clic, statut <em>draft</em>.
+              automatiquement). Import en 1 clic, <strong>titre + description traduits
+              automatiquement par Claude</strong> dans la langue des pays de ton site, statut <em>draft</em>.
             </p>
           </div>
         )}
@@ -434,12 +444,12 @@ export default function Sourcing() {
                       >
                         {state === "busy" && (
                           <>
-                            <ArrowClockwise size={12} className="animate-spin" /> Import…
+                            <ArrowClockwise size={12} className="animate-spin" /> Traduction…
                           </>
                         )}
                         {state === "ok" && (
                           <>
-                            <CheckCircle size={12} weight="fill" /> Importé
+                            <CheckCircle size={12} weight="fill" /> Importé + traduit
                           </>
                         )}
                         {!state && (
