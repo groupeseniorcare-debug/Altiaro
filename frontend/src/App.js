@@ -20,6 +20,7 @@ import AdminPayouts from "./pages/AdminPayouts";
 import SiteDesign from "./pages/SiteDesign";
 import Sourcing from "./pages/Sourcing";
 import Wizard from "./pages/Wizard";
+import GoogleAds from "./pages/GoogleAds";
 import {
   StorefrontHome,
   StorefrontProduct,
@@ -195,6 +196,14 @@ function App() {
             element={
               <ProtectedRoute adminOnly>
                 <AdminPayouts />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/google-ads"
+            element={
+              <ProtectedRoute adminOnly>
+                <GoogleAds />
               </ProtectedRoute>
             }
           />
