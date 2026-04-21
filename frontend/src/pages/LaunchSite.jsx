@@ -74,20 +74,45 @@ export default function LaunchSite() {
     const { data, error: err } = await apiCall(() =>
       api.post("/quick-scan/multi", { product_or_niche: trimmed })
     );
-    setLoading(false);
-    if (err) {
-      setError(err);
+    if (err || !data?.group_id) {
+      setLoading(false);
+      setError(err || "Impossible de démarrer le scan.");
       return;
     }
-    setScan(data);
-    // Présélection des marchés GO
-    const preselect = {};
-    (data.results || []).forEach((r) => {
-      if (r.verdict === "GO" || r.verdict === "GO_WITH_RESERVE") {
-        preselect[r.country] = true;
+    // Poll for progressive results every 2.5s
+    const groupId = data.group_id;
+    let cancelled = false;
+    let attempts = 0;
+    const poll = async () => {
+      if (cancelled) return;
+      attempts += 1;
+      const { data: progress, error: pErr } = await apiCall(() =>
+        api.get(`/quick-scan/multi/${groupId}`)
+      );
+      if (cancelled) return;
+      if (pErr) {
+        setError(pErr);
+        setLoading(false);
+        return;
       }
-    });
-    setSelected(preselect);
+      setScan(progress);
+      // Presélectionne les GO/GO_WITH_RESERVE dès qu'ils apparaissent
+      setSelected((prev) => {
+        const next = { ...prev };
+        (progress.results || []).forEach((r) => {
+          if (next[r.country] === undefined && (r.verdict === "GO" || r.verdict === "GO_WITH_RESERVE")) {
+            next[r.country] = true;
+          }
+        });
+        return next;
+      });
+      if (progress.status === "done" || attempts > 60) {
+        setLoading(false);
+        return;
+      }
+      setTimeout(poll, 2500);
+    };
+    poll();
   };
 
   const selectedCountries = Object.keys(selected).filter((c) => selected[c]);
@@ -176,7 +201,12 @@ export default function LaunchSite() {
             >
               {loading ? (
                 <>
-                  <ArrowClockwise size={16} className="animate-spin" /> Scan en cours (~60s)…
+                  <ArrowClockwise size={16} className="animate-spin" />
+                  {scan?.progress ? (
+                    <>Scan… {scan.progress.done}/{scan.progress.total}</>
+                  ) : (
+                    <>Scan en cours…</>
+                  )}
                 </>
               ) : (
                 <>
@@ -193,28 +223,33 @@ export default function LaunchSite() {
         </div>
 
         {/* Step 2 — Loading state */}
-        {loading && (
+        {loading && (!scan || (scan.results || []).length === 0) && (
           <div className="bg-white rounded-2xl border border-[#E7E5E4] p-8 mb-6 text-center">
             <ArrowClockwise size={32} className="animate-spin mx-auto text-[#EA580C] mb-4" />
             <div className="font-medium text-[#1C1917]">6 marchés en cours d'analyse en parallèle…</div>
             <div className="text-sm text-[#78716C] mt-1">
-              Claude + Google Ads sur FR · DE · BE · NL · CH · IT (environ 60 secondes)
+              Chaque marché met 10-15s (Claude + Google Ads). Les cartes apparaîtront au fur et à mesure.
             </div>
           </div>
         )}
 
-        {/* Step 2 bis — Results */}
-        {scan && !loading && (
+        {/* Step 2 bis — Results (partial or complete) */}
+        {scan && (scan.results || []).length > 0 && (
           <div className="mb-6">
             <div className="flex items-baseline justify-between mb-4">
               <div>
                 <div className="text-xs uppercase tracking-widest text-[#EA580C] font-bold">
-                  Étape 2 · Résultats par marché
+                  Étape 2 · {loading ? "Résultats partiels" : "Résultats par marché"}
                 </div>
                 <div className="text-lg font-semibold text-[#1C1917] mt-1">
                   {scan.summary.go} GO · {scan.summary.go_with_reserve} GO avec réserve ·{" "}
                   {scan.summary.no_go} NO-GO
                   {scan.summary.error > 0 && <> · {scan.summary.error} erreur</>}
+                  {loading && scan.progress && (
+                    <span className="text-[#78716C] font-normal ml-2">
+                      ({scan.progress.done}/{scan.progress.total} marchés analysés)
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -230,6 +265,17 @@ export default function LaunchSite() {
                   }}
                 />
               ))}
+              {loading && scan.progress && scan.progress.done < scan.progress.total && (
+                Array.from({ length: scan.progress.total - scan.progress.done }).map((_, i) => (
+                  <div
+                    key={`pending-${i}`}
+                    className="rounded-2xl border-2 border-dashed border-[#E7E5E4] p-5 flex flex-col items-center justify-center gap-2 min-h-[200px] bg-[#FAF7F2]"
+                  >
+                    <ArrowClockwise size={22} className="animate-spin text-[#EA580C]" />
+                    <div className="text-xs text-[#78716C]">Marché en cours…</div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}

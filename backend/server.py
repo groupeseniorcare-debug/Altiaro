@@ -238,11 +238,112 @@ async def startup():
             CronTrigger(day_of_week="mon", hour=5, minute=0),
             id="opportunity_scan", replace_existing=True, misfire_grace_time=3600,
         )
+
+        # Every 5 min — Auto-config DNS pour les domaines 'purchased'
+        scheduler.add_job(
+            try_auto_configure_dns,
+            "interval", minutes=5,
+            id="dns_auto_config", replace_existing=True, misfire_grace_time=300,
+        )
+
         scheduler.start()
         app.state.scheduler = scheduler
-        logger.info("APScheduler started : weekly_debits (Mon 03h) + bimonthly_payouts (1st/15th 03h) + opportunity_scan (Mon 05h UTC)")
+        logger.info("APScheduler started : weekly_debits + bimonthly_payouts + opportunity_scan + dns_auto_config (5min)")
     except Exception:
         logger.exception("Failed to start APScheduler")
+
+
+async def try_auto_configure_dns() -> dict:
+    """Scanne les domaines en statut 'purchased' et tente la config DNS automatiquement.
+
+    Appelé par APScheduler toutes les 5 min. Idempotent : si la zone OVH n'est pas
+    encore créée (~10 min post-achat), l'erreur ResourceNotFoundError est ignorée
+    et on retentera au cycle suivant. Après 30 min d'échec, bascule en
+    `dns_auto_failed` (intervention manuelle requise).
+    """
+    from datetime import datetime, timedelta, timezone
+    from deps import db
+
+    now = datetime.now(timezone.utc)
+    cutoff = (now - timedelta(minutes=30)).isoformat()
+    pending = await db.domains.find(
+        {"status": "purchased"}, {"_id": 0, "domain": 1, "site_id": 1,
+                                    "ovh_purchased_at": 1, "purchased_by": 1}
+    ).to_list(50)
+    configured, retrying, failed = [], [], []
+
+    for d in pending:
+        domain = d.get("domain")
+        if not domain:
+            continue
+        try:
+            import asyncio as _aio
+            from routes.domains import _client, PLATFORM_IP
+            import ovh
+            if not PLATFORM_IP:
+                break
+            client = _client()
+            try:
+                await _aio.to_thread(
+                    client.post, f"/domain/zone/{domain}/record",
+                    fieldType="A", subDomain="", target=PLATFORM_IP, ttl=300,
+                )
+                try:
+                    await _aio.to_thread(
+                        client.post, f"/domain/zone/{domain}/record",
+                        fieldType="CNAME", subDomain="www", target=f"{domain}.", ttl=300,
+                    )
+                except Exception:
+                    pass
+                await _aio.to_thread(client.post, f"/domain/zone/{domain}/refresh")
+                await db.domains.update_one(
+                    {"domain": domain},
+                    {"$set": {"status": "dns_configured",
+                              "dns_configured_at": now.isoformat(),
+                              "dns_auto": True}},
+                )
+                await db.sites.update_one(
+                    {"domain": domain},
+                    {"$set": {"domain_status": "active", "updated_at": now.isoformat()}},
+                )
+                configured.append(domain)
+                try:
+                    from routes.emails import _build_domain_email_html, send_email_via_resend, RESEND_OWNER_EMAIL
+                    site = await db.sites.find_one({"id": d.get("site_id")}, {"_id": 0})
+                    user = await db.users.find_one({"id": d.get("purchased_by")}, {"_id": 0})
+                    recipient = (user or {}).get("email") or RESEND_OWNER_EMAIL
+                    if recipient and site:
+                        body = f"""<div style="background:#D1FAE5;border:1px solid #A7F3D0;border-radius:8px;padding:14px 16px;margin:16px 0;"><div style="font-size:13px;color:#065F46;line-height:1.5;">🌍 <strong>Ton site est en ligne sur {domain} !</strong><br>La propagation DNS peut prendre 5 à 30 min supplémentaires avant d'être visible partout. Tu peux tester dès maintenant.</div></div>"""
+                        html = await _build_domain_email_html(
+                            domain=domain, site=site,
+                            title=f"🌍 {domain} est vivant !",
+                            intro=f"Bonne nouvelle : la zone DNS vient d'être configurée automatiquement pour <strong>{site.get('name','')}</strong>.",
+                            body_html=body, cta_label="Voir mon site",
+                            cta_url=f"https://{domain}",
+                            preheader="Ton domaine est actif",
+                        )
+                        await send_email_via_resend(to=recipient, subject=f"🌍 {domain} est en ligne", html=html, site=site, tags=["domain_live"])
+                except Exception:
+                    logger.exception("domain_live email failed")
+            except ovh.exceptions.ResourceNotFoundError:
+                if (d.get("ovh_purchased_at") or "") < cutoff:
+                    await db.domains.update_one(
+                        {"domain": domain},
+                        {"$set": {"status": "dns_auto_failed",
+                                  "dns_error": "Zone OVH non créée après 30 min"}},
+                    )
+                    failed.append(domain)
+                else:
+                    retrying.append(domain)
+        except Exception as e:
+            logger.exception(f"auto-config DNS failed for {domain}")
+            failed.append(f"{domain}:{str(e)[:60]}")
+
+    if configured or retrying or failed:
+        logger.info(
+            f"[dns-auto] configured={configured} retrying={retrying} failed={failed}"
+        )
+    return {"configured": configured, "retrying": retrying, "failed": failed}
 
 
 @app.on_event("shutdown")

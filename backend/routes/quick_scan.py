@@ -450,62 +450,119 @@ async def run_multi_market_scan(
     data: MultiScanInput,
     user: dict = Depends(get_current_user),
 ):
-    """Lance un scan Go/No-Go en parallèle sur 6 marchés (FR, DE, BE, NL, CH, IT).
+    """Démarre un scan Go/No-Go en arrière-plan sur 6 marchés (FR/DE/BE/NL/CH/IT).
 
-    Retourne un tableau trié par score décroissant. Chaque marché reçoit son propre
-    appel Claude pour capturer les spécificités (prix, concurrents, réglementation
-    locale).
+    Retourne immédiatement `{group_id, status: "running"}` — le frontend doit
+    ensuite poller `GET /quick-scan/multi/{group_id}` toutes les 2-3s pour voir
+    les résultats apparaître au fur et à mesure (chaque marché ~10-15s).
     """
     product = data.product_or_niche.strip()
     countries = [c.upper().strip() for c in (data.countries or DEFAULT_MULTI_MARKETS) if c.strip()]
-    # Dedupe + cap à 8 max
     countries = list(dict.fromkeys(countries))[:8]
     group_id = f"mg-{uuid.uuid4().hex[:12]}"
+    now_iso = datetime.now(timezone.utc).isoformat()
 
-    async def _safe_scan(cc: str) -> dict:
+    # Create the group record
+    await db.quick_scan_groups.insert_one({
+        "id": group_id,
+        "product_or_niche": product,
+        "countries": countries,
+        "created_at": now_iso,
+        "created_by": user.get("id"),
+        "status": "running",
+        "progress": {"done": 0, "total": len(countries)},
+    })
+
+    # Fire background tasks for each country (do not await)
+    async def _worker(cc: str):
         try:
             r = await _run_single_scan(product, cc, user.get("id"))
             r["multi_group_id"] = group_id
-            return r
+            await db.quick_scans.insert_one(dict(r))
         except HTTPException as e:
-            return {
+            await db.quick_scans.insert_one({
+                "id": f"qs-err-{uuid.uuid4().hex[:8]}",
                 "country": cc,
+                "product_or_niche": product,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_by": user.get("id"),
+                "multi_group_id": group_id,
+                "verdict": "ERROR",
                 "error": e.detail,
-                "verdict": "ERROR",
-                "multi_group_id": group_id,
-            }
+            })
         except Exception as e:
-            logger.exception(f"multi-scan failed for {cc}")
-            return {
+            logger.exception(f"multi-scan worker failed for {cc}")
+            await db.quick_scans.insert_one({
+                "id": f"qs-err-{uuid.uuid4().hex[:8]}",
                 "country": cc,
-                "error": str(e)[:200],
-                "verdict": "ERROR",
+                "product_or_niche": product,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_by": user.get("id"),
                 "multi_group_id": group_id,
-            }
+                "verdict": "ERROR",
+                "error": str(e)[:200],
+            })
+        finally:
+            await db.quick_scan_groups.update_one(
+                {"id": group_id},
+                {"$inc": {"progress.done": 1}},
+            )
+            grp = await db.quick_scan_groups.find_one({"id": group_id}, {"_id": 0})
+            if grp and grp["progress"]["done"] >= grp["progress"]["total"]:
+                await db.quick_scan_groups.update_one(
+                    {"id": group_id},
+                    {"$set": {
+                        "status": "done",
+                        "completed_at": datetime.now(timezone.utc).isoformat(),
+                    }},
+                )
 
-    tasks = [_safe_scan(cc) for cc in countries]
-    results = await asyncio.gather(*tasks)
-
-    # Persist all valid scans for history
-    to_store = [r for r in results if r.get("verdict") != "ERROR"]
-    if to_store:
-        await db.quick_scans.insert_many([dict(r) for r in to_store])
-
-    # Sort: GO (score desc) → GO_WITH_RESERVE → NO_GO → ERROR
-    order = {"GO": 0, "GO_WITH_RESERVE": 1, "NO_GO": 2, "ERROR": 3}
-    results.sort(key=lambda r: (order.get(r.get("verdict"), 9), -(r.get("score") or 0)))
+    for cc in countries:
+        asyncio.create_task(_worker(cc))
 
     return {
         "group_id": group_id,
+        "status": "running",
         "product_or_niche": product,
         "countries": countries,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "results": results,
+        "created_at": now_iso,
+    }
+
+
+@router.get("/quick-scan/multi/{group_id}")
+async def get_multi_scan_status(
+    group_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Retourne l'état + résultats partiels d'un scan multi-marché."""
+    group = await db.quick_scan_groups.find_one({"id": group_id}, {"_id": 0})
+    if not group:
+        raise HTTPException(404, "Groupe introuvable.")
+    if user.get("role") != "admin" and group.get("created_by") != user.get("id"):
+        raise HTTPException(403, "Pas autorisé.")
+
+    scans = await db.quick_scans.find(
+        {"multi_group_id": group_id}, {"_id": 0}
+    ).to_list(100)
+
+    # Sort same way as before
+    order = {"GO": 0, "GO_WITH_RESERVE": 1, "NO_GO": 2, "ERROR": 3}
+    scans.sort(key=lambda r: (order.get(r.get("verdict"), 9), -(r.get("score") or 0)))
+
+    return {
+        "group_id": group_id,
+        "product_or_niche": group.get("product_or_niche"),
+        "countries": group.get("countries", []),
+        "status": group.get("status", "running"),
+        "progress": group.get("progress", {"done": len(scans), "total": len(group.get("countries", []))}),
+        "created_at": group.get("created_at"),
+        "completed_at": group.get("completed_at"),
+        "results": scans,
         "summary": {
-            "go": sum(1 for r in results if r.get("verdict") == "GO"),
-            "go_with_reserve": sum(1 for r in results if r.get("verdict") == "GO_WITH_RESERVE"),
-            "no_go": sum(1 for r in results if r.get("verdict") == "NO_GO"),
-            "error": sum(1 for r in results if r.get("verdict") == "ERROR"),
+            "go": sum(1 for r in scans if r.get("verdict") == "GO"),
+            "go_with_reserve": sum(1 for r in scans if r.get("verdict") == "GO_WITH_RESERVE"),
+            "no_go": sum(1 for r in scans if r.get("verdict") == "NO_GO"),
+            "error": sum(1 for r in scans if r.get("verdict") == "ERROR"),
         },
     }
 
