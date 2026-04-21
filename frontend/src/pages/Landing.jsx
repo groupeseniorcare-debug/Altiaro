@@ -86,7 +86,7 @@ export default function Landing() {
           <div className="col-span-12 lg:col-span-4 lg:pl-12">
             <div className="border-l border-neutral-200 pl-8 space-y-8">
               {[
-                { n: "6", l: "Marchés européens scannés en parallèle", f: "FR · DE · IT · BE · CH · NL" },
+                { n: "5", l: "Marchés européens scannés en parallèle", f: "FR · DE · Benelux · CH · UK" },
                 { n: "< 2min", l: "Analyse Go / No-Go d'une niche", f: "Scan multi-intention, volume Google, concurrence" },
                 { n: "50/50", l: "Marge brute partagée", f: "Virements les 1er et 15 de chaque mois" },
                 { n: "0€", l: "Frais fixes mensuels", f: "Commission uniquement sur la marge" },
@@ -201,7 +201,7 @@ export default function Landing() {
                 n: "01",
                 icon: ChartLineUp,
                 t: "Analyser",
-                d: "Scan Go/No-Go en 6 marchés (FR, DE, IT, BE, CH, NL). Volumes Google, niveau de concurrence, potentiel de marge — tout en moins de 2 minutes.",
+                d: "Scan Go/No-Go en 5 marchés (FR, DE, Benelux, CH, UK). Volumes Google, niveau de concurrence, potentiel de marge — tout en moins de 2 minutes.",
                 time: "2 min",
               },
               {

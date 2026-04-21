@@ -44,10 +44,19 @@ MAX_COMPETITION_INDEX = int(os.environ.get("QS_MAX_COMPETITION", "75"))
 MAX_ACQ_COST_PCT = float(os.environ.get("QS_MAX_ACQ_COST_PCT", "40"))
 ASSUMED_CONV_RATE = float(os.environ.get("QS_ASSUMED_CONV_RATE", "0.02"))  # 2% e-com senior
 
-# 6 marchés Silver Economy à forts pouvoir d'achat 60+
+# 5 marchés cibles Silver Economy (Benelux agrégé)
 DEFAULT_MULTI_MARKETS = os.environ.get(
-    "QS_MULTI_MARKETS", "FR,DE,BE,NL,CH,IT"
+    "QS_MULTI_MARKETS", "FR,DE,BNL,CH,UK"
 ).split(",")
+
+# Agrégations : un code virtuel qui combine plusieurs vrais marchés.
+# Le scan exécute chaque sous-marché séparément puis merge les métriques.
+MARKET_AGGREGATES = {
+    "BNL": {
+        "name": "Benelux",
+        "members": ["BE", "NL", "LU"],
+    },
+}
 
 
 # ============== CLAUDE : variantes + prix concurrents ============== #
@@ -322,9 +331,129 @@ class MultiScanInput(BaseModel):
 
 
 async def _run_single_scan(product: str, country: str, user_id: Optional[str]) -> dict:
-    """Core scan logic — used by both single and multi-market endpoints."""
+    """Core scan logic — used by both single and multi-market endpoints.
+
+    Supports real market codes (FR, DE, BE, …) and aggregate codes
+    (BNL = Benelux) which are fanned out in parallel and merged.
+    """
+    cc = country.upper()
+
+    # ----- aggregate market? fan out to members and merge -----
+    if cc in MARKET_AGGREGATES:
+        agg = MARKET_AGGREGATES[cc]
+        members = agg["members"]
+        sub_results = await asyncio.gather(
+            *(_run_single_scan(product, m, user_id) for m in members),
+            return_exceptions=True,
+        )
+        # Filter exceptions (treat as missing data for that sub-market)
+        ok = [r for r in sub_results if isinstance(r, dict)]
+        if not ok:
+            raise HTTPException(500, "Aucun sous-marché Benelux n'a répondu.")
+
+        # Merge keyword metrics: sum volumes, weighted avg competition+cpc, take median price avg
+        keywords_by_kw: dict[str, dict] = {}
+        for r in ok:
+            for k in r.get("keywords", []):
+                kw = k.get("keyword", "").strip().lower()
+                if not kw:
+                    continue
+                entry = keywords_by_kw.setdefault(kw, {
+                    "keyword": k["keyword"],
+                    "volume": 0,
+                    "cpc_low_eur": 0.0,
+                    "cpc_high_eur": 0.0,
+                    "competition_index": 0,
+                    "_vol_for_avg": 0,
+                })
+                v = int(k.get("volume") or 0)
+                entry["volume"] += v
+                entry["_vol_for_avg"] += v
+                entry["cpc_low_eur"] += float(k.get("cpc_low_eur") or 0) * max(v, 1)
+                entry["cpc_high_eur"] += float(k.get("cpc_high_eur") or 0) * max(v, 1)
+                entry["competition_index"] += int(k.get("competition_index") or 0) * max(v, 1)
+
+        merged_keywords = []
+        for entry in keywords_by_kw.values():
+            w = max(entry["_vol_for_avg"], 1)
+            merged_keywords.append({
+                "keyword": entry["keyword"],
+                "volume": entry["volume"],
+                "cpc_low_eur": round(entry["cpc_low_eur"] / w, 2),
+                "cpc_high_eur": round(entry["cpc_high_eur"] / w, 2),
+                "competition_index": round(entry["competition_index"] / w),
+            })
+        merged_keywords.sort(key=lambda k: k["volume"], reverse=True)
+
+        # Aggregate top-level metrics
+        vol_total = sum((r.get("metrics") or {}).get("volume_total", 0) for r in ok)
+        if vol_total > 0:
+            competition_weighted = round(
+                sum((r.get("metrics") or {}).get("competition_weighted", 0) *
+                    (r.get("metrics") or {}).get("volume_total", 0) for r in ok)
+                / vol_total
+            )
+            cpc_weighted = round(
+                sum((r.get("metrics") or {}).get("cpc_weighted_eur", 0) *
+                    (r.get("metrics") or {}).get("volume_total", 0) for r in ok)
+                / vol_total, 2,
+            )
+        else:
+            competition_weighted = 0
+            cpc_weighted = 0.0
+        # Price stats → take median of medians (simple, fair enough at Benelux scope)
+        price_medians = [(r.get("metrics") or {}).get("avg_price_median", 0) for r in ok]
+        price_medians = [p for p in price_medians if p]
+        price_median = sorted(price_medians)[len(price_medians) // 2] if price_medians else 0.0
+        price_mins = [(r.get("metrics") or {}).get("avg_price_min", 0) for r in ok if (r.get("metrics") or {}).get("avg_price_min")]
+        price_maxs = [(r.get("metrics") or {}).get("avg_price_max", 0) for r in ok if (r.get("metrics") or {}).get("avg_price_max")]
+
+        metrics = {
+            "avg_price_median": price_median,
+            "avg_price_min": min(price_mins) if price_mins else 0.0,
+            "avg_price_max": max(price_maxs) if price_maxs else 0.0,
+            "volume_total": vol_total,
+            "competition_weighted": competition_weighted,
+            "cpc_weighted_eur": cpc_weighted,
+        }
+
+        # Use the first ok sub-scan's insights as a proxy (for red flags, checklist, etc.),
+        # but recompute verdict on aggregated metrics. Red flags are de-duped across members.
+        insights_proxy = {
+            "red_flags": list({rf for r in ok for rf in (r.get("red_flags") or [])})[:3],
+        }
+        verdict_data = _compute_verdict(metrics, insights_proxy)
+        # Sub-member verdicts summary (for the UI to show per-country)
+        by_member = {r["country"]: {
+            "name": r.get("country_name"),
+            "verdict": r.get("verdict"),
+            "score": r.get("score"),
+            "volume_total": (r.get("metrics") or {}).get("volume_total", 0),
+        } for r in ok}
+
+        return {
+            "id": f"qs-{uuid.uuid4().hex[:12]}",
+            "product_or_niche": product,
+            "country": cc,
+            "country_name": agg["name"],
+            "is_aggregate": True,
+            "aggregate_members": by_member,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_by": user_id,
+            "metrics": metrics,
+            "verdict": verdict_data["verdict"],
+            "score": verdict_data["score"],
+            "reason": verdict_data["reason"],
+            "recommendation": verdict_data["recommendation"],
+            "checklist": verdict_data["checklist"],
+            "red_flags": verdict_data["red_flags"],
+            "competition_high": verdict_data.get("competition_high", False),
+            "keywords": merged_keywords[:4],
+        }
+
+    # ----- real country code below -----
     from routes.google_ads import MARKETS
-    market = MARKETS.get(country.upper())
+    market = MARKETS.get(cc)
     if not market:
         raise HTTPException(400, f"Pays non supporté : {country}")
     country_name = market["name"]
@@ -450,7 +579,10 @@ async def run_multi_market_scan(
     data: MultiScanInput,
     user: dict = Depends(get_current_user),
 ):
-    """Démarre un scan Go/No-Go en arrière-plan sur 6 marchés (FR/DE/BE/NL/CH/IT).
+    """Démarre un scan Go/No-Go en arrière-plan sur 5 marchés (FR/DE/BNL/CH/UK).
+
+    Le code "BNL" est un agrégat Benelux (BE + NL + LU) exécuté en parallèle
+    puis mergé dans un seul résultat.
 
     Retourne immédiatement `{group_id, status: "running"}` — le frontend doit
     ensuite poller `GET /quick-scan/multi/{group_id}` toutes les 2-3s pour voir

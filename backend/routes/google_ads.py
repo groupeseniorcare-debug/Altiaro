@@ -39,6 +39,7 @@ MARKETS = {
     "DE": {"geo": 2276, "lang": 1001, "name": "Allemagne"},
     "BE": {"geo": 2056, "lang": 1002, "name": "Belgique"},
     "NL": {"geo": 2528, "lang": 1010, "name": "Pays-Bas"},
+    "LU": {"geo": 2442, "lang": 1002, "name": "Luxembourg"},
     "UK": {"geo": 2826, "lang": 1000, "name": "Royaume-Uni"},
     "CH": {"geo": 2756, "lang": 1002, "name": "Suisse"},
     "ES": {"geo": 2724, "lang": 1003, "name": "Espagne"},

@@ -16,8 +16,10 @@ import {
 } from "@phosphor-icons/react";
 
 const COUNTRY_FLAG = {
-  FR: "🇫🇷", DE: "🇩🇪", BE: "🇧🇪", NL: "🇳🇱", CH: "🇨🇭",
+  FR: "🇫🇷", DE: "🇩🇪", BE: "🇧🇪", NL: "🇳🇱", LU: "🇱🇺", CH: "🇨🇭",
   IT: "🇮🇹", UK: "🇬🇧", ES: "🇪🇸",
+  // Benelux aggregate uses a trio marker; we render the 3 flags inline
+  BNL: "🇧🇪🇳🇱🇱🇺",
 };
 
 const VERDICT_META = {
@@ -142,7 +144,7 @@ export default function LaunchSite() {
             Quelle niche veux-tu tester ?
           </h1>
           <p className="text-neutral-500 text-sm mt-1 max-w-xl">
-            Une seule idée, analysée en parallèle sur 6 marchés UE. Les cartes apparaissent au fur
+            Une seule idée, analysée en parallèle sur 5 marchés UE. Les cartes apparaissent au fur
             et à mesure — sélectionne celles qui valent le coup.
           </p>
         </div>
@@ -186,7 +188,7 @@ export default function LaunchSite() {
                 </>
               ) : (
                 <>
-                  <Lightning size={14} weight="fill" /> Analyser les 6 marchés
+                  <Lightning size={14} weight="fill" /> Analyser les 5 marchés
                 </>
               )}
             </button>
@@ -205,7 +207,7 @@ export default function LaunchSite() {
         {loading && (!scan || (scan.results || []).length === 0) && (
           <div className="bg-white rounded-md border border-neutral-200 p-8 mb-4 text-center">
             <ArrowClockwise size={24} className="animate-spin mx-auto text-neutral-600 mb-3" />
-            <div className="text-sm font-medium text-neutral-900">6 marchés en analyse parallèle</div>
+            <div className="text-sm font-medium text-neutral-900">5 marchés en analyse parallèle</div>
             <div className="text-xs text-neutral-500 mt-1">
               Chaque marché met 10-15s · Claude + Google Ads
             </div>
@@ -321,7 +323,7 @@ export default function LaunchSite() {
               <Info size={14} className="text-neutral-400 shrink-0 mt-0.5" />
               <div className="text-[11px] text-neutral-500 leading-relaxed">
                 <span className="text-neutral-700 font-medium">Comment ça marche</span> — Claude +
-                Google Keyword Planner en parallèle sur 6 marchés (FR / DE / BE / NL / CH / IT). Un
+                Google Keyword Planner en parallèle sur 5 marchés (FR / DE / Benelux / CH / UK). Un
                 verdict par marché sur 3 critères obligatoires (prix ≥ 50€, volume ≥ 5 000/mois, CPA
                 Ads ≤ 40%) + concurrence (soft ≤ 75/100, au-delà warning "concurrence élevée").
               </div>
