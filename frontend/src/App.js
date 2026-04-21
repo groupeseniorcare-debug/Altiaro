@@ -24,6 +24,7 @@ import PromptStudio from "./pages/PromptStudio";
 import Domains from "./pages/Domains";
 import GoogleAds from "./pages/GoogleAds";
 import Opportunities from "./pages/Opportunities";
+import QuickScan from "./pages/QuickScan";
 import {
   StorefrontHome,
   StorefrontProduct,
@@ -178,6 +179,14 @@ function App() {
           <Route path="/shop/:siteId/cgv" element={<StorefrontCGV />} />
           <Route path="/shop/:siteId/mentions" element={<StorefrontMentions />} />
           <Route path="/shop/:siteId/confidentialite" element={<StorefrontConfidentialite />} />
+          <Route
+            path="/scan"
+            element={
+              <ProtectedRoute>
+                <QuickScan />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/validations"
             element={

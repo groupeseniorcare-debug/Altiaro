@@ -74,6 +74,7 @@ Les 50 étapes du playbook sont regroupées en 4 blocs :
 | 38 | Prompt Studio (remplace Wizard) | ✅ |
 | 39 | **Storefront splitté en composants** (`components/storefront/{Hero,Benefits,ProductGrid,Testimonials,FAQSection,FinalCTA,NarrativeProduct}.jsx` + `storefrontUtils.js`) | ✅ |
 | 40 | **Emails Resend domaine acheté / échec OVH** (envoyés au Concepteur post-webhook Mollie) | ✅ |
+| 41 | **Scan Express Go/No-Go** (Claude + Google Keyword Planner → verdict en 30s sur prix, volume, concurrence, rentabilité Ads) | ✅ |
 
 ## Règles critiques
 - Pas de Shopify — tout custom React/FastAPI.

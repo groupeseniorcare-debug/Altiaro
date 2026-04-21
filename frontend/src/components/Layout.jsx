@@ -19,6 +19,7 @@ import {
   Bank,
   GoogleLogo,
   Fire,
+  Lightning,
 } from "@phosphor-icons/react";
 
 export default function Layout({ children }) {
@@ -28,6 +29,7 @@ export default function Layout({ children }) {
 
   const links = [
     { to: "/", label: "Tableau de bord", icon: House, testId: "nav-dashboard" },
+    { to: "/scan", label: "Scan Express", icon: Lightning, testId: "nav-scan" },
     { to: "/sites", label: "Sites", icon: SquaresFour, testId: "nav-sites" },
     { to: "/niches", label: "Analyseur", icon: Target, testId: "nav-niches" },
     ...(user?.role === "admin"
