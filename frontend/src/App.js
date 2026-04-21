@@ -21,6 +21,7 @@ import SiteDesign from "./pages/SiteDesign";
 import Sourcing from "./pages/Sourcing";
 import Wizard from "./pages/Wizard";
 import PromptStudio from "./pages/PromptStudio";
+import Domains from "./pages/Domains";
 import GoogleAds from "./pages/GoogleAds";
 import Opportunities from "./pages/Opportunities";
 import {
@@ -152,6 +153,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <PromptStudio />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites/:id/domains"
+            element={
+              <ProtectedRoute>
+                <Domains />
               </ProtectedRoute>
             }
           />

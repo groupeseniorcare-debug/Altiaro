@@ -314,6 +314,13 @@ export default function SiteDetail() {
                   <Rocket size={16} weight="fill" /> Wizard 10 étapes
                 </button>
                 <button
+                  onClick={() => navigate(`/sites/${id}/domains`)}
+                  data-testid="nav-domains"
+                  className="h-10 px-4 rounded-xl bg-white border border-[#E7E5E4] hover:border-[#2563EB] text-[#1C1917] text-sm font-medium flex items-center gap-2 transition"
+                >
+                  <Globe size={16} weight="duotone" /> Domaine
+                </button>
+                <button
                   onClick={() => navigate(`/sites/${id}/sourcing`)}
                   data-testid="nav-sourcing"
                   className="h-10 px-4 rounded-xl bg-white border border-[#E7E5E4] hover:border-[#F97316] text-[#1C1917] text-sm font-medium flex items-center gap-2 transition"
