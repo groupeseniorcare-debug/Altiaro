@@ -17,7 +17,7 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
@@ -129,10 +129,21 @@ async def oauth_start(user: dict = Depends(get_current_user)):
 
 
 @router.get("/google-ads/oauth/callback")
-async def oauth_callback(code: Optional[str] = None, state: Optional[str] = None,
+async def oauth_callback(request: Request, code: Optional[str] = None, state: Optional[str] = None,
                          error: Optional[str] = None):
     """Callback Google → échange code→refresh_token, persiste, redirige vers l'app."""
-    frontend_base = os.environ.get("PUBLIC_ORIGIN") or "https://senior-france.preview.emergentagent.com"
+    # Prefer PUBLIC_ORIGIN; otherwise derive from the request Origin/Referer.
+    frontend_base = os.environ.get("PUBLIC_ORIGIN")
+    if not frontend_base:
+        ref = request.headers.get("referer") or request.headers.get("origin") or ""
+        if ref:
+            from urllib.parse import urlparse
+            p = urlparse(ref)
+            if p.scheme and p.netloc:
+                frontend_base = f"{p.scheme}://{p.netloc}"
+    if not frontend_base:
+        # Last resort: build from request URL (avoids hardcoded preview URL)
+        frontend_base = f"{request.url.scheme}://{request.url.hostname}"
     if error or not code or not state:
         return RedirectResponse(
             f"{frontend_base}/admin/google-ads?status=error&reason={error or 'missing_code'}",
