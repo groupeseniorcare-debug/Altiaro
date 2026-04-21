@@ -322,10 +322,40 @@ async def _run_deep_analysis(job_id: str, user_id: str, product: str, persona: s
         step1 = await _claude_json(SYSTEM, STEP1_PROMPT.format(**ctx), f"{session}-s1", timeout=90)
         ctx["category"] = step1.get("category", "")
 
+        # STEP 1.5 — Google Ads Keyword Planner enrichment (optionnel, non bloquant)
+        google_enriched = {"available": False, "by_country": {}, "reason": "not_attempted"}
+        try:
+            from routes.google_ads import fetch_keyword_volumes
+            kw_input = {}
+            for c in countries:
+                block = (step1.get("keywords_by_country", {}).get(c, {}) or {})
+                merged = (block.get("transactional", []) or [])[:10] + (block.get("informational", []) or [])[:5]
+                if merged:
+                    kw_input[c] = merged
+            if kw_input:
+                await _set_progress(job_id, 1, "Volumes réels Google Keyword Planner (15s)")
+                google_enriched = await fetch_keyword_volumes(kw_input)
+        except Exception as e:
+            logger.warning(f"[analyzer] google enrichment skipped: {e}")
+            google_enriched = {"available": False, "by_country": {}, "reason": str(e)[:120]}
+
         # STEP 2
         kws_short = json.dumps({c: (step1.get("keywords_by_country", {}).get(c, {}) or {}).get("transactional", [])[:6] for c in countries}, ensure_ascii=False)[:1500]
         await _set_progress(job_id, 2, "Sizing marché par pays (60s)")
         step2 = await _claude_json(SYSTEM, STEP2_PROMPT.format(**ctx, keywords=kws_short), f"{session}-s2", timeout=120)
+
+        # Override Claude estimations with Google real data where available
+        if google_enriched.get("available"):
+            country_sizing = step2.get("country_sizing", {}) or {}
+            for c, g in google_enriched["by_country"].items():
+                if g.get("total_volume_monthly", 0) > 0:
+                    csz = country_sizing.get(c) or {}
+                    csz["monthly_search_volume"] = g["total_volume_monthly"]
+                    if g.get("avg_cpc_eur", 0) > 0:
+                        csz["cpc_avg_eur"] = g["avg_cpc_eur"]
+                    csz["google_verified"] = True
+                    country_sizing[c] = csz
+            step2["country_sizing"] = country_sizing
 
         # STEP 3
         await _set_progress(job_id, 3, "Analyse concurrentielle par pays (60s)")
@@ -358,6 +388,8 @@ async def _run_deep_analysis(job_id: str, user_id: str, product: str, persona: s
             "positioning_matrix": step3.get("positioning_matrix", {}),
             "legal_ops_by_country": step4.get("legal_ops_by_country", {}),
             "countries": countries,
+            "google_keyword_planner": google_enriched,
+            "google_verified": bool(google_enriched.get("available")),
         }
         # Aggregates
         sizing = analysis.get("country_sizing", {})
@@ -380,8 +412,10 @@ async def _run_deep_analysis(job_id: str, user_id: str, product: str, persona: s
             "countries_requested": countries,
             "notes": notes,
             "analysis": analysis,
-            "source": "ai_claude_sonnet_4.5_multistep_v2",
-            "enriched_with_dataforseo": False,
+            "source": ("ai_claude_sonnet_4.5_multistep_v2_google_verified"
+                       if google_enriched.get("available")
+                       else "ai_claude_sonnet_4.5_multistep_v2"),
+            "enriched_with_google_ads": bool(google_enriched.get("available")),
             "created_at": now,
             "job_id": job_id,
         })

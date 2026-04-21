@@ -1,0 +1,39 @@
+{
+  "summary": "Sprint 20 — Intégration Google Keyword Planner dans l'analyzer deep testée de bout en bout. 20/20 tests pytest passent : (1) imports analyzer.py + fetch_keyword_volumes sans erreur, (2) fallback silencieux sans admin connecté → available:false/reason:no_admin_connected, (3) analyse existante d9731ff8-... conforme (source=ai_claude_sonnet_4.5_multistep_v2 SANS _google_verified, google_verified:false, enriched_with_google_ads:false, google_keyword_planner.reason:no_admin_connected), (4) endpoints /api/niches/analyses et /api/niches/analyses/{id} exposent les nouveaux champs, (5) logique d'override country_sizing[code].google_verified=true validée par unit test, (6) faux admin connecté (refresh_token fake) → échoue gracieusement sans crash (available:false + error par pays). Non-régression Google Ads (27/27 iter14) + auth + sites OK. Pas lancé /api/niches/analyze (4min + coût Claude).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration15_analyzer_google_enrichment.py",
+    "/app/test_reports/pytest/iter15.xml",
+    "/app/test_reports/pytest/iter15_regress14.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "analyzer.py:325-340 — import lazy de fetch_keyword_volumes à l'intérieur du try/except : robuste, n'empêche pas le démarrage si google_ads.py crash. OK.",
+    "analyzer.py:348-358 — override country_sizing uniquement si total_volume_monthly>0 : logique correcte, les pays sans résultat Google gardent l'estimation Claude. Bon design.",
+    "analyzer.py:391-392 — google_keyword_planner et google_verified bien persistés dans analysis.* (pas à la racine du doc). Cohérent avec la structure existante.",
+    "analyzer.py:415-418 — source conditionnelle (_google_verified suffix) + enriched_with_google_ads booléen redondants mais utiles pour filtrage DB. OK.",
+    "google_ads.py:_get_platform_client — 'premier admin actif' arbitraire : si plusieurs admins connectent Google Ads, le premier trouvé est utilisé. À documenter/affiner en prod (ex: pick by updated_at desc).",
+    "google_ads.py:fetch_keyword_volumes — limite 20 kw/pays hardcodée : bon pour quota-friendly, pourrait être configurable.",
+    "google_ads.py:fetch_keyword_volumes — try/except par pays préserve la résilience : un échec FR ne casse pas DE. Bon.",
+    "google_ads.py:fetch_keyword_volumes — available calculé sur any(total_volume_monthly>0) : si TOUS les pays renvoient 0 OU erreur, reason='no_volumes_returned' (observé dans le test fake admin). Bon fallback."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration15_analyzer_google_enrichment.py"
+  ],
+  "success_rate": {"backend": "100% (20/20 new + 27/27 regression iter14)", "frontend": "not_tested"},
+  "test_credentials": "admin@conceptfactory.fr / Factory2026! ; concepteur@conceptfactory.fr / Concepteur2026! (depuis /app/memory/test_credentials.md)",
+  "seed_data_creation": "Insertion/suppression temporaire d'un doc google_ads_credentials factice (admin_user_id=TEST_fake_admin_*, is_active:true, refresh_token:fake_refresh_token_invalid) dans test_fake_admin_connected_fails_gracefully — nettoyé en fin de test (try/finally).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Admin id = '69e5e9842446df29e5036516' (string dans _id). Admin POSSÈDE l'analyse d9731ff8-80aa-42ed-8673-d03014acc05e, donc GET /api/niches/analyses/{id} avec admin session → 200. Concepteur (operator) → 404 sur cet id (bon comportement). Pour tester la logique 'google_verified=true' en frontend, le main agent peut patcher en DB : db.niche_analyses.update_one({id:'d9731ff8-...'}, {'$set':{'analysis.google_verified':true}}) puis checker le badge UI, puis revert.",
+  "rca of the issue": "N/A — aucun bug trouvé. La Sprint 20 est correctement intégrée : fallback Claude silencieux fonctionne, structure de réponse enrichie sans casser l'existant, aucune régression sur les 27 tests Google Ads Sprint 19."
+}

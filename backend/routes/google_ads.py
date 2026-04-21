@@ -338,3 +338,122 @@ async def campaigns(data: CampaignsInput, user: dict = Depends(get_current_user)
 async def list_markets(user: dict = Depends(get_current_user)):
     _require_admin(user)
     return {"markets": [{"code": k, **v} for k, v in MARKETS.items()]}
+
+
+# ====================== PUBLIC HELPER (for analyzer) ====================== #
+async def _get_platform_client():
+    """Trouve n'importe quel Admin ayant connecté Google Ads et renvoie son client.
+    Retourne (client, customer_id) ou (None, None) si aucune connexion.
+    """
+    if not (DEV_TOKEN and CLIENT_ID and CLIENT_SECRET):
+        return None, None
+    creds = await db.google_ads_credentials.find_one(
+        {"is_active": True, "refresh_token": {"$ne": None}},
+        {"_id": 0},
+    )
+    if not creds or not creds.get("refresh_token"):
+        return None, None
+    from google.ads.googleads.client import GoogleAdsClient
+    cfg = {
+        "developer_token": DEV_TOKEN,
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "refresh_token": creds["refresh_token"],
+        "use_proto_plus": True,
+    }
+    login_cid = creds.get("login_customer_id")
+    if login_cid:
+        cfg["login_customer_id"] = login_cid.replace("-", "")
+    try:
+        client = GoogleAdsClient.load_from_dict(cfg, version="v21")
+    except Exception as e:
+        logger.warning(f"Google Ads client init failed: {e}")
+        return None, None
+
+    # Take first accessible customer as default
+    try:
+        cs = client.get_service("CustomerService")
+        accessible = cs.list_accessible_customers()
+        if accessible.resource_names:
+            cid = accessible.resource_names[0].split("/")[-1]
+            return client, cid
+    except Exception as e:
+        logger.warning(f"list_accessible_customers failed: {e}")
+    return None, None
+
+
+async def fetch_keyword_volumes(keywords_by_country: dict) -> dict:
+    """Pour chaque pays, résout les volumes mensuels Google réels pour la liste
+    de mots-clés fournie. Limites : 20 mots-clés par pays max (quota friendly).
+
+    Input : {"FR": ["kw1", "kw2", ...], "DE": [...]}
+    Output : {
+      "available": bool,
+      "by_country": {
+        "FR": {"keywords": [{"keyword": "kw1", "volume": 2400, "competition": "MEDIUM",
+                             "competition_index": 55, "cpc_low_eur": 0.8, "cpc_high_eur": 2.1}],
+               "total_volume_monthly": 18500, "avg_cpc_eur": 1.35}
+      }}
+    Jamais d'exception remontée : si erreur, available=false."""
+    out = {"available": False, "by_country": {}, "reason": None}
+    client, default_cid = await _get_platform_client()
+    if not client:
+        out["reason"] = "no_admin_connected"
+        return out
+
+    for country, kws in (keywords_by_country or {}).items():
+        country = (country or "").upper()
+        market = MARKETS.get(country)
+        if not market or not kws:
+            continue
+        kws_clean = [k for k in (kws or []) if k and isinstance(k, str)][:20]
+        if not kws_clean:
+            continue
+        try:
+            svc = client.get_service("KeywordPlanIdeaService")
+            req = client.get_type("GenerateKeywordHistoricalMetricsRequest")
+            req.customer_id = default_cid
+            req.keywords.extend(kws_clean)
+            req.language = f"languageConstants/{market['lang']}"
+            req.geo_target_constants.append(f"geoTargetConstants/{market['geo']}")
+            req.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH
+            hist_opts = client.get_type("HistoricalMetricsOptions")
+            hist_opts.include_average_cpc = True
+            req.historical_metrics_options = hist_opts
+
+            resp = svc.generate_keyword_historical_metrics(request=req)
+            rows = []
+            vol_sum = 0
+            cpc_values = []
+            for r in resp.results:
+                kw = r.text or ""
+                m = r.keyword_metrics
+                v = int(m.avg_monthly_searches or 0) if m else 0
+                low = (m.low_top_of_page_bid_micros or 0) / 1_000_000 if m else 0
+                high = (m.high_top_of_page_bid_micros or 0) / 1_000_000 if m else 0
+                rows.append({
+                    "keyword": kw,
+                    "volume": v,
+                    "competition": str(m.competition).split(".")[-1] if m and m.competition else "UNKNOWN",
+                    "competition_index": int(m.competition_index or 0) if m else 0,
+                    "cpc_low_eur": round(low, 2),
+                    "cpc_high_eur": round(high, 2),
+                })
+                vol_sum += v
+                if high > 0:
+                    cpc_values.append((low + high) / 2)
+            avg_cpc = round(sum(cpc_values) / len(cpc_values), 2) if cpc_values else 0
+            rows.sort(key=lambda x: x["volume"], reverse=True)
+            out["by_country"][country] = {
+                "keywords": rows,
+                "total_volume_monthly": vol_sum,
+                "avg_cpc_eur": avg_cpc,
+            }
+        except Exception as e:
+            logger.warning(f"[google-ads enrich] {country} failed: {str(e)[:180]}")
+            out["by_country"][country] = {"keywords": [], "total_volume_monthly": 0,
+                                          "avg_cpc_eur": 0, "error": str(e)[:180]}
+    out["available"] = any(v.get("total_volume_monthly", 0) > 0 for v in out["by_country"].values())
+    if not out["available"]:
+        out["reason"] = "no_volumes_returned"
+    return out
