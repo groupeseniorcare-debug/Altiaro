@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
-import { AltioraLogo } from "../components/AltioraLogo";
+import { AltiaroLogo } from "../components/AltiaroLogo";
 import { Spinner, ArrowClockwise } from "@phosphor-icons/react";
 import { useAuth } from "../lib/auth";
 
@@ -111,7 +111,7 @@ export default function VerifyEmail() {
     >
       <nav className="w-full max-w-6xl h-16 flex items-center justify-between border-b border-neutral-200">
         <Link to="/" className="flex items-center" data-testid="verify-home-link">
-          <AltioraLogo variant="horizontal" size={22} color="#0A0A0A" />
+          <AltiaroLogo variant="horizontal" size={22} color="#0A0A0A" />
         </Link>
         <Link to="/login" className="text-sm text-neutral-600 hover:text-neutral-900">
           Se connecter

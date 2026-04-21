@@ -4,7 +4,7 @@ import { useAuth } from "../lib/auth";
 import CommandPalette from "./CommandPalette";
 import CopilotFab from "./CopilotFab";
 import { List, X } from "@phosphor-icons/react";
-import { AltioraLogo } from "./AltioraLogo";
+import { AltiaroLogo } from "./AltiaroLogo";
 import {
   House,
   SquaresFour,
@@ -84,17 +84,10 @@ export default function Layout({ children }) {
         data-testid="sidebar"
       >
         <div className="px-5 py-5 border-b border-neutral-200">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-md bg-neutral-900 flex items-center justify-center">
-              <AltioraLogo variant="icon-only" size={18} color="#FFFFFF" />
-            </div>
-            <div>
-              <div className="font-semibold text-[15px] leading-tight text-neutral-900 tracking-tight">
-                Altiora
-              </div>
-              <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-500 font-medium">
-                E-commerce Machine
-              </div>
+          <div className="flex flex-col gap-1.5">
+            <AltiaroLogo variant="horizontal" size={20} color="#0A0A0A" />
+            <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-500 font-medium pl-[22px]">
+              E-commerce Machine
             </div>
           </div>
         </div>

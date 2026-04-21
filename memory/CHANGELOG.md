@@ -3,6 +3,16 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 25 : Pivot "Altiora" → "Altiaro" (domaine .com libre)
+- **🔁 Rebrand forcé** : après constat que **tous les TLDs d'Altiora sont pris** (Altiora Financial Group LLC aux US sur le .com, squatters sur .fr/.io/.eu/etc.), pivot vers un nom proche disponible. La commande OVH 248781829 a été interprétée par erreur comme un "transfert entrant" par l'API OVH → s'auto-annulera sous 14 jours avec remboursement 7,99€.
+- **🌐 `altiaro.com` acheté** via OVH direct (order #248782321, 7,99€ TTC, vrai CREATE — vérifié dans la réponse item). Seul nom premium parmi 20 candidats testés qui avait `.com` réellement libre (DNS vide + HTTP silencieux + OVH `create` confirmé). Phonétiquement proche d'Altiora, même étymologie latine (élévation).
+- **🎨 Logo branded** : l'icône SVG "A géométrique avec flèche intégrée" **remplace le A initial** du wordmark → rendu final `[icône-A]LTIARO`. Component renommé `AltiaroLogo` (fichier `/app/frontend/src/components/AltiaroLogo.jsx`).
+- **✍️ 113 replacements** Altiora→Altiaro sur 20 fichiers code (backend + frontend + HTML + manifest + robots.txt + tax_utils + legal templates). Module `altiora_legal.py` renommé `altiaro_legal.py`. Contact email `contact@altiaro.com`.
+- **🔀 DNS OVH configuré** : redirection HTTP 301 altiaro.com → preview Emergent via le proxy natif OVH (A record vers 213.186.33.5 + TXT `"1|https://senior-france.preview.emergentagent.com"` sur `@` et `www`). Propagation DNS 30 min à 4h.
+- **✅ Layout sidebar simplifié** : la double représentation (carré noir+icône + texte "Altiaro") est remplacée par le nouveau logo horizontal unique, plus épuré. Idem Login/Signup panels.
+- **Tests** : Playwright smoke tests OK sur Landing + Signup + Cockpit avec le nouveau logo. Aucune console error. Backend reboot clean, API `/api/platform/info` renvoie bien `"name": "Altiaro"`.
+
+
 ## 2026-04-21 · Sprint 23 : Rebrand "Altiora" + domaine + logo + pages publiques
 - **🏢 Nouveau nom de plateforme** : "Concept Factory" → **Altiora** (latin « plus haut »). 32 remplacements dans 20 fichiers code (frontend JSX + backend routes + HTML/SEO meta). Emails techniques `@conceptfactory.fr` conservés (credentials login).
 - **🌐 Domaine `altiora.com` acheté** via OVH direct (order #248781829, **7,99 € TTC** prélevés sur CB OVH par défaut). Bypass du flow Mollie puisque domaine platform-level.

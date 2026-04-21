@@ -1,4 +1,4 @@
-"""Self-service signup + email OTP verification for Altiora.
+"""Self-service signup + email OTP verification for Altiaro.
 
 Flow:
   POST /auth/signup        → creates pending user + sends 6-digit OTP by email
@@ -66,7 +66,7 @@ class ResendInput(BaseModel):
 
 # ============== Helpers ==============
 def _hash_otp(code: str, email: str) -> str:
-    salt = os.environ.get("JWT_SECRET", "altiora-otp-salt")
+    salt = os.environ.get("JWT_SECRET", "altiaro-otp-salt")
     return hashlib.sha256(f"{salt}::{email}::{code}".encode("utf-8")).hexdigest()
 
 
@@ -95,12 +95,12 @@ async def _rate_limit_ip(ip: str, key: str, max_per_hour: int):
 
 
 async def _send_otp_email(to: str, name: str, code: str) -> None:
-    subject = "Altiora — Votre code de confirmation"
+    subject = "Altiaro — Votre code de confirmation"
     html = f"""<!DOCTYPE html>
 <html lang="fr"><body style="margin:0;padding:40px 20px;background:#F5F5F4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;color:#0A0A0A">
 <div style="max-width:520px;margin:0 auto;background:#FFFFFF;border:1px solid #E7E5E4;border-radius:12px;overflow:hidden">
   <div style="padding:32px 32px 0 32px">
-    <div style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#78716C">Altiora</div>
+    <div style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#78716C">Altiaro</div>
     <h1 style="font-size:24px;font-weight:600;margin:16px 0 12px 0;letter-spacing:-0.01em">Confirmons votre email</h1>
     <p style="font-size:15px;line-height:1.6;color:#44403C;margin:0 0 24px 0">Bonjour {name},<br>Voici votre code de confirmation pour activer votre compte Concepteur :</p>
   </div>
@@ -111,8 +111,8 @@ async def _send_otp_email(to: str, name: str, code: str) -> None:
     <p style="font-size:13px;color:#78716C;margin:20px 0 0 0">Ce code expire dans {OTP_TTL_MINUTES} minutes. Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement cet email.</p>
   </div>
   <div style="margin-top:32px;padding:20px 32px;background:#FAFAF9;border-top:1px solid #E7E5E4;font-size:12px;color:#78716C;line-height:1.6">
-    <div><strong style="color:#0A0A0A">Altiora</strong> — La plateforme e-commerce des partenariats éclairés.</div>
-    <div style="margin-top:6px">Édité par Robin Zuchiatti · SIREN 883 803 967 · <a href="https://altiora.com/mentions-legales" style="color:#78716C">Mentions légales</a></div>
+    <div><strong style="color:#0A0A0A">Altiaro</strong> — La plateforme e-commerce des partenariats éclairés.</div>
+    <div style="margin-top:6px">Édité par Robin Zuchiatti · SIREN 883 803 967 · <a href="https://altiaro.com/mentions-legales" style="color:#78716C">Mentions légales</a></div>
   </div>
 </div></body></html>"""
 

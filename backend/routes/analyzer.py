@@ -1,5 +1,5 @@
 """
-Deep Analyzer v2 — Altiora
+Deep Analyzer v2 — Altiaro
 - Open to ANY e-commerce product (no Silver Economy restriction)
 - 5-step deep analysis (2-5 min total)
 - Background task with real-time progress tracking

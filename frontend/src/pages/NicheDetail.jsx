@@ -75,7 +75,7 @@ export default function NicheDetail() {
     const params = new URLSearchParams({
       niche_slug: niche.slug,
       niche: niche.name,
-      name: `${niche.name} — Altiora`,
+      name: `${niche.name} — Altiaro`,
     });
     navigate(`/sites/new?${params.toString()}`);
   };

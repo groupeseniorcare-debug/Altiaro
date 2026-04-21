@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { AltioraLogo } from "../components/AltioraLogo";
+import { AltiaroLogo } from "../components/AltiaroLogo";
 
 function MarkdownLegal({ md }) {
   if (!md) return null;
@@ -55,7 +55,7 @@ export default function Legal({ slug }) {
       .get(`/platform/legal/${slug}`)
       .then((r) => setPage(r.data))
       .catch(() => setErr("Page introuvable"));
-    document.title = `Altiora · ${slug}`;
+    document.title = `Altiaro · ${slug}`;
   }, [slug]);
 
   return (
@@ -64,7 +64,7 @@ export default function Legal({ slug }) {
       <nav className="border-b border-neutral-200 bg-white/80 backdrop-blur sticky top-0 z-20">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2" data-testid="legal-home-link">
-            <AltioraLogo variant="horizontal" size={22} color="#0A0A0A" />
+            <AltiaroLogo variant="horizontal" size={22} color="#0A0A0A" />
           </Link>
           <Link
             to="/login"
@@ -97,7 +97,7 @@ export default function Legal({ slug }) {
       {/* Footer */}
       <footer className="border-t border-neutral-200 mt-24">
         <div className="max-w-5xl mx-auto px-6 py-10 flex flex-wrap gap-x-8 gap-y-3 items-center justify-between text-sm text-neutral-500">
-          <div>© {new Date().getFullYear()} Altiora — Tous droits réservés</div>
+          <div>© {new Date().getFullYear()} Altiaro — Tous droits réservés</div>
           <div className="flex flex-wrap gap-x-6 gap-y-2">
             <Link to="/mentions-legales" className="hover:text-neutral-900">
               Mentions légales

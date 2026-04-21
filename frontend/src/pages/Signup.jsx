@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
-import { AltioraLogo } from "../components/AltioraLogo";
+import { AltiaroLogo } from "../components/AltiaroLogo";
 import { ArrowUpRight, Spinner, Eye, EyeSlash } from "@phosphor-icons/react";
 
 function formatError(detail) {
@@ -42,11 +42,8 @@ export default function Signup() {
     >
       {/* Brand panel (hidden on mobile) */}
       <div className="hidden lg:flex flex-col justify-between p-12 bg-neutral-900 text-white">
-        <Link to="/" className="flex items-center gap-3" data-testid="signup-brand-link">
-          <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center">
-            <AltioraLogo variant="icon-only" size={22} color="#0A0A0A" />
-          </div>
-          <span className="text-lg font-semibold">Altiora</span>
+        <Link to="/" className="flex items-center" data-testid="signup-brand-link">
+          <AltiaroLogo variant="horizontal" size={26} color="#FFFFFF" />
         </Link>
         <div>
           <div className="text-[11px] uppercase tracking-[0.14em] text-neutral-400 mb-4">
@@ -64,7 +61,7 @@ export default function Signup() {
           </p>
         </div>
         <div className="text-xs text-neutral-500">
-          © {new Date().getFullYear()} Altiora — SIREN 883 803 967
+          © {new Date().getFullYear()} Altiaro — SIREN 883 803 967
         </div>
       </div>
 
@@ -72,7 +69,7 @@ export default function Signup() {
       <div className="flex flex-col justify-center px-6 py-12 md:px-16">
         <div className="lg:hidden mb-8">
           <Link to="/" className="inline-flex items-center gap-2" data-testid="signup-brand-mobile">
-            <AltioraLogo variant="horizontal" size={22} color="#0A0A0A" />
+            <AltiaroLogo variant="horizontal" size={22} color="#0A0A0A" />
           </Link>
         </div>
 

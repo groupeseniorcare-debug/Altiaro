@@ -1,5 +1,5 @@
 """
-Multi-domain routing pour Altiora.
+Multi-domain routing pour Altiaro.
 Chaque site peut être branché sur un domaine custom (ex: luméaconfort.fr).
 
 Flow :
@@ -187,7 +187,7 @@ async def verify_domain(site_id: str, user: dict = Depends(get_current_user)):
             verified = True
             reason = f"A records convergent ({', '.join(user_ips & target_ips)})"
         else:
-            reason = "Aucun CNAME vers la cible Altiora n'a été détecté."
+            reason = "Aucun CNAME vers la cible Altiaro n'a été détecté."
 
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc).isoformat()

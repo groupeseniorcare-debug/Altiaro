@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { AltioraLogo } from "../components/AltioraLogo";
+import { AltiaroLogo } from "../components/AltiaroLogo";
 import {
   ArrowUpRight,
   Gauge,
@@ -17,7 +17,7 @@ import {
 } from "@phosphor-icons/react";
 
 /**
- * Public landing page for Altiora — served on altiora.com.
+ * Public landing page for Altiaro — served on altiaro.com.
  * No auth required — discoverable by Google, Mollie, partners.
  *
  * Design: monochrome (black on white), mixed serif (Fraunces, display) +
@@ -25,7 +25,7 @@ import {
  */
 export default function Landing() {
   useEffect(() => {
-    document.title = "Altiora — La plateforme e-commerce des partenariats éclairés";
+    document.title = "Altiaro — La plateforme e-commerce des partenariats éclairés";
   }, []);
 
   return (
@@ -59,7 +59,7 @@ export default function Landing() {
               <span className="italic text-neutral-500">Sans trésorerie.</span>
             </h1>
             <p className="text-lg text-neutral-600 max-w-xl mt-8 leading-relaxed">
-              Altiora accompagne les entrepreneurs qui lancent des marques e-commerce
+              Altiaro accompagne les entrepreneurs qui lancent des marques e-commerce
               premium — analyse de niches multi-marchés, site généré par IA,
               pilotage complet, et <strong className="text-neutral-900">50% de la marge brute</strong> directement
               pour vous. <span className="text-neutral-900 underline decoration-neutral-300 underline-offset-4">Zéro frais fixes.</span>
@@ -130,7 +130,7 @@ export default function Landing() {
             </div>
             <div className="col-span-12 lg:col-span-6 lg:col-start-7 flex items-end">
               <p className="text-neutral-600 leading-relaxed">
-                Altiora n'est pas pour tout le monde. Nous recrutons des
+                Altiaro n'est pas pour tout le monde. Nous recrutons des
                 partenaires qui ont le temps et le goût du commerce, pas
                 nécessairement les 50 000 € qu'il faut pour lancer une marque
                 seul.
@@ -184,7 +184,7 @@ export default function Landing() {
           <div className="grid grid-cols-12 gap-8 mb-16">
             <div className="col-span-12 lg:col-span-6">
               <div className="text-[11px] uppercase tracking-[0.14em] text-neutral-500 mb-4">
-                La méthode Altiora
+                La méthode Altiaro
               </div>
               <h2
                 className="text-4xl sm:text-5xl tracking-tight leading-[1.05] font-medium"
@@ -277,7 +277,7 @@ export default function Landing() {
             <p className="text-neutral-300 leading-relaxed text-base">
               Sur chaque commande, la marge brute hors taxes (prix de vente HT −
               coût d'achat HT − frais Mollie) est partagée équitablement. 50%
-              pour vous. 50% pour Altiora.
+              pour vous. 50% pour Altiaro.
             </p>
 
             <div className="mt-10 pt-8 border-t border-white/10 flex flex-wrap gap-x-8 gap-y-4 text-sm">
@@ -352,7 +352,7 @@ export default function Landing() {
                 className="text-4xl sm:text-5xl tracking-tight leading-[1.05] font-medium"
                 style={{ fontFamily: "'Fraunces', serif" }}
               >
-                Shopify, Prestashop, agences, freelances. <span className="italic text-neutral-500">Et Altiora.</span>
+                Shopify, Prestashop, agences, freelances. <span className="italic text-neutral-500">Et Altiaro.</span>
               </h2>
             </div>
             <div className="col-span-12 lg:col-span-6 flex items-end">
@@ -376,7 +376,7 @@ export default function Landing() {
                     Agence / freelance
                   </th>
                   <th className="py-4 text-left text-[11px] uppercase tracking-[0.14em] text-white font-medium bg-neutral-900 px-4">
-                    Altiora
+                    Altiaro
                   </th>
                 </tr>
               </thead>
@@ -526,7 +526,7 @@ function TopNav() {
     <nav className="border-b border-neutral-200 bg-white/90 backdrop-blur sticky top-0 z-30">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center" data-testid="landing-home-link">
-          <AltioraLogo variant="horizontal" size={22} color="#0A0A0A" />
+          <AltiaroLogo variant="horizontal" size={22} color="#0A0A0A" />
         </Link>
         <div className="flex items-center gap-7">
           <a
@@ -564,7 +564,7 @@ function TopNav() {
 function FaqSection() {
   const faqs = [
     {
-      q: "Combien me coûte Altiora au démarrage ?",
+      q: "Combien me coûte Altiaro au démarrage ?",
       a: "Rien. Il n'y a ni abonnement mensuel, ni frais de setup, ni minimum de volume. Nous nous rémunérons uniquement sur les commandes, via le partage 50/50 de la marge brute. Les seuls débours optionnels : le domaine custom via OVH (14,99 € TTC / an) si vous en voulez un, et les publicités Google Ads que vous décidez éventuellement de lancer.",
     },
     {
@@ -573,7 +573,7 @@ function FaqSection() {
     },
     {
       q: "Qui gère la TVA, les factures, la comptabilité ?",
-      a: "Altiora émet automatiquement les factures à vos clients finaux au format exigé par l'administration française. Vous recevez une synthèse mensuelle de votre chiffre d'affaires HT et de vos parts de marge, prêtes à transmettre à votre comptable. La TVA est collectée et reversée à l'État par Altiora côté plateforme.",
+      a: "Altiaro émet automatiquement les factures à vos clients finaux au format exigé par l'administration française. Vous recevez une synthèse mensuelle de votre chiffre d'affaires HT et de vos parts de marge, prêtes à transmettre à votre comptable. La TVA est collectée et reversée à l'État par Altiaro côté plateforme.",
     },
     {
       q: "Que se passe-t-il si une commande est remboursée ou litigée ?",
@@ -588,7 +588,7 @@ function FaqSection() {
       a: "Oui. Vous pouvez ouvrir jusqu'à 3 sites en parallèle sur votre compte Concepteur. Nous recommandons d'en valider un avant de démultiplier pour ne pas disperser votre attention. Les sites sans chiffre d'affaires pendant 90 jours sont archivés automatiquement.",
     },
     {
-      q: "Que faites-vous concrètement, vous, Altiora ?",
+      q: "Que faites-vous concrètement, vous, Altiaro ?",
       a: "Nous opérons toute la couche technique, juridique et intelligence : l'infrastructure (serveurs, domaines, SSL, paiements), l'IA qui génère votre site et votre copy, les pages légales conformes LCEN/RGPD, le SEO multi-pays, l'intégration Google Merchant Center pour le Shopping gratuit, les scans de niche, et le support de niveau 1. Vous pilotez le produit et la relation client.",
     },
     {
@@ -645,11 +645,11 @@ function Footer() {
     <footer className="bg-neutral-50">
       <div className="max-w-7xl mx-auto px-6 py-16 grid grid-cols-2 md:grid-cols-4 gap-10 text-sm">
         <div className="col-span-2">
-          <AltioraLogo variant="horizontal" size={22} color="#0A0A0A" />
+          <AltiaroLogo variant="horizontal" size={22} color="#0A0A0A" />
           <p className="text-neutral-500 mt-5 max-w-sm leading-relaxed">
             La plateforme e-commerce des partenariats éclairés. Édité par
             Robin Zuchiatti (entrepreneur individuel), exerçant sous le nom
-            commercial Altiora.
+            commercial Altiaro.
           </p>
         </div>
         <div>
@@ -661,7 +661,7 @@ function Footer() {
             <a href="#partenariat" className="block hover:text-neutral-900">Partenariat 50/50</a>
             <a href="#faq" className="block hover:text-neutral-900">FAQ</a>
             <Link to="/login" className="block hover:text-neutral-900">Cockpit Concepteur</Link>
-            <a href="mailto:contact@altiora.com" className="block hover:text-neutral-900">contact@altiora.com</a>
+            <a href="mailto:contact@altiaro.com" className="block hover:text-neutral-900">contact@altiaro.com</a>
           </div>
         </div>
         <div>
@@ -682,7 +682,7 @@ function Footer() {
       </div>
       <div className="border-t border-neutral-200">
         <div className="max-w-7xl mx-auto px-6 py-6 flex flex-wrap gap-y-2 gap-x-6 text-xs text-neutral-500 justify-between">
-          <div>© {new Date().getFullYear()} Altiora — SIREN 883 803 967 · TVA FR42883803967</div>
+          <div>© {new Date().getFullYear()} Altiaro — SIREN 883 803 967 · TVA FR42883803967</div>
           <div>Fait avec soin depuis Farnay · France</div>
         </div>
       </div>

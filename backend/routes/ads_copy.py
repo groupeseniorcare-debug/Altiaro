@@ -1,5 +1,5 @@
 """
-Google Ads Copy Generator pour Altiora.
+Google Ads Copy Generator pour Altiaro.
 Le Concepteur sélectionne un pays + une langue, on génère :
 - 15 headlines (≤30 chars) prêts pour une Responsive Search Ad
 - 4 descriptions (≤90 chars)

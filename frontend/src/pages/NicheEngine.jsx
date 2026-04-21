@@ -188,7 +188,7 @@ export default function NicheEngine() {
           <section>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-[11px] uppercase tracking-widest text-neutral-500">
-                Niches recommandées par Altiora
+                Niches recommandées par Altiaro
               </h2>
               <div className="text-xs text-neutral-500">Basé sur 20 produits qualifiés</div>
             </div>

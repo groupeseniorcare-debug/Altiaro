@@ -1,4 +1,4 @@
-# 🎯 Altiora — Étude de marché Silver Economy
+# 🎯 Altiaro — Étude de marché Silver Economy
 ## 20 niches × 6 pays = 120 analyses opérationnelles
 
 > **Périmètre** : Silver Economy (seniors 60+ et aidants 45-60) — produits drop-shipping NON-médicaux

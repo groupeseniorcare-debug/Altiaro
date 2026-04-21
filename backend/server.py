@@ -1,5 +1,5 @@
 """
-Altiora — FastAPI orchestrator.
+Altiaro — FastAPI orchestrator.
 Monte les routers modulaires définis dans /app/backend/routes/.
 """
 import os
@@ -61,7 +61,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("conceptfactory")
 
-app = FastAPI(title="Altiora API")
+app = FastAPI(title="Altiaro API")
 api = APIRouter(prefix="/api")
 
 # Mount all routers

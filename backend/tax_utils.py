@@ -1,4 +1,4 @@
-"""TVA & marges bruttes pour Altiora.
+"""TVA & marges bruttes pour Altiaro.
 
 Règle unique : le prix de vente produit est TTC (ce que le client paye).
 Le prix d'achat fournisseur est HT (déclaré par le Concepteur).

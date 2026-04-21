@@ -22,4 +22,4 @@ Disallow: /niches
 Disallow: /domains
 Disallow: /empire
 
-Sitemap: https://altiora.com/sitemap.xml
+Sitemap: https://altiaro.com/sitemap.xml

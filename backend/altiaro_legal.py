@@ -1,4 +1,4 @@
-"""Altiora platform-level legal pages (platform = Altiora SAS itself,
+"""Altiaro platform-level legal pages (platform = Altiaro SAS itself,
 not a Concepteur's store).
 
 Exposed publicly (no auth) so Google / Mollie / partners can crawl them."""
@@ -7,7 +7,7 @@ from datetime import datetime
 
 PLATFORM_COMPANY = {
     # Nom commercial (apparaît dans tout le branding)
-    "nom": "Altiora",
+    "nom": "Altiaro",
     # Informations légales réelles de l'éditeur (entrepreneur individuel)
     "forme_juridique": "Entrepreneur individuel",
     "dirigeant_nom": "Robin Zuchiatti",  # Requis par la LCEN pour un EI
@@ -19,12 +19,12 @@ PLATFORM_COMPANY = {
     "code_naf": "47.82Z",
     "activite": "Commerce de détail et services e-commerce — plateforme SaaS multi-marques",
     "adresse": "4 impasse du Clos Fleuri, 42320 Farnay, France",
-    "email": "contact@altiora.com",
+    "email": "contact@altiaro.com",
     "telephone": "À compléter",
     "directeur_publication": "Robin Zuchiatti",
     "hebergeur_nom": "Emergent Labs",
     "hebergeur_adresse": "Infrastructure Kubernetes — à compléter avec l'adresse de l'hébergeur",
-    "site_web": "https://altiora.com",
+    "site_web": "https://altiaro.com",
 }
 
 
@@ -40,7 +40,7 @@ def render_mentions_legales():
         "content": f"""
 ## 1. Éditeur du site
 
-**Altiora** est le nom commercial sous lequel **{c['dirigeant_nom']}**, entrepreneur
+**Altiaro** est le nom commercial sous lequel **{c['dirigeant_nom']}**, entrepreneur
 individuel, édite et exploite la plateforme accessible à l'adresse {c['site_web']}.
 
 - Forme juridique : {c['forme_juridique']}
@@ -62,9 +62,9 @@ Le site **{c['site_web']}** est hébergé par :
 
 ## 3. Propriété intellectuelle
 
-L'ensemble du contenu de ce site (textes, logo, images, code, marque « Altiora »)
+L'ensemble du contenu de ce site (textes, logo, images, code, marque « Altiaro »)
 est la propriété exclusive de {c['dirigeant_nom']} (exerçant sous le nom
-commercial Altiora) et est protégé par les lois françaises et internationales
+commercial Altiaro) et est protégé par les lois françaises et internationales
 relatives à la propriété intellectuelle.
 
 Toute reproduction, représentation, modification, publication, adaptation totale
@@ -96,9 +96,9 @@ def render_cgu():
 ## Préambule
 
 Les présentes Conditions Générales d'Utilisation (CGU) régissent l'accès et
-l'utilisation de la plateforme **Altiora** (ci-après « la Plateforme »), éditée
+l'utilisation de la plateforme **Altiaro** (ci-après « la Plateforme »), éditée
 par {c['dirigeant_nom']} (entrepreneur individuel, SIREN {c['siren']}),
-exerçant sous le nom commercial Altiora.
+exerçant sous le nom commercial Altiaro.
 
 ## 1. Définitions
 
@@ -106,7 +106,7 @@ exerçant sous le nom commercial Altiora.
 - **Utilisateur** : toute personne physique ou morale utilisant la Plateforme.
 - **Concepteur** : Utilisateur inscrit exploitant un ou plusieurs sites e-commerce
   via la Plateforme, selon un modèle de partenariat 50/50 sur la marge brute.
-- **Éditeur** : {c['dirigeant_nom']} exerçant sous le nom commercial Altiora.
+- **Éditeur** : {c['dirigeant_nom']} exerçant sous le nom commercial Altiaro.
 - **Administrateur** : collaborateur de l'Éditeur disposant de droits étendus.
 
 ## 2. Inscription et compte
@@ -116,7 +116,7 @@ sociétés). L'Utilisateur garantit l'exactitude des informations fournies.
 
 ## 3. Services proposés
 
-Altiora met à disposition :
+Altiaro met à disposition :
 - Un moteur d'analyse de niches e-commerce (Silver Economy et autres marchés),
 - Un générateur de sites e-commerce par IA,
 - Un cockpit de gestion (catalogue, commandes, finance, SEO, publicité),
@@ -143,7 +143,7 @@ chaque mois par virement bancaire (SEPA).
 
 Les contenus générés par le Concepteur (textes, visuels, catalogue) restent sa
 propriété. L'Éditeur conserve la propriété de la Plateforme, de la marque
-Altiora et de son code source.
+Altiaro et de son code source.
 
 ## 7. Résiliation
 
@@ -170,7 +170,7 @@ def render_confidentialite():
         "content": f"""
 ## 1. Responsable du traitement
 
-**{c['dirigeant_nom']}**, exerçant sous le nom commercial Altiora
+**{c['dirigeant_nom']}**, exerçant sous le nom commercial Altiaro
 (entrepreneur individuel, SIREN {c['siren']}) — {c['adresse']} — {c['email']}.
 
 ## 2. Données collectées
@@ -257,7 +257,7 @@ Un cookie est un petit fichier texte déposé sur votre terminal lors de votre
 visite sur {c['site_web']}. Il permet de mémoriser vos préférences, d'analyser
 l'usage du site et de sécuriser votre session.
 
-## 2. Cookies utilisés par Altiora
+## 2. Cookies utilisés par Altiaro
 
 ### 2.1 Cookies strictement nécessaires (pas de consentement requis)
 | Nom | Finalité | Durée |

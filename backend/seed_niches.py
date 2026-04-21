@@ -1,5 +1,5 @@
 """
-Catalogue Niche Engine — Altiora Silver Economy
+Catalogue Niche Engine — Altiaro Silver Economy
 20 niches × 6 pays (FR, DE, CH, BE+LU, UK, NL).
 Les métriques (volume, CPC, KD, CPA cible) sont des estimations qualifiées
 à recalibrer via DataForSEO une fois la clé fournie.

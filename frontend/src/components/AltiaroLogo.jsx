@@ -1,11 +1,13 @@
 import React from "react";
 
 /**
- * Altiora wordmark + icon logo.
- * Defaults to horizontal layout (icon + text).
- * Pure CSS/SVG — no image fetch, guaranteed crisp at any size.
+ * Altiaro wordmark + icon logo.
+ * The icon itself is a geometric "A" with integrated up-arrow, so it replaces
+ * the leading "A" of the wordmark in the horizontal variant. Rendered result:
+ *   [icon-A] LTIARO
+ * That's both visually tighter and makes the icon more meaningful (it IS the A).
  */
-export function AltioraLogo({
+export function AltiaroLogo({
   size = 24,
   variant = "horizontal", // "horizontal" | "icon-only" | "wordmark-only"
   color = "currentColor",
@@ -34,6 +36,7 @@ export function AltioraLogo({
     return <span className={className}>{Icon}</span>;
   }
 
+  // The leading "A" is replaced by the icon glyph → "[icon]LTIARO"
   const Word = (
     <span
       style={{
@@ -45,16 +48,32 @@ export function AltioraLogo({
         lineHeight: 1,
       }}
     >
-      ALTIORA
+      LTIARO
     </span>
   );
 
   if (variant === "wordmark-only") {
-    return <span className={className}>{Word}</span>;
+    // Still show the full brand in this variant (e.g. in text-only contexts)
+    return (
+      <span
+        className={className}
+        style={{
+          fontSize: `${fontSize}px`,
+          fontWeight: 600,
+          letterSpacing: "0.09em",
+          color,
+          fontFamily: "'Inter', system-ui, sans-serif",
+          lineHeight: 1,
+        }}
+      >
+        ALTIARO
+      </span>
+    );
   }
 
+  // Horizontal: icon takes the place of the leading A, tighter spacing
   return (
-    <span className={`inline-flex items-center gap-2 ${className}`}>
+    <span className={`inline-flex items-center gap-[2px] ${className}`}>
       {Icon}
       {Word}
     </span>

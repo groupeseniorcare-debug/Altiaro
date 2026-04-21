@@ -1,5 +1,5 @@
 """
-Catalogue produits & commandes pour Altiora.
+Catalogue produits & commandes pour Altiaro.
 Séparé du server.py pour garder la modularité.
 """
 
