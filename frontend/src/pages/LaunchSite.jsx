@@ -127,28 +127,28 @@ export default function LaunchSite() {
     <Layout>
       <div className="p-8 md:p-10 max-w-[1200px]">
         <div className="mb-8">
-          <div className="text-[10px] uppercase tracking-[0.12em] text-zinc-500 font-medium mb-1.5">
+          <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-500 font-medium mb-1.5">
             Lancer un site
           </div>
-          <h1 className="text-3xl font-semibold text-zinc-100 tracking-tight">
+          <h1 className="text-3xl font-semibold text-neutral-900 tracking-tight">
             Quelle niche veux-tu tester ?
           </h1>
-          <p className="text-zinc-500 text-sm mt-1 max-w-xl">
+          <p className="text-neutral-500 text-sm mt-1 max-w-xl">
             Une seule idée, analysée en parallèle sur 6 marchés UE. Les cartes apparaissent au fur
             et à mesure — sélectionne celles qui valent le coup.
           </p>
         </div>
 
         {/* Step 1 — Input */}
-        <div className="bg-zinc-950 rounded-md border border-zinc-900 p-5 mb-4" data-testid="launch-input">
-          <div className="text-[10px] uppercase tracking-[0.12em] text-zinc-500 font-medium mb-2">
+        <div className="bg-white rounded-md border border-neutral-200 p-5 mb-4" data-testid="launch-input">
+          <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-500 font-medium mb-2">
             01 · Ton idée
           </div>
           <div className="flex flex-col md:flex-row gap-2">
             <div className="flex-1 relative">
               <MagnifyingGlass
                 size={16}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-600"
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400"
               />
               <input
                 type="text"
@@ -158,14 +158,14 @@ export default function LaunchSite() {
                 placeholder="fauteuil releveur électrique, monte-escalier, lit médicalisé…"
                 data-testid="launch-product"
                 disabled={loading}
-                className="w-full h-11 pl-10 pr-4 rounded-md border border-zinc-800 bg-black text-zinc-100 text-sm placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-400 disabled:opacity-60"
+                className="w-full h-11 pl-10 pr-4 rounded-md border border-neutral-200 bg-white text-neutral-900 text-sm placeholder:text-neutral-400 focus:outline-none focus:border-neutral-300 focus:ring-1 focus:ring-zinc-400 disabled:opacity-60"
               />
             </div>
             <button
               onClick={runMulti}
               disabled={loading || product.trim().length < 3}
               data-testid="launch-scan"
-              className="h-11 px-4 rounded-md bg-white hover:bg-zinc-200 disabled:opacity-50 text-black font-medium text-sm flex items-center gap-1.5 transition-colors"
+              className="h-11 px-4 rounded-md bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 text-white font-medium text-sm flex items-center gap-1.5 transition-colors"
             >
               {loading ? (
                 <>
@@ -195,10 +195,10 @@ export default function LaunchSite() {
 
         {/* Step 2 — Loading state */}
         {loading && (!scan || (scan.results || []).length === 0) && (
-          <div className="bg-zinc-950 rounded-md border border-zinc-900 p-8 mb-4 text-center">
-            <ArrowClockwise size={24} className="animate-spin mx-auto text-zinc-400 mb-3" />
-            <div className="text-sm font-medium text-zinc-200">6 marchés en analyse parallèle</div>
-            <div className="text-xs text-zinc-500 mt-1">
+          <div className="bg-white rounded-md border border-neutral-200 p-8 mb-4 text-center">
+            <ArrowClockwise size={24} className="animate-spin mx-auto text-neutral-600 mb-3" />
+            <div className="text-sm font-medium text-neutral-900">6 marchés en analyse parallèle</div>
+            <div className="text-xs text-neutral-500 mt-1">
               Chaque marché met 10-15s · Claude + Google Ads
             </div>
           </div>
@@ -209,23 +209,23 @@ export default function LaunchSite() {
           <div className="mb-4">
             <div className="flex items-baseline justify-between mb-3">
               <div>
-                <div className="text-[10px] uppercase tracking-[0.12em] text-zinc-500 font-medium">
+                <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-500 font-medium">
                   02 · Résultats
                 </div>
-                <div className="text-sm text-zinc-300 mt-1 font-mono">
+                <div className="text-sm text-neutral-700 mt-1 font-mono">
                   <span className="text-emerald-400">{scan.summary.go} GO</span>
-                  <span className="text-zinc-700 mx-2">·</span>
+                  <span className="text-neutral-400 mx-2">·</span>
                   <span className="text-amber-400">{scan.summary.go_with_reserve} RESERVE</span>
-                  <span className="text-zinc-700 mx-2">·</span>
+                  <span className="text-neutral-400 mx-2">·</span>
                   <span className="text-red-400">{scan.summary.no_go} NO-GO</span>
                   {scan.summary.error > 0 && (
                     <>
-                      <span className="text-zinc-700 mx-2">·</span>
-                      <span className="text-zinc-500">{scan.summary.error} err</span>
+                      <span className="text-neutral-400 mx-2">·</span>
+                      <span className="text-neutral-500">{scan.summary.error} err</span>
                     </>
                   )}
                   {loading && scan.progress && (
-                    <span className="text-zinc-500 ml-3">
+                    <span className="text-neutral-500 ml-3">
                       {scan.progress.done}/{scan.progress.total}
                     </span>
                   )}
@@ -248,10 +248,10 @@ export default function LaunchSite() {
                 Array.from({ length: scan.progress.total - scan.progress.done }).map((_, i) => (
                   <div
                     key={`pending-${i}`}
-                    className="rounded-md border border-dashed border-zinc-800 p-5 flex flex-col items-center justify-center gap-2 min-h-[200px] bg-zinc-950"
+                    className="rounded-md border border-dashed border-neutral-200 p-5 flex flex-col items-center justify-center gap-2 min-h-[200px] bg-white"
                   >
-                    <ArrowClockwise size={18} className="animate-spin text-zinc-500" />
-                    <div className="text-[11px] text-zinc-500">Analyse en cours…</div>
+                    <ArrowClockwise size={18} className="animate-spin text-neutral-500" />
+                    <div className="text-[11px] text-neutral-500">Analyse en cours…</div>
                   </div>
                 ))
               )}
@@ -261,8 +261,8 @@ export default function LaunchSite() {
 
         {/* Step 3 — Launch */}
         {scan && !loading && (scan.summary.go + scan.summary.go_with_reserve) > 0 && (
-          <div className="bg-zinc-950 rounded-md border border-zinc-700 p-5" data-testid="launch-step3">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-zinc-300 font-medium mb-2">
+          <div className="bg-white rounded-md border border-neutral-300 p-5" data-testid="launch-step3">
+            <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-700 font-medium mb-2">
               03 · Lance ton site
             </div>
             <input
@@ -271,15 +271,15 @@ export default function LaunchSite() {
               onChange={(e) => setSiteName(e.target.value)}
               placeholder={`Nom du site (par défaut : ${product})`}
               data-testid="launch-site-name"
-              className="w-full h-10 px-3 rounded-md border border-zinc-800 bg-black text-zinc-100 text-sm placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-400 mb-3"
+              className="w-full h-10 px-3 rounded-md border border-neutral-200 bg-white text-neutral-900 text-sm placeholder:text-neutral-400 focus:outline-none focus:border-neutral-300 focus:ring-1 focus:ring-zinc-400 mb-3"
             />
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="text-xs text-zinc-500">
+              <div className="text-xs text-neutral-500">
                 {selectedCountries.length === 0 ? (
                   <span className="text-red-400">Sélectionne au moins 1 marché GO ↑</span>
                 ) : (
                   <>
-                    <span className="text-zinc-300 font-medium">{selectedCountries.length}</span>{" "}
+                    <span className="text-neutral-700 font-medium">{selectedCountries.length}</span>{" "}
                     marché{selectedCountries.length > 1 ? "s" : ""} ·{" "}
                     {selectedCountries.map((c) => COUNTRY_FLAG[c] || c).join(" ")}
                   </>
@@ -289,7 +289,7 @@ export default function LaunchSite() {
                 onClick={createSite}
                 disabled={creating || selectedCountries.length === 0}
                 data-testid="launch-create"
-                className="h-9 px-4 rounded-md bg-white hover:bg-zinc-200 disabled:opacity-50 text-black font-medium text-sm flex items-center gap-1.5 transition-colors"
+                className="h-9 px-4 rounded-md bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 text-white font-medium text-sm flex items-center gap-1.5 transition-colors"
               >
                 {creating ? (
                   <>
@@ -308,11 +308,11 @@ export default function LaunchSite() {
 
         {/* Methodology */}
         {!scan && !loading && (
-          <div className="p-4 rounded-md border border-zinc-900 bg-zinc-950">
+          <div className="p-4 rounded-md border border-neutral-200 bg-white">
             <div className="flex items-start gap-2.5">
-              <Info size={14} className="text-zinc-600 shrink-0 mt-0.5" />
-              <div className="text-[11px] text-zinc-500 leading-relaxed">
-                <span className="text-zinc-300 font-medium">Comment ça marche</span> — Claude +
+              <Info size={14} className="text-neutral-400 shrink-0 mt-0.5" />
+              <div className="text-[11px] text-neutral-500 leading-relaxed">
+                <span className="text-neutral-700 font-medium">Comment ça marche</span> — Claude +
                 Google Keyword Planner en parallèle sur 6 marchés (FR / DE / BE / NL / CH / IT). Un
                 verdict par marché sur 3 critères obligatoires (prix ≥ 50€, volume ≥ 5 000/mois, CPA
                 Ads ≤ 40%) + concurrence (soft ≤ 75/100, au-delà warning "concurrence élevée").
@@ -338,8 +338,8 @@ function MarketCard({ result, selected, onToggle }) {
       onClick={onToggle}
       data-testid={`market-${result.country}`}
       className={`group relative rounded-md border p-4 transition-colors ${
-        canSelect ? "cursor-pointer hover:border-zinc-600" : "cursor-not-allowed opacity-70"
-      } ${selected ? "bg-zinc-900" : "bg-zinc-950"}`}
+        canSelect ? "cursor-pointer hover:border-neutral-300" : "cursor-not-allowed opacity-70"
+      } ${selected ? "bg-neutral-100" : "bg-white"}`}
       style={{
         borderColor: selected ? meta.color : "#27272A",
       }}
@@ -363,7 +363,7 @@ function MarketCard({ result, selected, onToggle }) {
       <div className="flex items-center gap-2.5 mb-4">
         <div className="text-2xl">{COUNTRY_FLAG[result.country] || "🌍"}</div>
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-zinc-100 text-sm">
+          <div className="font-medium text-neutral-900 text-sm">
             {result.country_name || result.country}
           </div>
           <div className="flex items-center gap-1 mt-0.5">
@@ -371,7 +371,7 @@ function MarketCard({ result, selected, onToggle }) {
             <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: meta.color }}>
               {meta.label}
               {result.score !== undefined && (
-                <span className="text-zinc-600"> · {result.score}</span>
+                <span className="text-neutral-400"> · {result.score}</span>
               )}
             </span>
           </div>
@@ -407,19 +407,19 @@ function MarketCard({ result, selected, onToggle }) {
           )}
 
           <div
-            className="text-[11px] text-zinc-400 leading-relaxed mt-2"
+            className="text-[11px] text-neutral-600 leading-relaxed mt-2"
             dangerouslySetInnerHTML={{
               __html: (result.reason || "").replace(
                 /\*\*(.*?)\*\*/g,
-                '<strong class="text-zinc-200 font-medium">$1</strong>'
+                '<strong class="text-neutral-900 font-medium">$1</strong>'
               ),
             }}
           />
 
           {result.market?.top_competitors?.length > 0 && (
-            <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-zinc-800">
-              <Globe size={9} className="text-zinc-600 shrink-0" />
-              <div className="text-[10px] text-zinc-500 truncate font-mono">
+            <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-neutral-200">
+              <Globe size={9} className="text-neutral-400 shrink-0" />
+              <div className="text-[10px] text-neutral-500 truncate font-mono">
                 {result.market.top_competitors.slice(0, 3).join(" · ")}
               </div>
             </div>
@@ -433,10 +433,10 @@ function MarketCard({ result, selected, onToggle }) {
 function Stat({ label, value, warn = false }) {
   return (
     <div>
-      <div className="text-[9px] text-zinc-500 uppercase tracking-wider font-medium">{label}</div>
+      <div className="text-[9px] text-neutral-500 uppercase tracking-wider font-medium">{label}</div>
       <div
         className={`text-xs font-mono font-semibold tabular-nums mt-0.5 ${
-          warn ? "text-red-400" : "text-zinc-200"
+          warn ? "text-red-400" : "text-neutral-900"
         }`}
       >
         {value}

@@ -57,41 +57,41 @@ export default function Layout({ children }) {
   };
 
   return (
-    <div className="min-h-screen flex bg-black text-zinc-100">
+    <div className="min-h-screen flex bg-neutral-50 text-neutral-900">
       {/* Mobile hamburger */}
       <button
         onClick={() => setMobileOpen(true)}
         data-testid="mobile-menu-open"
         aria-label="Ouvrir le menu"
-        className="fixed top-4 left-4 z-40 md:hidden w-10 h-10 rounded-md bg-zinc-950 border border-zinc-800 flex items-center justify-center hover:bg-zinc-900 transition"
+        className="fixed top-4 left-4 z-40 md:hidden w-10 h-10 rounded-md bg-white border border-neutral-200 flex items-center justify-center hover:bg-neutral-100 transition"
       >
-        <List size={18} className="text-zinc-300" />
+        <List size={18} className="text-neutral-700" />
       </button>
 
       {/* Mobile backdrop */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 md:hidden bg-black/70 backdrop-blur-sm"
+          className="fixed inset-0 z-40 md:hidden bg-neutral-900/40 backdrop-blur-sm"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
       <aside
-        className={`w-[240px] bg-black border-r border-zinc-900 flex flex-col fixed h-screen z-50 transition-transform duration-300 md:translate-x-0 ${
+        className={`w-[240px] bg-white border-r border-neutral-200 flex flex-col fixed h-screen z-50 transition-transform duration-300 md:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
         data-testid="sidebar"
       >
-        <div className="px-5 py-5 border-b border-zinc-900">
+        <div className="px-5 py-5 border-b border-neutral-200">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-md bg-white flex items-center justify-center">
-              <Rocket size={16} weight="fill" color="#000000" />
+            <div className="w-8 h-8 rounded-md bg-neutral-900 flex items-center justify-center">
+              <Rocket size={16} weight="fill" color="#FFFFFF" />
             </div>
             <div>
-              <div className="font-semibold text-[15px] leading-tight text-zinc-100 tracking-tight">
+              <div className="font-semibold text-[15px] leading-tight text-neutral-900 tracking-tight">
                 Concept Factory
               </div>
-              <div className="text-[10px] uppercase tracking-[0.12em] text-zinc-500 font-medium">
+              <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-500 font-medium">
                 E-commerce Machine
               </div>
             </div>
@@ -103,7 +103,7 @@ export default function Layout({ children }) {
             onClick={() => setMobileOpen(false)}
             data-testid="mobile-menu-close"
             aria-label="Fermer"
-            className="md:hidden absolute top-4 right-3 p-2 rounded-md hover:bg-zinc-900 text-zinc-400"
+            className="md:hidden absolute top-4 right-3 p-2 rounded-md hover:bg-neutral-100 text-neutral-600"
           >
             <X size={18} />
           </button>
@@ -117,8 +117,8 @@ export default function Layout({ children }) {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2 rounded-md text-[13.5px] transition-colors duration-150 ${
                   isActive
-                    ? "bg-zinc-900 text-zinc-100 font-medium"
-                    : "text-zinc-400 hover:bg-zinc-900/50 hover:text-zinc-100"
+                    ? "bg-neutral-100 text-neutral-900 font-medium"
+                    : "text-neutral-600 hover:bg-neutral-100/50 hover:text-neutral-900"
                 }`
               }
             >
@@ -128,21 +128,21 @@ export default function Layout({ children }) {
           ))}
         </nav>
 
-        <div className="p-3 border-t border-zinc-900">
+        <div className="p-3 border-t border-neutral-200">
           <div className="flex items-center gap-3 px-2 py-2">
-            <div className="w-8 h-8 rounded-md bg-zinc-900 text-zinc-300 flex items-center justify-center font-semibold text-xs border border-zinc-800">
+            <div className="w-8 h-8 rounded-md bg-neutral-100 text-neutral-700 flex items-center justify-center font-semibold text-xs border border-neutral-200">
               {user?.name?.[0]?.toUpperCase() || "?"}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-medium text-zinc-100 truncate">{user?.name}</div>
-              <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">
+              <div className="text-[13px] font-medium text-neutral-900 truncate">{user?.name}</div>
+              <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-medium">
                 {user?.role === "admin" ? "Administrateur" : "Concepteur"}
               </div>
             </div>
             <button
               onClick={handleLogout}
               data-testid="logout-button"
-              className="p-1.5 rounded-md text-zinc-500 hover:bg-zinc-900 hover:text-zinc-100 transition-colors"
+              className="p-1.5 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
               title="Déconnexion"
             >
               <SignOut size={16} />
@@ -151,7 +151,7 @@ export default function Layout({ children }) {
         </div>
       </aside>
 
-      <main className="flex-1 md:ml-[240px] min-h-screen pt-14 md:pt-0 bg-zinc-950/50">{children}</main>
+      <main className="flex-1 md:ml-[240px] min-h-screen pt-14 md:pt-0 bg-neutral-50">{children}</main>
       {user?.role === "admin" && <CommandPalette />}
       {user && <CopilotFab user={user} />}
     </div>

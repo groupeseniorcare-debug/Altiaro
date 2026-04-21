@@ -21,19 +21,19 @@ const fmt = (n, suffix = "€") =>
 function StatCard({ label, value, sub, icon: Icon, delay = 0, testId }) {
   return (
     <div
-      className={`bg-zinc-950 rounded-xl border border-zinc-800 p-6 animate-fade-up-delay-${delay}`}
+      className={`bg-white rounded-xl border border-neutral-200 p-6 animate-fade-up-delay-${delay}`}
       data-testid={testId}
     >
       <div className="flex items-start justify-between mb-4">
-        <div className="text-[11px] uppercase tracking-widest text-zinc-500 font-medium">
+        <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-medium">
           {label}
         </div>
-        <div className="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center">
+        <div className="w-9 h-9 rounded-lg bg-neutral-200 flex items-center justify-center">
           <Icon size={18} weight="duotone" color="#B84B31" />
         </div>
       </div>
-      <div className="font-heading text-3xl font-semibold text-zinc-100 tracking-tight">{value}</div>
-      {sub && <div className="text-sm text-zinc-500 mt-1">{sub}</div>}
+      <div className="font-heading text-3xl font-semibold text-neutral-900 tracking-tight">{value}</div>
+      {sub && <div className="text-sm text-neutral-500 mt-1">{sub}</div>}
     </div>
   );
 }
@@ -67,16 +67,16 @@ function AdminDashboard() {
       <div className="p-8 md:p-12 max-w-[1400px]">
         <div className="flex items-start justify-between mb-10 animate-fade-up">
           <div>
-            <div className="text-[11px] uppercase tracking-widest text-zinc-500 mb-2">Overview</div>
-            <h1 className="text-3xl font-semibold text-zinc-100">Tableau de bord</h1>
-            <p className="text-zinc-400 mt-2">
+            <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-2">Overview</div>
+            <h1 className="text-3xl font-semibold text-neutral-900">Tableau de bord</h1>
+            <p className="text-neutral-600 mt-2">
               Vision consolidée de votre portefeuille de marques.
             </p>
           </div>
           <button
             onClick={() => navigate("/sites/new")}
             data-testid="create-site-btn-dashboard"
-            className="h-11 px-5 rounded-xl bg-white hover:bg-zinc-200 text-black font-medium transition-all duration-200 flex items-center gap-2 active:scale-[0.98] shadow-sm"
+            className="h-11 px-5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-medium transition-all duration-200 flex items-center gap-2 active:scale-[0.98] shadow-sm"
           >
             {isAdmin ? (
               <>
@@ -91,7 +91,7 @@ function AdminDashboard() {
         </div>
 
         {loading ? (
-          <div className="text-zinc-500">Chargement...</div>
+          <div className="text-neutral-500">Chargement...</div>
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
@@ -130,13 +130,13 @@ function AdminDashboard() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
-              <div className="lg:col-span-2 bg-zinc-950 rounded-xl border border-zinc-800 p-6">
+              <div className="lg:col-span-2 bg-white rounded-xl border border-neutral-200 p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <div className="text-[11px] uppercase tracking-widest text-zinc-500">
+                    <div className="text-[11px] uppercase tracking-widest text-neutral-500">
                       Évolution mensuelle
                     </div>
-                    <h2 className="font-heading text-xl font-semibold text-zinc-100 mt-1">
+                    <h2 className="font-heading text-xl font-semibold text-neutral-900 mt-1">
                       Revenu vs Dépense publicitaire
                     </h2>
                   </div>
@@ -157,27 +157,27 @@ function AdminDashboard() {
                       </LineChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-full flex items-center justify-center text-zinc-500 text-sm">
+                    <div className="h-full flex items-center justify-center text-neutral-500 text-sm">
                       Aucune donnée financière saisie pour l'instant.
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-6">
-                <div className="text-[11px] uppercase tracking-widest text-zinc-500 mb-1">
+              <div className="bg-white rounded-xl border border-neutral-200 p-6">
+                <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-1">
                   Workflow global
                 </div>
-                <h2 className="font-heading text-xl font-semibold text-zinc-100 mb-5">
+                <h2 className="font-heading text-xl font-semibold text-neutral-900 mb-5">
                   Avancement des étapes
                 </h2>
                 <div className="space-y-4">
                   <div>
                     <div className="flex justify-between text-sm mb-1.5">
-                      <span className="text-zinc-400">Validées</span>
+                      <span className="text-neutral-600">Validées</span>
                       <span className="font-medium text-emerald-400">{kpis.totals.validated_steps}</span>
                     </div>
-                    <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-2 bg-neutral-200 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-[#047857] rounded-full transition-all duration-500"
                         style={{ width: `${kpis.totals.global_progress_pct}%` }}
@@ -185,18 +185,18 @@ function AdminDashboard() {
                     </div>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-zinc-400">En attente validation</span>
+                    <span className="text-neutral-600">En attente validation</span>
                     <span className="font-medium text-[#0369A1]">{kpis.totals.pending_validations}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-zinc-400">Total étapes</span>
-                    <span className="font-medium text-zinc-100">{kpis.totals.total_steps}</span>
+                    <span className="text-neutral-600">Total étapes</span>
+                    <span className="font-medium text-neutral-900">{kpis.totals.total_steps}</span>
                   </div>
                   {kpis.totals.pending_validations > 0 && (
                     <button
                       onClick={() => navigate("/validations")}
                       data-testid="dashboard-validations-cta"
-                      className="w-full mt-3 h-10 rounded-lg border border-zinc-800 bg-[#E0F2FE] text-[#0369A1] text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-[#BAE6FD] transition"
+                      className="w-full mt-3 h-10 rounded-lg border border-neutral-200 bg-[#E0F2FE] text-[#0369A1] text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-[#BAE6FD] transition"
                     >
                       <Warning size={16} weight="fill" />
                       {kpis.totals.pending_validations} validation{kpis.totals.pending_validations > 1 ? "s" : ""} en attente
@@ -206,15 +206,15 @@ function AdminDashboard() {
               </div>
             </div>
 
-            <div className="bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden">
-              <div className="px-6 py-5 border-b border-zinc-800 flex items-center justify-between">
+            <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
+              <div className="px-6 py-5 border-b border-neutral-200 flex items-center justify-between">
                 <div>
-                  <div className="text-[11px] uppercase tracking-widest text-zinc-500">Portefeuille</div>
-                  <h2 className="font-heading text-xl font-semibold text-zinc-100 mt-1">Vos sites</h2>
+                  <div className="text-[11px] uppercase tracking-widest text-neutral-500">Portefeuille</div>
+                  <h2 className="font-heading text-xl font-semibold text-neutral-900 mt-1">Vos sites</h2>
                 </div>
                 <button
                   onClick={() => navigate("/sites")}
-                  className="text-sm text-zinc-100 hover:text-[#993D26] font-medium flex items-center gap-1"
+                  className="text-sm text-neutral-900 hover:text-[#993D26] font-medium flex items-center gap-1"
                   data-testid="dashboard-all-sites-link"
                 >
                   Voir tous <ArrowRight size={14} />
@@ -222,25 +222,25 @@ function AdminDashboard() {
               </div>
               {kpis.per_site.length === 0 ? (
                 <div className="p-10 text-center">
-                  <div className="text-zinc-500 mb-4">Aucun site créé pour l'instant.</div>
+                  <div className="text-neutral-500 mb-4">Aucun site créé pour l'instant.</div>
                   <button
                     onClick={() => navigate("/sites/new")}
                     data-testid="create-first-site-btn"
-                    className="h-11 px-5 rounded-xl bg-white hover:bg-zinc-200 text-black font-medium transition inline-flex items-center gap-2"
+                    className="h-11 px-5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-medium transition inline-flex items-center gap-2"
                   >
                     <Plus size={18} weight="bold" /> Lancer votre premier site
                   </button>
                 </div>
               ) : (
                 <table className="w-full">
-                  <thead className="bg-black">
+                  <thead className="bg-white">
                     <tr>
-                      <th className="text-left px-6 py-3 text-[11px] uppercase tracking-widest text-zinc-500 font-medium">Site</th>
-                      <th className="text-left px-6 py-3 text-[11px] uppercase tracking-widest text-zinc-500 font-medium">Niche</th>
-                      <th className="text-left px-6 py-3 text-[11px] uppercase tracking-widest text-zinc-500 font-medium">Avancement</th>
-                      <th className="text-right px-6 py-3 text-[11px] uppercase tracking-widest text-zinc-500 font-medium">CA</th>
-                      <th className="text-right px-6 py-3 text-[11px] uppercase tracking-widest text-zinc-500 font-medium">Marge</th>
-                      <th className="text-right px-6 py-3 text-[11px] uppercase tracking-widest text-zinc-500 font-medium">ROAS</th>
+                      <th className="text-left px-6 py-3 text-[11px] uppercase tracking-widest text-neutral-500 font-medium">Site</th>
+                      <th className="text-left px-6 py-3 text-[11px] uppercase tracking-widest text-neutral-500 font-medium">Niche</th>
+                      <th className="text-left px-6 py-3 text-[11px] uppercase tracking-widest text-neutral-500 font-medium">Avancement</th>
+                      <th className="text-right px-6 py-3 text-[11px] uppercase tracking-widest text-neutral-500 font-medium">CA</th>
+                      <th className="text-right px-6 py-3 text-[11px] uppercase tracking-widest text-neutral-500 font-medium">Marge</th>
+                      <th className="text-right px-6 py-3 text-[11px] uppercase tracking-widest text-neutral-500 font-medium">ROAS</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -248,32 +248,32 @@ function AdminDashboard() {
                       <tr
                         key={s.id}
                         onClick={() => navigate(`/sites/${s.id}`)}
-                        className="border-t border-zinc-800 hover:bg-black cursor-pointer transition"
+                        className="border-t border-neutral-200 hover:bg-white cursor-pointer transition"
                         data-testid={`site-row-${s.id}`}
                       >
                         <td className="px-6 py-4">
-                          <div className="font-medium text-zinc-100">{s.name}</div>
-                          <div className="text-xs text-zinc-500 mt-0.5">
+                          <div className="font-medium text-neutral-900">{s.name}</div>
+                          <div className="text-xs text-neutral-500 mt-0.5">
                             {s.current_step_title ? `Étape ${s.current_step_number} · ${s.current_step_title.substring(0, 40)}` : "Non démarré"}
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-zinc-400">{s.niche}</td>
+                        <td className="px-6 py-4 text-sm text-neutral-600">{s.niche}</td>
                         <td className="px-6 py-4 w-56">
                           <div className="flex items-center gap-3">
-                            <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="flex-1 h-2 bg-neutral-200 rounded-full overflow-hidden">
                               <div
                                 className="h-full bg-white rounded-full transition-all"
                                 style={{ width: `${s.progress_pct}%` }}
                               />
                             </div>
-                            <span className="text-xs font-medium text-zinc-400 min-w-[40px] text-right">
+                            <span className="text-xs font-medium text-neutral-600 min-w-[40px] text-right">
                               {s.progress_pct}%
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-right font-medium text-zinc-100">{fmt(s.revenue)}</td>
+                        <td className="px-6 py-4 text-right font-medium text-neutral-900">{fmt(s.revenue)}</td>
                         <td className="px-6 py-4 text-right font-medium text-emerald-400">{fmt(s.margin)}</td>
-                        <td className="px-6 py-4 text-right font-medium text-zinc-100">
+                        <td className="px-6 py-4 text-right font-medium text-neutral-900">
                           {s.ad_spend > 0 ? `${(s.revenue / s.ad_spend).toFixed(2)}×` : "—"}
                         </td>
                       </tr>

@@ -69,7 +69,7 @@ export default function Wizard() {
   if (loading) {
     return (
       <Layout>
-        <div className="p-12 text-zinc-500">Chargement du wizard…</div>
+        <div className="p-12 text-neutral-500">Chargement du wizard…</div>
       </Layout>
     );
   }
@@ -84,7 +84,7 @@ export default function Wizard() {
       <div className="p-8 md:p-12 max-w-[1200px]">
         <button
           onClick={() => navigate(`/sites/${siteId}`)}
-          className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-100 mb-6 transition"
+          className="flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900 mb-6 transition"
           data-testid="wizard-back"
         >
           <ArrowLeft size={16} /> Retour au site
@@ -116,9 +116,9 @@ export default function Wizard() {
               <div className="text-sm text-white/70 mt-1">
                 {state?.progress?.done} / {state?.progress?.total} étapes complétées
               </div>
-              <div className="w-44 h-2 bg-zinc-950/20 rounded-full overflow-hidden mt-3 ml-auto">
+              <div className="w-44 h-2 bg-white/20 rounded-full overflow-hidden mt-3 ml-auto">
                 <div
-                  className="h-full bg-zinc-950 rounded-full transition-all duration-500"
+                  className="h-full bg-white rounded-full transition-all duration-500"
                   style={{ width: `${percent}%` }}
                 />
               </div>
@@ -139,12 +139,12 @@ export default function Wizard() {
               <div
                 key={d.id}
                 data-testid={`wizard-step-${d.id}`}
-                className={`bg-zinc-950 rounded-xl border p-5 transition ${
+                className={`bg-white rounded-xl border p-5 transition ${
                   done
                     ? "border-[#D1FAE5]"
                     : isCurrent
                     ? "border-[#7C3AED] shadow-md"
-                    : "border-zinc-800"
+                    : "border-neutral-200"
                 }`}
               >
                 <div className="flex items-start gap-4">
@@ -155,7 +155,7 @@ export default function Wizard() {
                           ? "bg-emerald-500/10"
                           : isCurrent
                           ? "bg-[#EDE9FE]"
-                          : "bg-zinc-800"
+                          : "bg-neutral-200"
                       }`}
                     >
                       {done ? (
@@ -170,7 +170,7 @@ export default function Wizard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-mono text-zinc-500">
+                      <span className="text-xs font-mono text-neutral-500">
                         Étape {idx + 1}/10
                       </span>
                       {done && (
@@ -184,17 +184,17 @@ export default function Wizard() {
                         </span>
                       )}
                     </div>
-                    <h3 className="text-lg font-semibold text-zinc-100 mb-1">
+                    <h3 className="text-lg font-semibold text-neutral-900 mb-1">
                       {d.title}
                     </h3>
-                    <p className="text-sm text-zinc-400">{d.desc}</p>
+                    <p className="text-sm text-neutral-600">{d.desc}</p>
                   </div>
                   <div className="flex flex-col gap-2 items-end">
                     {actionPath && (
                       <button
                         onClick={() => navigate(actionPath)}
                         data-testid={`wizard-action-${d.id}`}
-                        className="h-9 px-3 rounded-lg bg-white hover:bg-zinc-200 text-black text-xs font-medium flex items-center gap-1.5 transition whitespace-nowrap"
+                        className="h-9 px-3 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium flex items-center gap-1.5 transition whitespace-nowrap"
                       >
                         <ActionIcon size={12} weight="bold" /> {Action.label}
                       </button>
@@ -203,7 +203,7 @@ export default function Wizard() {
                       <button
                         onClick={() => setShowKeywordFinder(true)}
                         data-testid={`wizard-action-${d.id}`}
-                        className="h-9 px-3 rounded-lg bg-gradient-to-r from-[#4285F4] to-[#6D28D9] hover:opacity-90 text-white text-xs font-medium flex items-center gap-1.5 transition whitespace-nowrap"
+                        className="h-9 px-3 rounded-lg bg-gradient-to-r from-[#4285F4] to-[#6D28D9] hover:opacity-90 text-neutral-900 text-xs font-medium flex items-center gap-1.5 transition whitespace-nowrap"
                       >
                         <ActionIcon size={12} weight="bold" /> {Action.label}
                       </button>
@@ -215,7 +215,7 @@ export default function Wizard() {
                         }
                         disabled={marking === d.id}
                         data-testid={`wizard-mark-done-${d.id}`}
-                        className="h-9 px-3 rounded-lg bg-zinc-950 border border-[#D1FAE5] hover:bg-emerald-500/10/40 text-emerald-400 text-xs font-medium flex items-center gap-1.5 transition disabled:opacity-60"
+                        className="h-9 px-3 rounded-lg bg-white border border-[#D1FAE5] hover:bg-emerald-500/10/40 text-emerald-400 text-xs font-medium flex items-center gap-1.5 transition disabled:opacity-60"
                       >
                         {marking === d.id ? (
                           <ArrowClockwise size={12} className="animate-spin" />
@@ -229,7 +229,7 @@ export default function Wizard() {
                         onClick={() => mark(d.id, "pending")}
                         disabled={marking === d.id}
                         data-testid={`wizard-reopen-${d.id}`}
-                        className="h-9 px-3 rounded-lg bg-zinc-950 border border-zinc-800 hover:border-[#78716C] text-zinc-400 text-xs font-medium flex items-center gap-1.5 transition disabled:opacity-60"
+                        className="h-9 px-3 rounded-lg bg-white border border-neutral-200 hover:border-[#78716C] text-neutral-600 text-xs font-medium flex items-center gap-1.5 transition disabled:opacity-60"
                       >
                         <Circle size={12} /> Rouvrir
                       </button>
@@ -244,7 +244,7 @@ export default function Wizard() {
         {percent === 100 && (
           <div className="mt-8 bg-gradient-to-r from-[#D1FAE5] to-[#A7F3D0] border border-[#047857]/20 rounded-xl p-6 flex items-start gap-4">
             <div className="w-12 h-12 rounded-full bg-[#047857] flex items-center justify-center shrink-0">
-              <Rocket size={22} weight="fill" className="text-white" />
+              <Rocket size={22} weight="fill" className="text-neutral-900" />
             </div>
             <div className="flex-1">
               <div className="text-lg font-semibold text-emerald-300 mb-1">
@@ -260,7 +260,7 @@ export default function Wizard() {
                   target="_blank"
                   rel="noreferrer"
                   data-testid="wizard-open-shop"
-                  className="h-10 px-4 rounded-xl bg-[#047857] hover:bg-[#065F46] text-white text-sm font-medium flex items-center gap-2 transition"
+                  className="h-10 px-4 rounded-xl bg-[#047857] hover:bg-[#065F46] text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
                 >
                   <Eye size={14} /> Voir la boutique
                 </a>
@@ -275,7 +275,7 @@ export default function Wizard() {
         onClick={() => setShowKeywordFinder(true)}
         data-testid="wizard-floating-kwfinder"
         title="Recherche de mots-clés Google"
-        className="fixed bottom-24 right-6 h-12 px-4 rounded-full bg-gradient-to-r from-[#4285F4] to-[#6D28D9] text-white text-sm font-medium flex items-center gap-2 shadow-lg hover:shadow-xl transition z-40"
+        className="fixed bottom-24 right-6 h-12 px-4 rounded-full bg-gradient-to-r from-[#4285F4] to-[#6D28D9] text-neutral-900 text-sm font-medium flex items-center gap-2 shadow-lg hover:shadow-xl transition z-40"
       >
         <MagnifyingGlass size={16} weight="bold" />
         Mots-clés Google

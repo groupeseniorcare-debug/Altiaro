@@ -266,7 +266,7 @@ export default function Sourcing() {
               onClick={runSearch}
               disabled={loading || !keyword.trim() || !anyProviderEnabled}
               data-testid="sourcing-search-btn"
-              className="h-11 px-5 rounded-lg bg-[#1C1917] hover:bg-[#44403C] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium flex items-center gap-2 transition"
+              className="h-11 px-5 rounded-lg bg-[#1C1917] hover:bg-[#44403C] disabled:opacity-50 disabled:cursor-not-allowed text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
             >
               {loading ? (
                 <>
@@ -299,7 +299,7 @@ export default function Sourcing() {
                     !enabled
                       ? "bg-[#F5F2EB] text-[#A8A29E] cursor-not-allowed"
                       : active
-                      ? "text-white"
+                      ? "text-neutral-900"
                       : "bg-white border border-[#E7E5E4] text-[#57534E] hover:border-[#1C1917]"
                   }`}
                   style={active && enabled ? { backgroundColor: meta.color } : {}}
@@ -396,7 +396,7 @@ export default function Sourcing() {
                         </div>
                       )}
                       <div
-                        className="absolute top-2 left-2 text-[10px] uppercase tracking-wider px-2 py-1 rounded-full text-white font-medium"
+                        className="absolute top-2 left-2 text-[10px] uppercase tracking-wider px-2 py-1 rounded-full text-neutral-900 font-medium"
                         style={{ backgroundColor: meta.color }}
                       >
                         {meta.emoji} {meta.label}
@@ -439,7 +439,7 @@ export default function Sourcing() {
                             ? "bg-[#D1FAE5] text-[#047857]"
                             : state === "busy"
                             ? "bg-[#F5F2EB] text-[#78716C]"
-                            : "bg-[#1C1917] hover:bg-[#44403C] text-white"
+                            : "bg-[#1C1917] hover:bg-[#44403C] text-neutral-900"
                         }`}
                       >
                         {state === "busy" && (

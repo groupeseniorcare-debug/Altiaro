@@ -128,7 +128,7 @@ export default function SiteProducts() {
   if (loading) {
     return (
       <Layout>
-        <div className="p-8 text-zinc-500">Chargement…</div>
+        <div className="p-8 text-neutral-500">Chargement…</div>
       </Layout>
     );
   }
@@ -138,7 +138,7 @@ export default function SiteProducts() {
       <div className="p-8 md:p-12 max-w-7xl">
         <button
           onClick={() => navigate(`/sites/${siteId}`)}
-          className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-100 mb-6 transition"
+          className="flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900 mb-6 transition"
           data-testid="back-to-site"
         >
           <ArrowLeft size={16} /> Retour au site
@@ -146,11 +146,11 @@ export default function SiteProducts() {
 
         <div className="flex items-start justify-between gap-8 mb-10 animate-fade-up">
           <div>
-            <div className="text-[11px] uppercase tracking-widest text-zinc-500 mb-2">
+            <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-2">
               {site?.name} · Catalogue
             </div>
-            <h1 className="text-3xl font-semibold text-zinc-100">Produits</h1>
-            <p className="text-zinc-400 mt-2 max-w-xl">
+            <h1 className="text-3xl font-semibold text-neutral-900">Produits</h1>
+            <p className="text-neutral-600 mt-2 max-w-xl">
               Importe depuis une URL fournisseur ou crée tes produits à la main.
               Fiches multilingues FR/EN/DE/NL publiées sur la boutique publique.
             </p>
@@ -161,14 +161,14 @@ export default function SiteProducts() {
               target="_blank"
               rel="noreferrer"
               data-testid="preview-shop"
-              className="h-11 px-4 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-[#B84B31] text-zinc-100 text-sm font-medium flex items-center gap-2 transition"
+              className="h-11 px-4 rounded-xl bg-white border border-neutral-200 hover:border-[#B84B31] text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
             >
               <Eye size={16} /> Voir la boutique
             </a>
             <button
               onClick={() => setEditing(emptyProduct())}
               data-testid="add-product"
-              className="h-11 px-4 rounded-xl bg-white hover:bg-zinc-200 text-black text-sm font-medium flex items-center gap-2 transition active:scale-[0.98]"
+              className="h-11 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium flex items-center gap-2 transition active:scale-[0.98]"
             >
               <Plus size={16} weight="bold" /> Nouveau produit
             </button>
@@ -176,13 +176,13 @@ export default function SiteProducts() {
         </div>
 
         {/* Import from URL bar */}
-        <div className="bg-zinc-950 rounded-md border border-zinc-800 p-5 mb-6" data-testid="import-url-bar">
+        <div className="bg-white rounded-md border border-neutral-200 p-5 mb-6" data-testid="import-url-bar">
           <div className="flex items-center gap-2 mb-2">
-            <Sparkle size={16} weight="fill" className="text-zinc-100" />
-            <div className="font-heading text-sm font-semibold text-zinc-100">
+            <Sparkle size={16} weight="fill" className="text-neutral-900" />
+            <div className="font-heading text-sm font-semibold text-neutral-900">
               Import rapide depuis une URL fournisseur
             </div>
-            <div className="text-xs text-zinc-500">
+            <div className="text-xs text-neutral-500">
               · Shopify / WooCommerce / sites structurés (JSON-LD, Open Graph)
             </div>
           </div>
@@ -193,13 +193,13 @@ export default function SiteProducts() {
               placeholder="https://fournisseur.com/produits/..."
               data-testid="import-url-input"
               onKeyDown={(e) => e.key === "Enter" && handleImport()}
-              className="flex-1 h-11 px-4 rounded-xl border border-zinc-800 bg-black focus:ring-2 focus:ring-zinc-500/30 focus:border-zinc-500 outline-none text-sm"
+              className="flex-1 h-11 px-4 rounded-xl border border-neutral-200 bg-white focus:ring-2 focus:ring-zinc-500/30 focus:border-neutral-400 outline-none text-sm"
             />
             <button
               onClick={handleImport}
               disabled={importing || !importUrl.trim()}
               data-testid="import-url-submit"
-              className="h-11 px-5 rounded-xl bg-white hover:bg-zinc-200 text-black text-sm font-medium flex items-center gap-2 transition disabled:opacity-50"
+              className="h-11 px-5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium flex items-center gap-2 transition disabled:opacity-50"
             >
               {importing ? (
                 "Analyse..."
@@ -218,12 +218,12 @@ export default function SiteProducts() {
         </div>
 
         {products.length === 0 ? (
-          <div className="bg-zinc-950 rounded-md border border-zinc-800 p-16 text-center">
-            <Storefront size={48} weight="thin" className="mx-auto text-zinc-700 mb-4" />
-            <div className="text-zinc-500 mb-4">Aucun produit pour l'instant.</div>
+          <div className="bg-white rounded-md border border-neutral-200 p-16 text-center">
+            <Storefront size={48} weight="thin" className="mx-auto text-neutral-400 mb-4" />
+            <div className="text-neutral-500 mb-4">Aucun produit pour l'instant.</div>
             <button
               onClick={() => setEditing(emptyProduct())}
-              className="inline-flex items-center gap-2 h-11 px-5 rounded-xl bg-white hover:bg-zinc-200 text-black text-sm font-medium transition"
+              className="inline-flex items-center gap-2 h-11 px-5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium transition"
             >
               <Plus size={16} weight="bold" /> Ajouter mon premier produit
             </button>
@@ -234,18 +234,18 @@ export default function SiteProducts() {
               <div
                 key={p.id}
                 data-testid={`admin-product-${p.id}`}
-                className="group bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden hover:shadow-md transition"
+                className="group bg-white rounded-xl border border-neutral-200 overflow-hidden hover:shadow-md transition"
               >
-                <div className="aspect-[4/3] bg-zinc-800 relative">
+                <div className="aspect-[4/3] bg-neutral-200 relative">
                   {p.images?.[0] ? (
                     <img src={p.images[0]} alt={p.name?.fr} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-zinc-700">
+                    <div className="w-full h-full flex items-center justify-center text-neutral-400">
                       <Storefront size={40} weight="thin" />
                     </div>
                   )}
                   {p.featured && (
-                    <div className="absolute top-2 left-2 bg-white text-black text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <div className="absolute top-2 left-2 bg-neutral-900 text-white text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full flex items-center gap-1">
                       <Star size={10} weight="fill" /> Phare
                     </div>
                   )}
@@ -254,7 +254,7 @@ export default function SiteProducts() {
                       className={`text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full ${
                         p.status === "active"
                           ? "bg-emerald-500/10 text-emerald-400"
-                          : "bg-[#F5F5F4] text-zinc-500"
+                          : "bg-[#F5F5F4] text-neutral-500"
                       }`}
                     >
                       {p.status}
@@ -262,14 +262,14 @@ export default function SiteProducts() {
                   </div>
                 </div>
                 <div className="p-4">
-                  <div className="font-medium text-zinc-100 truncate">
+                  <div className="font-medium text-neutral-900 truncate">
                     {p.name?.fr || "(sans nom)"}
                   </div>
-                  <div className="text-sm text-zinc-400 mt-1">
+                  <div className="text-sm text-neutral-600 mt-1">
                     {p.price}€ TTC {p.compare_at_price ? `(avant ${p.compare_at_price}€)` : ""}
                   </div>
                   {p.cost_price_ht > 0 && (
-                    <div className="text-[11px] text-zinc-500 mt-0.5 flex items-center gap-1.5">
+                    <div className="text-[11px] text-neutral-500 mt-0.5 flex items-center gap-1.5">
                       <span>Achat&nbsp;: {p.cost_price_ht}€ HT</span>
                       {(() => {
                         const ht = p.price / 1.2;
@@ -290,7 +290,7 @@ export default function SiteProducts() {
                     <button
                       onClick={() => setEditing(p)}
                       data-testid={`edit-${p.id}`}
-                      className="flex-1 h-9 rounded-lg bg-black border border-zinc-800 hover:border-[#B84B31] text-[13px] text-zinc-100 flex items-center justify-center gap-1.5 transition"
+                      className="flex-1 h-9 rounded-lg bg-white border border-neutral-200 hover:border-[#B84B31] text-[13px] text-neutral-900 flex items-center justify-center gap-1.5 transition"
                     >
                       <PencilSimple size={14} /> Éditer
                     </button>
@@ -300,7 +300,7 @@ export default function SiteProducts() {
                         disabled={syncing === p.id}
                         data-testid={`resync-${p.id}`}
                         title="Re-vérifier le prix fournisseur"
-                        className="h-9 w-9 rounded-lg border border-zinc-800 hover:border-[#B84B31] text-zinc-500 hover:text-zinc-100 flex items-center justify-center transition disabled:opacity-50"
+                        className="h-9 w-9 rounded-lg border border-neutral-200 hover:border-[#B84B31] text-neutral-500 hover:text-neutral-900 flex items-center justify-center transition disabled:opacity-50"
                       >
                         <ArrowsClockwise size={14} className={syncing === p.id ? "animate-spin" : ""} />
                       </button>
@@ -308,7 +308,7 @@ export default function SiteProducts() {
                     <button
                       onClick={() => handleDelete(p)}
                       data-testid={`delete-${p.id}`}
-                      className="h-9 w-9 rounded-lg border border-zinc-800 hover:border-[#BE123C] hover:text-red-400 text-zinc-500 flex items-center justify-center transition"
+                      className="h-9 w-9 rounded-lg border border-neutral-200 hover:border-[#BE123C] hover:text-red-400 text-neutral-500 flex items-center justify-center transition"
                     >
                       <Trash size={14} />
                     </button>
@@ -353,20 +353,20 @@ function ResyncModal({ result, onClose, onApply }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose} data-testid="resync-modal">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      <div className="relative w-full max-w-lg bg-zinc-950 rounded-md shadow-2xl border border-zinc-800 overflow-hidden animate-fade-up" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+      <div className="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" />
+      <div className="relative w-full max-w-lg bg-white rounded-md shadow-2xl border border-neutral-200 overflow-hidden animate-fade-up" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200">
           <div>
-            <div className="text-[11px] uppercase tracking-widest text-zinc-500">Re-sync fournisseur</div>
-            <div className="text-base font-semibold text-zinc-100 truncate max-w-xs">
+            <div className="text-[11px] uppercase tracking-widest text-neutral-500">Re-sync fournisseur</div>
+            <div className="text-base font-semibold text-neutral-900 truncate max-w-xs">
               {product.name?.fr || "Produit"}
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-800"><X size={18} /></button>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-neutral-200"><X size={18} /></button>
         </div>
 
         <div className="p-6 space-y-4">
-          <div className="flex items-center gap-2 text-xs text-zinc-500">
+          <div className="flex items-center gap-2 text-xs text-neutral-500">
             <ArrowsClockwise size={12} /> Source : {diff.source_host || "Fournisseur"}
           </div>
 
@@ -381,15 +381,15 @@ function ResyncModal({ result, onClose, onApply }) {
               </div>
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div>
-                  <div className="text-[10px] uppercase tracking-widest text-zinc-500">Ancien</div>
-                  <div className="text-lg font-semibold text-zinc-100 mt-1 tabular-nums">{diff.price.old}€</div>
+                  <div className="text-[10px] uppercase tracking-widest text-neutral-500">Ancien</div>
+                  <div className="text-lg font-semibold text-neutral-900 mt-1 tabular-nums">{diff.price.old}€</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase tracking-widest text-zinc-500">Nouveau</div>
-                  <div className="text-lg font-semibold text-zinc-100 mt-1 tabular-nums">{diff.price.new}€</div>
+                  <div className="text-[10px] uppercase tracking-widest text-neutral-500">Nouveau</div>
+                  <div className="text-lg font-semibold text-neutral-900 mt-1 tabular-nums">{diff.price.new}€</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase tracking-widest text-zinc-500">Variation</div>
+                  <div className="text-[10px] uppercase tracking-widest text-neutral-500">Variation</div>
                   <div className="text-lg font-semibold mt-1 tabular-nums" style={{ color: bigIncrease ? "#BE123C" : "#854D0E" }}>
                     {diff.price.diff > 0 ? "+" : ""}{diff.price.diff}€ ({diff.price.diff_pct > 0 ? "+" : ""}{diff.price.diff_pct}%)
                   </div>
@@ -416,15 +416,15 @@ function ResyncModal({ result, onClose, onApply }) {
           )}
         </div>
 
-        <div className="px-6 py-4 bg-black border-t border-zinc-800 flex items-center justify-end gap-3">
-          <button onClick={onClose} className="h-10 px-4 rounded-xl border border-zinc-800 bg-zinc-950 text-sm text-zinc-400 hover:bg-zinc-800 transition">
+        <div className="px-6 py-4 bg-white border-t border-neutral-200 flex items-center justify-end gap-3">
+          <button onClick={onClose} className="h-10 px-4 rounded-xl border border-neutral-200 bg-white text-sm text-neutral-600 hover:bg-neutral-200 transition">
             Fermer
           </button>
           {priceChanged && (
             <button
               onClick={onApply}
               data-testid="apply-resync"
-              className="h-10 px-4 rounded-xl bg-white hover:bg-zinc-200 text-black text-sm font-medium flex items-center gap-2 transition"
+              className="h-10 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium flex items-center gap-2 transition"
             >
               <CheckCircle size={14} weight="fill" /> Appliquer le nouveau prix
             </button>
@@ -479,18 +479,18 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-50 flex" data-testid="product-editor">
-      <div className="flex-1 bg-black/40" onClick={onClose} />
-      <div className="w-full max-w-2xl bg-black h-full overflow-y-auto shadow-2xl animate-slide-in-right">
-        <div className="sticky top-0 bg-zinc-950 border-b border-zinc-800 px-6 py-4 flex items-center justify-between z-10">
+      <div className="flex-1 bg-neutral-900/40" onClick={onClose} />
+      <div className="w-full max-w-2xl bg-white h-full overflow-y-auto shadow-2xl animate-slide-in-right">
+        <div className="sticky top-0 bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-between z-10">
           <div>
-            <div className="text-[11px] uppercase tracking-widest text-zinc-500">
+            <div className="text-[11px] uppercase tracking-widest text-neutral-500">
               {isNew ? "Nouveau" : "Édition"}
             </div>
-            <div className="text-base font-semibold text-zinc-100">
+            <div className="text-base font-semibold text-neutral-900">
               {form.name?.fr || "Produit"}
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-800" data-testid="editor-close">
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-neutral-200" data-testid="editor-close">
             <X size={20} />
           </button>
         </div>
@@ -507,8 +507,8 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
                   data-testid={`lang-tab-${l.code}`}
                   className={`h-8 px-3 rounded-full text-xs font-medium transition ${
                     activeLang === l.code
-                      ? "bg-white text-white"
-                      : "bg-zinc-950 border border-zinc-800 text-zinc-400 hover:border-[#B84B31]"
+                      ? "bg-white text-neutral-900"
+                      : "bg-white border border-neutral-200 text-neutral-600 hover:border-[#B84B31]"
                   }`}
                 >
                   {l.label}
@@ -525,7 +525,7 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
                 required={activeLang === "fr"}
               />
               <div>
-                <label className="block text-[13px] font-medium text-zinc-100 mb-1.5">
+                <label className="block text-[13px] font-medium text-neutral-900 mb-1.5">
                   Description ({activeLang.toUpperCase()})
                 </label>
                 <textarea
@@ -533,7 +533,7 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
                   onChange={(e) => setI18n("description", activeLang, e.target.value)}
                   rows={5}
                   data-testid={`desc-${activeLang}`}
-                  className="w-full px-4 py-3 rounded-xl border border-zinc-800 bg-zinc-950 focus:ring-2 focus:ring-zinc-500/30 focus:border-zinc-500 outline-none resize-none"
+                  className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-white focus:ring-2 focus:ring-zinc-500/30 focus:border-neutral-400 outline-none resize-none"
                 />
               </div>
             </div>
@@ -598,12 +598,12 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[13px] font-medium text-zinc-100 mb-1.5">Statut</label>
+              <label className="block text-[13px] font-medium text-neutral-900 mb-1.5">Statut</label>
               <select
                 value={form.status}
                 onChange={(e) => setForm({ ...form, status: e.target.value })}
                 data-testid="status"
-                className="w-full h-11 px-4 rounded-xl border border-zinc-800 bg-zinc-950 outline-none"
+                className="w-full h-11 px-4 rounded-xl border border-neutral-200 bg-white outline-none"
               >
                 <option value="active">Actif (publié)</option>
                 <option value="draft">Brouillon</option>
@@ -617,7 +617,7 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
                 onChange={(e) => setForm({ ...form, featured: e.target.checked })}
                 className="w-4 h-4 accent-[#B84B31]"
               />
-              <span className="text-sm text-zinc-100">Produit phare (en haut de la boutique)</span>
+              <span className="text-sm text-neutral-900">Produit phare (en haut de la boutique)</span>
             </label>
           </div>
 
@@ -627,11 +627,11 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-800">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-200">
             <button
               type="button"
               onClick={onClose}
-              className="h-11 px-5 rounded-xl border border-zinc-800 text-zinc-400 hover:bg-zinc-950 transition"
+              className="h-11 px-5 rounded-xl border border-neutral-200 text-neutral-600 hover:bg-white transition"
             >
               Annuler
             </button>
@@ -639,7 +639,7 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
               type="submit"
               disabled={saving}
               data-testid="save-product"
-              className="h-11 px-5 rounded-xl bg-white hover:bg-zinc-200 text-black font-medium flex items-center gap-2 transition active:scale-[0.98] disabled:opacity-60"
+              className="h-11 px-5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-medium flex items-center gap-2 transition active:scale-[0.98] disabled:opacity-60"
             >
               {saving ? "…" : (
                 <>
@@ -657,7 +657,7 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
 function Field({ label, value, onChange, type = "text", required, testId }) {
   return (
     <div>
-      <label className="block text-[13px] font-medium text-zinc-100 mb-1.5">{label}</label>
+      <label className="block text-[13px] font-medium text-neutral-900 mb-1.5">{label}</label>
       <input
         type={type}
         value={value}
@@ -665,7 +665,7 @@ function Field({ label, value, onChange, type = "text", required, testId }) {
         onChange={(e) => onChange(e.target.value)}
         required={required}
         data-testid={`field-${testId}`}
-        className="w-full h-11 px-4 rounded-xl border border-zinc-800 bg-zinc-950 focus:ring-2 focus:ring-zinc-500/30 focus:border-zinc-500 outline-none"
+        className="w-full h-11 px-4 rounded-xl border border-neutral-200 bg-white focus:ring-2 focus:ring-zinc-500/30 focus:border-neutral-400 outline-none"
       />
     </div>
   );
@@ -680,13 +680,13 @@ function MarginPreview({ price, costHt, vatRate = 0.20 }) {
   const concepteur = margin > 0 ? margin * 0.5 : 0;
   const color = margin <= 0 ? "#BE123C" : marginPct < 30 ? "#854D0E" : "#047857";
   return (
-    <div className="h-11 px-3 rounded-xl border border-dashed border-zinc-800 bg-black flex items-center" data-testid="margin-preview">
-      <div className="text-[11px] text-zinc-500 mr-2">Marge HT</div>
+    <div className="h-11 px-3 rounded-xl border border-dashed border-neutral-200 bg-white flex items-center" data-testid="margin-preview">
+      <div className="text-[11px] text-neutral-500 mr-2">Marge HT</div>
       <div className="font-heading tabular-nums text-sm font-semibold" style={{ color }}>
         {margin.toFixed(2)}€ ({marginPct.toFixed(0)}%)
       </div>
-      <div className="text-[11px] text-zinc-500 ml-auto">
-        50% Concepteur&nbsp;: <span className="font-medium text-zinc-100">{concepteur.toFixed(2)}€</span>
+      <div className="text-[11px] text-neutral-500 ml-auto">
+        50% Concepteur&nbsp;: <span className="font-medium text-neutral-900">{concepteur.toFixed(2)}€</span>
       </div>
     </div>
   );
@@ -756,8 +756,8 @@ function ImagesField({ images, onChange }) {
 
   return (
     <div data-testid="images-field">
-      <label className="block text-[13px] font-medium text-zinc-100 mb-1.5">
-        Images <span className="text-zinc-500 font-normal">· La 1ère est l'image principale</span>
+      <label className="block text-[13px] font-medium text-neutral-900 mb-1.5">
+        Images <span className="text-neutral-500 font-normal">· La 1ère est l'image principale</span>
       </label>
 
       {/* Gallery */}
@@ -767,20 +767,20 @@ function ImagesField({ images, onChange }) {
             <div
               key={`${url}-${idx}`}
               data-testid={`image-thumb-${idx}`}
-              className="relative aspect-square rounded-lg overflow-hidden bg-zinc-800 border border-zinc-800 group"
+              className="relative aspect-square rounded-lg overflow-hidden bg-neutral-200 border border-neutral-200 group"
             >
               <img src={url} alt="" className="w-full h-full object-cover" />
               {idx === 0 && (
-                <div className="absolute top-1 left-1 bg-white text-black text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full">
+                <div className="absolute top-1 left-1 bg-neutral-900 text-white text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full">
                   Principale
                 </div>
               )}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1 transition">
+              <div className="absolute inset-0 bg-neutral-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1 transition">
                 {idx > 0 && (
                   <button
                     type="button"
                     onClick={() => move(idx, idx - 1)}
-                    className="w-7 h-7 rounded-full bg-zinc-950 text-zinc-100 flex items-center justify-center text-xs hover:scale-110 transition"
+                    className="w-7 h-7 rounded-full bg-white text-neutral-900 flex items-center justify-center text-xs hover:scale-110 transition"
                     title="Remonter"
                   >
                     ←
@@ -790,7 +790,7 @@ function ImagesField({ images, onChange }) {
                   <button
                     type="button"
                     onClick={() => move(idx, idx + 1)}
-                    className="w-7 h-7 rounded-full bg-zinc-950 text-zinc-100 flex items-center justify-center text-xs hover:scale-110 transition"
+                    className="w-7 h-7 rounded-full bg-white text-neutral-900 flex items-center justify-center text-xs hover:scale-110 transition"
                     title="Descendre"
                   >
                     →
@@ -800,7 +800,7 @@ function ImagesField({ images, onChange }) {
                   type="button"
                   onClick={() => remove(idx)}
                   data-testid={`remove-image-${idx}`}
-                  className="w-7 h-7 rounded-full bg-zinc-950 text-red-400 flex items-center justify-center hover:scale-110 transition"
+                  className="w-7 h-7 rounded-full bg-white text-red-400 flex items-center justify-center hover:scale-110 transition"
                   title="Supprimer"
                 >
                   <Trash size={12} />
@@ -828,11 +828,11 @@ function ImagesField({ images, onChange }) {
         className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition ${
           dragOver
             ? "border-[#B84B31] bg-[#FDF4E7]"
-            : "border-zinc-800 bg-black hover:border-[#B84B31]/50"
+            : "border-neutral-200 bg-white hover:border-[#B84B31]/50"
         }`}
       >
-        <UploadSimple size={24} weight="regular" className="mx-auto text-zinc-100 mb-2" />
-        <div className="text-sm text-zinc-100">
+        <UploadSimple size={24} weight="regular" className="mx-auto text-neutral-900 mb-2" />
+        <div className="text-sm text-neutral-900">
           {uploading ? (
             "Upload en cours..."
           ) : (
@@ -860,14 +860,14 @@ function ImagesField({ images, onChange }) {
           placeholder="...ou colle une URL d'image (https://...)"
           data-testid="image-url-input"
           onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addFromUrl())}
-          className="flex-1 h-10 px-3 rounded-lg border border-zinc-800 bg-zinc-950 focus:ring-2 focus:ring-zinc-500/30 focus:border-zinc-500 outline-none text-sm"
+          className="flex-1 h-10 px-3 rounded-lg border border-neutral-200 bg-white focus:ring-2 focus:ring-zinc-500/30 focus:border-neutral-400 outline-none text-sm"
         />
         <button
           type="button"
           onClick={addFromUrl}
           data-testid="image-url-add"
           disabled={!urlInput.trim()}
-          className="h-10 px-4 rounded-lg border border-zinc-800 bg-zinc-950 text-sm text-zinc-100 hover:border-[#B84B31] disabled:opacity-40"
+          className="h-10 px-4 rounded-lg border border-neutral-200 bg-white text-sm text-neutral-900 hover:border-[#B84B31] disabled:opacity-40"
         >
           <ImageIcon size={14} className="inline mr-1" /> Ajouter
         </button>

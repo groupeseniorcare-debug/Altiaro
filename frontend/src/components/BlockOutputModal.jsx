@@ -60,7 +60,7 @@ export default function BlockOutputModal({ output, onClose }) {
   const entries = Object.entries(output.output || {});
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 p-4" onClick={onClose}>
       <div
         className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
@@ -86,7 +86,7 @@ export default function BlockOutputModal({ output, onClose }) {
               type="button"
               onClick={copy}
               data-testid="copy-block-output"
-              className="h-9 px-3 rounded-lg bg-[#1C1917] hover:bg-[#44403C] text-white text-xs font-medium flex items-center gap-1.5"
+              className="h-9 px-3 rounded-lg bg-[#1C1917] hover:bg-[#44403C] text-neutral-900 text-xs font-medium flex items-center gap-1.5"
             >
               {copied ? (
                 <>

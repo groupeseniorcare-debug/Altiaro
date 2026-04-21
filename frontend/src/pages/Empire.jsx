@@ -79,7 +79,7 @@ export default function Empire() {
   if (loading) {
     return (
       <Layout>
-        <div className="p-8 text-zinc-500">Chargement de l'Empire…</div>
+        <div className="p-8 text-neutral-500">Chargement de l'Empire…</div>
       </Layout>
     );
   }
@@ -99,13 +99,13 @@ export default function Empire() {
       <div className="p-6 md:p-12 max-w-[1600px]">
         <div className="flex items-start justify-between gap-4 mb-8 flex-wrap">
           <div>
-            <div className="text-[11px] uppercase tracking-widest text-zinc-500 mb-2 flex items-center gap-2">
+            <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-2 flex items-center gap-2">
               <Globe size={13} weight="duotone" /> Dashboard Empire · Admin only
             </div>
-            <h1 className="text-3xl font-semibold text-zinc-100">
+            <h1 className="text-3xl font-semibold text-neutral-900">
               Vue macro cross-pays
             </h1>
-            <p className="text-zinc-400 mt-2 max-w-2xl">
+            <p className="text-neutral-600 mt-2 max-w-2xl">
               KPIs agrégés, breakdown par pays, familles scalées, alertes auto.
               Données temps réel sur {days} derniers jours.
             </p>
@@ -115,7 +115,7 @@ export default function Empire() {
               value={days}
               onChange={(e) => setDays(parseInt(e.target.value))}
               data-testid="days-select"
-              className="h-10 px-3 rounded-lg border border-zinc-800 bg-zinc-950 text-sm"
+              className="h-10 px-3 rounded-lg border border-neutral-200 bg-white text-sm"
             >
               <option value={7}>7 jours</option>
               <option value={30}>30 jours</option>
@@ -126,7 +126,7 @@ export default function Empire() {
               onClick={load}
               disabled={refreshing}
               data-testid="refresh-empire"
-              className="h-10 px-3 rounded-lg bg-zinc-950 border border-zinc-800 hover:border-[#B84B31] text-sm font-medium flex items-center gap-2 transition disabled:opacity-50"
+              className="h-10 px-3 rounded-lg bg-white border border-neutral-200 hover:border-[#B84B31] text-sm font-medium flex items-center gap-2 transition disabled:opacity-50"
             >
               <ArrowClockwise size={14} className={refreshing ? "animate-spin" : ""} />
               Actualiser
@@ -173,47 +173,47 @@ export default function Empire() {
 
         {/* Recent period + secondary row */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 text-sm">
-          <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-4" data-testid="kpi-recent-gmv">
-            <div className="text-xs uppercase tracking-wider text-zinc-500">
+          <div className="bg-white rounded-xl border border-neutral-200 p-4" data-testid="kpi-recent-gmv">
+            <div className="text-xs uppercase tracking-wider text-neutral-500">
               GMV {days}j
             </div>
-            <div className="text-xl font-semibold text-zinc-100">
+            <div className="text-xl font-semibold text-neutral-900">
               {formatEuro(t.recent_gmv)}
             </div>
-            <div className="text-xs text-zinc-500 mt-1">
+            <div className="text-xs text-neutral-500 mt-1">
               {t.recent_orders} commandes sur la période
             </div>
           </div>
-          <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-4">
-            <div className="text-xs uppercase tracking-wider text-zinc-500">
+          <div className="bg-white rounded-xl border border-neutral-200 p-4">
+            <div className="text-xs uppercase tracking-wider text-neutral-500">
               Alertes actives
             </div>
             <div className="text-xl font-semibold text-red-400">
               {data.alerts.length}
             </div>
-            <div className="text-xs text-zinc-500 mt-1">
+            <div className="text-xs text-neutral-500 mt-1">
               cf. section ci-dessous
             </div>
           </div>
-          <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-4">
-            <div className="text-xs uppercase tracking-wider text-zinc-500">
+          <div className="bg-white rounded-xl border border-neutral-200 p-4">
+            <div className="text-xs uppercase tracking-wider text-neutral-500">
               Familles scalées
             </div>
-            <div className="text-xl font-semibold text-zinc-100">
+            <div className="text-xl font-semibold text-neutral-900">
               {data.families.length}
             </div>
-            <div className="text-xs text-zinc-500 mt-1">
+            <div className="text-xs text-neutral-500 mt-1">
               sources dupliquées cross-pays
             </div>
           </div>
-          <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-4">
-            <div className="text-xs uppercase tracking-wider text-zinc-500">
+          <div className="bg-white rounded-xl border border-neutral-200 p-4">
+            <div className="text-xs uppercase tracking-wider text-neutral-500">
               À traiter
             </div>
             <div className="text-xl font-semibold text-amber-400">
               {data.pending_orders.length}
             </div>
-            <div className="text-xs text-zinc-500 mt-1">
+            <div className="text-xs text-neutral-500 mt-1">
               commandes en attente
             </div>
           </div>
@@ -221,8 +221,8 @@ export default function Empire() {
 
         {/* Charts row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
-          <div className="bg-zinc-950 rounded-md border border-zinc-800 p-5 lg:col-span-2" data-testid="chart-timeseries">
-            <h3 className="font-heading text-sm font-semibold text-zinc-100 mb-4 uppercase tracking-wider">
+          <div className="bg-white rounded-md border border-neutral-200 p-5 lg:col-span-2" data-testid="chart-timeseries">
+            <h3 className="font-heading text-sm font-semibold text-neutral-900 mb-4 uppercase tracking-wider">
               Evolution GMV · {days}j
             </h3>
             <div style={{ width: "100%", height: 260 }}>
@@ -247,12 +247,12 @@ export default function Empire() {
             </div>
           </div>
 
-          <div className="bg-zinc-950 rounded-md border border-zinc-800 p-5" data-testid="chart-countries">
-            <h3 className="font-heading text-sm font-semibold text-zinc-100 mb-4 uppercase tracking-wider">
+          <div className="bg-white rounded-md border border-neutral-200 p-5" data-testid="chart-countries">
+            <h3 className="font-heading text-sm font-semibold text-neutral-900 mb-4 uppercase tracking-wider">
               Répartition pays
             </h3>
             {data.per_country.length === 0 ? (
-              <div className="text-sm text-zinc-500 h-[260px] flex items-center justify-center text-center">
+              <div className="text-sm text-neutral-500 h-[260px] flex items-center justify-center text-center">
                 Aucune commande encore.
               </div>
             ) : (
@@ -285,15 +285,15 @@ export default function Empire() {
 
         {/* 2-col : per country table + alerts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
-          <section className="bg-zinc-950 rounded-md border border-zinc-800 p-5" data-testid="section-per-country">
+          <section className="bg-white rounded-md border border-neutral-200 p-5" data-testid="section-per-country">
             <div className="flex items-center gap-2 mb-4">
-              <MapPin size={16} weight="duotone" className="text-zinc-100" />
+              <MapPin size={16} weight="duotone" className="text-neutral-900" />
               <h3 className="font-heading text-sm font-semibold uppercase tracking-wider">
                 Performance par pays
               </h3>
             </div>
             {data.per_country.length === 0 ? (
-              <div className="text-sm text-zinc-500 text-center py-8">
+              <div className="text-sm text-neutral-500 text-center py-8">
                 Pas encore de données géographiques.
               </div>
             ) : (
@@ -301,18 +301,18 @@ export default function Empire() {
                 {data.per_country.map((c) => (
                   <div
                     key={c.code}
-                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-zinc-900/40 transition"
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-100/40 transition"
                     data-testid={`country-row-${c.code}`}
                   >
                     <div className="text-2xl">{COUNTRY_EMOJI[c.code] || "🌍"}</div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm text-zinc-100">{c.name}</div>
-                      <div className="text-xs text-zinc-500">
+                      <div className="font-medium text-sm text-neutral-900">{c.name}</div>
+                      <div className="text-xs text-neutral-500">
                         {c.orders} cmd · AOV {formatEuro(c.aov)} · {c.unique_cities} villes
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-heading font-semibold text-zinc-100">
+                      <div className="font-heading font-semibold text-neutral-900">
                         {formatEuro(c.revenue)}
                       </div>
                     </div>
@@ -322,7 +322,7 @@ export default function Empire() {
             )}
           </section>
 
-          <section className="bg-zinc-950 rounded-md border border-zinc-800 p-5" data-testid="section-alerts">
+          <section className="bg-white rounded-md border border-neutral-200 p-5" data-testid="section-alerts">
             <div className="flex items-center gap-2 mb-4">
               <Warning size={16} weight="duotone" className="text-amber-400" />
               <h3 className="font-heading text-sm font-semibold uppercase tracking-wider">
@@ -345,17 +345,17 @@ export default function Empire() {
                       type="button"
                       onClick={() => navigate(`/sites/${a.site_id}`)}
                       data-testid={`alert-${a.site_id}-${a.type}`}
-                      className="w-full text-left p-3 rounded-lg border border-zinc-900 hover:border-zinc-800 transition flex items-start gap-3"
+                      className="w-full text-left p-3 rounded-lg border border-neutral-200 hover:border-neutral-200 transition flex items-start gap-3"
                       style={{ background: cfg.bg + "20" }}
                     >
                       <Icon size={16} weight="fill" className="shrink-0 mt-0.5" style={{ color: cfg.text }} />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-zinc-100 truncate">
+                        <div className="text-sm font-medium text-neutral-900 truncate">
                           {a.site_name}
                         </div>
-                        <div className="text-xs text-zinc-400">{a.message}</div>
+                        <div className="text-xs text-neutral-600">{a.message}</div>
                       </div>
-                      <CaretRight size={14} className="text-zinc-500 shrink-0 mt-1" />
+                      <CaretRight size={14} className="text-neutral-500 shrink-0 mt-1" />
                     </button>
                   );
                 })}
@@ -366,15 +366,15 @@ export default function Empire() {
 
         {/* Families + top products */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
-          <section className="bg-zinc-950 rounded-md border border-zinc-800 p-5" data-testid="section-families">
+          <section className="bg-white rounded-md border border-neutral-200 p-5" data-testid="section-families">
             <div className="flex items-center gap-2 mb-4">
-              <Rocket size={16} weight="fill" className="text-zinc-100" />
+              <Rocket size={16} weight="fill" className="text-neutral-900" />
               <h3 className="font-heading text-sm font-semibold uppercase tracking-wider">
                 Familles scalées cross-pays ({data.families.length})
               </h3>
             </div>
             {data.families.length === 0 ? (
-              <div className="text-sm text-zinc-500 text-center py-8">
+              <div className="text-sm text-neutral-500 text-center py-8">
                 Aucune famille. Va sur un site et clique <strong>"Scaler 6 pays"</strong>.
               </div>
             ) : (
@@ -382,19 +382,19 @@ export default function Empire() {
                 {data.families.map((f) => (
                   <div
                     key={f.source_id || f.source_name}
-                    className="p-3 rounded-lg border border-zinc-900 hover:border-[#B84B31]/40 transition cursor-pointer"
+                    className="p-3 rounded-lg border border-neutral-200 hover:border-[#B84B31]/40 transition cursor-pointer"
                     onClick={() => f.source_id && navigate(`/sites/${f.source_id}`)}
                     data-testid={`family-${f.source_id}`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <div className="font-medium text-sm text-zinc-100 truncate flex-1">
+                      <div className="font-medium text-sm text-neutral-900 truncate flex-1">
                         {f.source_name}
                       </div>
-                      <div className="font-heading font-semibold text-zinc-100">
+                      <div className="font-heading font-semibold text-neutral-900">
                         {formatEuro(f.total_revenue)}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-zinc-500 flex-wrap">
+                    <div className="flex items-center gap-1.5 text-xs text-neutral-500 flex-wrap">
                       <span className="font-mono">
                         {f.total_sites} sites · {f.total_orders} cmd
                       </span>
@@ -410,7 +410,7 @@ export default function Empire() {
             )}
           </section>
 
-          <section className="bg-zinc-950 rounded-md border border-zinc-800 p-5" data-testid="section-top-products">
+          <section className="bg-white rounded-md border border-neutral-200 p-5" data-testid="section-top-products">
             <div className="flex items-center gap-2 mb-4">
               <Package size={16} weight="duotone" className="text-emerald-400" />
               <h3 className="font-heading text-sm font-semibold uppercase tracking-wider">
@@ -418,7 +418,7 @@ export default function Empire() {
               </h3>
             </div>
             {data.top_products.length === 0 ? (
-              <div className="text-sm text-zinc-500 text-center py-8">
+              <div className="text-sm text-neutral-500 text-center py-8">
                 Aucune vente encore enregistrée.
               </div>
             ) : (
@@ -426,19 +426,19 @@ export default function Empire() {
                 {data.top_products.map((p, i) => (
                   <div
                     key={p.product_id}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-zinc-900/40"
+                    className="flex items-center gap-3 p-3 rounded-lg bg-neutral-100/40"
                     data-testid={`top-product-${i}`}
                   >
-                    <div className="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center font-heading font-semibold text-sm">
+                    <div className="w-8 h-8 rounded-full bg-neutral-900 text-white flex items-center justify-center font-heading font-semibold text-sm">
                       {i + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm text-zinc-100 truncate">
+                      <div className="font-medium text-sm text-neutral-900 truncate">
                         {p.name || "—"}
                       </div>
-                      <div className="text-xs text-zinc-500">{p.quantity} vendus</div>
+                      <div className="text-xs text-neutral-500">{p.quantity} vendus</div>
                     </div>
-                    <div className="font-heading font-semibold text-zinc-100">
+                    <div className="font-heading font-semibold text-neutral-900">
                       {formatEuro(p.revenue)}
                     </div>
                   </div>
@@ -449,7 +449,7 @@ export default function Empire() {
         </div>
 
         {/* Pending orders */}
-        <section className="bg-zinc-950 rounded-md border border-zinc-800 p-5 mb-8" data-testid="section-pending-orders">
+        <section className="bg-white rounded-md border border-neutral-200 p-5 mb-8" data-testid="section-pending-orders">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <ClockClockwise size={16} weight="duotone" className="text-amber-400" />
@@ -459,14 +459,14 @@ export default function Empire() {
             </div>
             <button
               onClick={() => navigate("/orders")}
-              className="text-xs text-zinc-100 hover:underline"
+              className="text-xs text-neutral-900 hover:underline"
               data-testid="goto-orders"
             >
               Voir toutes →
             </button>
           </div>
           {data.pending_orders.length === 0 ? (
-            <div className="text-sm text-zinc-500 text-center py-6">
+            <div className="text-sm text-neutral-500 text-center py-6">
               Aucune commande en attente. ✨
             </div>
           ) : (
@@ -474,7 +474,7 @@ export default function Empire() {
               {data.pending_orders.map((o) => (
                 <div
                   key={o.id}
-                  className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-zinc-900/40 transition"
+                  className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-neutral-100/40 transition"
                 >
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-semibold ${
@@ -486,14 +486,14 @@ export default function Empire() {
                     {o.status}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-mono text-zinc-100 truncate">
+                    <div className="text-sm font-mono text-neutral-900 truncate">
                       {o.order_number}
                     </div>
-                    <div className="text-xs text-zinc-500 truncate">
+                    <div className="text-xs text-neutral-500 truncate">
                       {o.site_name} · {new Date(o.created_at).toLocaleString("fr-FR")}
                     </div>
                   </div>
-                  <div className="font-heading font-semibold text-zinc-100">
+                  <div className="font-heading font-semibold text-neutral-900">
                     {formatEuro(o.total)}
                   </div>
                 </div>
@@ -502,7 +502,7 @@ export default function Empire() {
           )}
         </section>
 
-        <div className="text-xs text-zinc-500 text-center">
+        <div className="text-xs text-neutral-500 text-center">
           Dashboard généré le {new Date(data.generated_at).toLocaleString("fr-FR")}
         </div>
       </div>
@@ -514,14 +514,14 @@ function HeroCard({ testid, label, value, sub, icon: Icon, color, highlight }) {
   return (
     <div
       className={`rounded-md p-5 ${
-        highlight ? "bg-gradient-to-br from-[#1C1917] to-[#44403C] text-white" : "bg-zinc-950 border border-zinc-800"
+        highlight ? "bg-gradient-to-br from-[#1C1917] to-[#44403C] text-white" : "bg-white border border-neutral-200"
       }`}
       data-testid={testid}
     >
       <div className="flex items-center gap-2 mb-2">
         <div
           className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-            highlight ? "bg-zinc-950/10" : ""
+            highlight ? "bg-white" : ""
           }`}
           style={!highlight ? { background: color + "18" } : {}}
         >
@@ -529,7 +529,7 @@ function HeroCard({ testid, label, value, sub, icon: Icon, color, highlight }) {
         </div>
         <div
           className={`text-[10px] uppercase tracking-widest ${
-            highlight ? "text-white/60" : "text-zinc-500"
+            highlight ? "text-white/60" : "text-neutral-500"
           }`}
         >
           {label}
@@ -537,13 +537,13 @@ function HeroCard({ testid, label, value, sub, icon: Icon, color, highlight }) {
       </div>
       <div
         className={`text-2xl font-semibold ${
-          highlight ? "text-white" : "text-zinc-100"
+          highlight ? "text-white" : "text-neutral-900"
         }`}
       >
         {value}
       </div>
       <div
-        className={`text-xs mt-1.5 ${highlight ? "text-white/70" : "text-zinc-500"}`}
+        className={`text-xs mt-1.5 ${highlight ? "text-white/70" : "text-neutral-500"}`}
       >
         {sub}
       </div>

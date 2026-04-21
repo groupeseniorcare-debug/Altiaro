@@ -216,7 +216,7 @@ export function StorefrontContact() {
                 type="submit"
                 disabled={sending}
                 data-testid="contact-submit"
-                className="h-11 px-5 rounded-xl text-white font-medium disabled:opacity-60"
+                className="h-11 px-5 rounded-xl text-neutral-900 font-medium disabled:opacity-60"
                 style={{ background: primary }}
               >
                 {sending ? "Envoi…" : "Envoyer"}

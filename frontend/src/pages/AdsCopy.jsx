@@ -258,7 +258,7 @@ export default function AdsCopy() {
                       data-testid={`country-${c.code}`}
                       className={`h-12 rounded-lg border text-sm flex flex-col items-center justify-center gap-0.5 transition ${
                         active
-                          ? "bg-[#1C1917] text-white border-[#1C1917]"
+                          ? "bg-[#1C1917] text-neutral-900 border-[#1C1917]"
                           : eligible
                           ? "bg-white border-[#E7E5E4] hover:border-[#B84B31] text-[#1C1917]"
                           : "bg-[#FAF7F2] border-[#F5F2EB] text-[#A8A29E] cursor-not-allowed"
@@ -324,7 +324,7 @@ export default function AdsCopy() {
                 onClick={handleGenerate}
                 disabled={generating}
                 data-testid="generate-ads"
-                className="w-full h-11 rounded-xl bg-[#B84B31] hover:bg-[#993D26] disabled:opacity-60 text-white text-sm font-medium flex items-center justify-center gap-2 transition active:scale-[0.98]"
+                className="w-full h-11 rounded-xl bg-[#B84B31] hover:bg-[#993D26] disabled:opacity-60 text-neutral-900 text-sm font-medium flex items-center justify-center gap-2 transition active:scale-[0.98]"
               >
                 {generating ? (
                   <>
@@ -446,7 +446,7 @@ function CampaignDetail({ campaign, onCopyAll, onExport, onDelete }) {
             type="button"
             onClick={onExport}
             data-testid="export-csv"
-            className="h-10 px-4 rounded-xl bg-[#1C1917] hover:bg-[#44403C] text-white text-sm font-medium flex items-center gap-2 transition"
+            className="h-10 px-4 rounded-xl bg-[#1C1917] hover:bg-[#44403C] text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
           >
             <DownloadSimple size={14} /> CSV Google Ads
           </button>

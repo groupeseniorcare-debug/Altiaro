@@ -50,7 +50,7 @@ export default function ConcepteurDashboard() {
   if (loading) {
     return (
       <Layout>
-        <div className="p-8 flex items-center gap-2 text-zinc-500 text-sm">
+        <div className="p-8 flex items-center gap-2 text-neutral-500 text-sm">
           <ArrowClockwise size={14} className="animate-spin" /> Chargement du tableau de bord…
         </div>
       </Layout>
@@ -74,11 +74,11 @@ export default function ConcepteurDashboard() {
         {/* Header */}
         <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.12em] text-zinc-500 font-medium mb-1.5">
+            <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-500 font-medium mb-1.5">
               Vue globale
             </div>
-            <h1 className="text-3xl font-semibold text-zinc-100 tracking-tight">Dashboard</h1>
-            <p className="text-zinc-500 text-sm mt-1">
+            <h1 className="text-3xl font-semibold text-neutral-900 tracking-tight">Dashboard</h1>
+            <p className="text-neutral-500 text-sm mt-1">
               {hasSites
                 ? `${data.sites.total} site${data.sites.total > 1 ? "s" : ""} · ${data.orders.paid} commande${data.orders.paid > 1 ? "s" : ""} payée${data.orders.paid > 1 ? "s" : ""}`
                 : "Lance ton premier site en quelques minutes."}
@@ -87,7 +87,7 @@ export default function ConcepteurDashboard() {
           <button
             onClick={() => navigate("/sites/new")}
             data-testid="dash-launch-site"
-            className="h-9 px-4 rounded-md bg-zinc-950 hover:bg-zinc-200 text-black text-[13px] font-medium flex items-center gap-1.5 transition-colors"
+            className="h-9 px-4 rounded-md bg-white hover:bg-neutral-100 text-black text-[13px] font-medium flex items-center gap-1.5 transition-colors"
           >
             <Rocket size={14} weight="fill" /> Lancer un site
           </button>
@@ -96,16 +96,16 @@ export default function ConcepteurDashboard() {
         {/* Setup banner */}
         {!setupComplete && (
           <div
-            className="bg-zinc-950 border border-zinc-800 rounded-md p-4 mb-5 flex items-start gap-3"
+            className="bg-white border border-neutral-200 rounded-md p-4 mb-5 flex items-start gap-3"
             data-testid="setup-banner"
           >
             <Warning size={16} weight="fill" className="text-amber-400 shrink-0 mt-0.5" />
             <div className="flex-1 text-sm">
-              <div className="font-medium text-zinc-100 mb-1">Finalise ta configuration</div>
-              <div className="flex items-center gap-4 text-xs text-zinc-400 flex-wrap">
+              <div className="font-medium text-neutral-900 mb-1">Finalise ta configuration</div>
+              <div className="flex items-center gap-4 text-xs text-neutral-600 flex-wrap">
                 {!data.setup.has_card && <span>Carte bancaire manquante (prélèvement Ads)</span>}
                 {data.setup.has_card && <span className="text-emerald-400">✓ Carte OK</span>}
-                <span className="text-zinc-700">·</span>
+                <span className="text-neutral-400">·</span>
                 {!data.setup.has_iban && <span>IBAN manquant (virement versements)</span>}
                 {data.setup.has_iban && <span className="text-emerald-400">✓ IBAN OK</span>}
               </div>
@@ -113,7 +113,7 @@ export default function ConcepteurDashboard() {
             <Link
               to="/billing"
               data-testid="setup-goto-account"
-              className="h-8 px-3 rounded-md bg-zinc-950 text-black text-xs font-medium flex items-center gap-1 shrink-0 hover:bg-zinc-200 transition"
+              className="h-8 px-3 rounded-md bg-white text-black text-xs font-medium flex items-center gap-1 shrink-0 hover:bg-neutral-100 transition"
             >
               Compléter <ArrowRight size={12} />
             </Link>
@@ -178,16 +178,16 @@ export default function ConcepteurDashboard() {
         </div>
 
         {/* Sites list */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-md p-5">
+        <div className="bg-white border border-neutral-200 rounded-md p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <div className="text-[10px] uppercase tracking-[0.12em] text-zinc-500 font-medium mb-0.5">
+              <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-500 font-medium mb-0.5">
                 Mes sites
               </div>
-              <h2 className="text-lg font-semibold text-zinc-100 tracking-tight">
+              <h2 className="text-lg font-semibold text-neutral-900 tracking-tight">
                 {data.sites.total} site{data.sites.total > 1 ? "s" : ""}
                 {data.sites.total > 0 && (
-                  <span className="text-zinc-500 text-sm font-normal ml-2">
+                  <span className="text-neutral-500 text-sm font-normal ml-2">
                     · {data.sites.active} actif{data.sites.active > 1 ? "s" : ""}
                   </span>
                 )}
@@ -197,7 +197,7 @@ export default function ConcepteurDashboard() {
               <Link
                 to="/sites"
                 data-testid="dash-goto-sites"
-                className="text-xs text-zinc-400 hover:text-zinc-100 font-medium"
+                className="text-xs text-neutral-600 hover:text-neutral-900 font-medium"
               >
                 Voir tout →
               </Link>
@@ -205,14 +205,14 @@ export default function ConcepteurDashboard() {
           </div>
 
           {data.sites.total === 0 ? (
-            <div className="py-12 text-center rounded-md border border-dashed border-zinc-800">
-              <Storefront size={32} weight="thin" className="mx-auto text-zinc-700 mb-3" />
-              <div className="text-sm text-zinc-400 mb-1">Aucun site pour l'instant</div>
-              <div className="text-xs text-zinc-600 mb-5">Lance ton 1er site en 3 étapes</div>
+            <div className="py-12 text-center rounded-md border border-dashed border-neutral-200">
+              <Storefront size={32} weight="thin" className="mx-auto text-neutral-400 mb-3" />
+              <div className="text-sm text-neutral-600 mb-1">Aucun site pour l'instant</div>
+              <div className="text-xs text-neutral-400 mb-5">Lance ton 1er site en 3 étapes</div>
               <Link
                 to="/sites/new"
                 data-testid="dash-empty-launch"
-                className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-zinc-950 hover:bg-zinc-200 text-black text-[13px] font-medium"
+                className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-white hover:bg-neutral-100 text-black text-[13px] font-medium"
               >
                 <Rocket size={14} weight="fill" /> Lancer
               </Link>
@@ -224,22 +224,22 @@ export default function ConcepteurDashboard() {
                   key={s.id}
                   to={`/sites/${s.id}`}
                   data-testid={`dash-site-${s.id}`}
-                  className="block p-3 rounded-md border border-zinc-800 bg-zinc-900/30 hover:border-zinc-700 hover:bg-zinc-900 transition-colors"
+                  className="block p-3 rounded-md border border-neutral-200 bg-neutral-100/30 hover:border-neutral-300 hover:bg-neutral-100 transition-colors"
                 >
                   <div className="flex items-center justify-between mb-0.5">
-                    <div className="font-medium text-sm text-zinc-100 truncate pr-2">{s.name}</div>
+                    <div className="font-medium text-sm text-neutral-900 truncate pr-2">{s.name}</div>
                     {s.ads_active ? (
                       <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                         ● Actif
                       </span>
                     ) : (
-                      <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 border border-zinc-800">
+                      <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-neutral-200 text-neutral-500 border border-neutral-200">
                         Pause
                       </span>
                     )}
                   </div>
                   {s.domain && (
-                    <div className="font-mono text-[11px] text-zinc-500 truncate">{s.domain}</div>
+                    <div className="font-mono text-[11px] text-neutral-500 truncate">{s.domain}</div>
                   )}
                 </Link>
               ))}
@@ -254,23 +254,23 @@ export default function ConcepteurDashboard() {
 function KpiCard({ label, value, sub, icon: Icon, alert = false, testId }) {
   return (
     <div
-      className="bg-zinc-950 rounded-md border border-zinc-900 p-4 hover:border-zinc-800 transition-colors"
+      className="bg-white rounded-md border border-neutral-200 p-4 hover:border-neutral-200 transition-colors"
       data-testid={testId}
     >
       <div className="flex items-start justify-between mb-3">
-        <div className="text-[10px] uppercase tracking-[0.12em] text-zinc-500 font-medium">
+        <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-500 font-medium">
           {label}
         </div>
-        <Icon size={14} className={alert ? "text-red-400" : "text-zinc-600"} weight="duotone" />
+        <Icon size={14} className={alert ? "text-red-400" : "text-neutral-400"} weight="duotone" />
       </div>
       <div
         className={`text-2xl font-semibold tracking-tight leading-none font-mono tabular-nums ${
-          alert ? "text-red-400" : "text-zinc-100"
+          alert ? "text-red-400" : "text-neutral-900"
         }`}
       >
         {value}
       </div>
-      {sub && <div className="text-xs text-zinc-500 mt-2">{sub}</div>}
+      {sub && <div className="text-xs text-neutral-500 mt-2">{sub}</div>}
     </div>
   );
 }
@@ -278,35 +278,35 @@ function KpiCard({ label, value, sub, icon: Icon, alert = false, testId }) {
 function NextEventCard({ label, date, amount, status, statusBlockedLabel, icon: Icon, flow, testId }) {
   const blocked = status && status.startsWith("blocked");
   return (
-    <div className="bg-zinc-950 rounded-md border border-zinc-900 p-4" data-testid={testId}>
+    <div className="bg-white rounded-md border border-neutral-200 p-4" data-testid={testId}>
       <div className="flex items-start justify-between mb-3">
-        <div className="text-[10px] uppercase tracking-[0.12em] text-zinc-500 font-medium">
+        <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-500 font-medium">
           {label}
         </div>
         <Icon
           size={14}
           weight="bold"
-          className={flow === "in" ? "text-emerald-400" : "text-zinc-500"}
+          className={flow === "in" ? "text-emerald-400" : "text-neutral-500"}
         />
       </div>
       <div
         className={`text-2xl font-semibold tracking-tight leading-none font-mono tabular-nums mb-2 ${
-          flow === "in" ? "text-emerald-400" : "text-zinc-100"
+          flow === "in" ? "text-emerald-400" : "text-neutral-900"
         }`}
       >
         {flow === "in" ? "+" : "−"}
         {fmtEur(amount)}
       </div>
       <div className="flex items-center gap-2 text-xs">
-        <Clock size={10} weight="bold" className="text-zinc-600" />
-        <span className="text-zinc-400">{fmtDate(date)}</span>
+        <Clock size={10} weight="bold" className="text-neutral-400" />
+        <span className="text-neutral-600">{fmtDate(date)}</span>
         {blocked ? (
           <span className="ml-auto font-medium text-red-400 flex items-center gap-1 text-[11px]">
             <Warning size={10} weight="fill" />
             {statusBlockedLabel}
           </span>
         ) : (
-          <span className="ml-auto text-zinc-500 flex items-center gap-1 text-[11px]">
+          <span className="ml-auto text-neutral-500 flex items-center gap-1 text-[11px]">
             <CheckCircle size={10} weight="fill" className="text-emerald-400" />
             Programmé
           </span>

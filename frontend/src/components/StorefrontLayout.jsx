@@ -54,7 +54,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
     >
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${fontsQuery}&display=swap`} />
       {/* Trust bar */}
-      <div className="text-white text-[13px]" style={{ background: textCol }}>
+      <div className="text-neutral-900 text-[13px]" style={{ background: textCol }}>
         <div className="max-w-6xl mx-auto px-6 py-2 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-5">
             <span className="flex items-center gap-1.5">
@@ -71,7 +71,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
             value={lang}
             onChange={(e) => setLang(e.target.value)}
             data-testid="lang-switcher"
-            className="bg-transparent border border-white/20 rounded px-2 py-0.5 text-[12px] hover:bg-white/10 cursor-pointer outline-none"
+            className="bg-transparent border border-neutral-900/20 rounded px-2 py-0.5 text-[12px] hover:bg-neutral-900/10 cursor-pointer outline-none"
           >
             {LANGUAGES.map((l) => (
               <option key={l.code} value={l.code} style={{ color: textCol }}>
@@ -120,7 +120,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
             {cartCount > 0 && (
               <span
                 data-testid="cart-count"
-                className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] rounded-full text-white text-[11px] font-semibold flex items-center justify-center px-1.5"
+                className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] rounded-full text-neutral-900 text-[11px] font-semibold flex items-center justify-center px-1.5"
                 style={{ background: primary }}
               >
                 {cartCount}

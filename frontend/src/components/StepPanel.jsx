@@ -244,7 +244,7 @@ export default function StepPanel({ step: initialStep, site, isAdmin, onClose, o
                   onClick={handleExecute}
                   disabled={executing}
                   data-testid="step-execute-ai"
-                  className="h-10 px-4 rounded-lg bg-[#1C1917] hover:bg-[#2A2421] text-white text-sm font-medium flex items-center gap-2 disabled:opacity-60 transition active:scale-[0.98]"
+                  className="h-10 px-4 rounded-lg bg-[#1C1917] hover:bg-[#2A2421] text-neutral-900 text-sm font-medium flex items-center gap-2 disabled:opacity-60 transition active:scale-[0.98]"
                 >
                   {executing ? (
                     <>
@@ -378,7 +378,7 @@ export default function StepPanel({ step: initialStep, site, isAdmin, onClose, o
               <button
                 onClick={handleValidate}
                 data-testid="step-validate-btn"
-                className="h-11 px-5 rounded-xl bg-[#047857] hover:bg-[#065F46] text-white font-medium transition flex items-center gap-2 active:scale-[0.98]"
+                className="h-11 px-5 rounded-xl bg-[#047857] hover:bg-[#065F46] text-neutral-900 font-medium transition flex items-center gap-2 active:scale-[0.98]"
               >
                 <CheckCircle size={18} weight="fill" /> Valider et déverrouiller la suivante
               </button>
@@ -405,7 +405,7 @@ export default function StepPanel({ step: initialStep, site, isAdmin, onClose, o
                 <button
                   onClick={handleReject}
                   data-testid="step-reject-confirm"
-                  className="h-10 px-4 rounded-lg bg-[#BE123C] hover:bg-[#9F1239] text-white font-medium flex items-center gap-2"
+                  className="h-10 px-4 rounded-lg bg-[#BE123C] hover:bg-[#9F1239] text-neutral-900 font-medium flex items-center gap-2"
                 >
                   <XCircle size={16} /> Confirmer le refus
                 </button>
@@ -432,7 +432,7 @@ export default function StepPanel({ step: initialStep, site, isAdmin, onClose, o
                   onClick={handleSubmit}
                   disabled={submitting}
                   data-testid="step-submit-btn"
-                  className="h-11 px-5 rounded-xl bg-[#047857] hover:bg-[#065F46] text-white font-medium transition flex items-center gap-2 active:scale-[0.98] disabled:opacity-60"
+                  className="h-11 px-5 rounded-xl bg-[#047857] hover:bg-[#065F46] text-neutral-900 font-medium transition flex items-center gap-2 active:scale-[0.98] disabled:opacity-60"
                 >
                   {submitting ? <Spinner size={16} className="animate-spin" /> : <CheckCircle size={16} weight="fill" />}
                   Valider & continuer

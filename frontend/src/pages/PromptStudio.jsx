@@ -183,7 +183,7 @@ export default function PromptStudio() {
   if (loading) {
     return (
       <Layout>
-        <div className="p-12 text-zinc-500">Chargement du Studio…</div>
+        <div className="p-12 text-neutral-500">Chargement du Studio…</div>
       </Layout>
     );
   }
@@ -198,7 +198,7 @@ export default function PromptStudio() {
       <div className="p-8 md:p-12 max-w-[1200px]">
         <button
           onClick={() => navigate(`/sites/${siteId}`)}
-          className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-100 mb-6 transition"
+          className="flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900 mb-6 transition"
           data-testid="studio-back"
         >
           <ArrowLeft size={16} /> Retour au site
@@ -233,7 +233,7 @@ export default function PromptStudio() {
                 <button
                   onClick={() => setPaletteModal(true)}
                   data-testid="studio-palette-btn"
-                  className="h-9 px-3 rounded-lg bg-zinc-950/10 hover:bg-zinc-950/20 border border-white/20 text-xs font-medium flex items-center gap-1.5"
+                  className="h-9 px-3 rounded-lg bg-white hover:bg-white border border-neutral-900/20 text-xs font-medium flex items-center gap-1.5"
                 >
                   <Palette size={14} weight="bold" />
                   Palette
@@ -241,7 +241,7 @@ export default function PromptStudio() {
                 <button
                   onClick={() => setKwModal(true)}
                   data-testid="studio-keywords-btn"
-                  className="h-9 px-3 rounded-lg bg-zinc-950/10 hover:bg-zinc-950/20 border border-white/20 text-xs font-medium flex items-center gap-1.5"
+                  className="h-9 px-3 rounded-lg bg-white hover:bg-white border border-neutral-900/20 text-xs font-medium flex items-center gap-1.5"
                 >
                   <MagnifyingGlass size={14} weight="bold" />
                   Mots-clés
@@ -249,7 +249,7 @@ export default function PromptStudio() {
                 <button
                   onClick={() => setShowPreview(true)}
                   data-testid="studio-preview-btn"
-                  className="h-9 px-3 rounded-lg bg-zinc-950 text-zinc-100 text-xs font-medium flex items-center gap-1.5"
+                  className="h-9 px-3 rounded-lg bg-white text-neutral-900 text-xs font-medium flex items-center gap-1.5"
                 >
                   <Eye size={14} weight="fill" />
                   Voir live
@@ -261,7 +261,7 @@ export default function PromptStudio() {
 
         {/* Current brand palette preview */}
         {state?.brand?.primary_color && (
-          <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-4 mb-5 flex items-center gap-4">
+          <div className="bg-white rounded-xl border border-neutral-200 p-4 mb-5 flex items-center gap-4">
             <div className="flex gap-2">
               {[
                 state.brand.background_color || "#FDFBF7",
@@ -271,20 +271,20 @@ export default function PromptStudio() {
               ].map((c, i) => (
                 <div
                   key={i}
-                  className="w-10 h-10 rounded-lg border border-zinc-800 shadow-sm"
+                  className="w-10 h-10 rounded-lg border border-neutral-200 shadow-sm"
                   style={{ backgroundColor: c }}
                   title={c}
                 />
               ))}
             </div>
             <div className="flex-1">
-              <div className="text-xs text-zinc-500 uppercase tracking-wider">Palette actuelle</div>
+              <div className="text-xs text-neutral-500 uppercase tracking-wider">Palette actuelle</div>
               <div className="text-sm font-medium">
                 {state.brand.name || "Marque non générée"}
                 {state.brand.tagline && ` — ${state.brand.tagline}`}
               </div>
             </div>
-            <div className="text-xs text-zinc-500">
+            <div className="text-xs text-neutral-500">
               Font: {state.brand.font_heading || "Fraunces"} / {state.brand.font_body || "Inter"}
             </div>
           </div>
@@ -299,8 +299,8 @@ export default function PromptStudio() {
               <div
                 key={section.id}
                 data-testid={`studio-section-${section.id}`}
-                className={`bg-zinc-950 rounded-xl border transition ${
-                  sState.filled ? "border-[#D1FAE5]" : "border-zinc-800"
+                className={`bg-white rounded-xl border transition ${
+                  sState.filled ? "border-[#D1FAE5]" : "border-neutral-200"
                 }`}
               >
                 <button
@@ -309,7 +309,7 @@ export default function PromptStudio() {
                 >
                   <div
                     className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0 ${
-                      sState.filled ? "bg-emerald-500/10" : "bg-zinc-800"
+                      sState.filled ? "bg-emerald-500/10" : "bg-neutral-200"
                     }`}
                   >
                     {sState.filled ? (
@@ -319,10 +319,10 @@ export default function PromptStudio() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-base font-semibold text-zinc-100">
+                    <div className="text-base font-semibold text-neutral-900">
                       {section.title}
                     </div>
-                    <div className="text-xs text-zinc-500 mt-0.5">{section.desc}</div>
+                    <div className="text-xs text-neutral-500 mt-0.5">{section.desc}</div>
                   </div>
                   {sState.filled && !isExpanded && (
                     <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-medium mr-2">
@@ -333,9 +333,9 @@ export default function PromptStudio() {
                 </button>
 
                 {isExpanded && (
-                  <div className="px-5 pb-5 border-t border-zinc-900 pt-4 space-y-3">
+                  <div className="px-5 pb-5 border-t border-neutral-200 pt-4 space-y-3">
                     <div>
-                      <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">
+                      <label className="block text-xs font-semibold text-neutral-600 mb-1.5 uppercase tracking-wider">
                         Prompt (éditable)
                       </label>
                       <textarea
@@ -345,7 +345,7 @@ export default function PromptStudio() {
                         }
                         rows={4}
                         data-testid={`studio-prompt-${section.id}`}
-                        className="w-full px-3 py-2 rounded-lg border border-zinc-800 bg-zinc-900/40 text-sm focus:outline-none focus:border-[#7C3AED] font-mono"
+                        className="w-full px-3 py-2 rounded-lg border border-neutral-200 bg-neutral-100/40 text-sm focus:outline-none focus:border-[#7C3AED] font-mono"
                       />
                     </div>
 
@@ -354,7 +354,7 @@ export default function PromptStudio() {
                         onClick={() => runPrompt(section.id)}
                         disabled={running === section.id}
                         data-testid={`studio-run-${section.id}`}
-                        className="h-10 px-4 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-60 text-white text-sm font-medium flex items-center gap-2"
+                        className="h-10 px-4 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-60 text-neutral-900 text-sm font-medium flex items-center gap-2"
                       >
                         {running === section.id ? (
                           <>
@@ -373,7 +373,7 @@ export default function PromptStudio() {
                           onClick={() => applyGenerated(section.id)}
                           disabled={applying === section.id}
                           data-testid={`studio-apply-${section.id}`}
-                          className="h-10 px-4 rounded-lg bg-[#047857] hover:bg-[#065F46] disabled:opacity-60 text-white text-sm font-medium flex items-center gap-2"
+                          className="h-10 px-4 rounded-lg bg-[#047857] hover:bg-[#065F46] disabled:opacity-60 text-neutral-900 text-sm font-medium flex items-center gap-2"
                         >
                           {applying === section.id ? (
                             <ArrowClockwise size={14} className="animate-spin" />
@@ -386,12 +386,12 @@ export default function PromptStudio() {
                     </div>
 
                     {gen && (
-                      <div className="mt-2 bg-zinc-900/40 rounded-lg p-4 border border-zinc-800">
-                        <div className="text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wider">
+                      <div className="mt-2 bg-neutral-100/40 rounded-lg p-4 border border-neutral-200">
+                        <div className="text-xs font-semibold text-neutral-600 mb-2 uppercase tracking-wider">
                           Résultat Claude
                         </div>
                         <pre
-                          className="text-xs text-zinc-100 whitespace-pre-wrap font-mono max-h-96 overflow-y-auto"
+                          className="text-xs text-neutral-900 whitespace-pre-wrap font-mono max-h-96 overflow-y-auto"
                           data-testid={`studio-result-${section.id}`}
                         >
                           {JSON.stringify(gen, null, 2)}
@@ -400,7 +400,7 @@ export default function PromptStudio() {
                     )}
 
                     {sState.filled && !gen && (
-                      <div className="text-xs text-zinc-500 bg-zinc-900/40 rounded-lg px-3 py-2 border border-dashed border-zinc-800">
+                      <div className="text-xs text-neutral-500 bg-neutral-100/40 rounded-lg px-3 py-2 border border-dashed border-neutral-200">
                         Cette section est déjà remplie sur ton site. Regénère pour la remplacer.
                       </div>
                     )}
@@ -415,28 +415,28 @@ export default function PromptStudio() {
       {/* Palette modal */}
       {paletteModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 p-4"
           onClick={() => setPaletteModal(false)}
         >
           <div
-            className="bg-zinc-950 rounded-md w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl"
+            className="bg-white rounded-md w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#F97316] to-[#B84B31] flex items-center justify-center">
                   <Palette size={18} weight="bold" color="#fff" />
                 </div>
                 <div>
                   <div className="font-heading font-semibold">Palette de couleurs</div>
-                  <div className="text-xs text-zinc-500">
+                  <div className="text-xs text-neutral-500">
                     3 propositions IA ou palette custom
                   </div>
                 </div>
               </div>
               <button
                 onClick={() => setPaletteModal(false)}
-                className="w-8 h-8 rounded-lg hover:bg-zinc-800 flex items-center justify-center"
+                className="w-8 h-8 rounded-lg hover:bg-neutral-200 flex items-center justify-center"
               >
                 <X size={16} />
               </button>
@@ -447,7 +447,7 @@ export default function PromptStudio() {
                 onClick={suggestPalettes}
                 disabled={palettesLoading}
                 data-testid="studio-palette-suggest"
-                className="w-full h-11 mb-5 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-60 text-white text-sm font-medium flex items-center justify-center gap-2"
+                className="w-full h-11 mb-5 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-60 text-neutral-900 text-sm font-medium flex items-center justify-center gap-2"
               >
                 {palettesLoading ? (
                   <>
@@ -466,17 +466,17 @@ export default function PromptStudio() {
                 <div
                   key={i}
                   data-testid={`studio-palette-${i}`}
-                  className="mb-3 p-4 border border-zinc-800 rounded-xl hover:border-[#7C3AED] transition"
+                  className="mb-3 p-4 border border-neutral-200 rounded-xl hover:border-[#7C3AED] transition"
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <div className="font-medium text-zinc-100">{p.name}</div>
-                      <div className="text-xs text-zinc-500">{p.description}</div>
+                      <div className="font-medium text-neutral-900">{p.name}</div>
+                      <div className="text-xs text-neutral-500">{p.description}</div>
                     </div>
                     <button
                       onClick={() => applyPalette(p)}
                       data-testid={`studio-palette-apply-${i}`}
-                      className="h-8 px-3 rounded-lg bg-white hover:bg-zinc-200 text-black text-xs font-medium"
+                      className="h-8 px-3 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium"
                     >
                       Appliquer
                     </button>
@@ -486,21 +486,21 @@ export default function PromptStudio() {
                       (c, j) => (
                         <div
                           key={j}
-                          className="flex-1 h-12 rounded-lg border border-zinc-800"
+                          className="flex-1 h-12 rounded-lg border border-neutral-200"
                           style={{ backgroundColor: c }}
                           title={c}
                         />
                       )
                     )}
                   </div>
-                  <div className="text-[10px] text-zinc-500 mt-2 font-mono">
+                  <div className="text-[10px] text-neutral-500 mt-2 font-mono">
                     Fonts : {p.font_heading} / {p.font_body}
                   </div>
                 </div>
               ))}
 
-              <div className="mt-6 p-4 bg-zinc-900/40 rounded-xl">
-                <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">
+              <div className="mt-6 p-4 bg-neutral-100/40 rounded-xl">
+                <div className="text-xs font-semibold uppercase tracking-wider text-neutral-600 mb-2">
                   Ou choisis ta couleur principale libre
                 </div>
                 <div className="flex items-center gap-3">
@@ -509,18 +509,18 @@ export default function PromptStudio() {
                     value={customColor}
                     onChange={(e) => setCustomColor(e.target.value)}
                     data-testid="studio-palette-custom-color"
-                    className="w-14 h-14 rounded-lg cursor-pointer border border-zinc-800"
+                    className="w-14 h-14 rounded-lg cursor-pointer border border-neutral-200"
                   />
                   <input
                     type="text"
                     value={customColor}
                     onChange={(e) => setCustomColor(e.target.value)}
-                    className="flex-1 h-10 px-3 rounded-lg border border-zinc-800 font-mono text-sm"
+                    className="flex-1 h-10 px-3 rounded-lg border border-neutral-200 font-mono text-sm"
                   />
                   <button
                     onClick={applyCustomColor}
                     data-testid="studio-palette-custom-apply"
-                    className="h-10 px-4 rounded-lg bg-white hover:bg-zinc-200 text-black text-sm font-medium"
+                    className="h-10 px-4 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium"
                   >
                     Appliquer
                   </button>
@@ -533,13 +533,13 @@ export default function PromptStudio() {
 
       {/* Live preview modal */}
       {showPreview && (
-        <div className="fixed inset-0 z-50 bg-black/70 p-4 flex flex-col">
-          <div className="bg-white text-black px-4 py-3 flex items-center justify-between rounded-t-xl">
+        <div className="fixed inset-0 z-50 bg-neutral-900/60 p-4 flex flex-col">
+          <div className="bg-neutral-900 text-white px-4 py-3 flex items-center justify-between rounded-t-xl">
             <div className="flex items-center gap-3">
               <Eye size={18} weight="fill" />
               <div>
                 <div className="font-medium text-sm">Preview Live · {state?.site_name}</div>
-                <div className="text-xs text-white/60 font-mono">{previewUrl}</div>
+                <div className="text-xs text-neutral-900/60 font-mono">{previewUrl}</div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -547,14 +547,14 @@ export default function PromptStudio() {
                 href={previewUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="h-8 px-3 rounded-lg bg-zinc-950/10 hover:bg-zinc-950/20 text-xs font-medium flex items-center gap-1"
+                className="h-8 px-3 rounded-lg bg-white hover:bg-white text-xs font-medium flex items-center gap-1"
               >
                 Ouvrir dans un onglet →
               </a>
               <button
                 onClick={() => setShowPreview(false)}
                 data-testid="studio-preview-close"
-                className="w-8 h-8 rounded-lg hover:bg-zinc-950/10 flex items-center justify-center"
+                className="w-8 h-8 rounded-lg hover:bg-white flex items-center justify-center"
               >
                 <X size={16} />
               </button>
@@ -564,7 +564,7 @@ export default function PromptStudio() {
             key={previewTick}
             src={previewUrl}
             title="preview"
-            className="flex-1 w-full bg-zinc-950 rounded-b-xl border-0"
+            className="flex-1 w-full bg-white rounded-b-xl border-0"
             data-testid="studio-preview-iframe"
           />
         </div>

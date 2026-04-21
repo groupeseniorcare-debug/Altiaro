@@ -369,7 +369,7 @@ function ScanResult({ result, onLaunchSite }) {
               <button
                 onClick={onLaunchSite}
                 data-testid="qs-launch-site"
-                className="mt-5 inline-flex items-center gap-2 h-11 px-5 rounded-full text-white font-medium transition hover:brightness-110"
+                className="mt-5 inline-flex items-center gap-2 h-11 px-5 rounded-full text-neutral-900 font-medium transition hover:brightness-110"
                 style={{ background: meta.color }}
               >
                 <Storefront size={16} weight="fill" /> Lancer un site sur cette niche{" "}

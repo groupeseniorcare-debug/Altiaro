@@ -76,7 +76,7 @@ export default function KeywordFinder({ initialSeed = "", initialCountry = "FR",
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 p-4"
       onClick={onClose}
     >
       <div
@@ -144,7 +144,7 @@ export default function KeywordFinder({ initialSeed = "", initialCountry = "FR",
             onClick={run}
             disabled={loading || !seed.trim()}
             data-testid="kwfinder-run"
-            className="h-11 px-5 rounded-lg bg-[#6D28D9] hover:bg-[#5B21B6] disabled:opacity-50 text-white text-sm font-medium flex items-center gap-2 transition"
+            className="h-11 px-5 rounded-lg bg-[#6D28D9] hover:bg-[#5B21B6] disabled:opacity-50 text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
           >
             {loading ? (
               <>
@@ -189,7 +189,7 @@ export default function KeywordFinder({ initialSeed = "", initialCountry = "FR",
                   <button
                     onClick={copyAllSelected}
                     data-testid="kwfinder-copy-all"
-                    className="h-8 px-3 rounded-lg bg-[#1C1917] hover:bg-[#44403C] text-white text-xs font-medium flex items-center gap-1.5"
+                    className="h-8 px-3 rounded-lg bg-[#1C1917] hover:bg-[#44403C] text-neutral-900 text-xs font-medium flex items-center gap-1.5"
                   >
                     {copiedIdx === "all" ? (
                       <>
@@ -248,7 +248,7 @@ export default function KeywordFinder({ initialSeed = "", initialCountry = "FR",
                         </td>
                         <td className="p-2 text-center">
                           <span
-                            className="inline-block px-1.5 py-0.5 rounded-full text-[9px] uppercase tracking-wider font-semibold text-white"
+                            className="inline-block px-1.5 py-0.5 rounded-full text-[9px] uppercase tracking-wider font-semibold text-neutral-900"
                             style={{ backgroundColor: COMPETITION_COLOR[i.competition] }}
                           >
                             {i.competition}

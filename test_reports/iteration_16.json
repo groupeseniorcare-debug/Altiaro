@@ -1,0 +1,30 @@
+{
+  "summary": "Sprint 21 — Validation UI du passage dark → light mode ('Ultra Premium Digital 2.0'). Tests Playwright sur /login, /, /sites/new, /sites, /finances, /billing, /admin-dashboard. Le thème clair est correctement appliqué : body bg=rgb(255,255,255) color=rgb(10,10,10). Aucune console error/warning (0/0). Tous les CTA noirs sont visibles et lisibles (Lancer ma boutique, Analyser une niche, Analyser les 6 marchés, Se connecter, Enregistrer ma CB). Login via login-quick-concepteur + login-quick-admin fonctionnel. Sidebar admin = 13 liens (Dashboard/Lancer un site/Sites/Analyseur/Empire/Commandes/Virements/Google Ads/Opportunités/Activité/Finances/Paiements/Équipe) — spec demandait 12, léger dépassement acceptable. Billing : BalanceCard 'Ta part à recevoir' bien SOMBRE (gradient neutral-900→neutral-700) avec texte BLANC (color=rgb(255,255,255)), 2 autres cards bien BLANCHES avec texte neutral-900. Carte bancaire (section interne gradient from-[#1C1917] to-[#44403C]) + IBAN + informations société rendent correctement. CopilotFab backdrop OK (bg-neutral-900/30 sur inner div, L151). Aucun texte invisible réel détecté (les 2 candidats récurrents 'Copilot IA' et 'Made with Emergent' sont des faux positifs — badges/boutons avec leur propre fond sombre).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Sidebar admin", "issues": ["13 liens visibles au lieu de 12 annoncés dans le brief — à vérifier si 'Google Ads' ou 'Paiements' a été ajouté récemment sans mise à jour du brief. Non bloquant."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "index.css L37-60 — CSS vars light mode cohérentes (background 0% 100%, foreground 240 10% 4%, border 240 6% 90%). Design token centralisé, bon pattern.",
+    "Billing.jsx L184-206 BalanceCard — `highlight` prop bascule correctement entre gradient sombre (from-neutral-900 to-neutral-700 text-white) et white+border. Contraste WCAG AA OK (white sur rgb(23,23,23) = 17:1).",
+    "Billing.jsx L234-247 — Card preview interne garde le gradient sombre `from-[#1C1917] to-[#44403C]` + text-white. Intentionnel pour représenter visuellement une vraie carte bancaire, cohérent.",
+    "CopilotFab.jsx L150-151 — backdrop structure à 2 divs : wrapper `pointer-events-none` + inner `bg-neutral-900/30 pointer-events-auto`. Pattern correct pour permettre click-outside sans bloquer le FAB lui-même.",
+    "Remarque : le thème clair est appliqué UNIQUEMENT au cockpit Concepteur/Admin. Le storefront (/storefront/*) conserve bien son thème chaud Fraunces + #FDFBF7 via la classe `.storefront-root` (index.css L31-35). Séparation propre.",
+    "Vérifier que le brief 'Admin = 12 liens sidebar' est à jour : le Layout actuel rend 13 items (Paiements inclus). Petit décalage doc vs code."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not_tested", "frontend": "100% (7/7 pages validées, 0 console error, 0 bug UI bloquant)"},
+  "test_credentials": "concepteur@conceptfactory.fr / Concepteur2026! ; admin@conceptfactory.fr / Factory2026!",
+  "seed_data_creation": "",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Les 'invisible text candidates' détectés par script JS walk-up-parent sur un gradient sans solid bg sont des faux positifs. Pour détecter correctement, il faut lire backgroundImage également. Pages vérifiées en light mode avec succès : /login, /, /sites/new, /sites, /finances, /billing, /admin (dashboard). Admin sidebar = 13 liens. Storefront non testé (hors scope).",
+  "rca of the issue": "N/A — conversion dark→light validée. Tous les éléments textuels ont un contraste suffisant, tous les CTA noirs sont visibles, les hero blocks/cards qui doivent rester sombres (BalanceCard highlight, card preview, CopilotFab FAB) le sont avec texte blanc correctement."
+}

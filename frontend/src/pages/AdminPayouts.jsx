@@ -96,7 +96,7 @@ export default function AdminPayouts() {
   if (loading) {
     return (
       <Layout>
-        <div className="p-8 text-zinc-500">Chargement…</div>
+        <div className="p-8 text-neutral-500">Chargement…</div>
       </Layout>
     );
   }
@@ -110,9 +110,9 @@ export default function AdminPayouts() {
       <div className="p-6 md:p-10 max-w-[1500px]">
         {/* Header */}
         <div className="mb-8 animate-fade-up">
-          <div className="text-[11px] uppercase tracking-widest text-zinc-500 mb-2">Administration · Trésorerie</div>
-          <h1 className="text-3xl font-semibold text-zinc-100">Virements Concepteurs</h1>
-          <p className="text-zinc-400 mt-2 max-w-2xl">
+          <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-2">Administration · Trésorerie</div>
+          <h1 className="text-3xl font-semibold text-neutral-900">Virements Concepteurs</h1>
+          <p className="text-neutral-600 mt-2 max-w-2xl">
             Liste des virements à effectuer, par Concepteur. Formule&nbsp;: <strong>50% × marge brute HT</strong> (CA HT − Prix d'achat HT),
             calculée automatiquement les 1<sup>er</sup> et 15 de chaque mois.
           </p>
@@ -158,7 +158,7 @@ export default function AdminPayouts() {
         <div className="flex flex-wrap items-center gap-3 mb-6">
           <button
             onClick={load}
-            className="h-10 px-4 rounded-xl border border-zinc-800 bg-zinc-950 hover:border-[#B84B31] text-sm flex items-center gap-2 transition"
+            className="h-10 px-4 rounded-xl border border-neutral-200 bg-white hover:border-[#B84B31] text-sm flex items-center gap-2 transition"
             data-testid="refresh-btn"
           >
             <ArrowClockwise size={14} /> Actualiser
@@ -166,7 +166,7 @@ export default function AdminPayouts() {
           <button
             onClick={runPayouts}
             disabled={running || rows.length === 0}
-            className="h-10 px-5 rounded-xl bg-white hover:bg-zinc-200 text-black text-sm font-medium flex items-center gap-2 transition disabled:opacity-40"
+            className="h-10 px-5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium flex items-center gap-2 transition disabled:opacity-40"
             data-testid="run-payouts-btn"
           >
             {running ? "Génération..." : (
@@ -183,7 +183,7 @@ export default function AdminPayouts() {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-zinc-800 mb-6 flex gap-6">
+        <div className="border-b border-neutral-200 mb-6 flex gap-6">
           <TabButton active={tab === "pending"} onClick={() => setTab("pending")} testId="tab-pending">
             <ClockCountdown size={16} /> À effectuer ({pendingPayouts.length})
           </TabButton>
@@ -229,7 +229,7 @@ export default function AdminPayouts() {
 function KpiCard({ icon: Icon, color, label, value, hint, testId }) {
   return (
     <div
-      className="bg-zinc-950 rounded-md border border-zinc-800 p-5 hover:shadow-md transition"
+      className="bg-white rounded-md border border-neutral-200 p-5 hover:shadow-md transition"
       data-testid={testId}
     >
       <div className="flex items-center gap-2 mb-3">
@@ -239,10 +239,10 @@ function KpiCard({ icon: Icon, color, label, value, hint, testId }) {
         >
           <Icon size={18} weight="fill" />
         </div>
-        <div className="text-[11px] uppercase tracking-widest text-zinc-500">{label}</div>
+        <div className="text-[11px] uppercase tracking-widest text-neutral-500">{label}</div>
       </div>
-      <div className="text-xl font-semibold text-zinc-100 tabular-nums">{value}</div>
-      <div className="text-xs text-zinc-500 mt-1">{hint}</div>
+      <div className="text-xl font-semibold text-neutral-900 tabular-nums">{value}</div>
+      <div className="text-xs text-neutral-500 mt-1">{hint}</div>
     </div>
   );
 }
@@ -253,7 +253,7 @@ function TabButton({ active, onClick, children, testId }) {
       onClick={onClick}
       data-testid={testId}
       className={`flex items-center gap-2 py-3 text-sm font-medium border-b-2 transition -mb-px ${
-        active ? "border-[#B84B31] text-zinc-100" : "border-transparent text-zinc-500 hover:text-zinc-100"
+        active ? "border-[#B84B31] text-neutral-900" : "border-transparent text-neutral-500 hover:text-neutral-900"
       }`}
     >
       {children}
@@ -263,10 +263,10 @@ function TabButton({ active, onClick, children, testId }) {
 
 function EmptyState({ title, subtitle }) {
   return (
-    <div className="bg-zinc-950 rounded-md border border-dashed border-zinc-800 p-16 text-center">
-      <Bank size={40} weight="thin" className="mx-auto text-zinc-700 mb-3" />
-      <div className="text-base font-medium text-zinc-100">{title}</div>
-      <div className="text-sm text-zinc-500 mt-1.5">{subtitle}</div>
+    <div className="bg-white rounded-md border border-dashed border-neutral-200 p-16 text-center">
+      <Bank size={40} weight="thin" className="mx-auto text-neutral-400 mb-3" />
+      <div className="text-base font-medium text-neutral-900">{title}</div>
+      <div className="text-sm text-neutral-500 mt-1.5">{subtitle}</div>
     </div>
   );
 }
@@ -281,9 +281,9 @@ function PendingTable({ items, onMarkPaid, onCancel, copyIban, copiedIban }) {
     );
   }
   return (
-    <div className="bg-zinc-950 rounded-md border border-zinc-800 overflow-hidden" data-testid="pending-table">
+    <div className="bg-white rounded-md border border-neutral-200 overflow-hidden" data-testid="pending-table">
       <table className="w-full">
-        <thead className="bg-black text-[11px] uppercase tracking-widest text-zinc-500">
+        <thead className="bg-white text-[11px] uppercase tracking-widest text-neutral-500">
           <tr>
             <th className="text-left px-5 py-3">Concepteur</th>
             <th className="text-left px-5 py-3">IBAN</th>
@@ -294,25 +294,25 @@ function PendingTable({ items, onMarkPaid, onCancel, copyIban, copiedIban }) {
         </thead>
         <tbody>
           {items.map((p) => (
-            <tr key={p.id} className="border-t border-zinc-800 hover:bg-black transition" data-testid={`pending-row-${p.id}`}>
+            <tr key={p.id} className="border-t border-neutral-200 hover:bg-white transition" data-testid={`pending-row-${p.id}`}>
               <td className="px-5 py-4">
-                <div className="font-medium text-zinc-100">{p.concepteur_name || p.holder_name || "—"}</div>
-                <div className="text-xs text-zinc-500">{p.concepteur_email || ""}</div>
+                <div className="font-medium text-neutral-900">{p.concepteur_name || p.holder_name || "—"}</div>
+                <div className="text-xs text-neutral-500">{p.concepteur_email || ""}</div>
               </td>
               <td className="px-5 py-4">
-                <div className="font-mono text-sm text-zinc-100">{maskIban(p.iban)}</div>
-                <div className="text-xs text-zinc-500">{p.bic ? `BIC ${p.bic}` : ""} · {p.holder_name}</div>
+                <div className="font-mono text-sm text-neutral-900">{maskIban(p.iban)}</div>
+                <div className="text-xs text-neutral-500">{p.bic ? `BIC ${p.bic}` : ""} · {p.holder_name}</div>
               </td>
               <td className="px-5 py-4 text-right">
-                <div className="text-base font-semibold text-zinc-100 tabular-nums">{fmt(p.amount)}</div>
+                <div className="text-base font-semibold text-neutral-900 tabular-nums">{fmt(p.amount)}</div>
               </td>
-              <td className="px-5 py-4 text-right text-sm text-zinc-500 tabular-nums">{fmtDate(p.created_at)}</td>
+              <td className="px-5 py-4 text-right text-sm text-neutral-500 tabular-nums">{fmtDate(p.created_at)}</td>
               <td className="px-5 py-4">
                 <div className="flex items-center gap-1.5 justify-end">
                   <button
                     onClick={() => copyIban(p.iban, p.id)}
                     data-testid={`copy-iban-${p.id}`}
-                    className="h-9 px-3 rounded-lg border border-zinc-800 hover:border-[#B84B31] text-xs flex items-center gap-1.5 transition"
+                    className="h-9 px-3 rounded-lg border border-neutral-200 hover:border-[#B84B31] text-xs flex items-center gap-1.5 transition"
                   >
                     {copiedIban === p.id ? (
                       <><CheckCircle size={12} weight="fill" className="text-emerald-400" /> Copié</>
@@ -323,7 +323,7 @@ function PendingTable({ items, onMarkPaid, onCancel, copyIban, copiedIban }) {
                   <button
                     onClick={() => onMarkPaid(p.id)}
                     data-testid={`mark-paid-${p.id}`}
-                    className="h-9 px-3 rounded-lg bg-white hover:bg-zinc-200 text-black text-xs font-medium flex items-center gap-1.5 transition"
+                    className="h-9 px-3 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium flex items-center gap-1.5 transition"
                   >
                     <CheckCircle size={12} weight="fill" /> Marquer payé
                   </button>
@@ -331,7 +331,7 @@ function PendingTable({ items, onMarkPaid, onCancel, copyIban, copiedIban }) {
                     onClick={() => onCancel(p.id)}
                     data-testid={`cancel-${p.id}`}
                     title="Annuler"
-                    className="h-9 w-9 rounded-lg border border-zinc-800 hover:border-[#BE123C] hover:text-red-400 text-zinc-500 flex items-center justify-center transition"
+                    className="h-9 w-9 rounded-lg border border-neutral-200 hover:border-[#BE123C] hover:text-red-400 text-neutral-500 flex items-center justify-center transition"
                   >
                     <XCircle size={14} />
                   </button>
@@ -359,48 +359,48 @@ function PreviewTable({ rows, expanded, setExpanded, copyIban, copiedIban }) {
       {rows.map((r) => {
         const open = !!expanded[r.user_id];
         return (
-          <div key={r.user_id} className="bg-zinc-950 rounded-md border border-zinc-800 overflow-hidden">
+          <div key={r.user_id} className="bg-white rounded-md border border-neutral-200 overflow-hidden">
             <div className="p-5 flex items-center gap-4 flex-wrap md:flex-nowrap">
               <div className="flex-1 min-w-0">
-                <div className="text-base font-semibold text-zinc-100">{r.name || "Concepteur"}</div>
-                <div className="text-sm text-zinc-500">{r.email}</div>
+                <div className="text-base font-semibold text-neutral-900">{r.name || "Concepteur"}</div>
+                <div className="text-sm text-neutral-500">{r.email}</div>
               </div>
               <MiniStat label="Commandes" value={r.orders_count} />
               <MiniStat label="CA HT" value={fmt(r.revenue_ht_total)} />
               <MiniStat label="Achats HT" value={fmt(r.cost_ht_total)} />
               <MiniStat label="Marge HT" value={fmt(r.gross_margin_ht_total)} color="#047857" />
               <div className="text-right">
-                <div className="text-[11px] uppercase tracking-widest text-zinc-500">À virer</div>
-                <div className="text-xl font-bold text-zinc-100 tabular-nums" data-testid={`net-due-${r.user_id}`}>
+                <div className="text-[11px] uppercase tracking-widest text-neutral-500">À virer</div>
+                <div className="text-xl font-bold text-neutral-900 tabular-nums" data-testid={`net-due-${r.user_id}`}>
                   {fmt(r.net_due_eur)}
                 </div>
               </div>
               <button
                 onClick={() => setExpanded((e) => ({ ...e, [r.user_id]: !open }))}
                 data-testid={`toggle-${r.user_id}`}
-                className="h-10 w-10 rounded-lg border border-zinc-800 hover:border-[#B84B31] text-zinc-500 flex items-center justify-center transition"
+                className="h-10 w-10 rounded-lg border border-neutral-200 hover:border-[#B84B31] text-neutral-500 flex items-center justify-center transition"
               >
                 {open ? <CaretUp size={16} /> : <CaretDown size={16} />}
               </button>
             </div>
 
             {open && (
-              <div className="border-t border-zinc-800 bg-black p-5 space-y-4">
+              <div className="border-t border-neutral-200 bg-white p-5 space-y-4">
                 {/* IBAN block */}
                 {r.has_iban ? (
-                  <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-4 flex items-center gap-3 flex-wrap">
-                    <Bank size={18} className="text-zinc-500" />
+                  <div className="bg-white rounded-xl border border-neutral-200 p-4 flex items-center gap-3 flex-wrap">
+                    <Bank size={18} className="text-neutral-500" />
                     <div className="flex-1 min-w-[200px]">
-                      <div className="text-[11px] uppercase tracking-widest text-zinc-500">IBAN</div>
-                      <div className="font-mono text-sm text-zinc-100 break-all">{formatIban(r.iban)}</div>
-                      <div className="text-xs text-zinc-500 mt-0.5">
+                      <div className="text-[11px] uppercase tracking-widest text-neutral-500">IBAN</div>
+                      <div className="font-mono text-sm text-neutral-900 break-all">{formatIban(r.iban)}</div>
+                      <div className="text-xs text-neutral-500 mt-0.5">
                         {r.holder_name} {r.bic ? `· BIC ${r.bic}` : ""} {r.iban_bank_name ? `· ${r.iban_bank_name}` : ""}
                       </div>
                     </div>
                     <button
                       onClick={() => copyIban(r.iban, r.user_id)}
                       data-testid={`copy-iban-preview-${r.user_id}`}
-                      className="h-10 px-4 rounded-xl border border-zinc-800 hover:border-[#B84B31] text-sm flex items-center gap-2 transition"
+                      className="h-10 px-4 rounded-xl border border-neutral-200 hover:border-[#B84B31] text-sm flex items-center gap-2 transition"
                     >
                       {copiedIban === r.user_id ? (
                         <><CheckCircle size={14} weight="fill" className="text-emerald-400" /> Copié !</>
@@ -417,12 +417,12 @@ function PreviewTable({ rows, expanded, setExpanded, copyIban, copiedIban }) {
 
                 {/* Ventilation par site */}
                 {r.site_breakdown && r.site_breakdown.length > 0 && (
-                  <div className="bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden">
-                    <div className="px-4 py-3 border-b border-zinc-800 text-[11px] uppercase tracking-widest text-zinc-500">
+                  <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-neutral-200 text-[11px] uppercase tracking-widest text-neutral-500">
                       Ventilation par site
                     </div>
                     <table className="w-full text-sm">
-                      <thead className="bg-black text-[11px] uppercase tracking-wider text-zinc-500">
+                      <thead className="bg-white text-[11px] uppercase tracking-wider text-neutral-500">
                         <tr>
                           <th className="text-left px-4 py-2">Site</th>
                           <th className="text-right px-4 py-2">Commandes</th>
@@ -434,9 +434,9 @@ function PreviewTable({ rows, expanded, setExpanded, copyIban, copiedIban }) {
                       </thead>
                       <tbody>
                         {r.site_breakdown.map((s) => (
-                          <tr key={s.site_id} className="border-t border-zinc-800">
+                          <tr key={s.site_id} className="border-t border-neutral-200">
                             <td className="px-4 py-2">
-                              <Link to={`/sites/${s.site_id}`} className="text-zinc-100 hover:text-zinc-100 transition">
+                              <Link to={`/sites/${s.site_id}`} className="text-neutral-900 hover:text-neutral-900 transition">
                                 {s.site_name}
                               </Link>
                             </td>
@@ -444,7 +444,7 @@ function PreviewTable({ rows, expanded, setExpanded, copyIban, copiedIban }) {
                             <td className="px-4 py-2 text-right tabular-nums">{fmt(s.revenue_ht)}</td>
                             <td className="px-4 py-2 text-right tabular-nums">{fmt(s.cost_ht)}</td>
                             <td className="px-4 py-2 text-right tabular-nums font-medium text-emerald-400">{fmt(s.gross_margin_ht)}</td>
-                            <td className="px-4 py-2 text-right tabular-nums font-semibold text-zinc-100">{fmt(s.concepteur_share)}</td>
+                            <td className="px-4 py-2 text-right tabular-nums font-semibold text-neutral-900">{fmt(s.concepteur_share)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -465,9 +465,9 @@ function HistoryTable({ items }) {
     return <EmptyState title="Aucun virement exécuté pour l'instant" subtitle="Les virements marqués comme payés apparaîtront ici." />;
   }
   return (
-    <div className="bg-zinc-950 rounded-md border border-zinc-800 overflow-hidden" data-testid="history-table">
+    <div className="bg-white rounded-md border border-neutral-200 overflow-hidden" data-testid="history-table">
       <table className="w-full">
-        <thead className="bg-black text-[11px] uppercase tracking-widest text-zinc-500">
+        <thead className="bg-white text-[11px] uppercase tracking-widest text-neutral-500">
           <tr>
             <th className="text-left px-5 py-3">Concepteur</th>
             <th className="text-left px-5 py-3">IBAN</th>
@@ -478,15 +478,15 @@ function HistoryTable({ items }) {
         </thead>
         <tbody>
           {items.map((p) => (
-            <tr key={p.id} className="border-t border-zinc-800 hover:bg-black transition">
+            <tr key={p.id} className="border-t border-neutral-200 hover:bg-white transition">
               <td className="px-5 py-4">
-                <div className="font-medium text-zinc-100">{p.concepteur_name || p.holder_name}</div>
-                <div className="text-xs text-zinc-500">{p.concepteur_email || ""}</div>
+                <div className="font-medium text-neutral-900">{p.concepteur_name || p.holder_name}</div>
+                <div className="text-xs text-neutral-500">{p.concepteur_email || ""}</div>
               </td>
-              <td className="px-5 py-4 font-mono text-sm text-zinc-500">{maskIban(p.iban)}</td>
+              <td className="px-5 py-4 font-mono text-sm text-neutral-500">{maskIban(p.iban)}</td>
               <td className="px-5 py-4 text-right font-heading tabular-nums text-emerald-400">{fmt(p.amount)}</td>
-              <td className="px-5 py-4 text-right text-sm text-zinc-500 tabular-nums">{fmtDate(p.paid_at)}</td>
-              <td className="px-5 py-4 text-right text-xs text-zinc-500">{p.paid_by || "—"}</td>
+              <td className="px-5 py-4 text-right text-sm text-neutral-500 tabular-nums">{fmtDate(p.paid_at)}</td>
+              <td className="px-5 py-4 text-right text-xs text-neutral-500">{p.paid_by || "—"}</td>
             </tr>
           ))}
         </tbody>
@@ -497,8 +497,8 @@ function HistoryTable({ items }) {
 
 function MiniStat({ label, value, color }) {
   return (
-    <div className="text-right px-3 border-r border-zinc-800 last:border-0">
-      <div className="text-[10px] uppercase tracking-widest text-zinc-500">{label}</div>
+    <div className="text-right px-3 border-r border-neutral-200 last:border-0">
+      <div className="text-[10px] uppercase tracking-widest text-neutral-500">{label}</div>
       <div className="font-heading text-sm font-semibold tabular-nums" style={{ color: color || "#1C1917" }}>
         {value}
       </div>

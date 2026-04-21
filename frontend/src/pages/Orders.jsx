@@ -90,7 +90,7 @@ export default function Orders() {
             <button
               onClick={handleExport}
               data-testid="export-csv"
-              className="h-11 px-4 rounded-xl bg-[#1C1917] hover:bg-[#44403C] text-white text-sm font-medium flex items-center gap-2 transition"
+              className="h-11 px-4 rounded-xl bg-[#1C1917] hover:bg-[#44403C] text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
             >
               <DownloadSimple size={16} weight="bold" /> Export CSV
             </button>
@@ -296,7 +296,7 @@ function OrderDetail({ order, onClose, onUpdated }) {
 
   return (
     <div className="fixed inset-0 z-50 flex" data-testid="order-detail-panel">
-      <div className="flex-1 bg-black/40" onClick={onClose} />
+      <div className="flex-1 bg-neutral-900/40" onClick={onClose} />
       <div className="w-full max-w-xl bg-[#FDFBF7] h-full overflow-y-auto shadow-2xl animate-slide-in-right">
         <div className="sticky top-0 bg-white border-b border-[#E7E5E4] px-6 py-4 flex items-center justify-between z-10">
           <div>
