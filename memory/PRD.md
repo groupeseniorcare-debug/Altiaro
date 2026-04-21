@@ -72,6 +72,7 @@ Les 50 étapes du playbook sont regroupées en 4 blocs :
 | 36 | **Storefront Apple/Dyson (narrative scroll + typographie premium)** | ✅ |
 | 37 | OVH Domaines (recherche + achat) | ✅ (markup Mollie à brancher) |
 | 38 | Prompt Studio (remplace Wizard) | ✅ |
+| 39 | **Storefront splitté en composants** (`components/storefront/{Hero,Benefits,ProductGrid,Testimonials,FAQSection,FinalCTA,NarrativeProduct}.jsx` + `storefrontUtils.js`) | ✅ |
 
 ## Règles critiques
 - Pas de Shopify — tout custom React/FastAPI.

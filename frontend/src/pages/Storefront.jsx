@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Link, useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import axios from "axios";
-import StorefrontLayout, { fetchPublicSite } from "../components/StorefrontLayout";
+import StorefrontLayout from "../components/StorefrontLayout";
 import { t, pickLang, COUNTRY_OPTIONS, countryLabel } from "../lib/i18n";
 import {
   addToCart,
@@ -11,80 +11,38 @@ import {
   cartTotals,
   clearCart,
 } from "../lib/cart";
-import { ArrowRight, CheckCircle, Trash, ShoppingBagOpen, Sparkle, ShieldCheck, Truck, Clock, Heart, Star, Leaf, Package, Headset } from "@phosphor-icons/react";
+import {
+  ArrowRight,
+  CheckCircle,
+  Trash,
+  ShoppingBagOpen,
+  ShieldCheck,
+  Truck,
+} from "@phosphor-icons/react";
 import SEOHead from "../components/SEOHead";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-
-// Icon name (from Prompt Studio schema) → Phosphor component
-const BENEFIT_ICON = {
-  ShieldCheck, Truck, Clock, Heart, Star, Leaf, Package, Headset,
-};
-
-// Map selected_countries → storefront langs for hreflang
-const LANG_BY_COUNTRY = {
-  FR: "fr", BE: "fr", LU: "fr", CH: "fr",
-  DE: "de", AT: "de",
-  UK: "en", IE: "en",
-  NL: "nl", IT: "it", ES: "es",
-};
-
-function buildHreflangs(site, path) {
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const base = `${origin}/shop/${site?.id || ""}${path}`;
-  const codes = Array.from(
-    new Set((site?.selected_countries || ["FR"]).map((c) => LANG_BY_COUNTRY[(c || "").toUpperCase()] || "fr"))
-  );
-  return codes.map((c) => ({ code: c, href: `${base}?lang=${c}` }));
-}
-
-function useSiteAndLang() {
-  const { siteId } = useParams();
-  const [site, setSite] = useState(null);
-  const [design, setDesign] = useState(null);
-  const storageKey = `cf_lang_${siteId}`;
-  const [lang, setLangState] = useState(() => localStorage.getItem(storageKey) || "fr");
-  const setLang = (l) => {
-    localStorage.setItem(storageKey, l);
-    setLangState(l);
-  };
-  useEffect(() => {
-    fetchPublicSite(siteId).then(setSite).catch(() => setSite({ error: true }));
-    axios
-      .get(`${BACKEND_URL}/api/public/sites/${siteId}/design`)
-      .then(({ data }) => setDesign(data?.published ? data.design : null))
-      .catch(() => setDesign(null));
-  }, [siteId]);
-  return { siteId, site, design, lang, setLang };
-}
-
-function designText(design, path, lang) {
-  // path: ex "hero.title" → design.hero.title[lang] || .fr
-  if (!design) return null;
-  const parts = path.split(".");
-  let node = design;
-  for (const p of parts) {
-    node = node?.[p];
-    if (node === undefined || node === null) return null;
-  }
-  if (typeof node === "string") return node;
-  if (typeof node === "object") return node[lang] || node.fr || Object.values(node)[0] || null;
-  return null;
-}
-
-function formatPrice(price, currency = "EUR", lang = "fr") {
-  try {
-    return new Intl.NumberFormat(lang === "en" ? "en-GB" : lang, {
-      style: "currency",
-      currency,
-    }).format(price);
-  } catch {
-    return `${price} ${currency}`;
-  }
-}
+import {
+  BACKEND_URL,
+  useSiteAndLang,
+  designText,
+  formatPrice,
+  designAccents,
+  buildHreflangs,
+} from "../components/storefront/storefrontUtils";
+import { Hero } from "../components/storefront/Hero";
+import { Benefits } from "../components/storefront/Benefits";
+import { ProductGrid } from "../components/storefront/ProductGrid";
+import { Testimonials } from "../components/storefront/Testimonials";
+import { FAQSection } from "../components/storefront/FAQSection";
+import { FinalCTA } from "../components/storefront/FinalCTA";
+import {
+  NarrativeSections,
+  TechSpecs,
+  ProductFAQ,
+} from "../components/storefront/NarrativeProduct";
 
 /* =========================================================
- * STOREFRONT HOME — grille produits (+ sections IA)
+ * STOREFRONT HOME
  * ========================================================= */
 export function StorefrontHome() {
   const { siteId, site, design, lang, setLang } = useSiteAndLang();
@@ -108,11 +66,6 @@ export function StorefrontHome() {
 
   const heroTitle = designText(design, "hero.title", lang) || t(lang, "shop_title");
   const heroSub = designText(design, "hero.subtitle", lang) || t(lang, "shop_subtitle");
-  const heroCta = designText(design, "hero.cta_label", lang);
-  const heroTrust = designText(design, "hero.trust_line", lang);
-  const primary = design?.brand?.primary_color || "#B84B31";
-  const fontHeading = design?.brand?.font_heading || "Fraunces";
-
   const seoTitle =
     designText(design, "seo.title", lang) || `${site?.name || ""} · ${heroTitle}`;
   const seoDesc =
@@ -155,304 +108,18 @@ export function StorefrontHome() {
         langs={buildHreflangs(site, "")}
         schema={[orgSchema, websiteSchema].filter(Boolean)}
       />
-
-      {/* ====== HERO — Apple/Dyson: huge type, whitespace, 1 CTA ====== */}
-      <section
-        className="relative overflow-hidden"
-        style={{
-          background: design?.brand?.background_color || "#FDFBF7",
-          color: design?.brand?.text_color || "#1C1917",
-        }}
-      >
-        <div className="max-w-6xl mx-auto px-6 md:px-10 pt-20 md:pt-28 pb-16 md:pb-24 text-center">
-          {(design?.brand?.tagline || site?.niche) && (
-            <div
-              className="text-[11px] uppercase tracking-[0.25em] mb-6 font-medium"
-              style={{ color: primary }}
-            >
-              {design?.brand?.tagline || site?.niche}
-            </div>
-          )}
-          <h1
-            className="text-[40px] md:text-[64px] lg:text-[80px] font-semibold leading-[1.02] tracking-[-0.02em] max-w-4xl mx-auto"
-            style={{ fontFamily: `"${fontHeading}", Georgia, serif` }}
-          >
-            {heroTitle}
-          </h1>
-          {heroSub && (
-            <p
-              className="text-lg md:text-xl mt-6 max-w-2xl mx-auto leading-relaxed"
-              style={{ color: design?.brand?.text_color ? `${design.brand.text_color}cc` : "#57534E" }}
-            >
-              {heroSub}
-            </p>
-          )}
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a
-              href="#products"
-              data-testid="hero-cta"
-              className="inline-flex items-center gap-2 h-14 px-8 rounded-full text-white font-medium transition-all hover:opacity-90 active:scale-[0.98] text-[15px]"
-              style={{ background: primary }}
-            >
-              {heroCta || t(lang, "shop_now") || "Découvrir la collection"}
-              <ArrowRight size={16} weight="bold" />
-            </a>
-            {heroTrust && (
-              <div
-                className="inline-flex items-center gap-1.5 text-sm"
-                style={{ color: design?.brand?.text_color ? `${design.brand.text_color}99` : "#78716C" }}
-              >
-                <ShieldCheck size={14} weight="fill" /> {heroTrust}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Decorative: gradient fade bottom */}
-        <div
-          className="absolute inset-x-0 bottom-0 h-32 pointer-events-none"
-          style={{ background: `linear-gradient(to bottom, transparent, ${design?.brand?.background_color || "#FDFBF7"})` }}
-        />
-      </section>
-
-      {/* ====== BENEFITS — Dyson-style clean cards, big icon ====== */}
-      {(design?.benefits?.items?.length > 0 || design?.benefits?.length > 0) && (
-        <section className="max-w-6xl mx-auto px-6 md:px-10 py-16 md:py-24">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {(design.benefits.items || design.benefits).map((b, i) => {
-              // New schema (Prompt Studio) vs old
-              const title = typeof b.title === "string"
-                ? b.title
-                : (b.title?.[lang] || b.title?.fr || "");
-              const desc = typeof b.description === "string"
-                ? b.description
-                : (b.desc?.[lang] || b.desc?.fr || b.description?.[lang] || "");
-              const Icon = BENEFIT_ICON[b.icon] || ShieldCheck;
-              return (
-                <div
-                  key={i}
-                  className="text-center"
-                  data-testid={`benefit-${i}`}
-                >
-                  <div
-                    className="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-5"
-                    style={{ background: `${primary}14`, color: primary }}
-                  >
-                    <Icon size={28} weight="duotone" />
-                  </div>
-                  <div
-                    className="font-semibold text-lg mb-2"
-                    style={{ fontFamily: `"${fontHeading}", serif` }}
-                  >
-                    {title}
-                  </div>
-                  <div className="text-sm leading-relaxed" style={{ color: "#78716C" }}>
-                    {desc}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* ====== PRODUCTS GRID — Dyson-style clean minimal cards ====== */}
-      <section id="products" className="max-w-6xl mx-auto px-6 md:px-10 pb-24">
-        <div className="flex items-baseline justify-between mb-10">
-          <h2
-            className="text-3xl md:text-4xl font-semibold tracking-tight"
-            style={{ fontFamily: `"${fontHeading}", serif` }}
-          >
-            {t(lang, "our_collection") || "Notre sélection"}
-          </h2>
-          <div className="text-sm text-[#78716C]">
-            {products.length} {products.length > 1 ? "produits" : "produit"}
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="py-20 text-center text-[#78716C]">…</div>
-        ) : products.length === 0 ? (
-          <div className="py-20 text-center text-[#78716C] bg-white rounded-2xl border border-dashed border-[#E7E5E4]">
-            {t(lang, "no_products") || "Bientôt en ligne"}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8" data-testid="products-grid">
-            {products.map((p) => (
-              <Link
-                key={p.id}
-                to={`/shop/${siteId}/product/${p.id}`}
-                data-testid={`product-card-${p.id}`}
-                className="group block"
-              >
-                <div className="aspect-square bg-[#F5F2EB] rounded-2xl overflow-hidden relative mb-4">
-                  {p.images?.[0] ? (
-                    <img
-                      src={p.images[0]}
-                      alt={pickLang(p.name, lang)}
-                      className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700 ease-out"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[#D6D3D1]">
-                      <ShoppingBagOpen size={56} weight="thin" />
-                    </div>
-                  )}
-                  {p.featured && (
-                    <div
-                      className="absolute top-4 left-4 text-white text-[10px] uppercase tracking-widest font-semibold px-3 py-1.5 rounded-full backdrop-blur-sm"
-                      style={{ background: `${primary}dd` }}
-                    >
-                      ★ {t(lang, "featured") || "Best-seller"}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <div
-                    className="text-lg font-semibold leading-tight mb-1 group-hover:opacity-70 transition"
-                    style={{ fontFamily: `"${fontHeading}", serif` }}
-                  >
-                    {pickLang(p.name, lang)}
-                  </div>
-                  <div className="flex items-baseline gap-2 mt-2">
-                    <span className="text-xl font-semibold" style={{ color: primary }}>
-                      {formatPrice(p.price, p.currency, lang)}
-                    </span>
-                    {p.compare_at_price && (
-                      <span className="text-sm line-through text-[#A8A29E]">
-                        {formatPrice(p.compare_at_price, p.currency, lang)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* ====== TESTIMONIALS ====== */}
-      {(design?.testimonials?.items?.length > 0 || design?.testimonials?.length > 0) && (
-        <section
-          className="py-20 md:py-28"
-          style={{ background: `${primary}08` }}
-        >
-          <div className="max-w-6xl mx-auto px-6 md:px-10">
-            <div className="text-center mb-12">
-              <div
-                className="text-[11px] uppercase tracking-[0.25em] mb-3 font-medium"
-                style={{ color: primary }}
-              >
-                Avis clients
-              </div>
-              <h2
-                className="text-3xl md:text-4xl font-semibold"
-                style={{ fontFamily: `"${fontHeading}", serif` }}
-              >
-                Ils en parlent mieux que nous
-              </h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {(design.testimonials.items || design.testimonials).slice(0, 6).map((tt, i) => {
-                const text = typeof tt.text === "string"
-                  ? tt.text
-                  : (tt.quote?.[lang] || tt.quote?.fr || "");
-                const loc = tt.location || tt.city || "";
-                const rating = tt.rating || 5;
-                return (
-                  <div
-                    key={i}
-                    className="bg-white rounded-2xl p-6 md:p-8 border border-[#E7E5E4]"
-                    data-testid={`testimonial-${i}`}
-                  >
-                    <div className="flex gap-0.5 mb-4" style={{ color: primary }}>
-                      {Array.from({ length: rating }).map((_, j) => (
-                        <Star key={j} size={16} weight="fill" />
-                      ))}
-                    </div>
-                    <p className="text-[15px] leading-relaxed mb-5" style={{ color: "#44403C" }}>
-                      "{text}"
-                    </p>
-                    <div className="text-sm font-medium text-[#1C1917]">{tt.name}</div>
-                    {loc && <div className="text-xs text-[#78716C]">{loc}</div>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ====== FAQ ====== */}
-      {(design?.faq?.items?.length > 0 || design?.faq?.length > 0) && (
-        <section className="max-w-3xl mx-auto px-6 md:px-10 py-20 md:py-28">
-          <div className="text-center mb-12">
-            <div
-              className="text-[11px] uppercase tracking-[0.25em] mb-3 font-medium"
-              style={{ color: primary }}
-            >
-              FAQ
-            </div>
-            <h2
-              className="text-3xl md:text-4xl font-semibold"
-              style={{ fontFamily: `"${fontHeading}", serif` }}
-            >
-              Questions fréquentes
-            </h2>
-          </div>
-          <div className="space-y-3">
-            {(design.faq.items || design.faq).map((it, i) => {
-              const q = typeof it.question === "string"
-                ? it.question
-                : (it.q?.[lang] || it.q?.fr || "");
-              const a = typeof it.answer === "string"
-                ? it.answer
-                : (it.a?.[lang] || it.a?.fr || "");
-              return (
-                <details
-                  key={i}
-                  className="bg-white rounded-xl border border-[#E7E5E4] p-5 group hover:border-[#D6D3D1] transition"
-                  data-testid={`faq-${i}`}
-                >
-                  <summary className="cursor-pointer font-medium list-none flex items-center justify-between text-[#1C1917]">
-                    <span className="pr-4">{q}</span>
-                    <span
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-xs group-open:rotate-45 transition-transform shrink-0"
-                      style={{ background: `${primary}14`, color: primary }}
-                    >
-                      +
-                    </span>
-                  </summary>
-                  <p className="text-[15px] mt-4 leading-relaxed" style={{ color: "#57534E" }}>
-                    {a}
-                  </p>
-                </details>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* ====== FINAL CTA ====== */}
-      <section
-        className="py-20 md:py-28 text-center"
-        style={{ background: primary, color: "#ffffff" }}
-      >
-        <div className="max-w-3xl mx-auto px-6">
-          <h2
-            className="text-3xl md:text-5xl font-semibold mb-6"
-            style={{ fontFamily: `"${fontHeading}", serif` }}
-          >
-            {design?.brand?.tagline || heroTitle}
-          </h2>
-          <a
-            href="#products"
-            className="inline-flex items-center gap-2 h-14 px-8 rounded-full bg-white font-medium transition-all hover:scale-[1.02] active:scale-[0.98] text-[15px]"
-            style={{ color: primary }}
-          >
-            {heroCta || "Découvrir la collection"} <ArrowRight size={16} weight="bold" />
-          </a>
-        </div>
-      </section>
+      <Hero site={site} design={design} lang={lang} />
+      <Benefits design={design} lang={lang} />
+      <ProductGrid
+        siteId={siteId}
+        products={products}
+        loading={loading}
+        design={design}
+        lang={lang}
+      />
+      <Testimonials design={design} lang={lang} />
+      <FAQSection design={design} lang={lang} />
+      <FinalCTA design={design} lang={lang} />
     </StorefrontLayout>
   );
 }
@@ -550,7 +217,7 @@ export function StorefrontProduct() {
           ← {t(lang, "back_to_shop")}
         </button>
 
-        {/* ====== HERO PRODUCT (Apple-style split) ====== */}
+        {/* HERO PRODUCT (Apple-style split) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-20 mb-16 md:mb-24 items-start">
           {/* Gallery */}
           <div className="sticky top-24">
@@ -634,7 +301,7 @@ export function StorefrontProduct() {
               <button
                 onClick={handleAdd}
                 data-testid="add-to-cart"
-                className={`flex-1 h-12 rounded-full font-medium text-[15px] transition-all duration-200 active:scale-[0.98] text-white`}
+                className="flex-1 h-12 rounded-full font-medium text-[15px] transition-all duration-200 active:scale-[0.98] text-white"
                 style={{ background: added ? "#047857" : primary }}
               >
                 {added ? (
@@ -642,7 +309,7 @@ export function StorefrontProduct() {
                     <CheckCircle size={18} weight="fill" /> {t(lang, "added_to_cart")}
                   </span>
                 ) : (
-                  t(lang, "add_to_cart") || "Ajouter au panier"
+                  t(lang, "add_to_cart")
                 )}
               </button>
             </div>
@@ -650,11 +317,11 @@ export function StorefrontProduct() {
             <div className="mt-8 grid grid-cols-2 gap-3 text-sm">
               <div className="bg-[#FAF7F2] rounded-xl p-3 flex items-center gap-2">
                 <ShieldCheck size={16} weight="fill" style={{ color: primary }} />
-                <span className="text-[#57534E]">{t(lang, "secure_checkout") || "Paiement sécurisé"}</span>
+                <span className="text-[#57534E]">{t(lang, "secure_checkout")}</span>
               </div>
               <div className="bg-[#FAF7F2] rounded-xl p-3 flex items-center gap-2">
                 <Truck size={16} weight="fill" style={{ color: primary }} />
-                <span className="text-[#57534E]">{t(lang, "free_shipping_above") || "Livraison offerte"}</span>
+                <span className="text-[#57534E]">{t(lang, "free_shipping_above")}</span>
               </div>
             </div>
 
@@ -667,100 +334,9 @@ export function StorefrontProduct() {
           </div>
         </div>
 
-        {/* ====== NARRATIVE SECTIONS (Apple-style long scroll) ====== */}
-        {p.narrative?.sections?.length > 0 && (
-          <div className="space-y-16 md:space-y-24 mb-20">
-            {p.narrative.sections.map((s, i) => (
-              <section
-                key={i}
-                data-testid={`product-section-${i}`}
-                className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12 items-start"
-              >
-                <div className="md:col-span-5">
-                  <div
-                    className="text-[11px] uppercase tracking-[0.25em] mb-3 font-medium"
-                    style={{ color: primary }}
-                  >
-                    {String(i + 1).padStart(2, "0")} · Section
-                  </div>
-                  <h2
-                    className="text-2xl md:text-3xl font-semibold leading-tight"
-                    style={{ fontFamily: `"${fontHeading}", serif` }}
-                  >
-                    {s.title}
-                  </h2>
-                </div>
-                <div className="md:col-span-7">
-                  <p className="text-[16px] md:text-[17px] leading-relaxed text-[#44403C]">
-                    {s.body}
-                  </p>
-                  {s.bullet_points?.length > 0 && (
-                    <ul className="mt-6 space-y-3">
-                      {s.bullet_points.map((bp, j) => (
-                        <li key={j} className="flex items-start gap-3 text-[15px] text-[#57534E]">
-                          <CheckCircle size={18} weight="fill" className="shrink-0 mt-0.5" style={{ color: primary }} />
-                          <span>{bp}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </section>
-            ))}
-          </div>
-        )}
-
-        {/* ====== TECH SPECS ====== */}
-        {p.narrative?.tech_specs?.length > 0 && (
-          <section className="mb-20 bg-[#FAF7F2] rounded-3xl p-8 md:p-12">
-            <h2
-              className="text-2xl md:text-3xl font-semibold mb-8"
-              style={{ fontFamily: `"${fontHeading}", serif` }}
-            >
-              Caractéristiques techniques
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
-              {p.narrative.tech_specs.map((t, i) => (
-                <div key={i} className="flex items-baseline justify-between border-b border-[#E7E5E4] pb-3">
-                  <span className="text-sm text-[#78716C]">{t.label}</span>
-                  <span className="text-sm font-medium text-[#1C1917] text-right">{t.value}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* ====== PRODUCT FAQ ====== */}
-        {p.narrative?.faq?.length > 0 && (
-          <section className="mb-20">
-            <h2
-              className="text-2xl md:text-3xl font-semibold mb-8"
-              style={{ fontFamily: `"${fontHeading}", serif` }}
-            >
-              Questions sur ce produit
-            </h2>
-            <div className="space-y-3 max-w-3xl">
-              {p.narrative.faq.map((it, i) => (
-                <details
-                  key={i}
-                  data-testid={`product-faq-${i}`}
-                  className="bg-white rounded-xl border border-[#E7E5E4] p-5 group"
-                >
-                  <summary className="cursor-pointer font-medium list-none flex items-center justify-between text-[#1C1917]">
-                    <span className="pr-4">{it.question}</span>
-                    <span
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-xs group-open:rotate-45 transition-transform shrink-0"
-                      style={{ background: `${primary}14`, color: primary }}
-                    >
-                      +
-                    </span>
-                  </summary>
-                  <p className="text-[15px] mt-4 leading-relaxed text-[#57534E]">{it.answer}</p>
-                </details>
-              ))}
-            </div>
-          </section>
-        )}
+        <NarrativeSections sections={p.narrative?.sections} design={design} />
+        <TechSpecs specs={p.narrative?.tech_specs} design={design} />
+        <ProductFAQ faq={p.narrative?.faq} design={design} />
       </div>
 
       {/* Sticky mobile CTA */}
@@ -781,14 +357,6 @@ export function StorefrontProduct() {
       </div>
     </StorefrontLayout>
   );
-}
-
-// Helper: compute `primary` and `fontHeading` in product page scope
-function designAccents(design) {
-  return {
-    primary: design?.brand?.primary_color || "#B84B31",
-    fontHeading: design?.brand?.font_heading || "Fraunces",
-  };
 }
 
 /* =========================================================
@@ -995,7 +563,6 @@ export function StorefrontCheckout() {
           return;
         }
       } catch (payErr) {
-        // Fallback : go to confirmation page if Mollie fails (pending_payment)
         console.error("Mollie payment creation failed", payErr);
       }
       navigate(`/shop/${siteId}/confirmation?order=${data.order_number}`);
@@ -1136,7 +703,6 @@ export function StorefrontConfirmation() {
         .then(({ data }) => {
           if (cancelled) return;
           setOrder(data);
-          // Keep polling while payment still pending (Mollie webhook async)
           attempts += 1;
           if (data.status === "pending_payment" && attempts < 20) {
             setTimeout(fetchOrder, 2000);
@@ -1202,7 +768,7 @@ export function StorefrontConfirmation() {
   );
 }
 
-/* --- shared small components --- */
+/* --- shared small components (used by Checkout) --- */
 function Card({ title, children }) {
   return (
     <div className="bg-white rounded-2xl border border-[#E7E5E4] p-6 space-y-4">
