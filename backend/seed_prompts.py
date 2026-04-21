@@ -17,8 +17,8 @@ PHASES = {
     "B": "Marque, positionnement, voix",
     "C": "Sourcing fournisseurs",
     "D": "Cadre juridique",
-    "E": "Shopify backend",
-    "F": "Front React headless",
+    "E": "backend Altiaro",
+    "F": "Front React (template Altiaro fourni)",
     "G": "SEO technique",
     "H": "AEO / GEO (IA génératives)",
     "I": "Conversion & social proof",
@@ -49,7 +49,7 @@ BLOCKS = {
         "order": 3,
         "name": "Fondations boutique",
         "emoji": "🏗️",
-        "description": "Cadre légal, backend Shopify, sourcing fournisseurs, import catalogue 20 produits — les fondations avant le front.",
+        "description": "Cadre légal, backend Altiaro, sourcing fournisseurs, import catalogue 20 produits — les fondations avant le front.",
     },
     "front": {
         "order": 4,
@@ -67,7 +67,7 @@ BLOCKS = {
         "order": 6,
         "name": "Conversion & CRM",
         "emoji": "🎯",
-        "description": "CRO, social proof, Klaviyo 7 flows, paiement optimisé, chatbot, helpdesk, téléphonie.",
+        "description": "CRO, social proof, Brevo 7 flows, paiement optimisé, chatbot, helpdesk, téléphonie.",
     },
     "operations": {
         "order": 7,
@@ -89,11 +89,11 @@ PHASE_TO_BLOCK = {
     "B": "marque",       # Marque, positionnement, voix
     "C": "fondations",   # Sourcing fournisseurs
     "D": "fondations",   # Cadre juridique
-    "E": "fondations",   # Shopify backend (inclut import catalogue)
-    "F": "front",        # Front React headless + pages
+    "E": "fondations",   # backend Altiaro (inclut import catalogue)
+    "F": "front",        # Front React (template Altiaro fourni) + pages
     "G": "seo",          # SEO technique
     "H": "seo",          # AEO/GEO
-    "I": "conversion",   # CRO + social proof + Klaviyo
+    "I": "conversion",   # CRO + social proof + Brevo
     "J": "conversion",   # Paiement
     "K": "conversion",   # Service client (chatbot, helpdesk, tel)
     "L": "operations",   # Logistique, tracking, retours
@@ -112,7 +112,7 @@ PROMPTS = [
         "summary": "Produire une matrice de 15 produits candidats avec volumes de recherche FR, CPC Google Ads, prix, marges, score GO — assez pour identifier le TOP 5.",
         "prompt": """Tu es product researcher e-commerce drop-shipping FR (10 ans d'exp senior/silver economy).
 
-Je lance une boutique Shopify FR/EU sur la niche : **[NICHE]**.
+Je lance une boutique Altiaro FR/EU sur la niche : **[NICHE]**.
 Contraintes : budget Google Ads 30€/jour · CPC cible < 1€ OU marge absolue > 400€/vente.
 
 **Critères d'entrée obligatoires** :
@@ -353,102 +353,167 @@ Livrable: legal_framework_dropship.md""",
         "summary": "6 documents complets 2026 : CGV B2C (25 articles), Mentions légales, Politique RGPD, Cookies, Rétractation + formulaire, CGU programmes.",
         "prompt": """Génère 6 documents légaux complets pour [NOM_MARQUE] (SIRET placeholder, domaine [DOMAINE]) clauses 2026 FR:
 
-1. CGV B2C 25 articles min (identité, prix TTC/TVA, commande, paiement CB/PayPal/Alma, livraison drop transparente, IOSS, rétractation 14j + formulaire annexe I, garantie légale 2 ans, SAV, RGPD, médiation CE2C, droit applicable)
+1. CGV B2C 25 articles min (identité, prix TTC/TVA, commande, paiement CB/Mollie (Bancontact, iDEAL, Apple Pay)/Alma, livraison drop transparente, IOSS, rétractation 14j + formulaire annexe I, garantie légale 2 ans, SAV, RGPD, médiation CE2C, droit applicable)
 2. Mentions légales (hébergeur, éditeur, directeur pub, RCS, TVA, DEEE, contact)
-3. Politique RGPD (6 finalités, durée, droits, DPO, transferts hors UE Shopify/Google US)
+3. Politique RGPD (6 finalités, durée, droits, DPO, transferts hors UE Altiaro/Google US)
 4. Politique cookies bannière CNIL conforme
 5. Politique rétractation + formulaire-type
 6. CGU newsletter/fidélité
 
-Livrable: 6 fichiers .md + version HTML Shopify pages""",
+Livrable: 6 fichiers .md + version HTML Altiaro pages""",
     },
-    # PHASE E — Shopify Backend
+    # PHASE E — Altiaro Backend
     {
         "number": 14,
         "phase": "E",
-        "title": "Configuration Shopify complète (backend-only)",
-        "summary": "Procédure pas-à-pas : paramètres boutique, taxes OSS/IOSS, zones livraison, paiements, Custom App tokens API Admin + Storefront, webhooks.",
-        "prompt": """J'ai compte Shopify Basic [URL_ADMIN]. Usage headless: Shopify backend (produits/commandes/paiement/checkout), front React via Storefront API.
+        "title": "Paramétrage backend Altiaro (taxes, livraison, paiement)",
+        "summary": "Configuration du backend Altiaro : taxes OSS/IOSS, zones livraison FR/UE/DOM-TOM, méthodes de paiement Mollie, emails transactionnels — tout est déjà branché, il ne reste qu'à paramétrer.",
+        "prompt": """Tu es ops manager d'un e-commerce FR senior, 8 ans sur stack custom (pas Shopify).
 
-Procédure pas-à-pas:
-1. Paramètres: EUR, timezone Paris, kg, adresse, SIRET, coller CGV/mentions en policies
-2. Taxes: franchise OU TVA 20%, registration OSS UE >10k€, IOSS si import direct Chine
-3. Zones livraison: FR métropole Colissimo, DOM-TOM, UE 6 pays, tarifs par poids
-4. Paiements: Shopify Payments (CB/Apple/Google Pay 3DS), PayPal, Alma 3x/4x, virement B2B
-5. Localisation checkout: FR+EN, téléphone obligatoire
-6. Custom App privée: scopes Admin API (products/orders/inventory/customers), Storefront API (unauthenticated_read_*), tokens dans .env
-7. Webhooks vers /api/webhooks/shopify: orders/create/paid/fulfilled/cancelled, HMAC verification
-8. Emails transactionnels custom template (logo, couleurs, signature)
+La boutique [NOM_MARQUE] tourne sur **Altiaro** (notre plateforme propriétaire React + FastAPI + Mollie). Le template, le checkout, les pages légales, les webhooks Mollie sont **déjà branchés d'office**. Tu n'as **rien à coder**.
 
-Livrable: shopify_setup_checklist.md + routes/shopify_webhooks.py""",
+Ta mission : me livrer un **brief de paramétrage** prêt à exécuter dans le back-office Altiaro.
+
+**1. Taxes (niche [NICHE], cible FR+UE)**
+- Régime TVA : franchise en base ? TVA 20% ? OSS (One-Stop Shop UE) si > 10k€ UE ?
+- Taux applicables par catégorie produit (standard 20% / taux réduit 5,5% si catégorie médicale / exonération si certif)
+- IOSS si import direct Chine < 150€
+
+**2. Zones de livraison et transporteurs**
+- Tableau des zones : FR métropole, Corse, DOM-TOM, Belgique+Luxembourg, Allemagne, Pays-Bas, Suisse, UK
+- Pour chaque zone : transporteur recommandé (Colissimo/Mondial Relay/Chronopost/DHL), délai, prix par palier de poids
+- Seuil franco de port (ex: 150€ France)
+
+**3. Méthodes de paiement Mollie**
+- Méthodes à activer par pays : CB/VISA (tous), Bancontact (BE), iDEAL (NL), Apple Pay + Google Pay (tous), PayPal Mollie (tous), virement B2B si panier > 500€
+- Alma 3x/4x (si éligible, seuil 100€)
+- Frais vs conversion attendue par méthode
+
+**4. Emails transactionnels**
+- Liste des 8 emails à configurer (commande reçue / payée / expédiée / livrée / retour / rétractation / relance panier / welcome)
+- Ton à adopter (chaleureux sans infantiliser, voix de marque prompt #7)
+
+**Livrable** : `backend_setup_checklist.md` avec chaque section en check-list actionnable (✅ à cocher une fois configuré dans l'admin Altiaro). 800-1200 mots MAX, pas de code.""",
     },
     {
         "number": 15,
         "phase": "E",
-        "title": "Import catalogue CSV haute qualité (20 produits)",
-        "summary": "CSV Shopify complet : 20 produits avec Handle SEO, Title, Body HTML 700+ mots structuré, variantes, prix, tags, meta SEO, image alts.",
-        "prompt": """Génère CSV import Shopify 20 produits prioritaires (Phase 1+2 roadmap prompt 4). Format Shopify officiel 100%: Handle, Title, Body HTML, Vendor, Product Category, Type, Tags, Published, Option1 Name/Value, Variant SKU, Variant Price, Compare At Price, Variant Inventory Qty, Image Src, Image Alt, SEO Title, SEO Description, Variant Barcode.
+        "title": "Brief import catalogue (20 produits haute qualité)",
+        "summary": "Rédaction complète des 20 fiches produits (titre SEO, body 700+ mots, meta, tags, alt image). Le hook #16 injecte automatiquement les produits en BDD à validation.",
+        "prompt": """Tu es copywriter e-commerce FR spécialisé senior (fiches Fauteuils de France, Domitys, Hagnoss).
 
-Pour chaque produit:
-- Handle SEO kebab-case
-- Title <=65 car. KW+bénéfice
-- Body HTML 700+ mots: ouverture émotionnelle 100 mots + 5 bénéfices bullets + Pour qui? + tableau specs + Contenu colis + Engagement marque + FAQ 5 Q/R + témoignages + conformité CE
-- Variantes SKU structurés
-- Prix + comparatif barré (ancrage psycho)
-- Meta title 60 car. + description 155 car.
-- Tags 15+
-- Image Alt riche
+Pour la boutique [NOM_MARQUE] (niche : [NICHE]), rédige les **20 fiches produits prioritaires** retenues dans la feuille de route (prompt #4). Le backend Altiaro importera ces fiches automatiquement à validation — **livre un JSON exploitable**.
 
-Livrable: shopify_products_import.csv + preview_product_exemple.html""",
+**Format strict pour chaque produit** :
+```json
+{
+  "handle": "nom-produit-kebab-case",
+  "title": "Nom commercial FR 60 caractères max",
+  "short_description": "Pitch 1 phrase (120 car. max) — le bénéfice clé",
+  "description_md": "Body 700-900 mots en markdown, structuré ainsi :\\n\\n## Ouverture émotionnelle (100 mots)\\n\\n## 5 bénéfices clés\\n(bullets avec preuve pour chaque)\\n\\n## Pour qui ?\\n(3-5 personas)\\n\\n## Caractéristiques techniques\\n| Dimension | Valeur |\\n\\n## Contenu du colis\\n\\n## Notre engagement marque (garantie, SAV, livraison)\\n\\n## FAQ (5 Q/R)\\n\\n## Conformité et certifications (CE, REACH, etc.)",
+  "price_eur": 149.00,
+  "compare_at_price_eur": 199.00,
+  "supplier_cost_eur": 42.00,
+  "sku": "SKU-0001",
+  "weight_kg": 2.5,
+  "category": "Confort",
+  "tags": ["aidance", "arthrose", "salon", ...],
+  "meta_title": "60 caractères max",
+  "meta_description": "155 caractères max",
+  "image_alt_hero": "Description sémantique de l'image principale"
+}
+```
+
+**Règles** :
+- **20 produits minimum**, tous cohérents avec la niche et la feuille de route #4
+- Prix vente avec marge ≥ 70% (cost/price)
+- Zéro placeholder dans les livrables finaux
+- Ton chaleureux senior (vouvoiement, pas d'infantilisation, voix de marque #7)
+- Conformité : pas de promesse thérapeutique si pas de marquage CE médical
+
+**Livrable** : bloc JSON unique (array de 20 objets), exécutable par le hook #16 auto-import. **C'est tout** — pas de code CSV, pas d'images à générer.""",
     },
     {
         "number": 16,
         "phase": "E",
-        "title": "Stack apps Shopify optimale",
-        "summary": "Installation et config apps essentielles : DSers, Judge.me, Alma, Klaviyo, Shopify Flow, + phase scale Loox, ReConvert, Gorgias, Langify, Google/Meta channels.",
-        "prompt": """Installation et config apps Shopify:
+        "title": "Intégrations tierces Altiaro (emails, avis, analytics)",
+        "summary": "Brief d'activation des intégrations natives Altiaro : Resend (emails transac), Brevo (marketing), Trustpilot + Judge.me (avis), GA4 + Meta Pixel + TikTok Pixel. Les connecteurs sont déjà codés.",
+        "prompt": """Tu es growth / martech lead (10 ans e-commerce FR > 5M€/an).
 
-Essentielles (gratuit/low cost):
-1. DSers — sync AliExpress
-2. Judge.me — avis produits + photos + schema SEO
-3. Alma — 3x/4x sans frais FR (conv +30%)
-4. Klaviyo — email + SMS flows
-5. Shopify Flow — automations natives
+La boutique [NOM_MARQUE] tourne sur **Altiaro** — les connecteurs backend pour toutes les intégrations sont **déjà codés**. Ta mission : définir **quelles intégrations activer, dans quel ordre, et avec quelle config**.
 
-Phase scale:
-6. Loox — avis photos
-7. ReConvert — upsell post-achat
-8. Zipify OCU — one-click-upsell
-9. Gorgias — helpdesk (>20 tickets/j)
-10. Langify — traductions DE/ES/IT
+**Couvre impérativement** :
 
-Shopping feeds:
-11. Google & YouTube Channel — Merchant Center
-12. Meta Channel — catalog FB/IG Shop
+**1. Emails transactionnels et marketing**
+- **Resend** (transactionnel) : déjà branché côté backend. Paramètres à définir : from-name, reply-to, template design (header logo + footer mentions).
+- **Brevo** ou **Mailjet** (marketing) : lequel choisir ? Plan recommandé ? 7 flows à créer (welcome, abandon panier, relance client, post-achat, review request, winback 60j, anniversaire).
 
-Pour chaque: plan recommandé, coût, installation, paramétrage exact, intégration front React, KPI.
+**2. Avis clients et social proof**
+- **Trustpilot** (site-level, gratuit puis payant) vs **Judge.me** (produit-level) vs **Loox** (photo-first). Recommandation pour niche [NICHE] senior.
+- Flow de collecte automatique post-achat (J+14, J+30)
+- Injection schema JSON-LD `AggregateRating` sur fiches produit
 
-Livrable: shopify_apps_stack.md""",
+**3. Analytics + tracking**
+- **GA4** : config propriétés, événements e-commerce (view_item, add_to_cart, purchase), conversion funnel
+- **Meta Pixel** + **Conversions API** (côté serveur via webhook Altiaro)
+- **TikTok Pixel** (si cible silver < 75 ans active sur TikTok)
+- **Mixpanel** ou **PostHog** (optionnel, pour comportement utilisateur granulaire)
+
+**4. Service client**
+- **Gorgias** (helpdesk unifié email + chat + Meta DM) dès 20 tickets/jour
+- **Tawk.to** ou **Intercom** (chat live) — recommandation
+
+**Pour chaque intégration** : plan tarifaire recommandé, seuil de déclenchement (quand activer), config exacte (clés API à créer où), KPI à tracker.
+
+**Livrable** : `integrations_stack.md` en tableau priorisé (À activer maintenant / Phase 2 / Phase scale) + 800-1500 mots MAX.""",
     },
-    # PHASE F — Front React (Prompts 17-24 condensed)
+    # PHASE F — Front (prompts 17-24)
     {
         "number": 17,
         "phase": "F",
-        "title": "Scaffold React headless + Shopify Storefront API",
-        "summary": "App React 18 + Vite + TypeScript + Tailwind + shadcn + Framer Motion connectée à Shopify Storefront GraphQL, architecture complète, accessibilité AAA, perfs Lighthouse 95+, SEO-ready.",
-        "prompt": """Crée app frontend React 18 headless connectée Shopify.
+        "title": "Customisation du template Altiaro (design, sections homepage)",
+        "summary": "Le template Altiaro (React premium light) est déjà appliqué au hook #17. Ce brief affine les choix de sections homepage, couleurs finales, typographies, assets visuels à produire.",
+        "prompt": """Tu es directeur artistique e-commerce FR (ex-Sézane, ex-Petit Bateau).
 
-Stack: Vite + React 18 + TS strict + Tailwind + shadcn/ui + Framer Motion + Lucide + graphql-request + @shopify/hydrogen-react types + react-hook-form + zod + Zustand + react-helmet-async
+Le template **Altiaro Premium Light** est **déjà appliqué** à la boutique [NOM_MARQUE] (hook #17 automatique, brand book du #6 injecté). Tu n'as rien à coder.
 
-Architecture /app/frontend/src/:
-/pages (Home, Collection/[handle], Product/[handle], Blog, Blog/[slug], About, Contact, FAQ, Search, Legal/*, Admin/Dashboard)
-/components: /layout, /ui (shadcn), /product, /blocks, /chat, /a11y
-/lib: shopify.ts, analytics.ts, schemas.ts, seo.ts, i18n.ts
-/hooks, /styles
+Ta mission : livrer le **brief de customisation** pour que les développeurs front appliquent les dernières touches visuelles propres à la niche.
 
-Exigences: Accessibilité AAA (18px base, 56px buttons, contrastes WCAG AAA, focus rings, aria-labels), perfs Lighthouse 95+ mobile, SEO SSG/ISR + sitemap + schemas + hreflang + canonical, tracking client + server-side, PAS dark mode, PAS AI-slop purple.
+**1. Sections homepage à activer/désactiver**
+Le template propose 13 sections modulaires (hero, personas, produits phares, social proof, engagements, comparatif, blog, fondateur, FAQ, newsletter, footer). Pour [NICHE] :
+- Quelles 7-9 sections retenir (priorités) ?
+- Dans quel ordre (funnel de conversion) ?
+- Pourquoi retirer les autres ?
 
-Livrable: scaffold complet + README + .env.example + package.json""",
+**2. Charte finale**
+- Couleurs validées (reprend #6 brand book) : primary, accent, background, text — vérifier contrastes WCAG AAA
+- Typographie : tailles par breakpoint mobile/tablet/desktop
+- Radius, ombres, espacements (grid 4 vs 8)
+
+**3. Assets visuels à produire**
+Liste exhaustive des médias à produire (ou sourcer) :
+- 1 hero vidéo 15-30s (scénario en 3 lignes)
+- 6-8 photos produits lifestyle (styling, décor, mannequin silver)
+- 3-5 photos équipe / coulisses / fondateur
+- 4 illustrations vectorielles pour sections engagements
+- 1 logo animé pour preloader
+
+Pour chaque : format, dimensions, style (photo réelle vs IA vs illustration), brief de direction artistique en 1 paragraphe.
+
+**4. Micro-interactions et motion**
+- Hover states (boutons, cards produits, liens)
+- Transitions de page (fade/slide ?)
+- Animations scroll reveals
+- Feedback tactile (add-to-cart anim, toast confirmation)
+
+**5. Accessibilité renforcée senior**
+- Taille corps minimale 18px (pas 16px)
+- Boutons min 56px haut
+- Contraste AAA (pas AA)
+- Alternative texte tous médias
+- Raccourcis clavier (skip-links, Cmd+K recherche)
+
+**Livrable** : `homepage_customization_brief.md` (1500-2000 mots MAX) + `assets_shotlist.csv` (liste médias à produire). PAS DE CODE.""",
     },
     {
         "number": 18,
@@ -515,7 +580,7 @@ Droite BuyBox sticky:
 4. Variantes (swatches couleur 48px, tailles)
 5. Stock temps réel
 6. Bouton AJOUTER AU PANIER 64px AAA
-7. Logos paiement (CB, PayPal, Alma, Apple Pay)
+7. Logos paiement (CB, Mollie (Bancontact, iDEAL, Apple Pay), Alma, Apple Pay)
 8. Bloc réassurance 4 lignes icônes (Livraison offerte, Essai 30j, Garantie 2 ans, Conseil 7j/7)
 9. Conseiller personnalisé photo+tél+chat
 10. Simulateur livraison code postal → date exacte
@@ -529,97 +594,127 @@ Micro: slide-in cart + exit-intent + scroll notif VRAIE.""",
     {
         "number": 21,
         "phase": "F",
-        "title": "Cart drawer + checkout redirect Shopify",
-        "summary": "Drawer panier : liste produits, upsell, barre progressive livraison gratuite, widget Alma, code promo, redirect checkout Shopify via Storefront API mutation.",
-        "prompt": """Construis CartDrawer slide-in right:
-- Liste produits (image, titre, options, qty +/-, prix, remove)
-- Upsell 1 produit recommandé (top collection)
-- Barre progressive livraison gratuite
-- Widget Alma 3x calculé
-- Sous-total + total (livraison estimée)
-- Code promo (validation Storefront API)
-- Bouton Passer commande → checkout.shopify.com via checkoutCreate mutation line items + email
-- Footer sécurité SSL + 3DS
+        "title": "Brief panier + checkout (Mollie déjà branché)",
+        "summary": "Le panier et checkout Mollie sont déjà fonctionnels. Ce brief affine les règles business : franco de port, upsell, code promo, réassurance.",
+        "prompt": """Tu es CRO lead e-commerce FR senior.
 
-Persistance Zustand + localStorage + sync Storefront API multi-devices.
+Le **panier drawer** et le **checkout Mollie** sont **déjà codés** dans le template Altiaro. Tu ne codes rien. Tu **brieffes les règles business** à appliquer.
 
-Tracking add_to_cart/remove_from_cart/begin_checkout (GA4+Meta+server-side).
+**1. Règles panier**
+- Franco de port à quel montant ? (par pays — FR, BE+LU, DE, NL, CH, UK)
+- Upsell au panier : produit recommandé auto (cross-sell) ? Critères ?
+- Code promo : lesquels proposer (WELCOME10, NEWSLETTER15), durée, seuil de panier min
+- Cart abandonment : après combien de minutes déclencher email de rappel ?
 
-Livrable: CartDrawer.tsx + hooks/useCart.ts + lib/shopify/cart.ts""",
+**2. Messages de réassurance au checkout**
+Pour [NICHE] cible senior — liste 5-8 messages clés :
+- Livraison (délai précis, transporteur, suivi)
+- Paiement sécurisé Mollie + 3DS
+- Rétractation 14 jours
+- Garantie 2 ans
+- Service client (téléphone, email <2h)
+
+**3. Méthodes de paiement visibles**
+Quelles icônes afficher par défaut ? Ordre recommandé ?
+
+**4. Top 5 causes d'abandon à éviter** sur cible senior, pour chaque une règle à appliquer.
+
+**Livrable** : `cart_checkout_rules.md` (800-1200 mots) en check-list. Aucun code.""",
     },
     {
         "number": 22,
         "phase": "F",
-        "title": "Blog + article template haute qualité SEO",
-        "summary": "Module blog listing + article long format : TOC sticky, 2500+ mots, images/vidéos, callouts, interlinking, schema Article+Author+Publisher, auteur bio E-E-A-T.",
-        "prompt": """Module BLOG:
+        "title": "Brief éditorial blog (15 piliers + calendrier)",
+        "summary": "Le blog est intégré au template. Ce brief livre la ligne éditoriale, 15 sujets piliers, le profil auteur E-E-A-T et le calendrier 90 jours.",
+        "prompt": """Tu es rédacteur en chef e-commerce senior (ex-Notre Temps, ex-Silver Économie).
 
-/blog listing: grille 3 cols + catégories filter, recherche full-text, sidebar articles+newsletter+CTA produits, pagination.
+Le **blog** est **déjà intégré** dans le template Altiaro. Ta mission : livrer la **ligne éditoriale** et les **15 sujets piliers** à rédiger en priorité.
 
-/blog/[slug]: breadcrumb+schema, H1, meta auteur photo+bio+diplôme + date + temps lecture, TOC sticky sidebar desktop, contenu 2500+ mots (H2/H3, paragraphes courts, images landscape+portrait avec alt, vidéos YouTube lite, callouts info/warning/tip, listes+tableaux, citations expert, FAQ milieu, interlinking 4-6 produits + 4-6 articles + 2-3 liens externes autorité, CTA natif milieu+fin), schema Article+Author+Publisher, bloc auteur bas, 3 articles connexes rel prev/next, partage Web Share API, newsletter inline.
+**1. Ligne éditoriale**
+- 3 promesses du blog (pas de remplissage SEO)
+- Ton (reprend voix de marque #7)
+- 3 rubriques (ex: Guides pratiques, Avis d'experts, Témoignages)
+- Persona type du lecteur
 
-Source: Shopify Blog API (simple) OU MDX+Contentlayer (SEO contrôle ultime).
+**2. 15 sujets piliers prioritaires** pour [NICHE]
+| # | Titre | Cluster | Mot-clé | Intention | Volume/mois | Priorité |
 
-Livrable: /app/frontend/src/pages/Blog* + hooks/useBlog.ts""",
+Chaque titre : accroche sans clickbait, UNE question précise, commence par Comment/Quel/Pourquoi/Où/Combien.
+
+**3. Calendrier 90 jours** (2 articles/semaine = 24 articles)
+- Phase 1 (priorité max), Phase 2 (approfondissement), Phase 3 (longue traîne)
+
+**4. E-E-A-T** : profil auteur (nom, photo, bio 80 mots, crédentials crédibles — médecin/ergothérapeute). Injecté en schema.
+
+**Livrable** : `editorial_guidelines.md` + `pillar_articles.csv` (15 lignes) + `publishing_calendar.csv` (24 lignes) + `author_profile.md`. 1500-2000 mots MAX.""",
     },
     {
         "number": 23,
         "phase": "F",
-        "title": "Pages statiques (About, Contact, FAQ, Legal, A11y)",
-        "summary": "About 1000 mots storytelling, Contact form + tél + chat, FAQ 50 questions schema, pages légales du prompt 13, page accessibilité avec toggle panel (police, contraste, curseur).",
-        "prompt": """Code pages:
+        "title": "Brief contenu pages statiques (About, Contact, FAQ)",
+        "summary": "Les pages About/Contact/FAQ/Legal sont dans le template. Ce brief livre le contenu : storytelling fondateur, 50 FAQ, coordonnées support, charte accessibilité.",
+        "prompt": """Tu es content strategist e-commerce senior.
 
-1. /a-propos — 1000 mots storytelling, histoire fondateur, équipe photos+rôles, valeurs, engagements mesurables, vidéo manifesto, chiffres clés, presse
-2. /contact — formulaire (nom, email, tél, motif, message), alternatives (tél gros + chat + WhatsApp), horaires, carte, FAQ ancre, promesse réponse <2h
-3. /faq — 50 questions par catégories (Livraison/Paiement/Produit/Retour/SAV/Compte/Fidélité), recherche, schema FAQPage 50+ mainEntity
-4. Pages légales (6 du prompt 13) avec TOC, ancres
-5. /accessibilite — déclaration RGAA + toggle panel (taille police, contraste élevé, curseur XXL, interligne, no animations) persistant cookie
+Les pages **About / Contact / FAQ / Accessibilité / Legal** sont **déjà présentes** dans le template (les docs légaux sont auto-injectés au hook #9). Ta mission : **écrire le contenu éditorial**.
 
-Bouton flottant bas-droit Accessibilité depuis toutes pages.""",
+**1. About (1000 mots)**
+- Storytelling fondateur (reprend #7, amplifie)
+- Équipe : 3-5 membres (nom, rôle, citation 20 mots, photo brief)
+- 3 engagements mesurables (ex: SAV <2h ouvrées)
+- Chiffres clés, mentions presse
+
+**2. Contact**
+- Email support + délai <2h ouvrées
+- Téléphone (horaires)
+- Formulaire : champs minimaux (nom, email, tél optionnel, motif dropdown 8-10 motifs, message)
+- Confirmation post-envoi
+
+**3. FAQ — 50 questions structurées** en 7 catégories (Livraison 8, Paiement 7, Produits 12 spécifiques à [NICHE], Retours 6, SAV 8, Compte 5, Engagement 4)
+Format JSON :
+`[{"category":"Livraison","q":"...","a":"..."}]`
+Vraies questions de seniors/aidants, pas de questions marketing.
+
+**4. Accessibilité**
+Déclaration RGAA 4.1 (taille 18px, contraste AAA, navigation clavier) + référent accessibilité.
+
+**Livrable** : `about.md` + `contact.md` + `faq.json` (50 items) + `accessibility_statement.md`. 2500-3500 mots MAX total.""",
     },
     {
         "number": 24,
         "phase": "F",
-        "title": "Recherche interne + suggestions",
-        "summary": "Composant Search avec modal Cmd+K, suggestions instantanées (produits, collections, articles, FAQ), historique, populaires, Shopify predictive search API.",
-        "prompt": """Tu es Senior Frontend Engineer (ex-Shopify Plus), 10 ans d'exp sur des e-commerces FR > 5M€/an.
+        "title": "Brief navigation (catégories, filtres, méga-menu)",
+        "summary": "La navigation et la recherche sont dans le template. Ce brief définit l'arborescence catégories, filtres collection, méga-menu header et recherches populaires.",
+        "prompt": """Tu es UX e-commerce senior.
 
-Implémente la recherche interne complète du site Altiaro.
+La **navigation** et la **recherche interne** sont **déjà codées** dans le template Altiaro. Ta mission : livrer l'**architecture de l'information**.
 
-**Composant Search** :
-- Input dans le header (icône loupe à droite) + raccourci **Cmd+K / Ctrl+K** (écoute globale)
-- Clic ou raccourci → modal plein écran avec overlay dark semi-transparent
-- Input auto-focus + placeholder contextuel ("Fauteuil releveur, coussin anti-escarres...")
-- **Debounce 300ms** avant d'envoyer la requête (évite le spam)
+**1. Arborescence catégories**
+Pour [NICHE], 2 niveaux max :
+- Niveau 1 : 4-6 catégories (nav principale)
+- Niveau 2 : 3-6 sous-catégories par L1
 
-**Résultats en 4 sections** (chaque item : image 40x40 + titre + meta preview + prix si produit) :
-1. **Produits** (top 5 match) — image + nom + prix + disponibilité stock
-2. **Collections** (top 3 match) — image + nombre de produits
-3. **Articles blog** (top 3 match) — image + temps de lecture
-4. **FAQ** (top 3 match) — question + début de réponse tronqué
+Par catégorie : nom court (20 car max, KW SEO), slug, meta title, meta description, image hero brief.
 
-**États vides** :
-- Input vide → "Recherches populaires" (5 termes hardcodés + top 5 derniers cherchés de l'user)
-- Aucun résultat → message empathique + suggestion de catégories + CTA contact
-- Historique localStorage limité à 10 items, clearable
+**2. Filtres par page collection**
+- Prix (slider, tranches)
+- Caractéristiques spécifiques [NICHE] (ex fauteuils : nb moteurs, charge max, revêtement)
+- Notes clients (3+, 4+, 5★)
+- Disponibilité (en stock)
 
-**Sources** :
-- Shopify **predictive search API** en priorité (rapide, natif)
-- Algolia DocSearch en fallback si catalogue > 200 produits
-- Tracking events (Mixpanel/GA4) : `search_performed`, `search_result_clicked`, `search_empty`
-- **Les recherches vides sont GOLD** pour détecter les gaps catalogue → export CSV mensuel
+**3. Méga-menu header**
+Si L1 > 4 catégories :
+- Colonnes thématiques (max 3)
+- Image d'ambiance + CTA collection phare
+- Lien "Voir tous" en bas
 
-**Accessibilité** :
-- Navigation clavier (↑↓ pour naviguer, Enter pour ouvrir, Esc pour fermer)
-- Lecteur d'écran : aria-live="polite" pour annoncer les résultats
-- Focus trap dans la modal (Radix UI Dialog recommandé)
+**4. Recherches populaires par défaut** — 10 requêtes pré-affichées :
+- 5 produits top volume
+- 3 informationnelles ("comment choisir...")
+- 2 offres ("promo", "soldes")
 
-**Performance** :
-- Requête debounced + abort controller (annule si user tape vite)
-- Skeletons loading animés (pas de spinner brutal)
-- Cache des 20 dernières requêtes (in-memory, TTL 5min)
+**5. Footer navigation** : colonnes (Marque / Aide / Légal / Réseaux)
 
-Livrable : `/components/SearchModal.tsx` + `/hooks/useSearch.ts` + `/lib/searchTracking.ts` + tests Playwright (ouvre Cmd+K, tape "fauteuil", clique 1er résultat)""",
+**Livrable** : `ia_navigation.md` + `collection_filters.json` + `footer_links.md`. 1000-1500 mots MAX.""",
     },
     # PHASE G — SEO (Prompts 25-29)
     {
@@ -661,7 +756,7 @@ Pour chaque:
 - Interlinking: 5-7 vers satellites même cluster + 2-3 vers produits + 2-3 externes autorité .gouv.fr + 1 vers autre cluster
 - E-E-A-T: signé ergothérapeute DE 10 ans exp, date pub+MAJ, bloc méthodologie, schema Author+Publisher
 
-Livrable: 15 fichiers .md prêts import Shopify Blog""",
+Livrable: 15 fichiers .md prêts import Altiaro Blog""",
     },
     {
         "number": 27,
@@ -857,7 +952,7 @@ Livrable: aeo_offsite_strategy.md + monitoring_sheet.xlsx""",
 7. Formulaire devis commandes >500€ (B2B, EHPAD)
 8. Live chat Crisp/Tidio pré-qualif 3 questions puis bot
 9. Microsurvey post-scroll 45s page produit: "Qu'est-ce qui vous retient?" 5 choix
-10. A/B test infra: PostHog feature flags OU Shopify Shogun/GemPages
+10. A/B test infra: PostHog feature flags OU Altiaro Shogun/GemPages
 
 Plan 20 tests A/B priorisés sur 6 mois avec hypothèses chiffrées.
 
@@ -872,10 +967,10 @@ Livrable: CRO toolkit intégré + ab_test_roadmap.md""",
 
 1. Judge.me: avis produit + photos + réponses marque
 2. Trustpilot widget home+footer (score réel)
-3. Live social proof: "Emma de Nantes a commandé canne il y a 12 min" bas-gauche 45s → VRAI via webhook Shopify orders/paid anonymisé prénom+ville, RGPD
+3. Live social proof: "Emma de Nantes a commandé canne il y a 12 min" bas-gauche 45s → VRAI via webhook Altiaro orders/paid anonymisé prénom+ville, RGPD
 4. Vu dans la presse: 6 logos cliquables modal article
 5. Partenaires: 4 logos (asso, experts)
-6. Compteur "+X familles équipées" scroll animé (DATA RÉELLE Shopify count)
+6. Compteur "+X familles équipées" scroll animé (DATA RÉELLE Altiaro count)
 7. Note globale site (agrégation Judge.me + Trustpilot)
 8. 4 vidéos témoignages clients réels (UGC ~80€/vidéo Bridge/Uprise/Influee)
 9. Case studies long format blog: "Comment Jeanne a retrouvé mobilité" 1/mois
@@ -891,9 +986,9 @@ Livrable: social_proof_stack.md + composants React + workflow modération""",
     {
         "number": 35,
         "phase": "I",
-        "title": "Klaviyo 7 flows email + SMS complets",
+        "title": "Brevo 7 flows email + SMS complets",
         "summary": "Welcome, abandon panier, abandon navigation, post-achat, winback, review request, VIP. Copywriting complet 50 emails + 6 SMS en ton marque vouvoiement chaleureux.",
-        "prompt": """Configure 7 flows Klaviyo avec COPYWRITING complet ton marque (vouvoiement, chaleureux, jamais infantilisant):
+        "prompt": """Configure 7 flows Brevo avec COPYWRITING complet ton marque (vouvoiement, chaleureux, jamais infantilisant):
 
 FLOW 1 Welcome (inscription newsletter, 4 touches):
 - Email 1 (instant): bienvenue + guide PDF lead magnet + histoire marque
@@ -938,19 +1033,43 @@ Livrable: klaviyo_flows.md (50+ pages) + templates_import.json""",
     {
         "number": 36,
         "phase": "J",
-        "title": "Stack paiement FR optimale dropshipping",
-        "summary": "Shopify Payments (CB, Apple/Google Pay, 3DS) + PayPal Business + Alma 3x/4x (critique conversion) + virement B2B + anti-fraude + facturation auto conforme FR.",
-        "prompt": """Configure stack paiement complet:
+        "title": "Optimisation checkout Mollie (réduction abandon panier)",
+        "summary": "Mollie est déjà branché. Ce brief identifie les leviers pour baisser le taux d'abandon panier (FR ~ 70%) : friction, trust signals, A/B tests prioritaires.",
+        "prompt": """Tu es CRO senior (ex-Oui.sncf, ex-Vestiaire Collective).
 
-1. Shopify Payments (Stripe): CB (Visa, Mastercard, Amex optionnel), Apple/Google Pay, 3DS v2 auto dès 150€ (PSD2), descripteur bancaire clair
-2. PayPal Business: Express Checkout + 4x sans frais (30-2000€ auto), compte Business Pro (+features)
-3. Alma (critique high-ticket FR): 3x/4x sans frais jusqu'à 3000€ (2,5% vendeur), 10x/12x avec frais, intégration native + widget produit+cart, +25 à +40% conversion panier >300€
-4. Virement bancaire B2B+grandes cmd: manual, validation 24-48h post-réception
-5. Anti-fraude: Shopify Fraud Analysis activé, règle custom review manuelle >1500€ OU first order+email disposable OU billing≠shipping country, chargeback dispute kit
-6. Facturation auto: app Sufio/Order Printer Pro, numéro facture séquentiel inaltérable (obligation FR), PDF conformes (raison sociale, SIRET, TVA intracom, RCS, client, TVA ventilée), envoi auto order paid
-7. Conformité DSP2: 3DS challenge fluide, authentication strong customer, tokenization
+**Mollie** est **déjà branché** comme PSP unique (CB, Bancontact, iDEAL, Apple Pay, Google Pay, virement B2B). Taxes/transport paramétrés au prompt #14. Ta mission : **optimiser le checkout** pour réduire l'abandon (moyenne FR ~ 70%).
 
-Livrable: payments_setup.md + conformity_checklist.md""",
+**1. Audit friction (liste 10 frictions classiques e-commerce senior)**
+Pour chaque friction, la règle à appliquer sur le checkout Altiaro :
+- Obligation de créer compte ? (recommandation : guest checkout autorisé)
+- Trop de champs ? (quelle liste minimale ?)
+- Frais de port révélés tardivement ? (règle : afficher dès le panier)
+- Pas de numéro téléphone support visible ?
+- Process > 3 steps ?
+- ...
+
+**2. Trust signals à ajouter au checkout**
+- Logos paiements acceptés + icône cadenas SSL
+- Bandeau "Paiement 100% sécurisé Mollie"
+- Note Trustpilot / Avis Vérifiés visible
+- Mention satisfaction ou remboursé
+- Promesse livraison (délai + transporteur)
+- Politique retour visible en footer sticky
+
+**3. Paiement 3x/4x sans frais**
+Alma est-il pertinent pour [NICHE] ? (seuil 100€) — marge rognée vs conversion boostée. Alternatives : Younited Pay, Franfinance, Cofidis. Recommandation argumentée.
+
+**4. 5 A/B tests prioritaires à lancer**
+- Hypothèse, variation, métrique primaire, durée d'estimation
+Exemples : "Déplacer le code promo de l'étape 2 à l'étape 1 → augmente perception de bonne affaire"
+
+**5. KPIs de monitoring**
+- Taux d'abandon panier global
+- Taux d'abandon par étape (panier → adresse → paiement → confirmation)
+- Taux de conversion par méthode de paiement
+- Panier moyen par device
+
+**Livrable** : `checkout_optimization.md` (1500-2000 mots MAX) avec sections priorisées P0/P1/P2 et backlog A/B tests en tableau.""",
     },
     # PHASE K — Service client
     {
@@ -960,11 +1079,11 @@ Livrable: payments_setup.md + conformity_checklist.md""",
         "summary": "Chatbot FastAPI + LLM (Claude/GPT) + RAG sur catalogue, FAQ, politiques, blog. Widget frontend + WhatsApp + Messenger + email. RGPD opt-in. Escalade humaine auto. Dashboard admin.",
         "prompt": """Chatbot IA intégré:
 
-Stack: Backend FastAPI /api/chat streaming SSE, LLM GPT-4o-mini OU Claude Haiku via Emergent LLM Key, RAG vector store (Chroma/Qdrant) sur catalogue Shopify + FAQ 50Q + politiques + articles blog (chunking 500 tokens). Session memory 10 msg. RGPD opt-in, purge 90j, export/delete rights.
+Stack: Backend FastAPI /api/chat streaming SSE, LLM GPT-4o-mini OU Claude Haiku via Emergent LLM Key, RAG vector store (Chroma/Qdrant) sur catalogue Altiaro + FAQ 50Q + politiques + articles blog (chunking 500 tokens). Session memory 10 msg. RGPD opt-in, purge 90j, export/delete rights.
 
 Frontend: widget bouton flottant bas-droit, modal chat élégant, typography accessibility 18px, suggested prompts initiaux, indicateur typing + streaming.
 
-Capacités: qualification besoin 5Q max, reco produit avec lien+image, explication politiques, suivi commande Shopify (session email+order), escalade humaine (détection frustration OU hors périmètre) → Gorgias avec contexte.
+Capacités: qualification besoin 5Q max, reco produit avec lien+image, explication politiques, suivi commande Altiaro (session email+order), escalade humaine (détection frustration OU hors périmètre) → Gorgias avec contexte.
 
 Canaux phase 2: WhatsApp Business Twilio/360dialog, Messenger + IG DM, email auto-reply support@ (GPT pré-remplit, humain valide).
 
@@ -978,8 +1097,8 @@ Livrable: backend + Chat.tsx + system_prompt.md + RAG pipeline + dashboard""",
         "number": 38,
         "phase": "K",
         "title": "Helpdesk centralisé + 30 macros",
-        "summary": "Gorgias centralise email/chat/WhatsApp/Messenger/IG/téléphone. Règles auto-tag ML, priorités, SLA <2h, intégration Shopify fiche client, 30 macros pré-écrites, dashboard KPI.",
-        "prompt": """Setup Gorgias (recommandé e-commerce Shopify):
+        "summary": "Gorgias centralise email/chat/WhatsApp/Messenger/IG/téléphone. Règles auto-tag ML, priorités, SLA <2h, intégration Altiaro fiche client, 30 macros pré-écrites, dashboard KPI.",
+        "prompt": """Setup Gorgias (recommandé e-commerce Altiaro):
 
 Centralisation canaux: support@ email, chat site (hand-off bot prompt 37), WhatsApp Business (Twilio/WATI 20€/mois), Messenger+IG DM, téléphone Aircall transcription auto.
 
@@ -987,7 +1106,7 @@ Configuration:
 1. Règles auto-tag par motif (ML Gorgias): livraison/SAV/avant-vente/paiement/facture/retour/garantie/compte/autre
 2. Priorités auto: P1 VIP/réclamation forte, P2 avant-vente, P3 info
 3. SLA: 1ère réponse <2h jour (9h-19h LS), <24h hors
-4. Intégration Shopify: fiche client dans conversation (commandes, AOV, tags)
+4. Intégration Altiaro: fiche client dans conversation (commandes, AOV, tags)
 5. 30 macros pré-écrites en ton marque
 6. Auto-close 5j inactifs + relance CSAT
 7. Escalade manager si tag réclamation ou CSAT 1-2/5
@@ -1002,15 +1121,15 @@ Livrable: gorgias_config.md + 30_macros.md + workflow_escalation.md""",
         "number": 39,
         "phase": "K",
         "title": "Téléphonie FR + 3 scripts vente senior",
-        "summary": "Aircall/Ringover numéro FR 01/09, menu vocal chaleureux, 9h-19h L-S, enregistrement RGPD, intégration Shopify, 3 scripts (vente entrante, SAV, rappel lead).",
+        "summary": "Aircall/Ringover numéro FR 01/09, menu vocal chaleureux, 9h-19h L-S, enregistrement RGPD, intégration Altiaro, 3 scripts (vente entrante, SAV, rappel lead).",
         "prompt": """Setup téléphonie pro:
 
 1. Numéro FR fixe virtuel: Aircall (30€/mois), Ringover (20€/mois), Onoff Business. Numéro 01 Paris ou 09 dédié (PAS 06). Enregistrement avec annonce RGPD obligatoire.
 2. Menu vocal humain court:
 "Bonjour, bienvenue chez [NOM]. Pour suivi commande, tapez 1. Conseil avant achat, tapez 2. Autre demande, restez en ligne. Décrochage <1 minute."
 3. Horaires 9h-19h L-S (samedi critique seniors retraités) + renvoi répondeur promesse rappel <2h (SLA)
-4. Intégration Shopify: pop fiche client Aircall au décroché (nom, dernière cmd, historique)
-5. Logging: appels → Shopify customer notes + Gorgias transcription
+4. Intégration Altiaro: pop fiche client Aircall au décroché (nom, dernière cmd, historique)
+5. Logging: appels → Altiaro customer notes + Gorgias transcription
 
 3 SCRIPTS:
 A. Vente entrante 10 étapes: accueil personnalisé → écoute 2min → reformulation → diagnostic 3-5Q → reco 2 produits max → traitement objection prix (valeur, 3x, garantie) → objection livraison → closing doux → upsell léger → remerciement
@@ -1045,11 +1164,11 @@ Livrable: logistics_playbook.md + suppliers_SLAs.xlsx""",
         "number": 41,
         "phase": "L",
         "title": "Module tracking client + notifications",
-        "summary": "Backend webhook Shopify + AfterShip/Track123, frontend page /suivi-commande timeline 7 étapes, estimation dynamique, photos preuve, notifications email+SMS, anti-où-est-mon-colis.",
+        "summary": "Backend webhook Altiaro + AfterShip/Track123, frontend page /suivi-commande timeline 7 étapes, estimation dynamique, photos preuve, notifications email+SMS, anti-où-est-mon-colis.",
         "prompt": """Module tracking post-achat:
 
 Backend:
-- Webhook Shopify orders/fulfilled → stock n° tracking + carrier
+- Webhook Altiaro orders/fulfilled → stock n° tracking + carrier
 - AfterShip API (gratuit <100/mois) OU Track123 polling multi-opérateurs
 - Webhook AfterShip updates → DB update + trigger notifs
 
@@ -1068,7 +1187,7 @@ Notifications auto (email + SMS optionnel):
 
 Anti-"où est mon colis?": -60% tickets SAV avec tracking clair.
 
-Livrable: /api/tracking/* + Suivi.tsx + Klaviyo transactional templates""",
+Livrable: /api/tracking/* + Suivi.tsx + Brevo transactional templates""",
     },
     {
         "number": 42,
@@ -1082,7 +1201,7 @@ Page /sav:
 
 Backend automation:
 - Génération ticket Gorgias auto (tag + priorité)
-- Motif "changement d'avis" (14j rétractation): étiquette prépayée auto (Sendcloud, ShippyPro, Shopify Returns), email instructions, remboursement auto dès scan retour 3PL
+- Motif "changement d'avis" (14j rétractation): étiquette prépayée auto (Sendcloud, ShippyPro, Altiaro Returns), email instructions, remboursement auto dès scan retour 3PL
 - Motif "défectueux": remboursement sans retour si <80€ (coût retour>valeur), sinon étiquette + remplacement parallèle (wow)
 - Motif "autre choix": proposition échange auto (catalogue reco)
 
@@ -1100,7 +1219,7 @@ Livrable: /app/frontend/src/pages/Sav.tsx + backend automation + Gorgias workflo
 
 Structure compte:
 
-1. Merchant Center setup: flow Shopify via app Google & YouTube Channel, GTIN ou MPN obligatoire, images ≥800×800, titres <150 car. (KW+brand+attribut), descriptions ≥250 car., catégorie Google précise. Fix disapprovals prioritaire.
+1. Merchant Center setup: flow Altiaro via app Google & YouTube Channel, GTIN ou MPN obligatoire, images ≥800×800, titres <150 car. (KW+brand+attribut), descriptions ≥250 car., catégorie Google précise. Fix disapprovals prioritaire.
 
 2. Répartition 30€/j:
 | Campagne | Type | % | €/j | Cible |
@@ -1118,7 +1237,7 @@ Stratégie: commencer Shopping Standard (PAS PMax pur à 30€/j — pas assez d
 
 5. Search exact+phrase: 4 AG (Nom produit, Meilleur/Avis, Concurrent, Acheter+produit), 3 RSA/AG, extensions sitelinks+callouts+structured snippets+price+location+lead form, mots négatifs (gratuit, occasion, leboncoin, définition, emploi, stage, bricolage, kijiji, solution urgence), conversions purchase primaire + lead + phone_click secondaires
 
-6. Remarketing Display: audiences Shopify (all visitors 30j, product viewers 30j, cart abandoners 14j), bannières responsives + 6 visuels produit top, cap fréquence 3/j/user
+6. Remarketing Display: audiences Altiaro (all visitors 30j, product viewers 30j, cart abandoners 14j), bannières responsives + 6 visuels produit top, cap fréquence 3/j/user
 
 7. Tracking: Enhanced Conversions activées, value-based bidding après 50 conv, conversion path modeling
 
@@ -1232,7 +1351,7 @@ Livrable: ads_optimization_playbook.md + scripts.js + weekly_report_template.md"
         "number": 47,
         "phase": "N",
         "title": "GA4 + CAPI + server-side tracking complet",
-        "summary": "GTM Web+Server, GA4 events ecommerce, Consent Mode v2 CNIL, Enhanced Conversions, Meta CAPI, Shopify Pixel custom, backend FastAPI tracking, tests DebugView/Tag Assistant/Events Manager.",
+        "summary": "GTM Web+Server, GA4 events ecommerce, Consent Mode v2 CNIL, Enhanced Conversions, Meta CAPI, Altiaro Pixel custom, backend FastAPI tracking, tests DebugView/Tag Assistant/Events Manager.",
         "prompt": """Mesure AVANCÉE (perte signal iOS14 / Consent Mode v2):
 
 1. Google Tag Manager Web + Server containers:
@@ -1247,11 +1366,11 @@ Custom: phone_click, whatsapp_click, form_submit_lead, newsletter_signup, exit_i
 
 4. Enhanced Conversions Google Ads: données hash (email, phone, name, address) client + offline upload backend long cycle
 
-5. Meta CAPI (phase Meta Ads): backend FastAPI /api/tracking/meta reçoit webhook Shopify order + emit event PurchaseserverSide event_id dédoublé côté pixel. Stape.io/Rudderstack simplifier (alt: native)
+5. Meta CAPI (phase Meta Ads): backend FastAPI /api/tracking/meta reçoit webhook Altiaro order + emit event PurchaseserverSide event_id dédoublé côté pixel. Stape.io/Rudderstack simplifier (alt: native)
 
-6. Shopify Pixel custom: web pixel extension Shopify manifest v3 capture events checkout
+6. Altiaro Pixel custom: web pixel extension Altiaro manifest v3 capture events checkout
 
-7. Backend FastAPI /app/backend/routes/analytics.py: POST webhook Shopify orders/paid → push GA4 Measurement Protocol + Google Ads offline + Meta CAPI + TikTok + server log. Anti-tampering hash. Event_id standard dédup client vs server.
+7. Backend FastAPI /app/backend/routes/analytics.py: POST webhook Altiaro orders/paid → push GA4 Measurement Protocol + Google Ads offline + Meta CAPI + TikTok + server log. Anti-tampering hash. Event_id standard dédup client vs server.
 
 8. Tests go-live: GA4 DebugView (events trigger), Google Tag Assistant (tags fire), Meta Test Events (dédup server-side), Search Console connecté GA4.
 
@@ -1302,7 +1421,7 @@ Livrable: seo_monitoring_stack.md + Looker template URL + rituals_calendar.md"""
         "summary": "Config centralisée /config/brand.config.ts, features optionnels par niche, CLI npm run create-brand, docs duplication_sop + niche_checklist.",
         "prompt": """Refactore projet front+back en TEMPLATE réutilisable <5j pour nouvelle niche.
 
-Centralisation config: /config/brand.config.ts unique avec Brand (name, tagline, manifesto, storyteller bio), Visual (colors CSS vars, fonts Google imports, logos URLs), Products (catégories, hero, USPs), Legal (entité, SIRET, adresse, DPO), Integrations (Shopify domain, Klaviyo list ID, GA4, Meta Pixel), Copy (20 textes fréquents), i18n (langues, default).
+Centralisation config: /config/brand.config.ts unique avec Brand (name, tagline, manifesto, storyteller bio), Visual (colors CSS vars, fonts Google imports, logos URLs), Products (catégories, hero, USPs), Legal (entité, SIRET, adresse, DPO), Integrations (Altiaro domain, Brevo list ID, GA4, Meta Pixel), Copy (20 textes fréquents), i18n (langues, default).
 
 Extraire composants niche-spécifiques /features/ optionnels:
 - Senior: AccessibilityPanel, LargeText, SimulatorAPA

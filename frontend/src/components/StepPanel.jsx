@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { marked } from "marked";
 import { api, apiCall } from "../lib/api";
 import {
@@ -38,6 +38,29 @@ export default function StepPanel({ step: initialStep, site, isAdmin, onClose, o
   const [rejectReason, setRejectReason] = useState("");
   const [showReject, setShowReject] = useState(false);
   const [error, setError] = useState("");
+  // Progress tracking during IA execution (elapsed seconds → 0-95% bar)
+  const [execStartTs, setExecStartTs] = useState(null);
+  const [elapsedSec, setElapsedSec] = useState(0);
+  useEffect(() => {
+    if (!executing) return;
+    if (!execStartTs) setExecStartTs(Date.now());
+    const interval = setInterval(() => {
+      setElapsedSec(Math.round((Date.now() - (execStartTs || Date.now())) / 1000));
+    }, 500);
+    return () => clearInterval(interval);
+  }, [executing, execStartTs]);
+  useEffect(() => {
+    if (!executing) {
+      setExecStartTs(null);
+      setElapsedSec(0);
+    }
+  }, [executing]);
+  // Target ≈ 45s — asymptote 95% so it never fills until real completion
+  const progressPct = Math.min(95, (elapsedSec / 45) * 85);
+  const estimatedRemain = Math.max(0, 60 - elapsedSec);
+  const progressLabel = elapsedSec < 60
+    ? `~${estimatedRemain}s restantes`
+    : `${elapsedSec}s écoulées`;
   const [copied, setCopied] = useState(false);
 
   const meta = STATUS_META[step.status] || STATUS_META.locked;
@@ -297,6 +320,29 @@ export default function StepPanel({ step: initialStep, site, isAdmin, onClose, o
                   )}
                 </button>
               </div>
+
+              {executing && (
+                <div className="mb-4 p-4 rounded-lg border border-[#E7E5E4] bg-gradient-to-br from-[#FDFBF7] to-[#F5F2EB]">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs text-[#57534E] flex items-center gap-2">
+                      <Sparkle size={12} weight="fill" className="animate-pulse" color="#B84B31" />
+                      <span>Claude rédige ton livrable...</span>
+                    </div>
+                    <div className="text-xs font-mono text-[#78716C]">
+                      {progressLabel}
+                    </div>
+                  </div>
+                  <div className="w-full h-1.5 bg-white rounded-full overflow-hidden border border-[#E7E5E4]">
+                    <div
+                      className="h-full bg-gradient-to-r from-[#B84B31] to-[#D97706] rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${Math.min(95, progressPct)}%` }}
+                    />
+                  </div>
+                  <div className="mt-2 text-[11px] text-[#78716C]">
+                    Génération typique : 30-90 secondes. Ne ferme pas le panneau.
+                  </div>
+                </div>
+              )}
               {executing && (
                 <div className="text-xs text-[#78716C]">
                   ⏳ L'IA peut mettre 20-60 secondes pour un prompt long. Ne fermez pas ce panneau.

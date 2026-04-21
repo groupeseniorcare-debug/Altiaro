@@ -3,6 +3,22 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 31 : Refonte des 50 prompts pour cohérence stack Altiaro + barre de progression IA
+- **Substitutions globales** dans `seed_prompts.py` pour retirer toute référence aux stacks qu'on n'utilise pas : **Shopify → Altiaro**, **Stripe/PayPal → Mollie**, **Klaviyo → Brevo**, **Algolia → recherche native Altiaro**, **"scaffold headless + Shopify Storefront API" → "customisation du template Altiaro"**. 24 prompts impactés, 0 occurrence restante vérifiée.
+- **6 prompts pivots entièrement réécrits** pour refléter la vraie architecture (template Altiaro fourni, Mollie branché d'office, hooks auto pour légal/brand/produits) :
+  - **#14** "Configuration Shopify complète" → **"Paramétrage backend Altiaro (taxes, livraison, paiement)"** — le Concepteur fournit des règles business, zéro code.
+  - **#15** "Import CSV Altiaro" → **"Brief import catalogue (20 produits haute qualité)"** — livre un JSON exploitable par le hook #16 auto-import, pas un CSV Shopify.
+  - **#16** "Stack apps Shopify" → **"Intégrations tierces Altiaro (emails, avis, analytics)"** — brief priorisé (Resend déjà branché, Brevo vs Mailjet, Trustpilot vs Judge.me, GA4/Meta/TikTok Pixel, Gorgias).
+  - **#17** "Scaffold React headless" → **"Customisation du template Altiaro"** — le template est déjà appliqué via hook #17, le Concepteur brieffe les 13 sections homepage + charte + assets.
+  - **#21** "Cart drawer + Shopify checkoutCreate" → **"Brief panier + checkout (Mollie déjà branché)"** — franco de port, upsell, code promo, trust signals.
+  - **#24** "Recherche interne Cmd+K" → **"Brief navigation (catégories, filtres, méga-menu)"** — la recherche est déjà dans le template, le Concepteur livre l'arborescence + filtres + 10 recherches populaires.
+  - **#36** "Stack paiement FR" → **"Optimisation checkout Mollie (réduction abandon panier)"** — Mollie est branché, l'étape = audit friction + 5 A/B tests + KPIs.
+- Chaque prompt refondu respecte le pattern : **rôle d'expert + mission précisée + livrable en markdown/JSON exploitable + contrainte de taille** (800-2000 mots selon complexité). Ton "expert mentor", pas "dev qui code".
+- **#22 et #23** également refondus en briefs éditoriaux (pas de code) : #22 = ligne éditoriale blog + 15 piliers + calendrier 90j + profil auteur E-E-A-T ; #23 = about 1000 mots + contact + 50 FAQ JSON + déclaration RGAA.
+- **Barre de progression IA** : ajoutée dans `StepPanel.jsx` — pendant l'exécution Claude, affiche `~Xs restantes` + barre dégradée (#B84B31→#D97706) qui avance asymptotiquement jusqu'à 95%, texte "Claude rédige ton livrable..." + mention "30-90 secondes, ne ferme pas le panneau". UX rassurante, fin du "j'attends sans savoir quoi".
+- **Synchronisation auto** : au démarrage backend, `server.py` re-pousse les 50 prompts depuis `PROMPTS` vers la BDD → les sites existants bénéficient immédiatement des nouveaux prompts sans re-seed.
+
+
 ## 2026-04-21 · Sprint 30 : Fix 4 bugs bloquants du flow Concepteur + UX guidage
 - **Bug redirection** : `LaunchSite.jsx:createSite` renvoyait sur `/sites/:id/studio` (route supprimée au Sprint 26) → corrigé en `/sites/:id` (cockpit unifié).
 - **Bug "Erreur est survenue" à l'exécution** : l'ingress Kubernetes coupe les requêtes > 60s. Le prompt #1 demandait 30 produits × 15 colonnes → output >5000 tokens → Anthropic/LiteLLM timeout > 60s → 502. **Fix** :
