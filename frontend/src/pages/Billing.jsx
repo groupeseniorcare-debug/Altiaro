@@ -14,6 +14,8 @@ import {
   Coins,
   Info,
   Trash,
+  Buildings,
+  PencilSimple,
 } from "@phosphor-icons/react";
 
 function formatEuro(v) {
@@ -26,21 +28,24 @@ export default function Billing() {
   const [iban, setIban] = useState(null);
   const [balance, setBalance] = useState(null);
   const [ledger, setLedger] = useState([]);
+  const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const isConcepteur = user?.role === "operator";
 
   const load = async () => {
-    const [c, i, b, l] = await Promise.all([
+    const [c, i, b, l, co] = await Promise.all([
       apiCall(() => api.get("/billing/card")),
       apiCall(() => api.get("/billing/iban")),
       apiCall(() => api.get("/billing/balance")),
       apiCall(() => api.get("/billing/ledger?limit=50")),
+      apiCall(() => api.get("/billing/company")),
     ]);
     if (c.data) setCard(c.data);
     if (i.data) setIban(i.data);
     if (b.data) setBalance(b.data);
     if (l.data) setLedger(l.data);
+    if (co.data) setCompany(co.data);
     setLoading(false);
   };
 
@@ -87,16 +92,28 @@ export default function Billing() {
       <div className="p-6 md:p-12 max-w-5xl">
         <div className="mb-8">
           <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-2">
-            Facturation · {isConcepteur ? "Concepteur" : "Admin"}
+            {isConcepteur ? "Mon compte" : "Facturation · Admin"}
           </div>
           <h1 className="font-heading text-4xl font-semibold text-[#1C1917]">
-            Mon compte & paiements
+            {isConcepteur ? "Compte" : "Mon compte & paiements"}
           </h1>
           <p className="text-[#57534E] mt-2 max-w-2xl">
-            Une CB pour que nous prélevions <strong>50% des dépenses pub</strong> chaque lundi quand
-            tes Ads tournent · Un RIB pour recevoir ta part <strong>le 1er et le 15</strong> de chaque mois.
+            {isConcepteur
+              ? "Infos société, carte bancaire pour les prélèvements Ads et IBAN pour recevoir tes versements."
+              : "Une CB pour que nous prélevions "}
+            {!isConcepteur && (
+              <>
+                <strong>50% des dépenses pub</strong> chaque lundi quand tes Ads tournent · Un RIB
+                pour recevoir ta part <strong>le 1er et le 15</strong> de chaque mois.
+              </>
+            )}
           </p>
         </div>
+
+        {/* Company section (Concepteur only) */}
+        {isConcepteur && (
+          <CompanySection company={company} onSaved={load} />
+        )}
 
         {/* Balance hero */}
         {balance && (
@@ -468,6 +485,269 @@ function LedgerRow({ entry }) {
           {cfg.prefix}{formatEuro(entry.amount)}
         </div>
       </div>
+    </div>
+  );
+}
+
+
+function CompanySection({ company, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState(() => ({
+    company_name: company?.company_name || "",
+    company_legal_form: company?.company_legal_form || "",
+    siret: company?.siret || "",
+    vat_number: company?.vat_number || "",
+    address_line1: company?.address_line1 || "",
+    address_line2: company?.address_line2 || "",
+    postal_code: company?.postal_code || "",
+    city: company?.city || "",
+    country_code: company?.country_code || "FR",
+    phone: company?.phone || "",
+  }));
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    if (!editing && company) {
+      setForm({
+        company_name: company.company_name || "",
+        company_legal_form: company.company_legal_form || "",
+        siret: company.siret || "",
+        vat_number: company.vat_number || "",
+        address_line1: company.address_line1 || "",
+        address_line2: company.address_line2 || "",
+        postal_code: company.postal_code || "",
+        city: company.city || "",
+        country_code: company.country_code || "FR",
+        phone: company.phone || "",
+      });
+    }
+  }, [company, editing]);
+
+  const isEmpty = !company?.company_name && !company?.siret && !company?.address_line1;
+
+  const save = async () => {
+    setSaving(true);
+    setErr("");
+    const { error } = await apiCall(() => api.patch("/billing/company", form));
+    setSaving(false);
+    if (error) {
+      setErr(error);
+      return;
+    }
+    setEditing(false);
+    onSaved?.();
+  };
+
+  return (
+    <section
+      className="bg-white rounded-2xl border border-[#E7E5E4] p-6 mb-6"
+      data-testid="company-section"
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Buildings size={18} weight="duotone" className="text-[#2563EB]" />
+          <h2 className="font-heading text-sm font-semibold uppercase tracking-wider">
+            Informations société
+          </h2>
+        </div>
+        {!editing && (
+          <button
+            onClick={() => setEditing(true)}
+            data-testid="company-edit"
+            className="h-8 px-3 rounded-full border border-[#E7E5E4] hover:bg-[#FAF7F2] text-xs font-medium flex items-center gap-1.5"
+          >
+            <PencilSimple size={12} /> Modifier
+          </button>
+        )}
+      </div>
+
+      {!editing ? (
+        isEmpty ? (
+          <div className="p-4 rounded-xl bg-[#FEF3C7] border border-[#FDE68A] text-[#92400E] text-sm flex items-start gap-2">
+            <Warning size={16} weight="fill" className="shrink-0 mt-0.5 text-[#D97706]" />
+            <div>
+              <strong>Société non renseignée.</strong> Ces infos apparaîtront sur tes factures
+              plateforme et tes mentions légales. Clique sur <em>Modifier</em>.
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <Field label="Dénomination" value={`${company.company_name || "—"}${company.company_legal_form ? ` (${company.company_legal_form})` : ""}`} />
+            <Field label="SIRET" value={company.siret || "—"} mono />
+            <Field label="TVA intracom." value={company.vat_number || "—"} mono />
+            <Field label="Téléphone" value={company.phone || "—"} />
+            <Field
+              label="Adresse"
+              value={
+                company.address_line1
+                  ? `${company.address_line1}${company.address_line2 ? ", " + company.address_line2 : ""}, ${company.postal_code} ${company.city}, ${company.country_code}`
+                  : "—"
+              }
+              wide
+            />
+          </div>
+        )
+      ) : (
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <FormField label="Dénomination" required>
+              <input
+                value={form.company_name}
+                onChange={(e) => setForm({ ...form, company_name: e.target.value })}
+                data-testid="company-name"
+                className="form-input"
+              />
+            </FormField>
+            <FormField label="Forme juridique">
+              <select
+                value={form.company_legal_form}
+                onChange={(e) => setForm({ ...form, company_legal_form: e.target.value })}
+                data-testid="company-legal-form"
+                className="form-input"
+              >
+                <option value="">—</option>
+                <option>SARL</option>
+                <option>SAS</option>
+                <option>SASU</option>
+                <option>EURL</option>
+                <option>EI</option>
+                <option>Micro-entreprise</option>
+                <option>SCI</option>
+                <option>SA</option>
+              </select>
+            </FormField>
+            <FormField label="Téléphone">
+              <input
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                data-testid="company-phone"
+                className="form-input"
+              />
+            </FormField>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <FormField label="SIRET (14 chiffres)">
+              <input
+                value={form.siret}
+                onChange={(e) => setForm({ ...form, siret: e.target.value })}
+                data-testid="company-siret"
+                className="form-input font-mono"
+                maxLength={17}
+              />
+            </FormField>
+            <FormField label="TVA intracommunautaire">
+              <input
+                value={form.vat_number}
+                onChange={(e) => setForm({ ...form, vat_number: e.target.value })}
+                placeholder="FR12345678901"
+                data-testid="company-vat"
+                className="form-input font-mono"
+              />
+            </FormField>
+          </div>
+          <FormField label="Adresse (ligne 1)">
+            <input
+              value={form.address_line1}
+              onChange={(e) => setForm({ ...form, address_line1: e.target.value })}
+              data-testid="company-addr1"
+              className="form-input"
+            />
+          </FormField>
+          <FormField label="Adresse (ligne 2, optionnelle)">
+            <input
+              value={form.address_line2}
+              onChange={(e) => setForm({ ...form, address_line2: e.target.value })}
+              data-testid="company-addr2"
+              className="form-input"
+            />
+          </FormField>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <FormField label="Code postal">
+              <input
+                value={form.postal_code}
+                onChange={(e) => setForm({ ...form, postal_code: e.target.value })}
+                data-testid="company-postal"
+                className="form-input"
+              />
+            </FormField>
+            <div className="md:col-span-2">
+              <FormField label="Ville">
+                <input
+                  value={form.city}
+                  onChange={(e) => setForm({ ...form, city: e.target.value })}
+                  data-testid="company-city"
+                  className="form-input"
+                />
+              </FormField>
+            </div>
+            <FormField label="Pays">
+              <select
+                value={form.country_code}
+                onChange={(e) => setForm({ ...form, country_code: e.target.value })}
+                data-testid="company-country"
+                className="form-input"
+              >
+                <option value="FR">🇫🇷 France</option>
+                <option value="BE">🇧🇪 Belgique</option>
+                <option value="CH">🇨🇭 Suisse</option>
+                <option value="LU">🇱🇺 Luxembourg</option>
+                <option value="DE">🇩🇪 Allemagne</option>
+                <option value="NL">🇳🇱 Pays-Bas</option>
+                <option value="ES">🇪🇸 Espagne</option>
+                <option value="IT">🇮🇹 Italie</option>
+                <option value="UK">🇬🇧 Royaume-Uni</option>
+              </select>
+            </FormField>
+          </div>
+
+          {err && (
+            <div className="p-2.5 rounded-lg bg-[#FFE4E6] text-[#BE123C] text-sm" data-testid="company-err">
+              {err}
+            </div>
+          )}
+          <div className="flex items-center gap-2 pt-2">
+            <button
+              onClick={save}
+              disabled={saving || !form.company_name}
+              data-testid="company-save"
+              className="h-10 px-4 rounded-full bg-[#1C1917] hover:bg-[#44403C] disabled:opacity-50 text-white text-sm font-medium flex items-center gap-2"
+            >
+              {saving ? <ArrowClockwise size={14} className="animate-spin" /> : <CheckCircle size={14} weight="bold" />}
+              Enregistrer
+            </button>
+            <button
+              onClick={() => setEditing(false)}
+              data-testid="company-cancel"
+              className="h-10 px-4 rounded-full border border-[#E7E5E4] hover:bg-[#FAF7F2] text-sm font-medium"
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
+      <style>{`.form-input { height:40px; padding:0 12px; border-radius:8px; border:1px solid #E7E5E4; background:white; font-size:14px; width:100%; outline:none; } .form-input:focus { border-color:#2563EB; box-shadow: 0 0 0 2px #2563EB22; }`}</style>
+    </section>
+  );
+}
+
+function Field({ label, value, mono = false, wide = false }) {
+  return (
+    <div className={wide ? "md:col-span-2" : ""}>
+      <div className="text-[11px] uppercase tracking-widest text-[#78716C] mb-1">{label}</div>
+      <div className={`text-[#1C1917] ${mono ? "font-mono text-sm" : ""}`}>{value}</div>
+    </div>
+  );
+}
+
+function FormField({ label, required, children }) {
+  return (
+    <div>
+      <label className="block text-[11px] uppercase tracking-widest text-[#78716C] font-medium mb-1">
+        {label}
+        {required && <span className="text-[#BE123C] ml-1">*</span>}
+      </label>
+      {children}
     </div>
   );
 }

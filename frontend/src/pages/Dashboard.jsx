@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, apiCall } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import ConcepteurDashboard from "./ConcepteurDashboard";
 import Layout from "../components/Layout";
 import {
   CurrencyEur,
@@ -38,6 +39,15 @@ function StatCard({ label, value, sub, icon: Icon, delay = 0, testId }) {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  // Route concepteurs to the dedicated dashboard with their KPIs/ledger/next events.
+  if (user && user.role !== "admin") {
+    return <ConcepteurDashboard />;
+  }
+  return <AdminDashboard />;
+}
+
+function AdminDashboard() {
   const [kpis, setKpis] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();

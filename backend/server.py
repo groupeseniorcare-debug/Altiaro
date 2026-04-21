@@ -51,6 +51,7 @@ from routes import opportunity as opportunity_routes
 from routes import emails as emails_routes
 from routes import domains as domains_routes
 from routes import quick_scan as quick_scan_routes
+from routes import concepteur_cockpit as concepteur_cockpit_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -88,6 +89,7 @@ api.include_router(opportunity_routes.router)
 api.include_router(emails_routes.router)
 api.include_router(domains_routes.router)
 api.include_router(quick_scan_routes.router)
+api.include_router(concepteur_cockpit_routes.router)
 api.include_router(niches_routes.router)
 api.include_router(dashboard_routes.router)
 api.include_router(meta_routes.router)

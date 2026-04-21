@@ -78,6 +78,9 @@ Les 50 étapes du playbook sont regroupées en 4 blocs :
 | 42 | **Scan multi-marché parallèle** (6 pays UE : FR/DE/BE/NL/CH/IT) + page "Lancer un site" qui fusionne scan + sélection marchés + création via `/sites/new` | ✅ |
 | 43 | **Seuil concurrence 66 → 75** + règle soft "GO avec réserve" quand concurrence > 75 mais autres critères OK | ✅ |
 | 44 | **Menu Concepteur restructuré** : Dashboard / Sites / Lancer un site / Finance / Compte | ✅ |
+| 45 | **Dashboard Concepteur v2** — KPIs globaux (CA, commandes, part Concepteur reçue, retours) + next events (prochain versement Mollie / prochain prélèvement Ads) + setup banner (CB + IBAN manquants) + liste sites + empty state | ✅ |
+| 46 | **Finance v2** — ledger unifié (crédits/débits/versements) avec filtres site/type/période + presets rapides (7/30/90j/année) + totaux par flux | ✅ |
+| 47 | **Compte v2** — édition infos société (SIRET, TVA, adresse, forme juridique, téléphone) avec validation SIRET 14 chiffres + persistance sur `billing_profiles` | ✅ |
 
 ## Règles critiques
 - Pas de Shopify — tout custom React/FastAPI.

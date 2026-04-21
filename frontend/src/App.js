@@ -7,7 +7,7 @@ import Sites from "./pages/Sites";
 import NewSite from "./pages/NewSite";
 import SiteDetail from "./pages/SiteDetail";
 import Validations from "./pages/Validations";
-import Finances from "./pages/Finances";
+import Finances from "./pages/Finance";
 import Users from "./pages/Users";
 import NicheEngine from "./pages/Analyzer";
 import NicheAnalysisDetail from "./pages/NicheAnalysisDetail";
