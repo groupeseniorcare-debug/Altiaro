@@ -232,7 +232,7 @@ export default function SiteDetail() {
 
   return (
     <Layout>
-      <div className="p-8 md:p-12 max-w-[1400px]">
+      <div className="p-8 md:p-12 max-w-[1600px] mx-auto w-full">
         <button
           onClick={() => navigate("/sites")}
           className="flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900 mb-6 transition"
@@ -290,47 +290,16 @@ export default function SiteDetail() {
                   <Package size={16} weight="bold" /> Gérer les produits
                 </button>
                 <button
-                  onClick={() => navigate(`/sites/${id}/design`)}
-                  data-testid="nav-design"
-                  className="h-10 px-4 rounded-xl text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
-                  style={{ background: "linear-gradient(135deg, #B84B31 0%, #DC2626 100%)" }}
-                >
-                  <Sparkle size={16} weight="fill" /> Design IA
-                </button>
-                <button
-                  onClick={() => navigate(`/sites/${id}/studio`)}
-                  data-testid="nav-studio"
-                  className="h-10 px-4 rounded-xl text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
-                  style={{ background: "linear-gradient(135deg, #7C3AED 0%, #4285F4 100%)" }}
-                >
-                  <Sparkle size={16} weight="fill" /> Prompt Studio
-                </button>
-                <button
-                  onClick={() => navigate(`/sites/${id}/wizard`)}
-                  data-testid="nav-wizard"
-                  className="h-10 px-4 rounded-xl text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
-                  style={{ background: "linear-gradient(135deg, #7C3AED 0%, #2563EB 100%)" }}
-                >
-                  <Rocket size={16} weight="fill" /> Wizard 10 étapes
-                </button>
-                <button
-                  onClick={() => navigate(`/sites/${id}/domains`)}
-                  data-testid="nav-domains"
-                  className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-[#2563EB] text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
-                >
-                  <Globe size={16} weight="duotone" /> Domaine
-                </button>
-                <button
                   onClick={() => navigate(`/sites/${id}/sourcing`)}
                   data-testid="nav-sourcing"
-                  className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-[#F97316] text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
+                  className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
                 >
-                  <Package size={16} weight="duotone" /> Sourcing CJ/AE
+                  <Package size={16} weight="duotone" /> Sourcing
                 </button>
                 <button
                   onClick={() => navigate(`/sites/${id}/ads-copy`)}
                   data-testid="ads-copy-link"
-                  className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-[#B84B31] text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
+                  className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
                 >
                   <Megaphone size={16} weight="duotone" /> Google Ads Copy
                 </button>
@@ -339,14 +308,14 @@ export default function SiteDetail() {
                   target="_blank"
                   rel="noreferrer"
                   data-testid="view-storefront"
-                  className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-[#B84B31] text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
+                  className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
                 >
                   <Eye size={16} /> Voir la boutique
                 </a>
                 <button
                   onClick={() => setShowDomain(true)}
                   data-testid="manage-domain"
-                  className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-[#B84B31] text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
+                  className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
                 >
                   <Globe size={16} weight="duotone" />
                   Domaine
@@ -362,16 +331,16 @@ export default function SiteDetail() {
                     setShowDuplicate(true);
                   }}
                   data-testid="duplicate-site"
-                  className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-[#B84B31] text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
+                  className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
                 >
                   <Copy size={16} /> Dupliquer
                 </button>
                 <button
                   onClick={() => setShowScale(true)}
                   data-testid="scale-site"
-                  className="h-10 px-4 rounded-xl bg-gradient-to-r from-[#B84B31] to-[#D97706] hover:from-[#993D26] hover:to-[#B45309] text-neutral-900 text-sm font-medium flex items-center gap-2 transition active:scale-[0.98]"
+                  className="h-10 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium flex items-center gap-2 transition active:scale-[0.98]"
                 >
-                  <Rocket size={16} weight="fill" /> Scaler 6 pays
+                  <Rocket size={16} weight="fill" /> Scaler sur plusieurs pays
                 </button>
               </div>
             </div>
@@ -399,45 +368,20 @@ export default function SiteDetail() {
             const blockPct = blockStepsFlat.length
               ? Math.round((blockValidated / blockStepsFlat.length) * 100)
               : 0;
+            const totalBlocks = sortedBlocks.length;
             return (
               <div key={block.id} data-testid={`block-${block.id}`}>
                 <div className="flex items-center gap-4 mb-5 pb-3 border-b border-neutral-200">
                   <div className="text-3xl">{block.emoji}</div>
                   <div className="flex-1">
                     <div className="text-[11px] uppercase tracking-widest text-neutral-500">
-                      Bloc {block.order} / 4
+                      Bloc {block.order} / {totalBlocks}
                     </div>
                     <h2 className="text-xl font-semibold text-neutral-900">
                       {block.name}
                     </h2>
                   </div>
                   <div className="flex items-center gap-3">
-                    {blockOutputs[block.id] && (
-                      <button
-                        onClick={() => setViewingBlockOutput(blockOutputs[block.id])}
-                        data-testid={`view-block-output-${block.id}`}
-                        className="h-9 px-3 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-medium hover:bg-[#A7F3D0] transition flex items-center gap-1.5"
-                      >
-                        <CheckCircle size={12} weight="fill" /> Livrable IA prêt
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleExecuteBlock(block.id)}
-                      disabled={executingBlock === block.id}
-                      data-testid={`execute-block-${block.id}`}
-                      className="h-9 px-3 rounded-lg bg-neutral-900 hover:bg-neutral-800 disabled:opacity-60 text-white text-xs font-medium flex items-center gap-1.5 transition"
-                    >
-                      {executingBlock === block.id ? (
-                        <>
-                          <ArrowClockwise size={12} className="animate-spin" /> Génération…
-                        </>
-                      ) : (
-                        <>
-                          <Sparkle size={12} weight="fill" />
-                          {blockOutputs[block.id] ? "Régénérer" : "Générer le bloc en IA"}
-                        </>
-                      )}
-                    </button>
                     <div className="text-right pl-3 border-l border-neutral-200">
                       <div className="text-lg font-semibold text-neutral-900">
                         {blockPct}%
@@ -447,7 +391,7 @@ export default function SiteDetail() {
                       </div>
                       <div className="w-32 h-1.5 bg-neutral-200 rounded-full overflow-hidden mt-1.5">
                         <div
-                          className="h-full bg-white rounded-full transition-all duration-500"
+                          className="h-full bg-neutral-900 rounded-full transition-all duration-500"
                           style={{ width: `${blockPct}%` }}
                         />
                       </div>

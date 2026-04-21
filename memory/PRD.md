@@ -24,10 +24,16 @@ SaaS multi-tenant d'e-commerce 100% custom (pas de Shopify) dédié à la **Silv
 - **Structure backend** : `server.py` (~140 lignes orchestrateur) + `deps.py` + `seed_prompts.py` + `routes/{auth,users,sites,steps,products,orders,public_shop,niches,dashboard,meta,uploads,search,analyzer,ads_copy,duplicate,domain,scale,empire,blocks_execute,copilot}.py`
 - **Data scope strict** : tout est scoped par `site_id` et filtré par `operator_id` côté Concepteur.
 
-## Blocks logiques (depuis sprint 7)
-Les 50 étapes du playbook sont regroupées en 4 blocs :
-1. 🏗️ **Template & Boutique** — Shopify backend, Front React, Juridique, Paiement, SAV, Logistique
-2. 📦 **Produits & Sourcing** — Étude marché, Sourcing fournisseurs
+## Blocks logiques (depuis avril 2026 — refonte Altiaro)
+Les 50 étapes du playbook sont regroupées en **8 blocs thématiques ordonnés** :
+1. 📦 **Produits & Sourcing** (#1-4) — Matrice, rentabilité Ads, concurrentiel, feuille de route
+2. 🎨 **Marque & Identité** (#5-7) — Nom de marque + domaine (c'est ICI que le Concepteur nomme son site), brand book, voix
+3. 🏗️ **Fondations boutique** (#8-16) — Sourcing fournisseurs, juridique, config Shopify, import catalogue 20 produits
+4. 🖥️ **Construction du front** (#17-24) — Template Altiaro appliqué : homepage, collection, fiche produit, checkout Mollie, pages statiques
+5. 🔍 **SEO & Contenu** (#25-32) — Keyword research, 15 piliers + 30 satellites, schemas, netlinking, AEO
+6. 🎯 **Conversion & CRM** (#33-39) — CRO, social proof, Klaviyo, paiement, chatbot, helpdesk, téléphonie
+7. 🚚 **Opérations & SAV** (#40-42) — Logistique drop, tracking, portail retours
+8. 🚀 **Acquisition & Scale** (#43-50) — Google Ads 30€/j, 100 headlines, 5 LP, GA4+CAPI, monitoring SEO, duplication, SOPs
 3. 🔍 **SEO & Marque** — Positionnement/voix, SEO technique, AEO/GEO
 4. 🚀 **Marketing & Scale** — Ads, Social proof, Analytics, Duplication
 

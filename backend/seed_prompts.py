@@ -31,51 +31,75 @@ PHASES = {
 }
 
 
-# ---------- 4 logical blocks ------------------------------------ #
+# ---------- 8 blocs du parcours Concepteur ----------------------- #
 BLOCKS = {
-    "template": {
+    "produits": {
         "order": 1,
-        "name": "Template & Boutique",
-        "emoji": "🏗️",
-        "description": "Monter la boutique : back-office, front React, paiement, logistique, SAV, juridique.",
-    },
-    "products": {
-        "order": 2,
         "name": "Produits & Sourcing",
         "emoji": "📦",
-        "description": "Choisir et sourcer les produits gagnants : matrice, fournisseurs, échantillons.",
+        "description": "Identifier les 20 produits gagnants : matrice 30 candidats, rentabilité Ads, concurrentiel, feuille de route catalogue.",
+    },
+    "marque": {
+        "order": 2,
+        "name": "Marque & Identité",
+        "emoji": "🎨",
+        "description": "Nommer la marque, construire l'identité visuelle, définir la voix. Le Concepteur nomme son site ici.",
+    },
+    "fondations": {
+        "order": 3,
+        "name": "Fondations boutique",
+        "emoji": "🏗️",
+        "description": "Cadre légal, backend Shopify, sourcing fournisseurs, import catalogue 20 produits — les fondations avant le front.",
+    },
+    "front": {
+        "order": 4,
+        "name": "Construction du front",
+        "emoji": "🖥️",
+        "description": "Template Altiaro appliqué : homepage, collection, fiche produit, checkout Mollie, pages légales, blog.",
     },
     "seo": {
-        "order": 3,
-        "name": "SEO & Marque",
+        "order": 5,
+        "name": "SEO & Contenu",
         "emoji": "🔍",
-        "description": "Construire la marque et la visibilité organique : positionnement, contenu, SEO technique, AEO.",
+        "description": "Visibilité organique : keyword research, 15 piliers, 30 satellites, schemas JSON-LD, netlinking, AEO.",
     },
-    "marketing": {
-        "order": 4,
-        "name": "Marketing & Scale",
+    "conversion": {
+        "order": 6,
+        "name": "Conversion & CRM",
+        "emoji": "🎯",
+        "description": "CRO, social proof, Klaviyo 7 flows, paiement optimisé, chatbot, helpdesk, téléphonie.",
+    },
+    "operations": {
+        "order": 7,
+        "name": "Opérations & SAV",
+        "emoji": "🚚",
+        "description": "Logistique drop, tracking client, portail retours — ce qui fait tourner une fois les commandes arrivent.",
+    },
+    "scale": {
+        "order": 8,
+        "name": "Acquisition & Scale",
         "emoji": "🚀",
-        "description": "Acquisition payante, conversion, analytics, duplication cross-pays.",
+        "description": "Google Ads 30€/j, landing pages, GA4+CAPI, monitoring SEO, duplication multi-niches, SOPs.",
     },
 }
 
 # Which block does each phase belong to ?
 PHASE_TO_BLOCK = {
-    "A": "products",   # Étude marché
-    "C": "products",   # Sourcing
-    "B": "seo",        # Marque/voix
-    "G": "seo",        # SEO technique
-    "H": "seo",        # AEO/GEO
-    "D": "template",   # Juridique
-    "E": "template",   # Shopify backend
-    "F": "template",   # Front React
-    "J": "template",   # Paiement
-    "K": "template",   # Service client
-    "L": "template",   # Logistique
-    "I": "marketing",  # Conversion & social proof
-    "M": "marketing",  # Google Ads
-    "N": "marketing",  # Analytics
-    "O": "marketing",  # Duplication
+    "A": "produits",     # Étude marché & produits
+    "B": "marque",       # Marque, positionnement, voix
+    "C": "fondations",   # Sourcing fournisseurs
+    "D": "fondations",   # Cadre juridique
+    "E": "fondations",   # Shopify backend (inclut import catalogue)
+    "F": "front",        # Front React headless + pages
+    "G": "seo",          # SEO technique
+    "H": "seo",          # AEO/GEO
+    "I": "conversion",   # CRO + social proof + Klaviyo
+    "J": "conversion",   # Paiement
+    "K": "conversion",   # Service client (chatbot, helpdesk, tel)
+    "L": "operations",   # Logistique, tracking, retours
+    "M": "scale",        # Google Ads
+    "N": "scale",        # Analytics
+    "O": "scale",        # Duplication, SOPs
 }
 
 

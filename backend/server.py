@@ -138,25 +138,34 @@ async def startup():
     except Exception:
         logger.exception("Failed to seed niches catalog")
 
-    # Backfill block info on existing steps (idempotent migration)
+    # Migrate existing steps to the current BLOCKS / PHASE_TO_BLOCK mapping.
+    # Force re-apply so the 4→8 block reorganization updates existing sites.
     try:
-        missing_block = await db.steps.count_documents({"block": {"$exists": False}})
-        if missing_block > 0:
-            logger.info(f"Backfilling block info on {missing_block} steps...")
-            for phase_code, block_id in PHASE_TO_BLOCK.items():
-                meta = BLOCKS[block_id]
-                await db.steps.update_many(
-                    {"phase": phase_code, "block": {"$exists": False}},
-                    {"$set": {
-                        "block": block_id,
-                        "block_name": meta["name"],
-                        "block_order": meta["order"],
-                        "block_emoji": meta["emoji"],
-                    }},
-                )
-            logger.info("Block backfill complete.")
+        # Detect mismatches : any step whose block doesn't match the current mapping
+        valid_block_ids = set(BLOCKS.keys())
+        needs_migration = await db.steps.count_documents({
+            "$or": [
+                {"block": {"$exists": False}},
+                {"block": {"$nin": list(valid_block_ids)}},
+            ]
+        })
+        if needs_migration > 0:
+            logger.info(f"Re-mapping {needs_migration} steps to new 8-block structure...")
+        # Always re-apply (idempotent) — cheap and ensures consistency with seed_prompts
+        for phase_code, block_id in PHASE_TO_BLOCK.items():
+            meta = BLOCKS[block_id]
+            await db.steps.update_many(
+                {"phase": phase_code},
+                {"$set": {
+                    "block": block_id,
+                    "block_name": meta["name"],
+                    "block_order": meta["order"],
+                    "block_emoji": meta["emoji"],
+                }},
+            )
+        logger.info("Block mapping synchronized.")
     except Exception:
-        logger.exception("Failed block backfill migration")
+        logger.exception("Failed block migration")
 
     # Seed admin user
     existing = await db.users.find_one({"email": ADMIN_EMAIL})

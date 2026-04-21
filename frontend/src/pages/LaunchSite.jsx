@@ -35,7 +35,6 @@ const fmtNum = (n) =>
 export default function LaunchSite() {
   const navigate = useNavigate();
   const [product, setProduct] = useState("");
-  const [siteName, setSiteName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [scan, setScan] = useState(null);
@@ -117,9 +116,11 @@ export default function LaunchSite() {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "")
       .slice(0, 40);
+    const niche = product.trim();
+    const placeholderName = `Projet ${niche.charAt(0).toUpperCase()}${niche.slice(1)}`;
     const payload = {
-      name: (siteName || product).trim(),
-      niche: product.trim(),
+      name: placeholderName,
+      niche,
       niche_slug: slug,
       selected_countries: selectedCountries,
       notes: `Lancé depuis scan multi-marché · ${selectedCountries.join(", ")} · scan #${scan?.group_id || ""}`,
@@ -135,7 +136,7 @@ export default function LaunchSite() {
 
   return (
     <Layout>
-      <div className="p-8 md:p-10 max-w-[1200px]">
+      <div className="p-8 md:p-10 max-w-[1400px] mx-auto w-full">
         <div className="mb-8">
           <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-500 font-medium mb-1.5">
             Lancer un site
@@ -275,14 +276,9 @@ export default function LaunchSite() {
             <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-700 font-medium mb-2">
               03 · Lance ton site
             </div>
-            <input
-              type="text"
-              value={siteName}
-              onChange={(e) => setSiteName(e.target.value)}
-              placeholder={`Nom du site (par défaut : ${product})`}
-              data-testid="launch-site-name"
-              className="w-full h-10 px-3 rounded-md border border-neutral-200 bg-white text-neutral-900 text-sm placeholder:text-neutral-400 focus:outline-none focus:border-neutral-300 focus:ring-1 focus:ring-zinc-400 mb-3"
-            />
+            <div className="text-sm text-neutral-600 mb-3">
+              Ton site sera créé avec le nom provisoire <span className="font-mono text-neutral-900">« Projet {product.trim()} »</span>. Tu le nommeras définitivement à l'étape <strong>#5 — Génération nom de marque + domaine</strong> dans le cockpit.
+            </div>
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="text-xs text-neutral-500">
                 {selectedCountries.length === 0 ? (

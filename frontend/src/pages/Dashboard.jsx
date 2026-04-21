@@ -64,7 +64,7 @@ function AdminDashboard() {
 
   return (
     <Layout>
-      <div className="p-8 md:p-12 max-w-[1400px]">
+      <div className="p-8 md:p-12 max-w-[1600px] mx-auto w-full">
         <div className="flex items-start justify-between mb-10 animate-fade-up">
           <div>
             <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-2">Overview</div>

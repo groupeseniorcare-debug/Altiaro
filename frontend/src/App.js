@@ -17,10 +17,7 @@ import Empire from "./pages/Empire";
 import Billing from "./pages/Billing";
 import Orders from "./pages/Orders";
 import AdminPayouts from "./pages/AdminPayouts";
-import SiteDesign from "./pages/SiteDesign";
 import Sourcing from "./pages/Sourcing";
-import Wizard from "./pages/Wizard";
-import PromptStudio from "./pages/PromptStudio";
 import Domains from "./pages/Domains";
 import GoogleAds from "./pages/GoogleAds";
 import Opportunities from "./pages/Opportunities";
@@ -156,34 +153,10 @@ function App() {
             }
           />
           <Route
-            path="/sites/:id/design"
-            element={
-              <ProtectedRoute>
-                <SiteDesign />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/sites/:id/sourcing"
             element={
               <ProtectedRoute>
                 <Sourcing />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/sites/:id/wizard"
-            element={
-              <ProtectedRoute>
-                <Wizard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/sites/:id/studio"
-            element={
-              <ProtectedRoute>
-                <PromptStudio />
               </ProtectedRoute>
             }
           />
