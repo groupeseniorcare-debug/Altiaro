@@ -5,9 +5,22 @@ import { LANGUAGES, t } from "../lib/i18n";
 import { readCart, cartTotals } from "../lib/cart";
 import { getCustomer } from "../lib/customerAuth";
 import CartDrawer from "./CartDrawer";
-import { ShoppingBag, Phone, ShieldCheck, Truck, MagnifyingGlass, User } from "@phosphor-icons/react";
+import {
+  ShoppingBag, Phone, ShieldCheck, Truck, MagnifyingGlass, User,
+  List, X, FacebookLogo, InstagramLogo, YoutubeLogo, LinkedinLogo,
+  CreditCard, EnvelopeSimple, MapPin, CaretRight,
+} from "@phosphor-icons/react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+
+/* ------- Nav items (pages naturelles du template) ------- */
+const navItems = (shopRoot) => [
+  { label: "Boutique", href: `${shopRoot}` },
+  { label: "Collections", href: `${shopRoot}#collections` },
+  { label: "Journal", href: `${shopRoot}/blog` },
+  { label: "À propos", href: `${shopRoot}/about` },
+  { label: "Contact", href: `${shopRoot}/contact` },
+];
 
 export default function StorefrontLayout({ children, lang, setLang, site, design }) {
   const { siteId } = useParams();
@@ -15,6 +28,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
   const [cartCount, setCartCount] = useState(0);
   const [customer, setCustomer] = useState(() => (siteId ? getCustomer(siteId) : null));
   const [searchQ, setSearchQ] = useState("");
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     const update = () => setCartCount(cartTotals(readCart(siteId)).itemsCount);
@@ -44,9 +58,14 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
     ? brandTaglineRaw
     : (brandTaglineRaw?.[lang] || brandTaglineRaw?.fr || site?.niche_data?.tagline);
 
-  const footer = design?.footer;
-  const footerTagline = (footer?.tagline?.[lang]) || (footer?.tagline?.fr);
-  const footerCols = footer?.columns || [];
+  const footerTagline = design?.footer?.tagline?.[lang] || design?.footer?.tagline?.fr
+    || "Des produits pensés pour bien vieillir chez soi, avec dignité.";
+  const contact = design?.contact || {};
+  const contactEmail = contact.email || "bonjour@boutique.fr";
+  const contactPhone = contact.phone || "01 23 45 67 89";
+  const contactHours = contact.hours || "Lun–Ven · 9h–18h";
+  const contactAddress = contact.address || "";
+  const social = design?.social || {};
 
   const cssVars = {
     "--cf-primary": primary,
@@ -57,8 +76,18 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
     "--cf-font-body": `"${fontBody}", system-ui, sans-serif`,
   };
 
-  // Google Fonts link for the chosen fonts (loaded once per page)
-  const fontsQuery = encodeURIComponent(`${fontHeading}:wght@400;500;600;700|${fontBody}:wght@400;500;600`);
+  const fontsQuery = encodeURIComponent(
+    `${fontHeading}:wght@400;500;600;700|${fontBody}:wght@400;500;600`
+  );
+
+  const nav = navItems(shopRoot);
+  const onSearch = (e) => {
+    e.preventDefault();
+    if (searchQ.trim().length >= 2) {
+      navigate(`${shopRoot}/search?q=${encodeURIComponent(searchQ)}`);
+      setMobileOpen(false);
+    }
+  };
 
   return (
     <div
@@ -67,9 +96,10 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
       data-testid="storefront-layout"
     >
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${fontsQuery}&display=swap`} />
-      {/* Trust bar */}
-      <div className="text-neutral-900 text-[13px]" style={{ background: textCol }}>
-        <div className="max-w-6xl mx-auto px-6 py-2 flex items-center justify-between flex-wrap gap-2">
+
+      {/* ================= TRUST BAR ================= */}
+      <div className="text-white text-[12.5px]" style={{ background: textCol }}>
+        <div className="max-w-7xl mx-auto px-6 py-2 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-5">
             <span className="flex items-center gap-1.5">
               <Truck size={14} weight="bold" /> {t(lang, "free_shipping_above")}
@@ -85,7 +115,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
             value={lang}
             onChange={(e) => setLang(e.target.value)}
             data-testid="lang-switcher"
-            className="bg-transparent border border-neutral-900/20 rounded px-2 py-0.5 text-[12px] hover:bg-neutral-900/10 cursor-pointer outline-none"
+            className="bg-transparent border border-white/25 rounded px-2 py-0.5 text-[12px] hover:bg-white/10 cursor-pointer outline-none"
           >
             {LANGUAGES.map((l) => (
               <option key={l.code} value={l.code} style={{ color: textCol }}>
@@ -96,10 +126,11 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
         </div>
       </div>
 
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-10" style={{ borderColor: "#E7E5E4" }}>
-        <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
-          <Link to={shopRoot} className="group flex items-center gap-3" data-testid="shop-logo">
+      {/* ================= HEADER ================= */}
+      <header className="bg-white/95 backdrop-blur border-b sticky top-0 z-30" style={{ borderColor: "#E7E5E4" }}>
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-6">
+          {/* LEFT — Logo */}
+          <Link to={shopRoot} className="group flex items-center gap-3 shrink-0" data-testid="shop-logo">
             {logoUrl && (
               <img
                 src={logoUrl}
@@ -110,23 +141,37 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
             )}
             <div>
               <div
-                className="font-semibold text-2xl leading-tight transition"
+                className="font-semibold text-xl md:text-2xl leading-tight transition"
                 style={{ fontFamily: `"${fontHeading}", serif`, color: textCol }}
               >
                 <span className="group-hover:text-[var(--cf-primary)]">{logoText}</span>
               </div>
               {tagline && (
-                <div className="text-xs mt-0.5 hidden md:block" style={{ color: "#78716C" }}>
+                <div className="text-[11px] mt-0.5 hidden md:block" style={{ color: "#78716C" }}>
                   {tagline}
                 </div>
               )}
             </div>
           </Link>
 
+          {/* CENTER — Nav desktop */}
+          <nav className="hidden lg:flex items-center gap-8" data-testid="header-nav">
+            {nav.map((n) => (
+              <Link
+                key={n.label}
+                to={n.href}
+                data-testid={`nav-${n.label.toLowerCase()}`}
+                className="text-[14px] font-medium relative transition hover:opacity-70"
+                style={{ color: textCol }}
+              >
+                {n.label}
+              </Link>
+            ))}
+          </nav>
+
+          {/* RIGHT — Actions */}
           <div className="flex items-center gap-2">
-            {/* Search */}
-            <form onSubmit={(e) => { e.preventDefault(); if (searchQ.trim().length >= 2) navigate(`${shopRoot}/search?q=${encodeURIComponent(searchQ)}`); }}
-              className="hidden md:flex relative">
+            <form onSubmit={onSearch} className="hidden xl:flex relative">
               <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#78716C" }} />
               <input
                 value={searchQ}
@@ -137,7 +182,18 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
                 style={{ borderColor: "#E7E5E4", background: "#fff", color: textCol }}
               />
             </form>
-            {/* Account */}
+            {/* Search icon only (smaller screens) */}
+            <button
+              type="button"
+              onClick={() => navigate(`${shopRoot}/search`)}
+              className="xl:hidden w-11 h-11 rounded-full border flex items-center justify-center hover:bg-neutral-50"
+              style={{ borderColor: "#E7E5E4" }}
+              data-testid="header-search-icon"
+              aria-label="Rechercher"
+            >
+              <MagnifyingGlass size={18} style={{ color: textCol }} />
+            </button>
+
             <Link
               to={customer ? `${shopRoot}/account` : `${shopRoot}/account/login`}
               data-testid="header-account"
@@ -150,15 +206,18 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
                 {customer ? (customer.first_name || "Mon compte") : "Se connecter"}
               </span>
             </Link>
+
             <button
               type="button"
               onClick={() => window.dispatchEvent(new Event("cf_cart_open"))}
               data-testid="cart-button"
-              className="relative flex items-center gap-2 h-11 px-4 rounded-full border transition group"
+              className="relative flex items-center gap-2 h-11 px-4 rounded-full border transition"
               style={{ background: accent, borderColor: "#E7E5E4" }}
             >
               <ShoppingBag size={20} weight="regular" style={{ color: textCol }} />
-              <span className="text-sm font-medium" style={{ color: textCol }}>{t(lang, "cart")}</span>
+              <span className="text-sm font-medium hidden sm:inline" style={{ color: textCol }}>
+                {t(lang, "cart")}
+              </span>
               {cartCount > 0 && (
                 <span
                   data-testid="cart-count"
@@ -169,68 +228,233 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
                 </span>
               )}
             </button>
+
+            {/* Mobile menu toggle */}
+            <button
+              type="button"
+              onClick={() => setMobileOpen(true)}
+              className="lg:hidden w-11 h-11 rounded-full border flex items-center justify-center"
+              style={{ borderColor: "#E7E5E4" }}
+              data-testid="mobile-menu-open"
+              aria-label="Menu"
+            >
+              <List size={20} style={{ color: textCol }} />
+            </button>
           </div>
         </div>
       </header>
 
+      {/* ================= MOBILE MENU ================= */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden" data-testid="mobile-menu">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
+          <div className="absolute top-0 right-0 w-[86%] max-w-sm h-full bg-white shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: "#E7E5E4" }}>
+              <div className="font-semibold text-lg" style={{ fontFamily: `"${fontHeading}", serif`, color: textCol }}>
+                {logoText}
+              </div>
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="w-10 h-10 rounded-full hover:bg-neutral-50 flex items-center justify-center"
+                data-testid="mobile-menu-close"
+                aria-label="Fermer"
+              >
+                <X size={20} style={{ color: textCol }} />
+              </button>
+            </div>
+            <form onSubmit={onSearch} className="p-5 border-b" style={{ borderColor: "#E7E5E4" }}>
+              <div className="relative">
+                <MagnifyingGlass size={16} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: "#78716C" }} />
+                <input
+                  value={searchQ}
+                  onChange={(e) => setSearchQ(e.target.value)}
+                  placeholder="Rechercher un produit…"
+                  className="h-12 w-full pl-11 pr-4 rounded-full border text-sm focus:outline-none"
+                  style={{ borderColor: "#E7E5E4" }}
+                  data-testid="mobile-search"
+                />
+              </div>
+            </form>
+            <nav className="flex-1 overflow-y-auto py-2">
+              {nav.map((n) => (
+                <Link
+                  key={n.label}
+                  to={n.href}
+                  onClick={() => setMobileOpen(false)}
+                  data-testid={`mobile-nav-${n.label.toLowerCase()}`}
+                  className="flex items-center justify-between px-6 py-4 text-base font-medium border-b transition hover:bg-neutral-50"
+                  style={{ color: textCol, borderColor: "#F5F2EB" }}
+                >
+                  {n.label}
+                  <CaretRight size={16} style={{ color: "#A8A29E" }} />
+                </Link>
+              ))}
+            </nav>
+            <div className="p-5 border-t text-sm flex flex-col gap-2" style={{ borderColor: "#E7E5E4", color: "#57534E" }}>
+              <a href={`mailto:${contactEmail}`} className="flex items-center gap-2 hover:opacity-70">
+                <EnvelopeSimple size={16} /> {contactEmail}
+              </a>
+              <a href={`tel:${contactPhone.replace(/\s/g, "")}`} className="flex items-center gap-2 hover:opacity-70">
+                <Phone size={16} /> {contactPhone}
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MAIN ================= */}
       <main className="flex-1">{children}</main>
 
       <CartDrawer design={design} />
 
-      <footer className="border-t bg-white mt-20" style={{ borderColor: "#E7E5E4" }}>
-        <div className="max-w-6xl mx-auto px-6 py-10 grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div className="md:col-span-1">
+      {/* ================= FOOTER ================= */}
+      <footer className="mt-24" style={{ background: "#1C1917", color: "#D6D3D1" }} data-testid="storefront-footer">
+        {/* Reassurance band */}
+        <div className="border-b" style={{ borderColor: "#2A2725" }}>
+          <div className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+            {[
+              { Icon: Truck, title: "Livraison offerte", sub: "Partout en Europe" },
+              { Icon: ShieldCheck, title: "Paiement sécurisé", sub: "CB, PayPal, Virement" },
+              { Icon: Phone, title: "Conseiller humain", sub: "Lun–Ven · 9h–18h" },
+              { Icon: CreditCard, title: "Retour 14 jours", sub: "Satisfait ou remboursé" },
+            ].map((b, i) => (
+              <div key={i} className="flex flex-col items-center gap-2" data-testid={`footer-reassurance-${i}`}>
+                <b.Icon size={24} weight="duotone" style={{ color: primary }} />
+                <div className="text-sm font-semibold text-white">{b.title}</div>
+                <div className="text-xs text-neutral-400">{b.sub}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Main footer columns */}
+        <div className="max-w-7xl mx-auto px-6 py-14 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8">
+          <div className="col-span-2">
             <div
-              className="font-semibold text-xl mb-1"
-              style={{ fontFamily: `"${fontHeading}", serif`, color: textCol }}
+              className="text-2xl font-semibold text-white mb-3"
+              style={{ fontFamily: `"${fontHeading}", serif` }}
             >
               {logoText}
             </div>
-            {footerTagline && (
-              <p className="text-sm mt-1" style={{ color: "#78716C" }}>
-                {footerTagline}
-              </p>
-            )}
-          </div>
-          {footerCols.slice(0, 3).map((col, idx) => {
-            const colTitle = col?.title?.[lang] || col?.title?.fr || "";
-            return (
-              <div key={idx}>
-                <div className="text-[11px] uppercase tracking-widest mb-3" style={{ color: "#78716C" }}>
-                  {colTitle}
+            <p className="text-sm leading-relaxed mb-5 max-w-sm">{footerTagline}</p>
+
+            <div className="space-y-2 text-sm">
+              <a href={`mailto:${contactEmail}`} className="flex items-center gap-2 hover:text-white transition">
+                <EnvelopeSimple size={15} /> {contactEmail}
+              </a>
+              <a href={`tel:${contactPhone.replace(/\s/g, "")}`} className="flex items-center gap-2 hover:text-white transition">
+                <Phone size={15} /> {contactPhone} · {contactHours}
+              </a>
+              {contactAddress && (
+                <div className="flex items-start gap-2">
+                  <MapPin size={15} className="mt-0.5 shrink-0" /> <span>{contactAddress}</span>
                 </div>
-                <ul className="space-y-1.5">
-                  {(col.links || []).map((lnk, i) => {
-                    const label = lnk?.label?.[lang] || lnk?.label?.fr || "";
-                    const href = lnk?.href?.startsWith("/shop") ? lnk.href : `${shopRoot}${lnk.href || ""}`;
-                    return (
-                      <li key={i}>
-                        <Link to={href} className="text-sm hover:underline" style={{ color: textCol }}>
-                          {label}
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })}
+              )}
+            </div>
+
+            {/* Social */}
+            <div className="flex items-center gap-3 mt-6">
+              {social.facebook && (
+                <a href={social.facebook} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full border border-neutral-700 hover:bg-white hover:text-neutral-900 flex items-center justify-center transition" aria-label="Facebook">
+                  <FacebookLogo size={16} weight="fill" />
+                </a>
+              )}
+              {social.instagram && (
+                <a href={social.instagram} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full border border-neutral-700 hover:bg-white hover:text-neutral-900 flex items-center justify-center transition" aria-label="Instagram">
+                  <InstagramLogo size={16} weight="fill" />
+                </a>
+              )}
+              {social.youtube && (
+                <a href={social.youtube} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full border border-neutral-700 hover:bg-white hover:text-neutral-900 flex items-center justify-center transition" aria-label="YouTube">
+                  <YoutubeLogo size={16} weight="fill" />
+                </a>
+              )}
+              {social.linkedin && (
+                <a href={social.linkedin} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full border border-neutral-700 hover:bg-white hover:text-neutral-900 flex items-center justify-center transition" aria-label="LinkedIn">
+                  <LinkedinLogo size={16} weight="fill" />
+                </a>
+              )}
+              {!social.facebook && !social.instagram && !social.youtube && !social.linkedin && (
+                <>
+                  <a href="#" className="w-9 h-9 rounded-full border border-neutral-700 hover:bg-white hover:text-neutral-900 flex items-center justify-center transition" aria-label="Facebook"><FacebookLogo size={16} weight="fill" /></a>
+                  <a href="#" className="w-9 h-9 rounded-full border border-neutral-700 hover:bg-white hover:text-neutral-900 flex items-center justify-center transition" aria-label="Instagram"><InstagramLogo size={16} weight="fill" /></a>
+                  <a href="#" className="w-9 h-9 rounded-full border border-neutral-700 hover:bg-white hover:text-neutral-900 flex items-center justify-center transition" aria-label="YouTube"><YoutubeLogo size={16} weight="fill" /></a>
+                </>
+              )}
+            </div>
+          </div>
+
+          <FooterCol title="Boutique" items={[
+            { label: "Tous les produits", href: `${shopRoot}` },
+            { label: "Collections", href: `${shopRoot}#collections` },
+            { label: "Nouveautés", href: `${shopRoot}?sort=new` },
+            { label: "Meilleures ventes", href: `${shopRoot}?sort=bestsellers` },
+          ]} />
+
+          <FooterCol title="Nous connaître" items={[
+            { label: "Notre histoire", href: `${shopRoot}/about` },
+            { label: "Le Journal", href: `${shopRoot}/blog` },
+            { label: "Ils parlent de nous", href: `${shopRoot}#press` },
+            { label: "Contact", href: `${shopRoot}/contact` },
+          ]} />
+
+          <FooterCol title="Service client" items={[
+            { label: "FAQ", href: `${shopRoot}#faq` },
+            { label: "Livraison & délais", href: `${shopRoot}/livraison` },
+            { label: "Retours & remboursements", href: `${shopRoot}/retours` },
+            { label: customer ? "Mon compte" : "Se connecter", href: customer ? `${shopRoot}/account` : `${shopRoot}/account/login` },
+          ]} />
+
+          <FooterCol title="Légal" items={[
+            { label: "CGV", href: `${shopRoot}/cgv` },
+            { label: "Mentions légales", href: `${shopRoot}/mentions` },
+            { label: "Confidentialité", href: `${shopRoot}/confidentialite` },
+            { label: "Cookies", href: `${shopRoot}/cookies` },
+          ]} />
         </div>
-        <div className="border-t py-6 text-center text-xs" style={{ borderColor: "#E7E5E4", color: "#78716C" }}>
-          © {new Date().getFullYear()} {logoText} ·{" "}
-          <Link to={`${shopRoot}/cgv`} className="hover:underline">CGV</Link> ·{" "}
-          <Link to={`${shopRoot}/mentions`} className="hover:underline">Mentions légales</Link> ·{" "}
-          <Link to={`${shopRoot}/confidentialite`} className="hover:underline">Confidentialité</Link>
+
+        {/* Payment methods */}
+        <div className="border-t" style={{ borderColor: "#2A2725" }}>
+          <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-3 flex-wrap" data-testid="footer-payments">
+              <span className="text-xs uppercase tracking-widest text-neutral-500 mr-2">Paiements</span>
+              {["Visa", "Mastercard", "CB", "PayPal", "Apple Pay", "iDEAL", "Bancontact"].map((p) => (
+                <span key={p} className="px-2.5 py-1 rounded bg-white text-neutral-900 text-[11px] font-medium">
+                  {p}
+                </span>
+              ))}
+            </div>
+            <div className="text-xs text-neutral-500">
+              © {new Date().getFullYear()} {logoText} — Tous droits réservés.
+            </div>
+          </div>
         </div>
       </footer>
     </div>
   );
 }
 
-export async function fetchPublicSite(siteId) {  const { data } = await axios.get(`${BACKEND_URL}/api/public/sites/${siteId}`);
-  return data;
+function FooterCol({ title, items }) {
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-widest text-white mb-4">{title}</div>
+      <ul className="space-y-2">
+        {items.map((it, i) => (
+          <li key={i}>
+            <Link to={it.href} className="text-sm hover:text-white transition">
+              {it.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
+export async function fetchPublicSite(siteId) {
+  const { data } = await axios.get(`${BACKEND_URL}/api/public/sites/${siteId}`);
+  return data;
+}
 
 export function useSiteData(siteId) {
   const [site, setSite] = useState(null);

@@ -39,6 +39,9 @@ import ValuesSection from "../components/storefront/ValuesSection";
 import FounderStory from "../components/storefront/FounderStory";
 import PressLogos from "../components/storefront/PressLogos";
 import NewsletterCTA from "../components/storefront/NewsletterCTA";
+import CollectionsShowcase from "../components/storefront/CollectionsShowcase";
+import BlogTeaser from "../components/storefront/BlogTeaser";
+import BuyingGuide from "../components/storefront/BuyingGuide";
 import {
   NarrativeSections,
   TechSpecs,
@@ -113,19 +116,22 @@ export function StorefrontHome() {
         schema={[orgSchema, websiteSchema].filter(Boolean)}
       />
       <Hero site={site} design={design} lang={lang} />
-      <PressLogos mentions={design?.press_mentions} design={design} />
+      <div id="press"><PressLogos mentions={design?.press_mentions} design={design} /></div>
       <Benefits design={design} lang={lang} />
-      <ProductGrid
+      <div id="collections"><CollectionsShowcase collections={design?.collections} lang={lang} design={design} /></div>
+      <div id="products"><ProductGrid
         siteId={siteId}
         products={products}
         loading={loading}
         design={design}
         lang={lang}
-      />
+      /></div>
+      <BuyingGuide guide={design?.buying_guide} design={design} />
       <ValuesSection values={design?.values} lang={lang} design={design} />
       <FounderStory story={design?.founder_story} lang={lang} design={design} />
       <Testimonials design={design} lang={lang} />
-      <FAQSection design={design} lang={lang} />
+      <BlogTeaser posts={design?.blog_posts} lang={lang} design={design} />
+      <div id="faq"><FAQSection design={design} lang={lang} /></div>
       <NewsletterCTA design={design} />
       <FinalCTA design={design} lang={lang} />
     </StorefrontLayout>

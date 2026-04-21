@@ -3,6 +3,18 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 36 : Homepage ultra-complète (Header nav + Footer premium + 3 sections)
+- **Header enrichi** (`StorefrontLayout.jsx`) : nav desktop (Boutique · Collections · Journal · À propos · Contact), menu mobile full-screen avec search intégré + contact footer, barre de confiance (livraison / paiement / support / langue), logo + tagline à gauche, search + compte + panier + hamburger à droite.
+- **Footer 3 niveaux** : (1) bande réassurance 4 piliers avec icônes Phosphor (Livraison offerte / Paiement sécurisé / Conseiller humain / Retour 14j), (2) 5 colonnes (logo + contact + social Facebook/Instagram/YouTube/LinkedIn, Boutique, Nous connaître, Service client, Légal), (3) méthodes de paiement (Visa / Mastercard / CB / PayPal / Apple Pay / iDEAL / Bancontact) + copyright. Fond `neutral-900`, typo cohérente.
+- **3 nouveaux composants homepage** :
+  - `CollectionsShowcase.jsx` — 3 cartes univers thématiques avec image plein cadre + overlay gradient + CTA (fallback silver-eco : Mobilité / Sommeil / Quotidien).
+  - `BuyingGuide.jsx` — 3 étapes visuelles reliées par un trait horizontal (écoute → livraison → accompagnement).
+  - `BlogTeaser.jsx` — 3 articles avec image + catégorie + read-time + excerpt (fallback 3 articles silver-eco).
+- **Nouvel ordre homepage** : Hero → Press → Benefits → **Collections** → Products → **BuyingGuide** → Values → Founder → Testimonials → **Blog** → FAQ → Newsletter → FinalCTA (13 sections).
+- **Ancres ajoutées** (`#press`, `#collections`, `#products`, `#faq`) pour la nav interne.
+- **Alimentation hook-ready** : chaque nouvelle section lit `design.collections`, `design.buying_guide`, `design.blog_posts` et tombe sur un fallback élégant tant que les hooks de prompts ne les ont pas écrits.
+
+
 ## 2026-04-21 · Sprint 35 : Homepage Storefront premium finalisée (4 nouvelles sections)
 - **Intégration dans `/app/frontend/src/pages/Storefront.jsx`** des 4 composants créés au sprint précédent : `PressLogos`, `ValuesSection`, `FounderStory`, `NewsletterCTA`.
 - **Nouvel ordre** de la homepage (schéma conversion orienté silver-eco) : Hero → PressLogos → Benefits → ProductGrid → ValuesSection → FounderStory → Testimonials → FAQ → NewsletterCTA → FinalCTA.
