@@ -14,16 +14,17 @@ Prix (markup plateforme, configurable via PLATFORM_DOMAIN_MARKUP_EUR env) :
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from datetime import datetime, timezone
 from typing import Optional
 
 import ovh
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from deps import db, get_current_user, _check_site_access
+from deps import db, get_current_user, _check_site_access, FRONTEND_URL
 
 logger = logging.getLogger("conceptfactory.domains")
 router = APIRouter()
@@ -125,21 +126,123 @@ async def check_domain(data: CheckInput, user: dict = Depends(get_current_user))
         raise HTTPException(500, str(e)[:200])
 
 
-# ============== PURCHASE ============== #
+# ============== PURCHASE (via Mollie) ============== #
 class PurchaseInput(BaseModel):
     domain: str
     site_id: str
 
 
-@router.post("/domains/purchase")
-async def purchase_domain(data: PurchaseInput,
-                          user: dict = Depends(get_current_user)):
-    """Achète un domaine via OVH et l'attache au site.
+def _ovh_client_required():
+    """Raises if OVH is not configured. Used before creating Mollie payment."""
+    _require_config()
 
-    ⚠️ Cet endpoint déclenche un VRAI paiement depuis le moyen de paiement
-    enregistré sur ton compte OVH (Admin). Pour l'instant nous facturons
-    UNIQUEMENT l'Admin côté OVH. Le markup de 10€ sera facturé au Concepteur
-    séparément (à brancher sur Mollie dans un sprint suivant).
+
+async def _execute_ovh_purchase(domain_record: dict) -> dict:
+    """Actually buy the domain on OVH (called from Mollie webhook after payment).
+
+    Returns the updated record dict. Idempotent: if already purchased, returns as-is.
+    """
+    domain = domain_record["domain"]
+    site_id = domain_record["site_id"]
+
+    # Idempotency guard — avoid double-buying on webhook retries
+    fresh = await db.domains.find_one({"id": domain_record["id"]}, {"_id": 0})
+    if fresh and fresh.get("status") in ("purchased", "dns_configured", "active"):
+        return fresh
+
+    client = _client()
+    try:
+        cart = await asyncio.to_thread(
+            client.post, "/order/cart",
+            ovhSubsidiary="FR",
+            description=f"cf-site-{site_id[:8]}-{domain}",
+        )
+        cart_id = cart["cartId"]
+        await asyncio.to_thread(client.post, f"/order/cart/{cart_id}/assign")
+        items = await asyncio.to_thread(
+            client.post, f"/order/cart/{cart_id}/domain", domain=domain,
+        )
+        item = items if isinstance(items, dict) else (items[0] if items else {})
+        item_id = item.get("itemId")
+        if not item_id:
+            raise RuntimeError("OVH n'a pas retourné d'itemId.")
+        checkout = await asyncio.to_thread(
+            client.post, f"/order/cart/{cart_id}/checkout",
+            autoPayWithPreferredPaymentMethod=True,
+            waiveRetractationPeriod=True,
+        )
+        order_id = checkout.get("orderId")
+        now_iso = datetime.now(timezone.utc).isoformat()
+        await db.domains.update_one(
+            {"id": domain_record["id"]},
+            {"$set": {
+                "status": "purchased",
+                "ovh_cart_id": cart_id,
+                "ovh_order_id": order_id,
+                "ovh_item_id": item_id,
+                "ovh_purchased_at": now_iso,
+            }},
+        )
+        await db.sites.update_one(
+            {"id": site_id},
+            {"$set": {"domain": domain, "domain_status": "purchased",
+                      "updated_at": now_iso}},
+        )
+        return await db.domains.find_one({"id": domain_record["id"]}, {"_id": 0})
+    except Exception as e:
+        logger.exception(f"OVH execute purchase failed for {domain}")
+        await db.domains.update_one(
+            {"id": domain_record["id"]},
+            {"$set": {
+                "status": "ovh_purchase_failed",
+                "ovh_error": str(e)[:500],
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }},
+        )
+        raise
+
+
+async def complete_domain_purchase(payment_id: str, paid: bool) -> None:
+    """Called by the Mollie webhook when a domain-purchase payment event arrives.
+
+    If paid → trigger the real OVH purchase.
+    If failed/expired/cancelled → mark the domain record as cancelled.
+    """
+    record = await db.domains.find_one({"mollie_payment_id": payment_id}, {"_id": 0})
+    if not record:
+        logger.warning(f"Domain payment webhook: no record for {payment_id}")
+        return
+    if record.get("status") in ("purchased", "dns_configured", "active"):
+        return  # already done
+    now_iso = datetime.now(timezone.utc).isoformat()
+    if not paid:
+        await db.domains.update_one(
+            {"id": record["id"]},
+            {"$set": {"status": "payment_failed", "updated_at": now_iso}},
+        )
+        return
+    # paid → mark and trigger OVH
+    await db.domains.update_one(
+        {"id": record["id"]},
+        {"$set": {"status": "paid_pending_ovh", "paid_at": now_iso,
+                  "updated_at": now_iso}},
+    )
+    fresh = await db.domains.find_one({"id": record["id"]}, {"_id": 0})
+    try:
+        await _execute_ovh_purchase(fresh)
+    except Exception:
+        pass  # already logged + status persisted
+
+
+@router.post("/domains/purchase")
+async def initiate_domain_purchase(data: PurchaseInput,
+                                   request: Request,
+                                   user: dict = Depends(get_current_user)):
+    """Démarre l'achat d'un domaine : crée un record + un paiement Mollie.
+
+    Le Concepteur est redirigé vers Mollie pour payer le prix plateforme (coût
+    OVH TTC + markup 10€). Dès que le paiement est confirmé par le webhook,
+    l'achat OVH est déclenché automatiquement.
     """
     await _check_site_access(data.site_id, user)
     domain = _normalise_domain(data.domain)
@@ -147,66 +250,125 @@ async def purchase_domain(data: PurchaseInput,
     if tld not in ALLOWED_TLDS:
         raise HTTPException(400, f"Extension non supportée : {tld}")
 
-    # Idempotency: refuse if domain already purchased
-    existing = await db.domains.find_one({"domain": domain}, {"_id": 0})
-    if existing and existing.get("status") in ("purchased", "active"):
-        raise HTTPException(400, "Ce domaine est déjà acheté.")
+    _ovh_client_required()  # fail-fast before creating Mollie payment
 
+    existing = await db.domains.find_one({"domain": domain}, {"_id": 0})
+    if existing and existing.get("status") in ("purchased", "dns_configured", "active"):
+        raise HTTPException(400, "Ce domaine est déjà acheté.")
+    # Allow retry if previous attempt failed
+    if existing and existing.get("status") == "pending_payment":
+        raise HTTPException(400, "Un paiement est déjà en cours pour ce domaine. Finalise-le depuis Mollie.")
+
+    # Re-check availability + price via OVH to avoid a stale front price
     client = _client()
-    import asyncio as _aio
     try:
-        # 1. cart
-        cart = await _aio.to_thread(
+        cart = await asyncio.to_thread(
             client.post, "/order/cart",
-            ovhSubsidiary="FR",
-            description=f"cf-site-{data.site_id[:8]}-{domain}",
+            ovhSubsidiary="FR", description="cf-quote",
         )
         cart_id = cart["cartId"]
-        # 2. assign cart to customer (the OVH account owning the API key)
-        await _aio.to_thread(client.post, f"/order/cart/{cart_id}/assign")
-        # 3. add domain
-        items = await _aio.to_thread(
-            client.post, f"/order/cart/{cart_id}/domain",
-            domain=domain,
+        items = await asyncio.to_thread(
+            client.post, f"/order/cart/{cart_id}/domain", domain=domain,
         )
         item = items if isinstance(items, dict) else (items[0] if items else {})
-        item_id = item.get("itemId")
-        if not item_id:
-            raise HTTPException(502, "OVH n'a pas retourné d'itemId.")
-        # 4. checkout
-        checkout = await _aio.to_thread(
-            client.post, f"/order/cart/{cart_id}/checkout",
-            autoPayWithPreferredPaymentMethod=True,
-            waiveRetractationPeriod=True,
-        )
-        order_id = checkout.get("orderId")
-        # 5. persist in our DB (domain = attached to site)
-        doc = {
-            "id": f"dom-{domain.replace('.', '-')}-{data.site_id[:8]}",
-            "domain": domain,
-            "tld": tld,
-            "site_id": data.site_id,
-            "purchased_by": user.get("id"),
-            "purchased_at": datetime.now(timezone.utc).isoformat(),
-            "ovh_cart_id": cart_id,
-            "ovh_order_id": order_id,
-            "ovh_item_id": item_id,
-            "ovh_price_ttc_eur": float((item.get("prices", [{}])[-1].get("price") or {}).get("value") or 0),
-            "platform_price_eur": None,  # billing Mollie : à brancher
-            "status": "purchased",  # purchased → dns_pending → active
-        }
-        await db.domains.insert_one(dict(doc))
-        # 6. attach domain to site (it will be fully active once DNS is configured)
-        await db.sites.update_one(
-            {"id": data.site_id},
-            {"$set": {"domain": domain, "domain_status": "purchased",
-                      "updated_at": datetime.now(timezone.utc).isoformat()}},
-        )
-        doc.pop("_id", None)
-        return {"ok": True, "domain_record": doc, "next_step": "Configure DNS via /domains/configure-dns"}
+        ovh_price_ttc = 0.0
+        for p in item.get("prices", []):
+            if p.get("label") == "TOTAL":
+                ovh_price_ttc = float(p.get("price", {}).get("value") or 0)
+                break
+        try:
+            await asyncio.to_thread(client.delete, f"/order/cart/{cart_id}")
+        except Exception:
+            pass
     except ovh.exceptions.APIError as e:
-        logger.exception("OVH purchase failed")
-        raise HTTPException(502, f"OVH API : {str(e)[:300]}")
+        raise HTTPException(502, f"OVH : {str(e)[:200]}")
+    if ovh_price_ttc <= 0:
+        raise HTTPException(400, "Domaine indisponible ou non cotable.")
+    platform_price = round(ovh_price_ttc + MARKUP_EUR, 2)
+
+    # Create the Mollie payment
+    import uuid
+    record_id = f"dom-{domain.replace('.', '-')}-{uuid.uuid4().hex[:8]}"
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.domains.insert_one({
+        "id": record_id,
+        "domain": domain,
+        "tld": tld,
+        "site_id": data.site_id,
+        "purchased_by": user.get("id"),
+        "purchased_at": now_iso,
+        "ovh_price_ttc_eur": ovh_price_ttc,
+        "markup_eur": MARKUP_EUR,
+        "platform_price_eur": platform_price,
+        "status": "pending_payment",
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    })
+
+    from routes.payments import _get_client as _mollie_client
+    mollie, mode = _mollie_client()
+    redirect_url = f"{FRONTEND_URL}/sites/{data.site_id}/domains?domain_payment=1&domain={domain}"
+    try:
+        webhook_url = str(request.url_for("mollie_webhook"))
+    except Exception:
+        webhook_url = f"{os.environ.get('BACKEND_URL', '')}/api/webhooks/mollie"
+
+    try:
+        payment = mollie.payments.create({
+            "amount": {"currency": "EUR", "value": f"{platform_price:.2f}"},
+            "description": f"Domaine {domain}",
+            "redirectUrl": redirect_url,
+            "webhookUrl": webhook_url,
+            "metadata": {
+                "type": "domain_purchase",
+                "domain": domain,
+                "domain_record_id": record_id,
+                "site_id": data.site_id,
+                "user_id": user.get("id"),
+            },
+            "locale": "fr_FR",
+        })
+    except Exception as e:
+        await db.domains.delete_one({"id": record_id})
+        logger.exception("Mollie create payment for domain failed")
+        raise HTTPException(502, f"Mollie : {str(e)[:200]}")
+
+    await db.domains.update_one(
+        {"id": record_id},
+        {"$set": {
+            "mollie_payment_id": payment.id,
+            "mollie_checkout_url": payment.checkout_url,
+            "mollie_mode": mode,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    return {
+        "ok": True,
+        "domain": domain,
+        "platform_price_eur": platform_price,
+        "checkout_url": payment.checkout_url,
+        "payment_id": payment.id,
+        "domain_record_id": record_id,
+    }
+
+
+@router.get("/domains/{domain}/purchase-status")
+async def get_purchase_status(domain: str, user: dict = Depends(get_current_user)):
+    """Polled by the frontend after Mollie redirect to know if OVH purchase is done."""
+    domain = _normalise_domain(domain)
+    record = await db.domains.find_one({"domain": domain}, {"_id": 0})
+    if not record:
+        raise HTTPException(404, "Domaine inconnu.")
+    if user.get("role") != "admin" and record.get("site_id"):
+        await _check_site_access(record["site_id"], user)
+    return {
+        "domain": domain,
+        "status": record.get("status"),
+        "ovh_error": record.get("ovh_error"),
+        "site_id": record.get("site_id"),
+        "platform_price_eur": record.get("platform_price_eur"),
+        "paid_at": record.get("paid_at"),
+    }
 
 
 # ============== DNS CONFIG ============== #

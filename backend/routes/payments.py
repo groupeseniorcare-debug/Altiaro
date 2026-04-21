@@ -144,6 +144,12 @@ async def mollie_webhook(request: Request):
             {"mollie_payment_id": payment_id}, {"_id": 0}
         )
         if not order:
+            # Maybe it's a domain purchase payment?
+            meta = getattr(payment, "metadata", None) or {}
+            if isinstance(meta, dict) and meta.get("type") == "domain_purchase":
+                from routes.domains import complete_domain_purchase
+                await complete_domain_purchase(payment_id, bool(payment.is_paid()))
+                return {"ok": True}
             # Maybe it's a card mandate setup ?
             await _handle_card_setup_webhook(payment, payment_id)
             return {"ok": True}

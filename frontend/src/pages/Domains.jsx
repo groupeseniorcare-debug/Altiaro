@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import React, { useCallback, useEffect, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, apiCall } from "../lib/api";
 import Layout from "../components/Layout";
 import {
@@ -10,29 +10,43 @@ import {
   CheckCircle,
   XCircle,
   ShoppingCart,
-  Warning,
   Lightning,
   Info,
+  CreditCard,
 } from "@phosphor-icons/react";
 
 const TLD_SUGGESTIONS = [".fr", ".com", ".shop", ".store", ".boutique", ".eu"];
 
+const STATUS_LABEL = {
+  pending_payment: { label: "Paiement en attente", color: "#D97706", bg: "#FEF3C7" },
+  paid_pending_ovh: { label: "Paiement reçu · Achat OVH…", color: "#2563EB", bg: "#DBEAFE" },
+  purchased: { label: "Acheté", color: "#047857", bg: "#D1FAE5" },
+  dns_configured: { label: "Actif", color: "#047857", bg: "#D1FAE5" },
+  payment_failed: { label: "Paiement échoué", color: "#BE123C", bg: "#FFE4E6" },
+  ovh_purchase_failed: { label: "Achat OVH en erreur", color: "#BE123C", bg: "#FFE4E6" },
+};
+
 export default function Domains() {
   const { id: siteId } = useParams();
+  const [search, setSearch] = useSearchParams();
   const navigate = useNavigate();
   const [site, setSite] = useState(null);
   const [base, setBase] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [buying, setBuying] = useState(null);
   const [mine, setMine] = useState([]);
+  const [returnStatus, setReturnStatus] = useState(null); // {domain, status, ovh_error}
+
+  const refreshMine = useCallback(async () => {
+    const { data } = await apiCall(() => api.get("/domains"));
+    if (data) setMine((data.domains || []).filter((d) => d.site_id === siteId));
+  }, [siteId]);
 
   useEffect(() => {
     apiCall(() => api.get(`/sites/${siteId}`)).then(({ data }) => {
       if (data) {
         setSite(data);
-        // Auto-suggest from site name
         const slug = (data.name || "")
           .toLowerCase()
           .normalize("NFD")
@@ -43,18 +57,44 @@ export default function Domains() {
         if (slug) setBase(slug);
       }
     });
-    apiCall(() => api.get("/domains")).then(({ data }) => {
-      if (data) setMine((data.domains || []).filter((d) => d.site_id === siteId));
-    });
-  }, [siteId]);
+    refreshMine();
+  }, [siteId, refreshMine]);
+
+  // Poll purchase status after Mollie redirect (?domain_payment=1&domain=xyz)
+  useEffect(() => {
+    const returnedDomain = search.get("domain");
+    const isPayment = search.get("domain_payment") === "1";
+    if (!isPayment || !returnedDomain) return;
+    let attempts = 0;
+    let cancelled = false;
+    const poll = async () => {
+      const { data } = await apiCall(() =>
+        api.get(`/domains/${returnedDomain}/purchase-status`)
+      );
+      if (cancelled || !data) return;
+      setReturnStatus(data);
+      await refreshMine();
+      const terminal = ["purchased", "dns_configured", "active",
+        "payment_failed", "ovh_purchase_failed"].includes(data.status);
+      attempts += 1;
+      if (!terminal && attempts < 30) {
+        setTimeout(poll, 2000);
+      } else if (terminal) {
+        // Clear query params after terminal state so refresh doesn't re-trigger
+        setTimeout(() => {
+          setSearch({}, { replace: true });
+        }, 5000);
+      }
+    };
+    poll();
+    return () => { cancelled = true; };
+  }, [search, refreshMine, setSearch]);
 
   const runSearch = async () => {
     const trimmed = (base || "").trim().toLowerCase();
     if (!trimmed) return;
     setLoading(true);
     setResults([]);
-    setError(null);
-    // Check each TLD in parallel
     const promises = TLD_SUGGESTIONS.map((tld) =>
       apiCall(() => api.post("/domains/check", { domain: `${trimmed}${tld}` }))
         .then(({ data, error: err }) => ({
@@ -68,10 +108,10 @@ export default function Domains() {
     setResults(all);
   };
 
-  const purchase = async (domain) => {
+  const purchase = async (domain, priceEur) => {
     if (
       !window.confirm(
-        `Confirmer l'achat de ${domain} pour le site "${site?.name}" ?\n\nLe domaine sera automatiquement configuré pour pointer vers ta boutique.`
+        `Tu vas être redirigé(e) vers Mollie pour payer ${priceEur}€ (TTC, 1 an) pour ${domain}.\n\nDès que le paiement est confirmé, l'achat OVH se déclenche automatiquement et le domaine est rattaché au site "${site?.name}".\n\nContinuer ?`
       )
     ) {
       return;
@@ -81,14 +121,12 @@ export default function Domains() {
       api.post("/domains/purchase", { domain, site_id: siteId })
     );
     setBuying(null);
-    if (err) {
-      window.alert("Erreur achat : " + err);
+    if (err || !data?.checkout_url) {
+      window.alert("Erreur : " + (err || "pas d'URL Mollie reçue"));
       return;
     }
-    window.alert(
-      `✅ ${domain} acheté !\n\nLa zone DNS sera configurée dans quelques minutes. Tu peux relancer la configuration depuis cette page.`
-    );
-    setMine((prev) => [data.domain_record, ...prev]);
+    // Redirect to Mollie
+    window.location.href = data.checkout_url;
   };
 
   const configureDns = async (domain) => {
@@ -106,9 +144,7 @@ export default function Domains() {
       return;
     }
     window.alert(`✅ DNS configuré pour ${domain} — la propagation peut prendre 5-30 min.`);
-    apiCall(() => api.get("/domains")).then(({ data }) => {
-      if (data) setMine((data.domains || []).filter((d) => d.site_id === siteId));
-    });
+    refreshMine();
   };
 
   return (
@@ -134,11 +170,51 @@ export default function Domains() {
               Choisis ton nom de domaine
             </h1>
             <p className="text-[#57534E] mt-1">
-              Achat en 1 clic, DNS auto-configuré sur ta boutique.
+              Paiement sécurisé via Mollie, DNS auto-configuré sur ta boutique.
               {site?.name && <> Site : <strong>{site.name}</strong></>}
             </p>
           </div>
         </div>
+
+        {/* Return banner after Mollie redirect */}
+        {returnStatus && (
+          <div
+            data-testid="domain-return-banner"
+            className="rounded-xl border p-5 mb-6"
+            style={{
+              background: STATUS_LABEL[returnStatus.status]?.bg || "#FEF3C7",
+              borderColor: STATUS_LABEL[returnStatus.status]?.color || "#D97706",
+            }}
+          >
+            <div className="flex items-center gap-3">
+              {returnStatus.status === "purchased" || returnStatus.status === "dns_configured" ? (
+                <CheckCircle size={22} weight="fill" color={STATUS_LABEL[returnStatus.status].color} />
+              ) : returnStatus.status?.includes("failed") ? (
+                <XCircle size={22} weight="fill" color="#BE123C" />
+              ) : (
+                <ArrowClockwise size={22} className="animate-spin" color={STATUS_LABEL[returnStatus.status]?.color || "#D97706"} />
+              )}
+              <div>
+                <div className="font-medium text-[#1C1917]">
+                  {returnStatus.domain} —{" "}
+                  <span style={{ color: STATUS_LABEL[returnStatus.status]?.color }}>
+                    {STATUS_LABEL[returnStatus.status]?.label || returnStatus.status}
+                  </span>
+                </div>
+                <div className="text-xs text-[#57534E] mt-1">
+                  {returnStatus.status === "pending_payment" && "En attente de confirmation Mollie…"}
+                  {returnStatus.status === "paid_pending_ovh" && "Paiement confirmé, OVH est en train d'acheter le domaine."}
+                  {returnStatus.status === "purchased" && "Parfait ! Prochaine étape : configurer les DNS (bouton plus bas)."}
+                  {returnStatus.status === "dns_configured" && "Ton site est accessible sur ce domaine 🎉"}
+                  {returnStatus.status === "payment_failed" && "Le paiement Mollie n'a pas abouti. Tu peux réessayer ci-dessous."}
+                  {returnStatus.status === "ovh_purchase_failed" && (
+                    <>Le paiement est OK mais l'achat OVH a échoué : <strong>{returnStatus.ovh_error || "erreur inconnue"}</strong>. Contacte l'Admin pour remboursement ou relance manuelle.</>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Existing domains on this site */}
         {mine.length > 0 && (
@@ -150,48 +226,66 @@ export default function Domains() {
               </div>
             </div>
             <div className="space-y-2">
-              {mine.map((d) => (
-                <div
-                  key={d.id}
-                  data-testid={`domain-mine-${d.domain}`}
-                  className="flex items-center justify-between bg-[#FAF7F2] rounded-lg p-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <Globe size={16} className="text-[#047857]" />
-                    <div>
-                      <div className="font-mono font-medium text-sm">{d.domain}</div>
-                      <div className="text-xs text-[#78716C]">
-                        Statut : <strong>{d.status}</strong> · Acheté le{" "}
-                        {d.purchased_at?.slice(0, 10)}
+              {mine.map((d) => {
+                const statusMeta = STATUS_LABEL[d.status] || { label: d.status, color: "#78716C", bg: "#F5F2EB" };
+                return (
+                  <div
+                    key={d.id}
+                    data-testid={`domain-mine-${d.domain}`}
+                    className="flex items-center justify-between bg-[#FAF7F2] rounded-lg p-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Globe size={16} className="text-[#047857]" />
+                      <div>
+                        <div className="font-mono font-medium text-sm">{d.domain}</div>
+                        <div className="text-xs text-[#78716C]">
+                          <span
+                            className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold mr-2"
+                            style={{ background: statusMeta.bg, color: statusMeta.color }}
+                          >
+                            {statusMeta.label}
+                          </span>
+                          · {d.purchased_at?.slice(0, 10)}
+                          {d.platform_price_eur && <> · {d.platform_price_eur}€</>}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {d.status === "purchased" && (
-                      <button
-                        onClick={() => configureDns(d.domain)}
-                        data-testid={`dns-${d.domain}`}
-                        className="h-8 px-3 rounded-lg bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-medium"
+                    <div className="flex items-center gap-2">
+                      {d.status === "purchased" && (
+                        <button
+                          onClick={() => configureDns(d.domain)}
+                          data-testid={`dns-${d.domain}`}
+                          className="h-8 px-3 rounded-lg bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-medium"
+                        >
+                          Configurer DNS
+                        </button>
+                      )}
+                      {d.status === "pending_payment" && d.mollie_checkout_url && (
+                        <a
+                          href={d.mollie_checkout_url}
+                          data-testid={`pay-${d.domain}`}
+                          className="h-8 px-3 rounded-lg bg-[#D97706] hover:bg-[#B45309] text-white text-xs font-medium flex items-center gap-1"
+                        >
+                          <CreditCard size={12} weight="fill" /> Payer
+                        </a>
+                      )}
+                      {(d.status === "dns_configured" || d.status === "active") && (
+                        <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-[#D1FAE5] text-[#047857] font-semibold">
+                          ✓ Actif
+                        </span>
+                      )}
+                      <a
+                        href={`https://${d.domain}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-[#2563EB] hover:underline"
                       >
-                        Configurer DNS
-                      </button>
-                    )}
-                    {d.status === "dns_configured" && (
-                      <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-[#D1FAE5] text-[#047857] font-semibold">
-                        ✓ Actif
-                      </span>
-                    )}
-                    <a
-                      href={`https://${d.domain}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs text-[#2563EB] hover:underline"
-                    >
-                      Visiter →
-                    </a>
+                        Visiter →
+                      </a>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -280,7 +374,7 @@ export default function Domains() {
                           Disponible · Prix TTC année 1 :{" "}
                           <strong className="text-[#047857]">{price}€</strong>
                           <span className="text-[#A8A29E]">
-                            {" "}(coût OVH {r.data.ovh_price_ttc_eur}€ + frais {r.data.markup_eur}€)
+                            {" "}(coût OVH {r.data.ovh_price_ttc_eur}€ + frais plateforme {r.data.markup_eur}€)
                           </span>
                         </>
                       ) : (
@@ -290,7 +384,7 @@ export default function Domains() {
                   </div>
                   {isAvail && (
                     <button
-                      onClick={() => purchase(fullDomain)}
+                      onClick={() => purchase(fullDomain, price)}
                       disabled={isBuying}
                       data-testid={`buy-${r.tld}`}
                       className="h-10 px-4 rounded-xl bg-gradient-to-r from-[#2563EB] to-[#7C3AED] text-white text-sm font-medium flex items-center gap-2 disabled:opacity-60"
@@ -298,11 +392,11 @@ export default function Domains() {
                       {isBuying ? (
                         <>
                           <ArrowClockwise size={14} className="animate-spin" />
-                          Achat en cours…
+                          Redirection Mollie…
                         </>
                       ) : (
                         <>
-                          <ShoppingCart size={14} weight="fill" /> Acheter {price}€
+                          <CreditCard size={14} weight="fill" /> Acheter {price}€
                         </>
                       )}
                     </button>
@@ -317,9 +411,7 @@ export default function Domains() {
           <div className="flex items-start gap-2">
             <Info size={16} className="text-[#2563EB] shrink-0 mt-0.5" />
             <div className="text-xs text-[#57534E] leading-relaxed">
-              <strong>Comment ça marche :</strong> tu achètes le domaine en 1 clic, on le
-              configure automatiquement pour qu'il pointe vers ta boutique. La propagation DNS
-              prend en général 5 à 30 minutes. Renouvellement automatique chaque année au même prix.
+              <strong>Comment ça marche :</strong> tu paies via Mollie (CB, iDEAL, Bancontact…), on achète le domaine chez OVH et on le configure pour pointer vers ta boutique. La propagation DNS prend 5 à 30 minutes. Renouvellement automatique chaque année au même prix.
             </div>
           </div>
         </div>
