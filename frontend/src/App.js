@@ -12,6 +12,7 @@ import Users from "./pages/Users";
 import NicheEngine from "./pages/Analyzer";
 import NicheAnalysisDetail from "./pages/NicheAnalysisDetail";
 import SiteProducts from "./pages/SiteProducts";
+import SiteBlogPosts from "./pages/SiteBlogPosts";
 import AdsCopy from "./pages/AdsCopy";
 import Empire from "./pages/Empire";
 import Billing from "./pages/Billing";
@@ -47,6 +48,7 @@ import {
   StorefrontBlog,
   StorefrontBlogPost,
 } from "./pages/StorefrontBlog";
+import StorefrontReview from "./pages/StorefrontReview";
 import {
   StorefrontAbout,
   StorefrontFAQ,
@@ -160,6 +162,14 @@ function App() {
             }
           />
           <Route
+            path="/sites/:id/blog-posts"
+            element={
+              <ProtectedRoute>
+                <SiteBlogPosts />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/sites/:id/ads-copy"
             element={
               <ProtectedRoute>
@@ -213,6 +223,7 @@ function App() {
           <Route path="/shop/:siteId/retours" element={<StorefrontRetours />} />
           <Route path="/shop/:siteId/blog" element={<StorefrontBlog />} />
           <Route path="/shop/:siteId/blog/:slug" element={<StorefrontBlogPost />} />
+          <Route path="/shop/:siteId/review/:token" element={<StorefrontReview />} />
           <Route path="/shop/:siteId/cgv" element={<StorefrontCGV />} />
           <Route path="/shop/:siteId/mentions" element={<StorefrontMentions />} />
           <Route path="/shop/:siteId/confidentialite" element={<StorefrontConfidentialite />} />

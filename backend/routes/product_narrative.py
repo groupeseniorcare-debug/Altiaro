@@ -91,12 +91,15 @@ async def enrich_product_narrative(product_id: str, force: bool = False) -> dict
     tags = product.get("tags") or []
 
     system = (
-        "Tu es un rédacteur expert en copywriting e-commerce pour le marché senior français. "
-        "Tu produis un narratif PREMIUM, empathique, jamais infantilisant, qui rassure autant qu'il séduit. "
+        "Tu es à la fois : (1) un rédacteur e-commerce premium pour le marché senior français, "
+        "et (2) un consultant SEO/AEO de niveau expert (top 1% mondial) qui maîtrise "
+        "les schémas structurés Google, les requêtes long-tail, People Also Ask, E-E-A-T, "
+        "et l'optimisation pour les moteurs de réponse IA (ChatGPT/Perplexity/Claude). "
+        "Tu produis un contenu qui ranke #1 en organique ET qui est cité par les IA. "
         "Tu renvoies UNIQUEMENT du JSON valide, strict, sans commentaire ni markdown."
     )
 
-    user = f"""Tu vas enrichir la fiche produit avec un narratif premium.
+    user = f"""Tu enrichis une fiche produit avec un narratif + un package SEO/AEO ultra-pertinent.
 
 === MARQUE ===
 - Nom : {brand_name}
@@ -110,79 +113,119 @@ async def enrich_product_narrative(product_id: str, force: bool = False) -> dict
 - Prix TTC : {price} €
 - Description brute : {desc[:1500]}
 
-=== CONSIGNES ===
-Génère un narratif qui convertit. Public : seniors (60-90 ans) et leurs aidants.
-Ton : élégant, rassurant, concret. Pas de superlatifs vides. Jamais de "nos chers seniors".
-Bénéfices ancrés dans le quotidien réel (se lever, dormir, marcher, recevoir).
+=== MISSION ===
+Le but est que CE produit soit trouvé organiquement sur Google ET cité par les IA de recherche.
+Cela signifie : long-tail keywords réels, contenu factuel, structure schema.org parfaite,
+réponses précises aux intents de recherche (comment, pourquoi, pour qui, prix, comparaison).
+
+Public : seniors (60-90 ans) et aidants. Ton élégant, rassurant, jamais infantilisant.
 
 Retourne EXACTEMENT ce JSON :
 {{
-  "headline": "Titre commercial court et puissant (max 70 caractères) — peut reformuler le nom produit",
+  "headline": "Titre commercial court et puissant (max 70 caractères) — inclut le mot-clé principal",
   "subheadline": "Sous-titre descriptif qui pose le bénéfice principal (max 140 caractères)",
   "sections": [
-    {{
-      "title": "Titre accrocheur de la section (max 55 caractères)",
-      "body": "Paragraphe narratif 2-4 phrases, 60-100 mots, qui raconte un usage concret.",
-      "bullet_points": [
-        "Preuve tangible 1 (bénéfice concret, chiffré si possible, max 85 caractères)",
-        "Preuve tangible 2 (max 85 caractères)",
-        "Preuve tangible 3 (max 85 caractères)"
-      ]
-    }},
-    {{
-      "title": "2e section — angle différent (matière, fabrication, service, accompagnement)",
-      "body": "Paragraphe narratif 2-4 phrases, 60-100 mots.",
-      "bullet_points": [
-        "Preuve 1",
-        "Preuve 2",
-        "Preuve 3"
-      ]
-    }},
-    {{
-      "title": "3e section — pourquoi nous, comparaison, service",
-      "body": "Paragraphe narratif 2-4 phrases.",
-      "bullet_points": [
-        "Preuve 1",
-        "Preuve 2",
-        "Preuve 3"
-      ]
-    }}
+    {{"title": "Titre section 1 (max 55 caractères, usage concret)",
+     "body": "2-4 phrases, 60-100 mots, storytelling concret.",
+     "bullet_points": ["Preuve 1 max 85 caractères", "Preuve 2", "Preuve 3"]}},
+    {{"title": "Titre section 2 (matière/fabrication/service)",
+     "body": "60-100 mots",
+     "bullet_points": ["Preuve 1", "Preuve 2", "Preuve 3"]}},
+    {{"title": "Titre section 3 (pourquoi nous / comparaison)",
+     "body": "60-100 mots",
+     "bullet_points": ["Preuve 1", "Preuve 2", "Preuve 3"]}}
   ],
   "tech_specs": [
-    {{"label": "Dimensions", "value": "xx × xx × xx cm"}},
-    {{"label": "Poids", "value": "x kg"}},
+    {{"label": "Dimensions", "value": "valeur plausible"}},
+    {{"label": "Poids", "value": "..."}},
     {{"label": "Matériau principal", "value": "..."}},
-    {{"label": "Charge maximale supportée", "value": "... kg"}},
+    {{"label": "Charge maximale", "value": "..."}},
     {{"label": "Alimentation / utilisation", "value": "..."}},
     {{"label": "Entretien", "value": "..."}},
     {{"label": "Garantie", "value": "2 ans pièces et main d'œuvre"}},
     {{"label": "Normes", "value": "CE, conforme UE"}}
   ],
   "faq": [
-    {{
-      "question": "Question très fréquente avant l'achat (livraison, installation, compatibilité…)",
-      "answer": "Réponse franche 2-4 phrases qui lève l'objection."
-    }},
-    {{"question": "2e question (usage au quotidien, ergonomie, confort)",
-      "answer": "Réponse 2-4 phrases."}},
-    {{"question": "3e question (remboursement mutuelle / Sécu / LPPR si pertinent)",
-      "answer": "Réponse 2-4 phrases."}},
-    {{"question": "4e question (garantie, SAV, durée de vie)",
-      "answer": "Réponse 2-4 phrases."}},
-    {{"question": "5e question (retour, remboursement si insatisfaction)",
-      "answer": "Réponse 2-4 phrases."}}
-  ]
+    {{"question": "Q livraison/installation", "answer": "Réponse 2-4 phrases"}},
+    {{"question": "Q usage quotidien", "answer": "Réponse 2-4 phrases"}},
+    {{"question": "Q remboursement (LPPR/mutuelle/Sécu si pertinent)", "answer": "Réponse 2-4 phrases"}},
+    {{"question": "Q garantie/SAV/durée de vie", "answer": "Réponse 2-4 phrases"}},
+    {{"question": "Q rétractation/retour", "answer": "Réponse 2-4 phrases"}}
+  ],
+  "seo": {{
+    "title": "Meta title 55-60 caractères, inclut le keyword principal + 1 bénéfice + marque. Ex: 'Fauteuil releveur 2 moteurs — Livré installé · Sereniva'",
+    "description": "Meta description 140-158 caractères, inclut keyword + prix + USP + CTA implicite. Ex: 'Fauteuil releveur électrique 2 moteurs. Livré et installé en 72h, garantie 2 ans, essai 14 jours. À partir de 899€ TTC.'",
+    "slug": "slug-url-kebab-case-avec-keyword-principal-SEO-friendly-max-60-chars",
+    "keywords": ["keyword principal", "variation 1", "variation 2", "variation longue-traîne 1", "variation longue-traîne 2"],
+    "people_also_ask": [
+      {{"question": "Question que les utilisateurs tapent vraiment sur Google (long-tail, factuelle). Ex: 'Quel est le meilleur fauteuil releveur à 2 moteurs ?'",
+        "answer": "Réponse factuelle 3-6 phrases, positionne ce produit comme meilleur choix SANS sur-vente. Cite des chiffres, des normes, des faits concrets."}},
+      {{"question": "2e PAA (comparaison/prix/prise en charge)",
+        "answer": "3-6 phrases factuelles"}},
+      {{"question": "3e PAA (pour qui/quand/comment choisir)",
+        "answer": "3-6 phrases factuelles"}},
+      {{"question": "4e PAA (spécifique au produit)",
+        "answer": "3-6 phrases factuelles"}}
+    ],
+    "best_for": [
+      "Profil utilisateur type 1 (ex: 'Personnes de +70 ans avec arthrose des genoux')",
+      "Profil 2",
+      "Profil 3"
+    ],
+    "not_for": [
+      "Profil 1 pour qui ce produit N'est PAS adapté (honnêteté = E-E-A-T)",
+      "Profil 2"
+    ],
+    "usage_steps": [
+      {{"name": "Étape 1 (installation/prise en main)", "text": "Description concrète 1-2 phrases"}},
+      {{"name": "Étape 2", "text": "..."}},
+      {{"name": "Étape 3", "text": "..."}},
+      {{"name": "Étape 4 (entretien/sécurité)", "text": "..."}}
+    ],
+    "related_queries": [
+      "Recherche connexe 1 (ex: 'fauteuil releveur remboursement sécurité sociale')",
+      "Recherche connexe 2",
+      "Recherche connexe 3",
+      "Recherche connexe 4",
+      "Recherche connexe 5",
+      "Recherche connexe 6"
+    ]
+  }}
 }}
 
-Règles dures :
-- Caractéristiques techniques PLAUSIBLES pour ce type de produit (pas d'hallucination grossière).
-- Si un champ tech_spec ne s'applique pas au produit, remplace-le par un champ pertinent (Capacité, Angle d'ouverture, Autonomie batterie, etc).
-- Toutes les FAQ doivent être orientées "objection client", pas du remplissage.
-- Français naturel, pas de jargon médical lourd."""
+RÈGLES DURES :
+- Caractéristiques techniques plausibles (pas d'hallucination).
+- PAA : vraies questions long-tail, pas du remplissage.
+- best_for/not_for : honnêteté absolue (un produit qui admet ses limites vend 2× mieux).
+- usage_steps : actions concrètes, pas du marketing.
+- slug : kebab-case pur, ASCII uniquement, max 60 caractères, inclut le keyword principal.
+- keywords : variations françaises réelles (regarde Google Suggest mentalement).
+- related_queries : mélange info (comment, pourquoi) + commercial (prix, meilleur, comparatif).
+- Jamais de "nos chers seniors" ni "personnes âgées" (dire "seniors").
+- Français naturel, niveau Le Monde / Figaro."""
 
     data = await _call_claude_json(system, user)
     if not data or not isinstance(data, dict):
         return {"status": "llm_failed", "product_id": product_id}
+
+    seo_data = data.get("seo") or {}
+    seo = {
+        "title": str(seo_data.get("title") or "")[:200],
+        "description": str(seo_data.get("description") or "")[:300],
+        "slug": re.sub(r"[^a-z0-9-]", "", str(seo_data.get("slug") or "").lower().replace(" ", "-"))[:80],
+        "keywords": [str(k)[:60] for k in (seo_data.get("keywords") or []) if k][:10],
+        "people_also_ask": [
+            {"question": str(p.get("question") or "")[:200], "answer": str(p.get("answer") or "")[:700]}
+            for p in (seo_data.get("people_also_ask") or []) if isinstance(p, dict) and p.get("question")
+        ][:6],
+        "best_for": [str(b)[:150] for b in (seo_data.get("best_for") or []) if b][:5],
+        "not_for": [str(b)[:150] for b in (seo_data.get("not_for") or []) if b][:5],
+        "usage_steps": [
+            {"name": str(s.get("name") or "")[:100], "text": str(s.get("text") or "")[:400]}
+            for s in (seo_data.get("usage_steps") or []) if isinstance(s, dict) and s.get("name")
+        ][:8],
+        "related_queries": [str(q)[:120] for q in (seo_data.get("related_queries") or []) if q][:8],
+    }
 
     narrative = {
         "headline": str(data.get("headline") or "")[:120],
@@ -203,6 +246,7 @@ Règles dures :
             {"question": str(f.get("question") or "")[:180], "answer": str(f.get("answer") or "")[:600]}
             for f in (data.get("faq") or []) if isinstance(f, dict) and f.get("question")
         ][:6],
+        "seo": seo,
         "enriched_at": datetime.now(timezone.utc).isoformat(),
         "enriched_model": "claude-sonnet-4-5-20250929",
     }

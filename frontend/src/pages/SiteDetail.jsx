@@ -298,6 +298,13 @@ export default function SiteDetail() {
                   <Package size={16} weight="duotone" /> Sourcing
                 </button>
                 <button
+                  onClick={() => navigate(`/sites/${id}/blog-posts`)}
+                  data-testid="nav-blog-posts"
+                  className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
+                >
+                  <Sparkle size={16} weight="duotone" /> Le Journal
+                </button>
+                <button
                   onClick={() => navigate(`/sites/${id}/ads-copy`)}
                   data-testid="ads-copy-link"
                   className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition"

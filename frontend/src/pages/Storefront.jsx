@@ -58,6 +58,13 @@ import DeliveryEstimate from "../components/storefront/DeliveryEstimate";
 import ProductBundle from "../components/storefront/ProductBundle";
 import PaymentOptions from "../components/storefront/PaymentOptions";
 import MobileStickyBuy from "../components/storefront/MobileStickyBuy";
+import {
+  PeopleAlsoAsk,
+  BestForNotFor,
+  UsageSteps,
+  RelatedQueries,
+  LastUpdatedBadge,
+} from "../components/storefront/ProductSEOBlocks";
 
 /* =========================================================
  * STOREFRONT HOME
@@ -241,9 +248,13 @@ export function StorefrontProduct() {
   return (
     <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
       <SEOHead
-        title={`${pickLang(p.name, lang)} · ${site?.name || ""}`}
+        title={
+          p.narrative?.seo?.title
+          || `${pickLang(p.name, lang)} · ${site?.name || ""}`
+        }
         description={
-          p.narrative?.subheadline
+          p.narrative?.seo?.description
+          || p.narrative?.subheadline
           || pickLang(p.description, lang)
           || pickLang(p.name, lang)
         }
@@ -255,7 +266,10 @@ export function StorefrontProduct() {
         image={p.images?.[0]}
         type="product"
         siteName={site?.name}
-        keywords={[pickLang(p.name, lang), p.category, ...(p.tags || [])].filter(Boolean).join(", ")}
+        keywords={
+          p.narrative?.seo?.keywords?.join(", ")
+          || [pickLang(p.name, lang), p.category, ...(p.tags || [])].filter(Boolean).join(", ")
+        }
         langs={buildHreflangs(site, `/product/${p.id}`)}
         schema={[
           // Product schema (with offer, rating, reviews)
@@ -329,14 +343,31 @@ export function StorefrontProduct() {
               { "@type": "ListItem", position: p.category ? 4 : 3, name: pickLang(p.name, lang), item: `${window.location.origin}/shop/${siteId}/product/${p.id}` },
             ].filter(Boolean),
           },
-          // FAQ schema (from product narrative FAQ)
-          p.narrative?.faq?.length ? {
+          // FAQ schema (from product narrative FAQ + PAA)
+          (p.narrative?.faq?.length || p.narrative?.seo?.people_also_ask?.length) ? {
             "@context": "https://schema.org",
             "@type": "FAQPage",
-            mainEntity: p.narrative.faq.slice(0, 6).map((f) => ({
+            mainEntity: [
+              ...(p.narrative?.faq || []),
+              ...(p.narrative?.seo?.people_also_ask || []),
+            ].slice(0, 12).map((f) => ({
               "@type": "Question",
               name: f.question,
               acceptedAnswer: { "@type": "Answer", text: f.answer },
+            })),
+          } : null,
+          // HowTo schema (from usage_steps)
+          p.narrative?.seo?.usage_steps?.length ? {
+            "@context": "https://schema.org",
+            "@type": "HowTo",
+            name: `Comment utiliser ${pickLang(p.name, lang)}`,
+            description: `Guide pas à pas pour l'utilisation de ${pickLang(p.name, lang)}.`,
+            totalTime: "PT5M",
+            step: p.narrative.seo.usage_steps.map((s, idx) => ({
+              "@type": "HowToStep",
+              position: idx + 1,
+              name: s.name,
+              text: s.text,
             })),
           } : null,
         ].filter(Boolean)}
@@ -507,9 +538,14 @@ export function StorefrontProduct() {
 
         <NarrativeSections sections={p.narrative?.sections} design={design} />
         <TechSpecs specs={p.narrative?.tech_specs} design={design} />
+        <BestForNotFor best_for={p.narrative?.seo?.best_for} not_for={p.narrative?.seo?.not_for} design={design} />
+        <UsageSteps steps={p.narrative?.seo?.usage_steps} productName={pickLang(p.name, lang)} design={design} />
         <ProductFAQ faq={p.narrative?.faq} design={design} />
+        <PeopleAlsoAsk items={p.narrative?.seo?.people_also_ask} design={design} />
         <ProductReviews product={p} design={design} />
+        <RelatedQueries queries={p.narrative?.seo?.related_queries} design={design} />
         <CrossSellProducts currentProduct={p} lang={lang} design={design} />
+        <LastUpdatedBadge date={p.narrative?.enriched_at || p.updated_at} design={design} />
       </div>
 
       <MobileStickyBuy

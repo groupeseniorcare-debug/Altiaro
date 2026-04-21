@@ -3,6 +3,50 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 43 : SEO Expert-level + Éditeur Blog WYSIWYG + Hook Review J+14
+### Volet 1 — SEO ultra-expert sur page Produit (🎯 l'objectif : trafic organique + citation IA)
+- **Prompt narrative Claude refondu** : ajoute un bloc `seo` complet avec 9 champs optimisés top 1% mondial :
+  - `title` (meta 55-60 chars avec keyword+bénéfice+marque)
+  - `description` (meta 140-158 chars avec prix+USP+CTA implicite)
+  - `slug` (kebab-case SEO-friendly)
+  - `keywords[]` (variations longue-traîne réelles)
+  - `people_also_ask[]` (4-6 vraies questions long-tail, réponses factuelles 3-6 phrases — cible snippets PAA Google + citations IA)
+  - `best_for[]` (3-5 profils utilisateurs idéaux)
+  - `not_for[]` (2-3 limites honnêtes — **signal E-E-A-T très fort**, admettre ses limites vend 2× mieux)
+  - `usage_steps[]` (4-8 étapes pour le schema HowTo)
+  - `related_queries[]` (6-8 requêtes connexes pour maillage interne)
+- **Nouveau composant** `/app/frontend/src/components/storefront/ProductSEOBlocks.jsx` avec 5 sections :
+  - `PeopleAlsoAsk` — accordéon AEO (visible + indexable par IA)
+  - `BestForNotFor` — cartes vert/rouge empathiques
+  - `UsageSteps` — timeline numérotée
+  - `RelatedQueries` — pills cliquables → `/search?q=`
+  - `LastUpdatedBadge` — signal E-E-A-T de fraîcheur
+- **Schemas schema.org enrichis** sur la page Produit :
+  - `Product` (+AggregateRating +Review +Offer avec MerchantReturnPolicy + ShippingDetails)
+  - `BreadcrumbList` taxonomique
+  - `FAQPage` (fusionne `narrative.faq` + `seo.people_also_ask` jusqu'à 12 Q/A)
+  - **Nouveau `HowTo`** généré depuis `seo.usage_steps`
+- **Meta tags auto-optimisés** : `<title>` et `<meta description>` utilisent les versions AI si présentes, sinon fallback.
+
+### Volet 2 — Éditeur WYSIWYG Blog dans le Cockpit (P1)
+- Backend `/app/backend/routes/blog_posts.py` : CRUD `GET / POST / PATCH / DELETE /api/sites/{id}/blog-posts[/:slug]` sur `design.blog_posts[]` + endpoint **AI-draft** `POST /blog-posts/ai-draft` (Claude rédige un article SEO complet avec meta title/description/markdown en 30s).
+- Frontend nouvelle page `/app/frontend/src/pages/SiteBlogPosts.jsx` accessible depuis le cockpit via bouton "Le Journal" :
+  - Grille 2 cols de cards articles (catégorie, temps lecture, badge ⚡ IA si généré).
+  - **Drawer éditeur** : titre, catégorie, image URL, extrait, corps markdown (textarea mono 15 rows), temps lecture, auteur.
+  - **Modale AI-draft** : champ keyword cible + angle optionnel + bouton longueur (court 600-800 / moyen 1000-1400 / **long 1800-2400**).
+  - Toasts succès/erreur, loading states, confirmation de suppression.
+- **IndexNow** fired après chaque article généré ou modifié.
+
+### Volet 3 — Hook Review J+14 (P2)
+- Backend `/app/backend/routes/reviews_hook.py` :
+  - `_create_invitations_for_order()` — crée 1 invitation par produit d'une commande livrée (token UUID, `send_after = delivered_at + 14j`, expiration 60j).
+  - `check_due_invitations()` — appelée par le cron quotidien **04:00 UTC** (ajouté à `scheduler` dans server.py), envoie via Resend (si `RESEND_API_KEY`), sinon log "skipped_no_resend" (ops manuelles).
+  - `_send_review_email()` — template HTML premium branded avec CTA "Laisser mon avis (1 min)".
+  - Endpoints admin : `POST /reviews/check-due` (trigger manuel), `POST /orders/{id}/mark-delivered` (marque livré + crée les invitations).
+  - Endpoints publics : `GET /public/reviews/invitation/:token` (résout le token) et `POST /public/reviews/submit/:token` (ajoute à `product.reviews[]` + recompute `rating.score`/`count` + fire IndexNow).
+- Frontend `/app/frontend/src/pages/StorefrontReview.jsx` : page publique `/shop/:siteId/review/:token` — formulaire élégant 1-5 étoiles + titre + body, page de remerciement après soumission, `noindex` meta. Fonctionne sans Resend (génération du token manuelle permet de tester e2e).
+
+
 ## 2026-04-21 · Sprint 42 : Bundles IA intelligents + Blog + UI Cockpit pour narrative
 ### Volet 1 — Bundles IA intelligents
 - **Backend** : nouveau champ `bundles_with: List[str]` sur produits + module `/app/backend/routes/product_bundles.py` avec endpoint `POST /api/sites/{id}/bundles/auto-generate` — Claude 4.5 analyse tout le catalogue et propose 2-4 cross-sells pertinents par produit (jamais de substituts, jamais aléatoire).

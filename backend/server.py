@@ -58,6 +58,8 @@ from routes import platform as platform_routes
 from routes import auth_signup as auth_signup_routes
 from routes import product_narrative as product_narrative_routes
 from routes import product_bundles as product_bundles_routes
+from routes import blog_posts as blog_posts_routes
+from routes import reviews_hook as reviews_hook_routes
 from routes import indexnow as indexnow_routes
 
 logging.basicConfig(
@@ -108,6 +110,8 @@ api.include_router(customers_routes.router)
 api.include_router(storefront_search_routes.router)
 api.include_router(product_narrative_routes.router)
 api.include_router(product_bundles_routes.router)
+api.include_router(blog_posts_routes.router)
+api.include_router(reviews_hook_routes.router)
 api.include_router(indexnow_routes.router)
 
 
@@ -276,6 +280,20 @@ async def startup():
             _scheduled_bimonthly_payouts_run,
             CronTrigger(day="1,15", hour=3, minute=0),
             id="bimonthly_payouts", replace_existing=True, misfire_grace_time=3600,
+        )
+
+        # Daily 04:00 UTC — Review invitation dispatch (14 days post-delivery)
+        async def _scheduled_reviews_check():
+            try:
+                from routes.reviews_hook import check_due_invitations
+                result = await check_due_invitations()
+                logger.info(f"[scheduler] reviews check : {result}")
+            except Exception:
+                logger.exception("[scheduler] reviews check failed")
+        scheduler.add_job(
+            _scheduled_reviews_check,
+            CronTrigger(hour=4, minute=0),
+            id="reviews_check_due", replace_existing=True, misfire_grace_time=3600,
         )
 
         # Monday 05:00 UTC — Scan opportunités Google (détection spikes)
