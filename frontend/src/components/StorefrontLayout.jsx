@@ -10,13 +10,22 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 export default function StorefrontLayout({ children, lang, setLang, site, design }) {
   const { siteId } = useParams();
+  const navigate = useNavigate();
   const [cartCount, setCartCount] = useState(0);
+  const [customer, setCustomer] = useState(() => (siteId ? getCustomer(siteId) : null));
+  const [searchQ, setSearchQ] = useState("");
 
   useEffect(() => {
     const update = () => setCartCount(cartTotals(readCart(siteId)).itemsCount);
+    const updateCust = () => setCustomer(getCustomer(siteId));
     update();
+    updateCust();
     window.addEventListener("cf_cart_updated", update);
-    return () => window.removeEventListener("cf_cart_updated", update);
+    window.addEventListener("alt_cust_session", updateCust);
+    return () => {
+      window.removeEventListener("cf_cart_updated", update);
+      window.removeEventListener("alt_cust_session", updateCust);
+    };
   }, [siteId]);
 
   const shopRoot = `/shop/${siteId}`;
