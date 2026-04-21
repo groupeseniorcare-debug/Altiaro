@@ -367,6 +367,122 @@ async def send_admin_new_order(order: dict, site: dict) -> dict:
     )
 
 
+# ============== DOMAIN PURCHASE EMAILS ============== #
+async def _build_domain_email_html(*, domain: str, site: dict, title: str,
+                                   intro: str, body_html: str,
+                                   cta_label: str = "", cta_url: str = "",
+                                   preheader: str = "") -> str:
+    brand = site.get("name") or "Concept Factory"
+    design = site.get("design") or {}
+    logo = (design.get("brand") or {}).get("logo_url") or ""
+    primary = (design.get("brand") or {}).get("primary_color") or "#2563EB"
+    site_url = await get_site_public_url(site)
+    cta_block = (
+        f"""
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
+  <tr><td align="center">
+    <a href="{cta_url}" style="display:inline-block;padding:14px 28px;background:{primary};color:#FFFFFF;text-decoration:none;border-radius:999px;font-weight:500;font-size:14px;">{cta_label} →</a>
+  </td></tr>
+</table>"""
+        if cta_label and cta_url else ""
+    )
+    inner = f"""
+<h1 style="font-family:Georgia,serif;font-size:26px;font-weight:600;color:#1C1917;margin:0 0 8px 0;line-height:1.2;">{title}</h1>
+<p style="color:#57534E;font-size:15px;line-height:1.6;margin:0 0 20px 0;">{intro}</p>
+
+<div style="background:#FAF7F2;border-radius:12px;padding:20px;margin:24px 0;text-align:center;">
+  <div style="font-size:11px;color:#78716C;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Domaine</div>
+  <div style="font-family:monospace;font-size:22px;font-weight:600;color:{primary};letter-spacing:0.5px;">{domain}</div>
+</div>
+
+{body_html}
+{cta_block}
+
+<p style="color:#A8A29E;font-size:11px;line-height:1.6;margin:32px 0 0 0;">
+  Concept Factory facture et gère pour toi l'achat chez OVH. Renouvellement automatique chaque année au même prix.
+</p>
+"""
+    return _email_shell(brand, logo, primary, site_url, inner, preheader=preheader)
+
+
+async def send_domain_purchased(domain_record: dict, site: dict, user: dict) -> dict:
+    """Envoyé au Concepteur juste après le succès OVH (via webhook Mollie)."""
+    recipient = (user or {}).get("email") or RESEND_OWNER_EMAIL
+    if not recipient:
+        return {"sent": False, "reason": "no_recipient"}
+    domain = domain_record.get("domain") or ""
+    price = domain_record.get("platform_price_eur") or 0
+    dns_url = f"{os.environ.get('FRONTEND_URL', '')}/sites/{site.get('id')}/domains"
+    body = f"""
+<div style="background:#D1FAE5;border:1px solid #A7F3D0;border-radius:8px;padding:14px 16px;margin:16px 0;">
+  <div style="font-size:13px;color:#065F46;line-height:1.5;">
+    ✅ <strong>Paiement confirmé</strong> — {_eur(price)} facturés via Mollie.<br>
+    ✅ <strong>Achat OVH</strong> effectué sous ton compte Concept Factory.<br>
+    ⏳ <strong>DNS</strong> : la zone se crée chez OVH dans 5 à 15 minutes. Dès qu'elle est prête, clique sur <em>"Configurer DNS"</em> depuis la console et ton site <strong>{site.get('name','')}</strong> sera en ligne sur <strong>{domain}</strong>.
+  </div>
+</div>
+<p style="color:#57534E;font-size:14px;line-height:1.6;margin:16px 0 0 0;">
+  Si tu veux, on peut t'envoyer un rappel dans 15 min pour lancer la configuration DNS en 1 clic.
+</p>
+"""
+    html = await _build_domain_email_html(
+        domain=domain, site=site,
+        title=f"🎉 {domain} est à toi",
+        intro=f"Bonne nouvelle ! Ton domaine vient d'être acheté pour le site <strong>{site.get('name','')}</strong>. Dernière étape : la configuration DNS (5-15 min).",
+        body_html=body,
+        cta_label="Configurer les DNS",
+        cta_url=dns_url,
+        preheader=f"{domain} acheté · prochaine étape : DNS",
+    )
+    return await send_email_via_resend(
+        to=recipient,
+        subject=f"🎉 Ton domaine {domain} est prêt",
+        html=html, site=site,
+        tags=["domain_purchased"],
+    )
+
+
+async def send_domain_purchase_failed(domain_record: dict, site: dict, user: dict,
+                                      error: str) -> dict:
+    """Envoyé au Concepteur si le paiement Mollie a réussi mais l'achat OVH a échoué."""
+    recipient = (user or {}).get("email") or RESEND_OWNER_EMAIL
+    if not recipient:
+        return {"sent": False, "reason": "no_recipient"}
+    domain = domain_record.get("domain") or ""
+    price = domain_record.get("platform_price_eur") or 0
+    body = f"""
+<div style="background:#FFE4E6;border:1px solid #FECDD3;border-radius:8px;padding:14px 16px;margin:16px 0;">
+  <div style="font-size:13px;color:#9F1239;line-height:1.5;">
+    ⚠️ Le paiement Mollie de <strong>{_eur(price)}</strong> est bien reçu, mais l'achat chez OVH a échoué :<br>
+    <code style="font-family:monospace;background:#FFFFFF;padding:2px 6px;border-radius:4px;font-size:12px;">{(error or '')[:200]}</code>
+  </div>
+</div>
+<p style="color:#57534E;font-size:14px;line-height:1.6;margin:16px 0;">
+  <strong>Pas de panique</strong> : on a tout loggé, ton paiement est sécurisé. L'équipe Concept Factory va :
+</p>
+<ol style="color:#57534E;font-size:14px;line-height:1.8;padding-left:20px;margin:0 0 16px 0;">
+  <li>Relancer manuellement l'achat OVH dans les 24 h,</li>
+  <li>Ou te rembourser intégralement si le domaine n'est plus disponible.</li>
+</ol>
+<p style="color:#57534E;font-size:14px;line-height:1.6;margin:16px 0 0 0;">
+  On te tient au courant très vite par email.
+</p>
+"""
+    html = await _build_domain_email_html(
+        domain=domain, site=site,
+        title="Achat OVH en attente d'intervention",
+        intro=f"Ton paiement pour <strong>{domain}</strong> a bien été reçu, mais une erreur technique bloque l'achat chez OVH.",
+        body_html=body,
+        preheader=f"{domain} — paiement OK, achat OVH à relancer",
+    )
+    return await send_email_via_resend(
+        to=recipient,
+        subject=f"⚠️ {domain} — paiement OK, achat OVH à relancer",
+        html=html, site=site,
+        tags=["domain_purchase_failed"],
+    )
+
+
 # ============== API ROUTES (for manual testing + admin) ============== #
 class TestEmailInput(BaseModel):
     to: EmailStr

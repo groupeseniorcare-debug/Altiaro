@@ -188,17 +188,41 @@ async def _execute_ovh_purchase(domain_record: dict) -> dict:
             {"$set": {"domain": domain, "domain_status": "purchased",
                       "updated_at": now_iso}},
         )
-        return await db.domains.find_one({"id": domain_record["id"]}, {"_id": 0})
+        updated = await db.domains.find_one({"id": domain_record["id"]}, {"_id": 0})
+        # Fire-and-forget success email to Concepteur
+        try:
+            from routes.emails import send_domain_purchased
+            site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+            user = await db.users.find_one(
+                {"id": domain_record.get("purchased_by")}, {"_id": 0}
+            )
+            if site and user:
+                await send_domain_purchased(updated, site, user)
+        except Exception:
+            logger.exception("send_domain_purchased failed")
+        return updated
     except Exception as e:
         logger.exception(f"OVH execute purchase failed for {domain}")
+        err_msg = str(e)[:500]
         await db.domains.update_one(
             {"id": domain_record["id"]},
             {"$set": {
                 "status": "ovh_purchase_failed",
-                "ovh_error": str(e)[:500],
+                "ovh_error": err_msg,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }},
         )
+        # Fire-and-forget failure email to Concepteur
+        try:
+            from routes.emails import send_domain_purchase_failed
+            site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+            user = await db.users.find_one(
+                {"id": domain_record.get("purchased_by")}, {"_id": 0}
+            )
+            if site and user:
+                await send_domain_purchase_failed(domain_record, site, user, err_msg)
+        except Exception:
+            logger.exception("send_domain_purchase_failed failed")
         raise
 
 

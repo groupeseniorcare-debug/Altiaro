@@ -73,6 +73,7 @@ Les 50 étapes du playbook sont regroupées en 4 blocs :
 | 37 | OVH Domaines (recherche + achat) | ✅ (markup Mollie branché, facturation Concepteur via Mollie puis déclenchement OVH auto via webhook) |
 | 38 | Prompt Studio (remplace Wizard) | ✅ |
 | 39 | **Storefront splitté en composants** (`components/storefront/{Hero,Benefits,ProductGrid,Testimonials,FAQSection,FinalCTA,NarrativeProduct}.jsx` + `storefrontUtils.js`) | ✅ |
+| 40 | **Emails Resend domaine acheté / échec OVH** (envoyés au Concepteur post-webhook Mollie) | ✅ |
 
 ## Règles critiques
 - Pas de Shopify — tout custom React/FastAPI.
