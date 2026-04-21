@@ -62,8 +62,11 @@ Les 50 étapes du playbook sont regroupées en 4 blocs :
 | 26 | **Virements Admin = 50% × marge brute HT** (par Concepteur, 1er/15) | ✅ |
 | 27 | `cost_price_ht` tracké sur produits + snapshot à la commande | ✅ |
 | 28 | TVA multi-pays auto (FR 20 / DE 19 / BE·NL 21 / UK 20 / CH 7.7) | ✅ |
-| 29 | Resend (emails transactionnels) | ⏳ (attente clé) |
-| 30 | Google Ads Center READ-ONLY sync | ⏳ (attente clé) |
+| 29 | **Sourcing CJ Dropshipping + AliExpress Affiliate (search + import 1-clic)** | ✅ |
+| 30 | **Wizard 10 étapes guidées avec auto-détection d'avancement** | ✅ |
+| 31 | **SEO avancé (sitemap hreflang, robots, Merchant Feed RSS, Schema.org, OG, canonical)** | ✅ |
+| 32 | Resend (emails transactionnels) | ⏳ (attente clé) |
+| 33 | Google Ads Center READ-ONLY sync | ⏳ (attente clé) |
 
 ## Règles critiques
 - Pas de Shopify — tout custom React/FastAPI.

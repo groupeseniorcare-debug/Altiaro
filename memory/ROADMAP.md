@@ -3,25 +3,21 @@
 Backlog priorisé.
 
 ## ✅ Livré
-Auth · Sites CRUD · Analyseur deep v2 (5 étapes, 8 pays, langue native) · Catalogue i18n + cost_price_ht · Storefront dynamique · Orders + snapshot HT · Niche Analyzer ouvert à tous produits · Ops Center · Ads Copy · Duplication · Multi-domain · Scale 6 pays · Empire Dashboard · Mega-Blocks · AI Copilot · Mollie Checkout + CB + IBAN · **Virements 50% marge brute HT (1er/15)** · **Site Designer IA-first** · **Pages légales auto**
+Auth · Sites CRUD · Analyseur deep v2 (5 étapes, 8 pays, langue native) · Catalogue i18n + cost_price_ht · Storefront dynamique · Orders + snapshot HT · Niche Analyzer ouvert à tous produits · Ops Center · Ads Copy · Duplication · Multi-domain · Scale 6 pays · Empire Dashboard · Mega-Blocks · AI Copilot · Mollie Checkout + CB + IBAN · **Virements 50% marge brute HT (1er/15)** · **Site Designer IA-first** · **Pages légales auto** · **Sprint 16 : Sourcing CJ Dropshipping + AliExpress Affiliate (backend + UI)** · **Sprint 16bis : Wizard 10 étapes guidées avec auto-détection d'avancement** · **Sprint 17 : SEO avancé (sitemap multi-pays avec hreflang, robots.txt, Google Merchant Feed RSS 2.0 par pays, Schema.org JSON-LD Organization/WebSite/Product, Open Graph, Twitter Cards, canonical)**
 
 ## 🔴 P0 — Prochaine session
 
-### Sprint 16 : Sourcing fournisseurs + Wizard de construction
-- [ ] Intégration **CJ Dropshipping API** (gratuite) — recherche produit → import fiches
-- [ ] Intégration **AliExpress Affiliate API** (clé gratuite, 5 min) — import fiches produits
-- [ ] **BigBuy** (optionnel si abonnement Admin)
-- [ ] **Wizard 10 étapes** : product → pays → sourcing → pricing → positionnement → identité → SEO → contenu → légal → publish
-- [ ] Chaque étape : prompt Claude pré-rempli éditable + génération + preview
+### Sprint 18 : Activation providers sourcing (user fournit clés)
+- [ ] Obtenir clé CJ Dropshipping (gratuite, https://developers.cjdropshipping.com)
+- [ ] Obtenir App Key + Secret + Tracking ID AliExpress Affiliate (gratuit, https://portals.aliexpress.com)
+- [ ] Tester les imports réels en environnement de production
+- [ ] BigBuy (optionnel si abonnement Admin)
 
-### Sprint 17 : SEO multi-pays avancé
-- [ ] **Routage `/fr/`, `/de/`, `/en/`** au niveau storefront
-- [ ] **hreflang** auto
-- [ ] **Sitemap.xml** par pays + robots.txt
-- [ ] **Schema.org** Product + Organization + FAQ markup
-- [ ] **Core Web Vitals** : lazy-load, preload fonts, CSS critique inline
-- [ ] **Feed Google Merchant Center** XML auto par pays
-- [ ] **Google Ads Keyword Planner API** (quand clé fournie) → remplacer estimations Claude par volumes officiels
+### Sprint 19 : Google Ads Center (Admin only)
+- [ ] Interface Admin pour gérer campagnes Google Ads via API
+- [ ] Génération copy automatique depuis Ads Copy existant
+- [ ] Reporting perf par site/pays
+- [ ] **Attente clé Google Ads Keyword Planner API**
 
 ## 🟡 P1 — Optimisations template vente
 - [ ] Trust badges dynamiques, scarcity countdown, social proof (nb commandes 7j), upsell cart, exit-intent popup

@@ -3,6 +3,28 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprints 16+17 : Sourcing CJ/AE + Wizard 10 étapes + SEO avancé
+- **📦 Sprint 16 Backend + Frontend** — Sourcing unifié CJ Dropshipping + AliExpress Affiliate :
+  - `GET /api/sourcing/providers` : statut activation + steps setup
+  - `POST /api/sourcing/search` : recherche parallèle multi-providers (fallback gracieux si clés manquantes, 0 crash)
+  - `POST /api/sites/{id}/sourcing/import` : import en 1 clic avec `cost_price_ht` snapshot
+  - Page `/sites/:id/sourcing` : recherche + grille résultats + bouton import 1-clic + multiplicateur marge (×2/×2.5/×3/×4)
+- **🧙 Wizard 10 étapes guidées** (`routes/wizard.py` + `pages/Wizard.jsx`) :
+  - 10 étapes : produit → pays → sourcing → pricing → positionnement → identité → SEO → contenu → légal → publish
+  - Auto-détection : scan DB (products/design/published) → marque automatiquement les étapes complétées
+  - Endpoints : `GET /api/sites/{id}/wizard` + `POST /api/sites/{id}/wizard/step/{step_id}` (mark done/pending + advance_to)
+- **🔍 Sprint 17 SEO avancé** :
+  - `GET /api/public/sites/{id}/sitemap.xml` : URLs + hreflang alternates auto selon selected_countries
+  - `GET /api/public/sites/{id}/robots.txt`
+  - **`GET /api/public/sites/{id}/merchant-feed.xml?country=FR|DE|BE|NL|UK|CH`** : RSS 2.0 conforme Google Merchant Center (g:id, g:title, g:price, g:availability, g:shipping)
+  - **Composant `SEOHead.jsx`** : injection DOM dynamique `<title>`, meta description, Open Graph, Twitter Cards, canonical, hreflang alternates, JSON-LD Schema.org
+  - Storefront Home : Schema.org `Organization` + `WebSite` avec SearchAction
+  - Storefront Product : Schema.org `Product` avec `Offer` (prix, currency, availability, URL)
+- Boutons `Wizard 10 étapes` + `Sourcing CJ/AE` ajoutés dans SiteDetail
+- Tests : 19/19 pytest backend + frontend E2E validé (iteration_13.json)
+
+
+
 ## 2026-04-20 · Sprint 15 : Deep Market Analyzer v2 🔬
 
 **Vision :** passer d'une « analyse 30 secondes » (Claude mono-appel) à une **vraie étude de marché approfondie** multi-étapes, langue native par pays, 2-4 minutes de calcul.
