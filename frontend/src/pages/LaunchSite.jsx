@@ -218,6 +218,14 @@ export default function LaunchSite() {
         {/* Step 2 bis — Results */}
         {scan && (scan.results || []).length > 0 && (
           <div className="mb-4">
+            {scan.corrected_query && scan.corrected_query.toLowerCase().trim() !== product.toLowerCase().trim() && (
+              <div className="mb-3 px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center gap-2" data-testid="corrected-query">
+                <Info size={12} weight="fill" className="shrink-0" />
+                <span>
+                  Recherche effectuée pour <strong className="font-semibold">« {scan.corrected_query} »</strong> (correction automatique de votre saisie)
+                </span>
+              </div>
+            )}
             <div className="flex items-baseline justify-between mb-3">
               <div>
                 <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-500 font-medium">
@@ -427,6 +435,26 @@ function MarketCard({ result, selected, onToggle }) {
               <Globe size={9} className="text-neutral-400 shrink-0" />
               <div className="text-[10px] text-neutral-500 truncate font-mono">
                 {result.market.top_competitors.slice(0, 3).join(" · ")}
+              </div>
+            </div>
+          )}
+
+          {result.keywords?.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-neutral-200">
+              <div className="text-[9px] text-neutral-500 uppercase tracking-wider font-medium mb-1.5">
+                Mots-clés analysés (top {Math.min(result.keywords.length, 4)})
+              </div>
+              <div className="space-y-1">
+                {result.keywords.slice(0, 4).map((kw, i) => (
+                  <div key={i} className="flex items-center justify-between text-[11px] gap-2">
+                    <span className="text-neutral-700 truncate flex-1" title={kw.keyword}>
+                      {i === 0 ? <strong>{kw.keyword}</strong> : kw.keyword}
+                    </span>
+                    <span className="font-mono text-neutral-900 tabular-nums shrink-0">
+                      {fmtNum(kw.volume)}/mo
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           )}

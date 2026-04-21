@@ -70,6 +70,7 @@ Pays cible : **{country_name}**
 Renvoie EXACTEMENT ce JSON (pas de markdown, pas de commentaire) :
 
 {{
+  "corrected_query": "<la version correctement orthographiée et formulée du produit, ou identique si ok>",
   "keyword_variants": ["kw1", "kw2", "kw3", "kw4", "kw5"],
   "avg_price_eur": {{"min": <int>, "median": <int>, "max": <int>}},
   "market_trend": "growing" | "stable" | "declining",
@@ -84,6 +85,10 @@ Renvoie EXACTEMENT ce JSON (pas de markdown, pas de commentaire) :
 }}
 
 Règles :
+- corrected_query : corrige les fautes d'orthographe du produit donné et reformule en \
+terminologie d'acheteur. Exemples : "matela medica" → "matelas médical", \
+"fauteuil releveur éléctrique" → "fauteuil releveur électrique", \
+"monte-escalier" → "monte-escalier". Si la requête est déjà parfaite, répète-la telle quelle.
 - keyword_variants : 5 requêtes de recherche français (ou langue du pays) que \
 cible un client final qui veut ACHETER ce produit. Vraies formulations \
 d'acheteurs 60+, pas du keyword stuffing. Pas de modificateurs ("pas cher", \
@@ -520,9 +525,12 @@ async def _run_single_scan(product: str, country: str, user_id: Optional[str]) -
     }
     verdict_data = _compute_verdict(metrics, insights)
 
+    corrected_query = str(insights.get("corrected_query") or "").strip() or product
+
     return {
         "id": f"qs-{uuid.uuid4().hex[:12]}",
         "product_or_niche": product,
+        "corrected_query": corrected_query,
         "country": country.upper(),
         "country_name": country_name,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -680,9 +688,18 @@ async def get_multi_scan_status(
     order = {"GO": 0, "GO_WITH_RESERVE": 1, "NO_GO": 2, "ERROR": 3}
     scans.sort(key=lambda r: (order.get(r.get("verdict"), 9), -(r.get("score") or 0)))
 
+    # Extract the first non-empty corrected_query across scans (same across markets)
+    corrected_query = None
+    for r in scans:
+        cq = r.get("corrected_query")
+        if cq and cq.strip():
+            corrected_query = cq.strip()
+            break
+
     return {
         "group_id": group_id,
         "product_or_niche": group.get("product_or_niche"),
+        "corrected_query": corrected_query or group.get("product_or_niche"),
         "countries": group.get("countries", []),
         "status": group.get("status", "running"),
         "progress": group.get("progress", {"done": len(scans), "total": len(group.get("countries", []))}),

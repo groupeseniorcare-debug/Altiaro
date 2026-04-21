@@ -3,6 +3,20 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 26 : Refonte cockpit Concepteur (1 seule vue, 8 blocs, flow unifié)
+- **🗑️ Suppression des 3 pages doublons** qui créaient un chaos visuel : `/sites/:id/studio` (Prompt Studio avec 7 prompts bâtards), `/sites/:id/wizard` (Wizard 10 étapes), `/sites/:id/design` (Design IA). Fichiers `PromptStudio.jsx`, `Wizard.jsx`, `SiteDesign.jsx` supprimés, routes retirées d'App.js.
+- **🏗️ Cockpit unique `/sites/:id`** : plus de boutons violets moches dans le bandeau. Seuls les CTA utiles restent (Gérer produits, Sourcing, Google Ads Copy, Voir la boutique, Domaine, Dupliquer, Scaler).
+- **📊 4 → 8 blocs thématiques** : réorganisation complète de BLOCKS et PHASE_TO_BLOCK dans `seed_prompts.py`. Ordre : (1) Produits & Sourcing, (2) Marque & Identité, (3) Fondations boutique, (4) Construction du front, (5) SEO & Contenu, (6) Conversion & CRM, (7) Opérations & SAV, (8) Acquisition & Scale.
+- **🔄 Migration automatique** : au démarrage backend, tous les steps existants sont re-mappés vers la nouvelle structure 8-blocs via `server.py:@on_event("startup")`. Idempotent — re-applicable à chaque redémarrage.
+- **✍️ Fin du champ "Nom du site" manuel** : `LaunchSite.jsx` crée désormais le site avec un placeholder auto `"Projet {niche}"` ; le Concepteur renomme officiellement au **prompt #5 (Génération nom de marque + domaine + INPI)**, au bon moment dans le parcours.
+- **🔠 Scan intelligent — correction orthographique** : `/api/quick-scan` renvoie maintenant `corrected_query` via Claude (ex: "matela medica" → "matelas médical"). Affiché dans l'UI LaunchSite si différent de la saisie.
+- **🔑 5 mots-clés frères visibles** : les cartes marché affichent désormais les 4 principaux mots-clés analysés avec leur volume mensuel (ex: matelas anti-escarres 2100/mo, matelas médical 1200/mo, matelas médicalisé 800/mo, matelas hospitalier 650/mo). Le backend agrégeait déjà les volumes, mais l'UI cachait les détails.
+- **🖥️ Layout full-screen** : Dashboard, LaunchSite, SiteDetail passés en `max-w-[1400|1600px] mx-auto w-full` — fin du "rien à droite de l'écran".
+- **🔐 Fix CORS prod** : CORS_ORIGINS passé à `"*"` + middleware custom utilisant `allow_origin_regex=".*"` avec credentials (contourne la limite Starlette). `routes/google_ads.py:oauth_callback` dérive dynamiquement le frontend_base depuis le header Origin/Referer (plus de fallback hardcodé preview). Nécessite un redeploy pour activer sur `altiaro.com`.
+- **👤 Seed auto du compte Concepteur** : `concepteur@conceptfactory.fr / Concepteur2026!` seedé idempotent au démarrage backend (avant : seul l'admin l'était, BDD prod fraîche = login impossible).
+- **Tests** : curl E2E OK — correction "matela medica"→"matelas médical", 5 keywords avec volumes, verdict NO_GO/score 65 cohérent. Lint JS/Python clean. StepPanel d'exécution d'étape déjà fonctionnel (ouvert sur clic étape #1 du cockpit) : prompt complet 500+ mots + sélecteur Claude + "Exécuter l'IA" + sauvegarde brouillon + valider/rejeter.
+
+
 ## 2026-04-21 · Sprint 25 : Pivot "Altiora" → "Altiaro" (domaine .com libre)
 - **🔁 Rebrand forcé** : après constat que **tous les TLDs d'Altiora sont pris** (Altiora Financial Group LLC aux US sur le .com, squatters sur .fr/.io/.eu/etc.), pivot vers un nom proche disponible. La commande OVH 248781829 a été interprétée par erreur comme un "transfert entrant" par l'API OVH → s'auto-annulera sous 14 jours avec remboursement 7,99€.
 - **🌐 `altiaro.com` acheté** via OVH direct (order #248782321, 7,99€ TTC, vrai CREATE — vérifié dans la réponse item). Seul nom premium parmi 20 candidats testés qui avait `.com` réellement libre (DNS vide + HTTP silencieux + OVH `create` confirmé). Phonétiquement proche d'Altiora, même étymologie latine (élévation).
