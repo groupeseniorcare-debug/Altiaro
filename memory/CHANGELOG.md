@@ -3,6 +3,20 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 21 : UI Light Mode (Ultra Premium Digital 2.0 — Light variant)
+- **🎨 Bascule complète dark → light** suite au feedback user ("fond noir trop agressif → fond blanc éléments noirs")
+- **`index.css`** réécrit : CSS vars light mode (background 0% 100%, foreground 240 10% 4%, border 240 6% 90%), body `bg-white text-neutral-900`, scrollbar (#E4E4E7), selection, markdown rebaselined clair
+- **37 fichiers JSX** transformés via script Python (`/tmp/flip_to_light.py`) avec placeholders pour les CTA inversés :
+  - `bg-black`/`bg-zinc-950` → `bg-white`, `bg-zinc-900` → `bg-neutral-100`, `bg-zinc-800` → `bg-neutral-200`
+  - `text-white`/`text-zinc-100` → `text-neutral-900`, `text-zinc-400` → `text-neutral-600`, `text-zinc-500` → `text-neutral-500`
+  - `border-zinc-800/900` → `border-neutral-200`, `border-zinc-700` → `border-neutral-300`
+  - CTA primaire inversé : `bg-white text-black hover:bg-zinc-200` → `bg-neutral-900 text-white hover:bg-neutral-800`
+- **Hero blocks sombres** conservés (BalanceCard `highlight`, Card preview Billing, Wizard/PromptStudio hero, CopilotFab button) avec `text-white/XX` sur les textes enfants
+- **Modales/backdrops** basculés de `bg-white/XX` (invisible) vers `bg-neutral-900/30-40` pour dimmer correctement
+- **Storefront** intact : les composants `/components/storefront/*` et `Storefront.jsx` conservent leur thème chaud Fraunces + #FDFBF7 (classe `.storefront-root`)
+- **Tests Playwright frontend** (iteration_16.json) : 7/7 pages validées, 0 console error, 0 bug UI bloquant, contraste WCAG AA OK, tous les CTA noirs visibles, tous les `data-testid` préservés
+
+
 ## 2026-04-21 · Sprint 19 : Google Ads Center (Admin only) + activation CJ
 - **🔑 CJ Dropshipping activée** avec la vraie clé user (`CJ135808@api@...`). Sourcing opérationnel : recherche + import 1-clic avec `cost_price_ht` snapshot. Fix parsing prix ranges (ex "0.48 -- 0.67").
 - **🎯 Sprint 19 — Google Ads Center** (`routes/google_ads.py` + `pages/GoogleAds.jsx`) — Admin only :
