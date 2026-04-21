@@ -212,6 +212,16 @@ Règles dures :
         {"$set": {"narrative": narrative, "updated_at": datetime.now(timezone.utc).isoformat()}},
     )
     logger.info(f"[narrative] enriched product {product_id} ({len(narrative['sections'])} sections, {len(narrative['faq'])} FAQ)")
+
+    # Fire-and-forget IndexNow to re-index the enriched product URL
+    try:
+        from routes.indexnow import fire_and_forget_indexnow
+        origin = os.environ.get("PUBLIC_ORIGIN") or "https://senior-france.preview.emergentagent.com"
+        url = f"{origin}/shop/{product.get('site_id')}/product/{product_id}"
+        fire_and_forget_indexnow([url])
+    except Exception:
+        logger.exception("[narrative→indexnow] dispatch failed")
+
     return {"status": "ok", "product_id": product_id, "narrative": narrative}
 
 

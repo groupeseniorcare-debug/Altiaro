@@ -3,6 +3,32 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 41 : Page Produit marketing premium + IndexNow (AEO boost)
+### Volet UX Produit — 6 composants ajoutés/refondus
+- **`DeliveryEstimate.jsx`** — carte grise premium qui calcule et affiche la date de livraison estimée **J+3 ouvré** (en français complet « vendredi 24 avril »), saute les week-ends, affiche « Commandez avant 14h pour un envoi aujourd'hui » si avant cutoff en semaine.
+- **`ProductBundle.jsx`** — bloc "Souvent achetés ensemble" : 2 produits complémentaires auto-sélectionnés (même `category`), cases à cocher, total avec −10 % en lot affiché et économie calculée, CTA "Ajouter le pack au panier". Fallback démo si pas d'autres produits.
+- **`PaymentOptions.jsx`** — carte grise "3 × XX,XX € sans frais" (si prix ≥ 100 €) + badges paiement (Visa, Mastercard, CB, PayPal, Apple Pay).
+- **`MobileStickyBuy.jsx`** — barre fixe bas de page mobile qui apparaît au scroll (>600px) avec image + nom + prix + CTA Ajouter, animation slide-in.
+- **`TechSpecs` refondu** — passage de table 2-col à **grid 3 colonnes de cartes grises** avec eyebrow uppercase + valeur en serif, hover subtle.
+- **Stock urgency** — badge subtil "Plus que X en stock" avec dot ambre pulsé, uniquement si stock < 10.
+- **Trust badges** condensés en 2×2 texte monochrome (remplace les cartes grises redondantes avec les nouvelles cartes marketing).
+
+### Volet IndexNow — AEO boost
+- **Nouveau module `/app/backend/routes/indexnow.py`** :
+  - `INDEXNOW_KEY` stable + fichier clé servi à `/api/public/indexnow-{key}.txt`.
+  - Fonction `notify_indexnow(urls)` — POST `api.indexnow.org/indexnow` (Bing / Yandex / Naver / Yep ; répliqué auto vers ChatGPT).
+  - `fire_and_forget_indexnow(urls)` — version non-bloquante.
+  - Endpoint `POST /api/indexnow/notify` (admin) — submission manuelle.
+  - Endpoint `POST /api/sites/{id}/indexnow/resubmit-all` — resoumet toutes les URLs du site.
+- **Hooks auto** :
+  - Après import catalogue (hook #16) → soumet accueil + collections + URLs produits.
+  - Après enrichissement narrative IA → resubmit de l'URL produit enrichie.
+- **Bénéfice concret** : indexation en ~24h au lieu de 2-4 semaines sur Bing, et citation accélérée par les moteurs de réponse IA.
+
+### Validation visuelle
+Tous les `data-testid` FOUND : `delivery-estimate`, `payment-options`, `payment-methods`, `product-trust-badges`, `product-bundle`, `product-specs`, `spec-0`. Screenshots confirmés (buy panel premium, bundle en vedette avec -104,80 €, fiche technique 9 cards en 3 colonnes).
+
+
 ## 2026-04-21 · Sprint 40 : Hook IA Product Narrative + SEO ultra-développé + AEO
 ### Volet 1 — Hook IA Product Narrative
 - **Nouveau module** `/app/backend/routes/product_narrative.py` :

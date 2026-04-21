@@ -404,6 +404,17 @@ Uniquement le JSON."""
         except Exception:
             logger.exception("[side-effect #16→narrative] dispatch failed")
 
+        # -------- Fire-and-forget IndexNow submission --------
+        try:
+            from routes.indexnow import fire_and_forget_indexnow, _origin
+            origin = _origin()
+            base = f"{origin}/shop/{step['site_id']}"
+            urls = [base, f"{base}/collections"] + [f"{base}/product/{pid}" for pid in inserted_ids]
+            fire_and_forget_indexnow(urls)
+            logger.info(f"[side-effect #16→indexnow] submitted {len(urls)} URLs")
+        except Exception:
+            logger.exception("[side-effect #16→indexnow] dispatch failed")
+
 
 # =====================================================================
 # Hook #17 — Scaffold React → template Altiaro + re-applique brand

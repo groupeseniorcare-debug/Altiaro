@@ -54,6 +54,10 @@ import {
 import ProductGallery from "../components/storefront/ProductGallery";
 import ProductReviews from "../components/storefront/ProductReviews";
 import CrossSellProducts from "../components/storefront/CrossSellProducts";
+import DeliveryEstimate from "../components/storefront/DeliveryEstimate";
+import ProductBundle from "../components/storefront/ProductBundle";
+import PaymentOptions from "../components/storefront/PaymentOptions";
+import MobileStickyBuy from "../components/storefront/MobileStickyBuy";
 
 /* =========================================================
  * STOREFRONT HOME
@@ -420,8 +424,16 @@ export function StorefrontProduct() {
             </div>
             <div className="text-xs text-neutral-500 mt-1">TVA incluse · livraison offerte dès 50 €</div>
 
+            {/* Stock urgency (subtle, only if < 10) */}
+            {typeof p.stock === "number" && p.stock > 0 && p.stock < 10 && (
+              <div className="mt-4 flex items-center gap-2 text-sm" data-testid="stock-urgency">
+                <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#F59E0B" }} />
+                <span className="text-amber-700 font-medium">Plus que {p.stock} en stock</span>
+              </div>
+            )}
+
             {/* Quantity + Add */}
-            <div className="mt-8 flex items-center gap-4">
+            <div className="mt-6 flex items-center gap-4">
               <div className="flex items-center border border-[#E7E5E4] rounded-full overflow-hidden bg-white">
                 <button
                   onClick={() => setQty(Math.max(1, qty - 1))}
@@ -443,7 +455,7 @@ export function StorefrontProduct() {
               <button
                 onClick={handleAdd}
                 data-testid="add-to-cart"
-                className="flex-1 h-12 rounded-full font-medium text-[15px] transition-all duration-200 active:scale-[0.98] text-white"
+                className="flex-1 h-14 rounded-full font-medium text-[15px] transition-all duration-200 active:scale-[0.98] text-white"
                 style={{ background: added ? "#047857" : primary }}
               >
                 {added ? (
@@ -456,23 +468,29 @@ export function StorefrontProduct() {
               </button>
             </div>
 
-            {/* Trust badges */}
-            <div className="mt-8 grid grid-cols-2 gap-3 text-sm">
-              <div className="bg-[#FAF7F2] rounded-xl p-3 flex items-center gap-2">
-                <Truck size={16} weight="fill" style={{ color: primary }} />
-                <span className="text-[#57534E]">Livraison offerte dès 50 €</span>
+            {/* Marketing elements — delivery estimate + payment options */}
+            <div className="mt-6 space-y-3">
+              <DeliveryEstimate design={design} />
+              <PaymentOptions price={p.price} currency={p.currency} design={design} />
+            </div>
+
+            {/* Trust badges — condensed */}
+            <div className="mt-6 grid grid-cols-2 gap-2 text-[13px]" data-testid="product-trust-badges">
+              <div className="flex items-center gap-2 text-neutral-700">
+                <ShieldCheck size={15} weight="fill" style={{ color: primary }} />
+                Garantie 2 ans
               </div>
-              <div className="bg-[#FAF7F2] rounded-xl p-3 flex items-center gap-2">
-                <ShieldCheck size={16} weight="fill" style={{ color: primary }} />
-                <span className="text-[#57534E]">Garantie 2 ans</span>
+              <div className="flex items-center gap-2 text-neutral-700">
+                <Truck size={15} weight="fill" style={{ color: primary }} />
+                Livraison offerte
               </div>
-              <div className="bg-[#FAF7F2] rounded-xl p-3 flex items-center gap-2">
-                <ShieldCheck size={16} weight="fill" style={{ color: primary }} />
-                <span className="text-[#57534E]">Paiement sécurisé</span>
+              <div className="flex items-center gap-2 text-neutral-700">
+                <CheckCircle size={15} weight="fill" style={{ color: primary }} />
+                Retour gratuit 14j
               </div>
-              <div className="bg-[#FAF7F2] rounded-xl p-3 flex items-center gap-2">
-                <CheckCircle size={16} weight="fill" style={{ color: primary }} />
-                <span className="text-[#57534E]">Retour gratuit 14j</span>
+              <div className="flex items-center gap-2 text-neutral-700">
+                <ShieldCheck size={15} weight="fill" style={{ color: primary }} />
+                Paiement sécurisé
               </div>
             </div>
 
@@ -485,12 +503,23 @@ export function StorefrontProduct() {
           </div>
         </div>
 
+        <ProductBundle currentProduct={p} lang={lang} design={design} />
+
         <NarrativeSections sections={p.narrative?.sections} design={design} />
         <TechSpecs specs={p.narrative?.tech_specs} design={design} />
         <ProductFAQ faq={p.narrative?.faq} design={design} />
         <ProductReviews product={p} design={design} />
         <CrossSellProducts currentProduct={p} lang={lang} design={design} />
       </div>
+
+      <MobileStickyBuy
+        product={p}
+        onAdd={handleAdd}
+        qty={qty}
+        added={added}
+        design={design}
+        lang={lang}
+      />
 
       {/* Sticky mobile CTA */}
       <div className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-[#E7E5E4] p-3 flex items-center gap-3 z-40">

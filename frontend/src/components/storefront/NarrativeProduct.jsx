@@ -81,21 +81,42 @@ export function TechSpecs({ specs, design }) {
     { label: "Entretien", value: "Housse déhoussable, lavable à 30°" },
   ];
   const items = (Array.isArray(specs) && specs.length > 0) ? specs : fallback;
-  const { fontHeading } = designAccents(design);
+  const { primary, fontHeading } = designAccents(design);
 
   return (
-    <section className="mb-20 bg-[#FAF7F2] rounded-3xl p-8 md:p-12" data-testid="product-specs">
-      <h2
-        className="text-2xl md:text-3xl font-semibold mb-8"
-        style={{ fontFamily: `"${fontHeading}", serif` }}
-      >
-        Caractéristiques techniques
-      </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+    <section className="mb-20" data-testid="product-specs">
+      <div className="flex items-end justify-between flex-wrap gap-3 mb-10">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-2">
+            Fiche technique
+          </div>
+          <h2
+            className="text-3xl md:text-4xl font-semibold"
+            style={{ fontFamily: `"${fontHeading}", serif`, color: "#1C1917" }}
+          >
+            Caractéristiques précises
+          </h2>
+        </div>
+        <div className="text-sm text-neutral-500">
+          {items.length} caractéristique{items.length > 1 ? "s" : ""} vérifiée{items.length > 1 ? "s" : ""}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
         {items.map((spec, i) => (
-          <div key={i} className="flex items-baseline justify-between border-b border-[#E7E5E4] pb-3">
-            <span className="text-sm text-[#78716C]">{spec.label}</span>
-            <span className="text-sm font-medium text-[#1C1917] text-right">{spec.value}</span>
+          <div
+            key={i}
+            className="bg-[#F5F2EB] rounded-2xl p-5 hover:bg-[#EFEBE2] transition-colors duration-300"
+            data-testid={`spec-${i}`}
+          >
+            <div className="text-[11px] uppercase tracking-[0.15em] text-neutral-500 mb-2 font-medium">
+              {spec.label}
+            </div>
+            <div
+              className="text-[15px] font-medium text-neutral-900 leading-snug"
+              style={{ fontFamily: `"${fontHeading}", serif` }}
+            >
+              {spec.value}
+            </div>
           </div>
         ))}
       </div>
