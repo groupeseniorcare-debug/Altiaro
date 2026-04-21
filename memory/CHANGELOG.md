@@ -3,6 +3,18 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 32 : Branchement visuel du brand book au storefront
+- **3 hooks mis à jour** dans `step_side_effects.py` pour set automatiquement `design.published = true` à la validation : #6 (brand), #9 (légal), #17 (scaffold). Avant, `/api/public/sites/{id}/design` renvoyait `null` tant que `design.published` n'était pas explicitement flippé par l'admin → aucun rendu ne changeait sur le storefront. Maintenant, dès qu'un hook tourne, le storefront est visible et reflète les nouveaux paramètres.
+- **Fix tagline string vs dict** dans `StorefrontLayout.jsx` : le hook #6 stocke `tagline` en string simple, mais le layout le lisait comme dict multilingue `{fr: "..."}` → tagline invisible. Fix : cast type runtime pour accepter string OU dict `{lang: string}`.
+- **Migration BDD** : `update_many({"design.brand": {"$exists": true}}, {"design.published": true})` → 2 sites existants (Luméa + Sereniva) immédiatement publiés avec leur brand book déjà appliqué.
+- **Vérification E2E** sur `/shop/{id}` de Luméa Confort :
+  - Logo en **Playfair Display** (font_heading injecté via Google Fonts dynamique + CSS var `--cf-font-heading`)
+  - Tagline "Le confort qui prend soin de vous" affichée
+  - Couleur primaire **#8B5A3C** (brun chaleureux extrait du markdown du hook #6) appliquée sur CTA "Découvrir la collection", icônes engagements, bandeau
+  - Background crème `#FEFBF5`, texte `#2D1810`, font body "DM Sans" — tout cohérent
+- Le brand book du hook #6 pilote désormais de bout en bout le rendu visuel du storefront **sans redéploiement**.
+
+
 ## 2026-04-21 · Sprint 31 : Refonte des 50 prompts pour cohérence stack Altiaro + barre de progression IA
 - **Substitutions globales** dans `seed_prompts.py` pour retirer toute référence aux stacks qu'on n'utilise pas : **Shopify → Altiaro**, **Stripe/PayPal → Mollie**, **Klaviyo → Brevo**, **Algolia → recherche native Altiaro**, **"scaffold headless + Shopify Storefront API" → "customisation du template Altiaro"**. 24 prompts impactés, 0 occurrence restante vérifiée.
 - **6 prompts pivots entièrement réécrits** pour refléter la vraie architecture (template Altiaro fourni, Mollie branché d'office, hooks auto pour légal/brand/produits) :

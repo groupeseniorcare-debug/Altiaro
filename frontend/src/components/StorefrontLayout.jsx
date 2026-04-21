@@ -28,7 +28,10 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
   const fontBody = brand.font_body || "Inter";
   const logoUrl = brand.logo_url ? `${BACKEND_URL}${brand.logo_url}` : null;
   const logoText = brand.logo_text || site?.name || "…";
-  const tagline = (design?.brand?.tagline?.[lang]) || (design?.brand?.tagline?.fr) || site?.niche_data?.tagline;
+  const brandTaglineRaw = design?.brand?.tagline;
+  const tagline = typeof brandTaglineRaw === "string"
+    ? brandTaglineRaw
+    : (brandTaglineRaw?.[lang] || brandTaglineRaw?.fr || site?.niche_data?.tagline);
 
   const footer = design?.footer;
   const footerTagline = (footer?.tagline?.[lang]) || (footer?.tagline?.fr);

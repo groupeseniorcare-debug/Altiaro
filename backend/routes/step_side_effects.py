@@ -215,6 +215,7 @@ Uniquement le JSON."""
         {"$set": {
             "design.brand": {**(site.get("design", {}).get("brand") or {}), **brand},
             "design.brand_applied_at": datetime.now(timezone.utc).isoformat(),
+            "design.published": True,
         }},
     )
     logger.info(f"[side-effect #6] brand applied to site {step['site_id']} : {list(brand.keys())}")
@@ -286,6 +287,7 @@ Uniquement le JSON."""
         {"$set": {
             "design.legal_pages": legal_pages,
             "design.legal_applied_at": datetime.now(timezone.utc).isoformat(),
+            "design.published": True,
         }},
     )
     logger.info(f"[side-effect #9] {len(legal_pages)} legal pages applied to site {step['site_id']}")
@@ -412,6 +414,7 @@ async def _hook_template_scaffold(step: dict) -> None:
             "design.template_applied": True,
             "design.template_applied_at": datetime.now(timezone.utc).isoformat(),
             "design.template_name": "altiaro-premium-light",
+            "design.published": True,
         }},
     )
     logger.info(f"[side-effect #17] template 'altiaro-premium-light' applied to site {step['site_id']}")
