@@ -65,14 +65,14 @@ export default function Landing() {
               pour vous. <span className="text-neutral-900 underline decoration-neutral-300 underline-offset-4">Zéro frais fixes.</span>
             </p>
             <div className="flex flex-wrap items-center gap-3 mt-10">
-              <a
-                href="#devenir-concepteur"
+              <Link
+                to="/signup"
                 data-testid="landing-hero-cta"
                 className="h-12 px-6 rounded-full bg-neutral-900 text-white font-medium hover:bg-neutral-800 inline-flex items-center gap-2 text-sm tracking-tight"
               >
                 Devenir Concepteur
                 <ArrowUpRight size={14} weight="bold" />
-              </a>
+              </Link>
               <a
                 href="#methode"
                 className="h-12 px-6 rounded-full border border-neutral-900 text-neutral-900 font-medium hover:bg-neutral-100 inline-flex items-center text-sm tracking-tight"
@@ -480,7 +480,7 @@ export default function Landing() {
       <section id="devenir-concepteur" className="border-b border-neutral-200">
         <div className="max-w-7xl mx-auto px-6 py-32 text-center">
           <div className="text-[11px] uppercase tracking-[0.14em] text-neutral-500 mb-6">
-            Inscription sur cooptation
+            Inscription en 30 secondes
           </div>
           <h2
             className="text-5xl sm:text-7xl tracking-[-0.03em] leading-[0.95] font-medium max-w-4xl mx-auto mb-10"
@@ -489,19 +489,18 @@ export default function Landing() {
             Prêt à lancer votre première marque ?
           </h2>
           <p className="text-neutral-600 mb-12 max-w-xl mx-auto leading-relaxed">
-            L'accès est limité pour garantir la qualité de l'accompagnement.
-            Nous sélectionnons les profils à l'entretien, par cooptation ou
-            candidature directe.
+            Créez votre compte Concepteur maintenant. Vérification par code email,
+            accès immédiat au scan de niches et au générateur de sites.
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            <a
-              href="mailto:contact@altiora.com?subject=Candidature%20Concepteur%20Altiora"
+            <Link
+              to="/signup"
               data-testid="landing-contact-cta"
               className="h-12 px-7 rounded-full bg-neutral-900 text-white font-medium hover:bg-neutral-800 inline-flex items-center gap-2 text-sm tracking-tight"
             >
-              Candidater
+              Créer mon compte Concepteur
               <ArrowUpRight size={14} weight="bold" />
-            </a>
+            </Link>
             <Link
               to="/login"
               className="h-12 px-7 rounded-full border border-neutral-900 text-neutral-900 font-medium hover:bg-neutral-100 inline-flex items-center text-sm tracking-tight"
@@ -593,8 +592,8 @@ function FaqSection() {
       a: "Nous opérons toute la couche technique, juridique et intelligence : l'infrastructure (serveurs, domaines, SSL, paiements), l'IA qui génère votre site et votre copy, les pages légales conformes LCEN/RGPD, le SEO multi-pays, l'intégration Google Merchant Center pour le Shopping gratuit, les scans de niche, et le support de niveau 1. Vous pilotez le produit et la relation client.",
     },
     {
-      q: "Comment je candidate ?",
-      a: "Par e-mail à contact@altiora.com avec un bref pitch de votre parcours et 2-3 idées de niches qui vous intéressent. Réponse sous 72h. Entretien visio de 30 min si votre profil correspond.",
+      q: "Comment je crée mon compte ?",
+      a: "Cliquez sur \"Devenir Concepteur\" en haut de cette page. Inscription en 30 secondes : nom, email professionnel, mot de passe. Vous recevez un code à 6 chiffres par email pour activer votre compte, et vous êtes immédiatement dans le cockpit pour scanner votre première niche.",
     },
   ];
   const [openIdx, setOpenIdx] = useState(0);

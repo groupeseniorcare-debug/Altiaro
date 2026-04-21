@@ -41,6 +41,16 @@ async def login(data: LoginInput, response: Response, request: Request):
         )
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
 
+    if user.get("status") == "pending_email_verification":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "pending_email_verification",
+                "message": "Votre compte attend la vérification par email.",
+                "email": email,
+            },
+        )
+
     await db.login_attempts.delete_one({"identifier": identifier})
     access = create_access_token(str(user["_id"]), user["email"])
     refresh = create_refresh_token(str(user["_id"]))

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate, Navigate } from "react-router-dom";
+import { useNavigate, Navigate, Link } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { Rocket, SignIn, Spinner } from "@phosphor-icons/react";
 import { AltioraLogo } from "../components/AltioraLogo";
@@ -17,18 +17,24 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    const ok = await login(email, password);
+    const res = await login(email, password);
     setSubmitting(false);
-    if (ok) navigate("/");
+    if (res.ok) navigate("/");
+    else if (res.code === "pending_email_verification") {
+      navigate(`/verify-email?email=${encodeURIComponent(res.email)}`);
+    }
   };
 
   const handleQuickLogin = async (quickEmail, quickPassword) => {
     setSubmitting(true);
     setEmail(quickEmail);
     setPassword(quickPassword);
-    const ok = await login(quickEmail, quickPassword);
+    const res = await login(quickEmail, quickPassword);
     setSubmitting(false);
-    if (ok) navigate("/");
+    if (res.ok) navigate("/");
+    else if (res.code === "pending_email_verification") {
+      navigate(`/verify-email?email=${encodeURIComponent(res.email)}`);
+    }
   };
 
   return (
@@ -163,6 +169,17 @@ export default function Login() {
             <div className="font-mono text-[12px] text-neutral-600">
               concepteur@conceptfactory.fr · Concepteur2026!
             </div>
+          </div>
+
+          <div className="mt-6 text-sm text-neutral-500 text-center">
+            Pas encore de compte ?{" "}
+            <Link
+              to="/signup"
+              className="text-neutral-900 font-medium hover:underline"
+              data-testid="login-signup-link"
+            >
+              Créer un compte Concepteur
+            </Link>
           </div>
         </div>
       </div>

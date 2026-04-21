@@ -53,6 +53,7 @@ from routes import domains as domains_routes
 from routes import quick_scan as quick_scan_routes
 from routes import concepteur_cockpit as concepteur_cockpit_routes
 from routes import platform as platform_routes
+from routes import auth_signup as auth_signup_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -92,6 +93,7 @@ api.include_router(domains_routes.router)
 api.include_router(quick_scan_routes.router)
 api.include_router(concepteur_cockpit_routes.router)
 api.include_router(platform_routes.router)
+api.include_router(auth_signup_routes.router)
 api.include_router(niches_routes.router)
 api.include_router(dashboard_routes.router)
 api.include_router(meta_routes.router)

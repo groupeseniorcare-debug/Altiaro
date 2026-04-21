@@ -30,11 +30,16 @@ export function AuthProvider({ children }) {
     try {
       const { data } = await api.post("/auth/login", { email, password });
       setUser(data);
-      return true;
+      return { ok: true };
     } catch (e) {
-      const msg = e.response?.data?.detail;
-      setError(typeof msg === "string" ? msg : "Erreur de connexion");
-      return false;
+      const detail = e.response?.data?.detail;
+      // Pending email verification → redirect signal for the caller
+      if (detail && typeof detail === "object" && detail.code === "pending_email_verification") {
+        return { ok: false, code: "pending_email_verification", email: detail.email || email };
+      }
+      const msg = typeof detail === "string" ? detail : "Erreur de connexion";
+      setError(msg);
+      return { ok: false, error: msg };
     }
   };
 
@@ -46,7 +51,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, error, setError, checkSession }}>
+    <AuthContext.Provider value={{ user, setUser, login, logout, error, setError, checkSession }}>
       {children}
     </AuthContext.Provider>
   );

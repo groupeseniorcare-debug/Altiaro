@@ -28,6 +28,8 @@ import QuickScan from "./pages/QuickScan";
 import LaunchSite from "./pages/LaunchSite";
 import Landing from "./pages/Landing";
 import Legal from "./pages/Legal";
+import Signup from "./pages/Signup";
+import VerifyEmail from "./pages/VerifyEmail";
 import {
   StorefrontHome,
   StorefrontProduct,
@@ -78,6 +80,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           {/* Public platform pages — no auth required, crawlable by Google */}
           <Route path="/mentions-legales" element={<Legal slug="mentions-legales" />} />
           <Route path="/cgu" element={<Legal slug="cgu" />} />
