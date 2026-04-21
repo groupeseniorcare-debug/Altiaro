@@ -34,6 +34,7 @@ EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 
 # Mapping number → handler name
 _HANDLERS: dict[int, str] = {
+    5: "rename_site",
     6: "brand_book",
     9: "legal_docs",
     16: "product_import",
@@ -82,6 +83,77 @@ def _step_content(step: dict) -> str:
         step.get("deliverable_notes") or "",
     ]
     return "\n\n".join(p for p in parts if p).strip()
+
+
+# =====================================================================
+# Hook #5 — Nom de marque retenu → sites.name + sites.niche_slug
+# =====================================================================
+def _slugify(text: str) -> str:
+    import unicodedata
+    s = unicodedata.normalize("NFKD", text or "").encode("ascii", "ignore").decode("ascii")
+    s = re.sub(r"[^a-zA-Z0-9]+", "-", s).strip("-").lower()
+    return s[:50] or "site"
+
+
+async def _hook_rename_site(step: dict) -> None:
+    content = _step_content(step)
+    if not content:
+        logger.info(f"[side-effect #5] no content, skipping")
+        return
+
+    site = await db.sites.find_one({"id": step["site_id"]}, {"_id": 0})
+    niche = (site or {}).get("niche") or ""
+    current_name = (site or {}).get("name") or ""
+
+    system = (
+        "Tu extrais le NOM DE MARQUE DÉFINITIF retenu par le Concepteur depuis un livrable de naming. "
+        "Tu renvoies UNIQUEMENT du JSON valide."
+    )
+    user = f"""Livrable étape #5 (génération nom de marque + domaine + INPI) — niche : {niche}
+Nom actuel provisoire : « {current_name} »
+
+---
+{content[:5000]}
+---
+
+Extrait au JSON EXACTEMENT :
+{{
+  "brand_name": "Nom de marque retenu par le Concepteur (le gagnant final, pas la short-list)",
+  "tagline": "Signature de marque courte FR (3-8 mots)",
+  "domain": "nom-domaine.fr ou .com retenu (sans https://)"
+}}
+
+Règles :
+- Si le livrable propose plusieurs candidats, choisis celui marqué comme "TOP 1" / "retenu" / "validé" / "choix final".
+- Si rien n'est explicitement retenu, prends le premier nom de la liste finale.
+- brand_name : juste le nom commercial, sans slogan ni extension de domaine.
+- Uniquement le JSON."""
+    data = await _call_claude(system, user)
+    if not data or not isinstance(data, dict):
+        logger.warning(f"[side-effect #5] extraction failed for site {step['site_id']}")
+        return
+
+    brand_name = str(data.get("brand_name") or "").strip()
+    if not brand_name or brand_name.lower() == current_name.lower():
+        logger.info(f"[side-effect #5] brand_name unchanged ('{brand_name}' == '{current_name}'), skipping")
+        return
+
+    slug = _slugify(brand_name)
+    updates: dict[str, Any] = {
+        "name": brand_name,
+        "niche_slug": slug,
+        "renamed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    tagline = str(data.get("tagline") or "").strip()
+    if tagline:
+        updates["design.brand.tagline"] = tagline
+        updates["design.brand.logo_text"] = brand_name
+    domain = str(data.get("domain") or "").strip().lower().replace("https://", "").replace("http://", "").rstrip("/")
+    if domain and "." in domain:
+        updates["target_domain"] = domain
+
+    await db.sites.update_one({"id": step["site_id"]}, {"$set": updates})
+    logger.info(f"[side-effect #5] site {step['site_id']} renamed : '{current_name}' → '{brand_name}' (slug={slug}, domain={domain or 'n/a'})")
 
 
 # =====================================================================
@@ -346,6 +418,7 @@ async def _hook_template_scaffold(step: dict) -> None:
 
 
 _DISPATCH = {
+    "rename_site": _hook_rename_site,
     "brand_book": _hook_brand_book,
     "legal_docs": _hook_legal_docs,
     "product_import": _hook_product_import,

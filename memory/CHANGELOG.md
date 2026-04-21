@@ -3,6 +3,12 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 28 : Hook #5 — Renommage automatique du site
+- Ajout d'un 5e handler dans `step_side_effects.py` : **#5 Génération nom de marque + domaine + INPI** → déclenche un appel Claude qui extrait du livrable markdown le nom final retenu + tagline + domaine, puis met à jour `sites.name`, `sites.niche_slug` (slugifié via `_slugify`), `sites.target_domain`, `sites.design.brand.tagline` et `sites.design.brand.logo_text`.
+- Testé E2E sur site fauteuil releveur éléctrique : provisoire "fauteuil releveur éléctrique" → **"Sereniva"** (avec slug `sereniva`, domaine `sereniva.fr`, tagline "L'art de vieillir sereinement"). Visible immédiatement dans la liste `/sites`.
+- Si `brand_name` identique au nom courant → skip silencieux (pas de faux update). Si extraction Claude échoue → skip silencieux, validation non affectée.
+
+
 ## 2026-04-21 · Sprint 27 : Hooks automatiques de validation d'étape (#6/#9/#16/#17)
 - **Nouveau module** `backend/routes/step_side_effects.py` : quand un Concepteur valide une étape clé, Claude Sonnet 4.5 est rappelé pour extraire le livrable en JSON structuré et l'appliquer automatiquement au site.
 - **Hook #6 Identité visuelle** → `sites.design.brand` (primary_color, accent_color, background_color, text_color, font_heading, font_body, tagline, logo_text, voice_keywords). Le storefront reflète immédiatement la nouvelle charte.
