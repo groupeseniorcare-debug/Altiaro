@@ -414,3 +414,286 @@ async def list_leads(site_id: str, user: dict = Depends(get_current_user)):
     await _check_site_access(site_id, user)
     items = await db.leads.find({"site_id": site_id}, {"_id": 0}).sort("created_at", -1).limit(200).to_list(200)
     return items
+
+
+
+# ====================== SPRINT 23 — PROMPT STUDIO ====================== #
+STUDIO_SYSTEM = """You are a senior e-commerce brand strategist and UX writer for \
+a premium direct-to-consumer boutique. You write copy in the language of the \
+target customer (default fr). Your tone is Apple/Dyson: clean, confident, \
+product-focused, benefit-driven, honest. No filler, no fluff, no clichés. \
+Always output STRICT JSON only (no markdown, no backticks)."""
+
+
+SECTION_SCHEMAS = {
+    "positioning": {
+        "json_schema": ("{\"brand_promise\": \"1 sentence\", "
+                        "\"unique_selling_points\": [\"3-5 short USPs\"], "
+                        "\"voice_attributes\": [\"3-4 adjectives\"], "
+                        "\"target_customer\": \"short\", "
+                        "\"elevator_pitch\": \"2 sentences max\"}"),
+    },
+    "identity": {
+        "json_schema": ("{\"brand_name\": \"<20 chars\", "
+                        "\"tagline\": \"<60 chars\", "
+                        "\"brand_story\": \"2-3 sentences\"}"),
+    },
+    "hero": {
+        "json_schema": ("{\"title\": \"<60 chars\", "
+                        "\"subtitle\": \"<140 chars\", "
+                        "\"cta_label\": \"2-3 words\", "
+                        "\"trust_line\": \"<80 chars\"}"),
+    },
+    "benefits": {
+        "json_schema": ("{\"items\": [{\"title\": \"3-5 words\", "
+                        "\"description\": \"1-2 sentences\", "
+                        "\"icon\": \"ShieldCheck|Truck|Clock|Heart|Star|Leaf|Package|Headset\"}]}"),
+    },
+    "faq": {
+        "json_schema": ("{\"items\": [{\"question\": \"...\", \"answer\": \"1-3 sentences\"}]}"),
+    },
+    "seo": {
+        "json_schema": ("{\"title\": \"<60 chars\", "
+                        "\"description\": \"<155 chars\", "
+                        "\"keywords\": [\"5-10 keywords\"]}"),
+    },
+    "testimonials": {
+        "json_schema": ("{\"items\": [{\"name\": \"First L.\", "
+                        "\"location\": \"city\", \"rating\": 5, "
+                        "\"text\": \"1-2 sentences\"}]}"),
+    },
+    "product_narrative": {
+        "json_schema": ("{\"headline\": \"<60 chars\", "
+                        "\"subheadline\": \"<140 chars\", "
+                        "\"sections\": [{\"title\": \"...\", "
+                        "\"body\": \"1-2 paragraphs\", "
+                        "\"bullet_points\": [\"3-4 concrete points\"]}], "
+                        "\"tech_specs\": [{\"label\": \"...\", \"value\": \"...\"}], "
+                        "\"faq\": [{\"question\": \"...\", \"answer\": \"...\"}]}"),
+    },
+}
+
+
+async def _site_context_block(site_id: str) -> str:
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        return ""
+    ctx = {
+        "site_name": site.get("name"),
+        "niche": site.get("niche"),
+        "countries": site.get("selected_countries") or ["FR"],
+        "design": site.get("design") or {},
+    }
+    analysis_id = site.get("analysis_id")
+    if analysis_id:
+        a = await db.niche_analyses.find_one({"id": analysis_id}, {"_id": 0})
+        if a:
+            ax = a.get("analysis") or {}
+            ctx["analysis"] = {
+                "product": a.get("product_input"),
+                "persona": a.get("persona"),
+                "verdict": ax.get("verdict"),
+                "verdict_reasoning": ax.get("verdict_reasoning"),
+                "usp_angles": ax.get("usp_angles") or ax.get("positioning_angles"),
+                "key_keywords": [kw for c in ctx["countries"]
+                                 for kw in (ax.get("keywords_by_country", {}).get(c, {})
+                                            .get("transactional", []) or [])[:6]],
+                "competitors": ax.get("competitors_by_country") or {},
+            }
+    products = await db.products.find(
+        {"site_id": site_id},
+        {"_id": 0, "name": 1, "description": 1, "price": 1, "cost_price_ht": 1}
+    ).limit(10).to_list(10)
+    ctx["products"] = [{
+        "name": (p.get("name") or {}).get("fr") or "",
+        "description_excerpt": ((p.get("description") or {}).get("fr") or "")[:400],
+        "price_eur": p.get("price"),
+    } for p in products]
+    return json.dumps(ctx, ensure_ascii=False, indent=2)[:6000]
+
+
+DEFAULT_PROMPTS = {
+    "positioning": ("En te basant sur le CONTEXT (niche, analyse, persona, produits), "
+                    "rédige le positionnement de la marque. Focus bénéfice utilisateur "
+                    "(jamais feature). Ton premium mais accessible. USPs spécifiques à "
+                    "cette niche. Voix de marque : 3-4 adjectifs cohérents."),
+    "identity": ("Propose un NOUVEAU nom de marque unique, prononçable, mémorable "
+                 "(pas 'Concept Factory'), un tagline bénéfice <60 chars, et une "
+                 "brand story en 2-3 phrases."),
+    "hero": ("Rédige le hero homepage, style Apple/Dyson : headline punchy bénéfice "
+             "principal, subtitle explicative, CTA action courte, trust line."),
+    "benefits": ("Génère 4 blocs bénéfices spécifiques à ce persona (pas 'livraison "
+                 "rapide' générique). Choisis l'icône la plus pertinente."),
+    "faq": ("Génère 7 questions RÉELLEMENT posées par ces clients : 3 produit, 2 "
+            "livraison/paiement, 2 retour/SAV. Réponses courtes, rassurantes."),
+    "seo": ("Rédige les meta SEO homepage : title <60 chars avec mot-clé principal, "
+            "description <155 chars bénéfice+CTA, 5-10 keywords transactionnels."),
+    "testimonials": ("Génère 5 témoignages réalistes : noms/villes cohérents pays "
+                     "cible, 1-2 phrases spécifiques, 5 étoiles, ton naturel."),
+    "product_narrative": ("Refonte COMPLÈTE et narrative du produit (Apple-style). "
+                          "Ne copie jamais le texte CJ/AE source. Storytelling autour "
+                          "des bénéfices, sections scrollables, tech_specs clean, FAQ."),
+}
+
+
+class PromptRunInput(BaseModel):
+    section: str
+    prompt: Optional[str] = None
+    product_id: Optional[str] = None  # only for product_narrative
+
+
+@router.post("/sites/{site_id}/design/prompt/run")
+async def prompt_run(site_id: str, data: PromptRunInput,
+                     user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    section = (data.section or "").lower()
+    if section not in SECTION_SCHEMAS:
+        raise HTTPException(400, f"Section inconnue : {section}")
+    context = await _site_context_block(site_id)
+    # For product_narrative, add the specific product context
+    if section == "product_narrative" and data.product_id:
+        product = await db.products.find_one(
+            {"id": data.product_id, "site_id": site_id}, {"_id": 0}
+        )
+        if product:
+            product_ctx = {
+                "name": (product.get("name") or {}).get("fr"),
+                "description": (product.get("description") or {}).get("fr"),
+                "price": product.get("price"),
+                "cost": product.get("cost_price_ht"),
+            }
+            context += "\n\n=== TARGET PRODUCT ===\n" + json.dumps(
+                product_ctx, ensure_ascii=False, indent=2
+            )
+    schema = SECTION_SCHEMAS[section]
+    user_prompt = data.prompt or DEFAULT_PROMPTS.get(section, "Générer du contenu.")
+    full_prompt = (f"=== CONTEXT ===\n{context}\n\n"
+                   f"=== TASK ===\n{user_prompt}\n\n"
+                   f"=== OUTPUT SCHEMA ===\n{schema['json_schema']}\n\n"
+                   f"Return STRICT JSON only, no prose.")
+    result = await _claude_json(
+        STUDIO_SYSTEM, full_prompt,
+        session_id=f"studio-{site_id}-{section}-{uuid.uuid4().hex[:6]}",
+        timeout=120,
+    )
+    return {"section": section, "data": result, "prompt_used": user_prompt}
+
+
+class PromptApplyInput(BaseModel):
+    section: str
+    data: dict
+    product_id: Optional[str] = None
+
+
+@router.post("/sites/{site_id}/design/prompt/apply")
+async def prompt_apply(site_id: str, data: PromptApplyInput,
+                       user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    section = (data.section or "").lower()
+    if section not in SECTION_SCHEMAS:
+        raise HTTPException(400, "Section inconnue")
+    # product_narrative → write into product, not site
+    if section == "product_narrative" and data.product_id:
+        await db.products.update_one(
+            {"id": data.product_id, "site_id": site_id},
+            {"$set": {"narrative": data.data,
+                      "updated_at": datetime.now(timezone.utc).isoformat()}},
+        )
+        return {"ok": True, "section": section, "product_id": data.product_id}
+    now = datetime.now(timezone.utc).isoformat()
+    # identity → patch brand_name/tagline + create a brand_story
+    if section == "identity":
+        await db.sites.update_one(
+            {"id": site_id},
+            {"$set": {
+                "design.brand.name": data.data.get("brand_name"),
+                "design.brand.tagline": data.data.get("tagline"),
+                "design.brand.story": data.data.get("brand_story"),
+                "design.updated_at": now,
+            }},
+        )
+        return {"ok": True, "section": section}
+    await db.sites.update_one(
+        {"id": site_id},
+        {"$set": {f"design.{section}": data.data, "design.updated_at": now}},
+    )
+    return {"ok": True, "section": section}
+
+
+class PaletteSuggestInput(BaseModel):
+    mood: Optional[str] = None
+
+
+@router.post("/sites/{site_id}/design/palette/suggest")
+async def palette_suggest(site_id: str, data: PaletteSuggestInput,
+                          user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    context = await _site_context_block(site_id)
+    mood_hint = f" The user prefers a {data.mood} mood." if data.mood else ""
+    user_prompt = (f"=== CONTEXT ===\n{context}\n\n"
+                   f"=== TASK ===\nPropose 3 distinct colour palettes for this "
+                   f"premium D2C boutique.{mood_hint} High contrast, senior-friendly, "
+                   f"Apple/Dyson (lots of neutrals + 1 statement accent).\n\n"
+                   f"=== OUTPUT SCHEMA ===\n"
+                   f"{{\"palettes\": [{{"
+                   f"\"name\": \"3-5 words\", "
+                   f"\"description\": \"1 sentence mood\", "
+                   f"\"primary_color\": \"#HEXCOLOR\", "
+                   f"\"secondary_color\": \"#HEXCOLOR\", "
+                   f"\"background_color\": \"#HEXCOLOR\", "
+                   f"\"text_color\": \"#HEXCOLOR\", "
+                   f"\"font_heading\": \"Fraunces|Playfair Display|Cormorant|Canela|DM Serif Display\", "
+                   f"\"font_body\": \"Inter|Manrope|DM Sans|IBM Plex Sans\""
+                   f"}}]}}\n\nReturn STRICT JSON only.")
+    result = await _claude_json(
+        STUDIO_SYSTEM, user_prompt,
+        session_id=f"palette-{site_id}-{uuid.uuid4().hex[:6]}",
+        timeout=90,
+    )
+    palettes = (result or {}).get("palettes") or []
+    if not palettes:
+        raise HTTPException(502, "L'IA n'a pas retourné de palettes. Réessaye.")
+    return {"palettes": palettes[:3]}
+
+
+class PaletteApplyInput(BaseModel):
+    primary_color: str
+    secondary_color: Optional[str] = None
+    background_color: Optional[str] = None
+    text_color: Optional[str] = None
+    font_heading: Optional[str] = None
+    font_body: Optional[str] = None
+
+
+@router.post("/sites/{site_id}/design/palette/apply")
+async def palette_apply(site_id: str, data: PaletteApplyInput,
+                        user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    patch = {}
+    for k, v in data.dict(exclude_none=True).items():
+        patch[f"design.brand.{k}"] = v
+    patch["design.updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.sites.update_one({"id": site_id}, {"$set": patch})
+    return {"ok": True}
+
+
+@router.get("/sites/{site_id}/design/studio-state")
+async def studio_state(site_id: str, user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "design": 1, "selected_countries": 1, "name": 1})
+    design = (site or {}).get("design") or {}
+    sections_state = {}
+    for s in SECTION_SCHEMAS:
+        block = design.get(s)
+        sections_state[s] = {
+            "filled": bool(block),
+            "preview": json.dumps(block, ensure_ascii=False)[:180] if block else "",
+        }
+    return {
+        "site_name": site.get("name") if site else "",
+        "brand": design.get("brand") or {},
+        "sections": sections_state,
+        "published": design.get("published", False),
+        "updated_at": design.get("updated_at"),
+        "default_prompts": DEFAULT_PROMPTS,
+    }

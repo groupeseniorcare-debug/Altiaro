@@ -20,6 +20,7 @@ import AdminPayouts from "./pages/AdminPayouts";
 import SiteDesign from "./pages/SiteDesign";
 import Sourcing from "./pages/Sourcing";
 import Wizard from "./pages/Wizard";
+import PromptStudio from "./pages/PromptStudio";
 import GoogleAds from "./pages/GoogleAds";
 import Opportunities from "./pages/Opportunities";
 import {
@@ -143,6 +144,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Wizard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites/:id/studio"
+            element={
+              <ProtectedRoute>
+                <PromptStudio />
               </ProtectedRoute>
             }
           />

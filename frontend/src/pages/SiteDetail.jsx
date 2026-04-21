@@ -298,6 +298,14 @@ export default function SiteDetail() {
                   <Sparkle size={16} weight="fill" /> Design IA
                 </button>
                 <button
+                  onClick={() => navigate(`/sites/${id}/studio`)}
+                  data-testid="nav-studio"
+                  className="h-10 px-4 rounded-xl text-white text-sm font-medium flex items-center gap-2 transition"
+                  style={{ background: "linear-gradient(135deg, #7C3AED 0%, #4285F4 100%)" }}
+                >
+                  <Sparkle size={16} weight="fill" /> Prompt Studio
+                </button>
+                <button
                   onClick={() => navigate(`/sites/${id}/wizard`)}
                   data-testid="nav-wizard"
                   className="h-10 px-4 rounded-xl text-white text-sm font-medium flex items-center gap-2 transition"
