@@ -50,6 +50,8 @@ import {
   StorefrontCGV,
   StorefrontMentions,
   StorefrontConfidentialite,
+  StorefrontLivraison,
+  StorefrontRetours,
 } from "./pages/StorefrontPages";
 
 function ProtectedRoute({ children, adminOnly = false }) {
@@ -203,6 +205,8 @@ function App() {
           <Route path="/shop/:siteId/about" element={<StorefrontAbout />} />
           <Route path="/shop/:siteId/faq" element={<StorefrontFAQ />} />
           <Route path="/shop/:siteId/contact" element={<StorefrontContact />} />
+          <Route path="/shop/:siteId/livraison" element={<StorefrontLivraison />} />
+          <Route path="/shop/:siteId/retours" element={<StorefrontRetours />} />
           <Route path="/shop/:siteId/cgv" element={<StorefrontCGV />} />
           <Route path="/shop/:siteId/mentions" element={<StorefrontMentions />} />
           <Route path="/shop/:siteId/confidentialite" element={<StorefrontConfidentialite />} />

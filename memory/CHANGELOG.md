@@ -3,6 +3,23 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 39 : Pages statiques (About/Contact/Livraison/Retours) + Page Produit ultra-complète
+- **4 pages statiques premium** (`StorefrontPages.jsx` réécrit) avec chacune un `PageHero` éditorial (eyebrow + titre 6xl serif + subtitle) et du contenu structuré :
+  - `/about` — Histoire de la marque + 4 piliers valeurs (Bienveillance/Exigence/Accompagnement/Responsabilité) + CTA contact.
+  - `/contact` — Layout 2 colonnes : infos (email/phone/horaires/adresse) + form 4 champs avec mailing RGPD note.
+  - `/livraison` — 3 cartes réassurance + table pays livrés avec délais/coûts/transporteurs + sections installation + emballage écolo.
+  - `/retours` — 3 cartes (14j/retour gratuit/remboursé 5j) + 4 étapes numérotées + garantie 2 ans + produits non retournables.
+  - `/cgv`, `/mentions`, `/confidentialite` enrichis avec PageHero + message clair quand la page n'est pas générée.
+  - Routes câblées dans `App.js` (livraison + retours nouveaux).
+- **Page Produit ultra-premium** (`StorefrontProduct` dans `Storefront.jsx`) :
+  - Nouveau composant `ProductGallery.jsx` — image principale 1:1, thumbs 5 colonnes, zoom modal plein écran.
+  - Nouveau composant `ProductReviews.jsx` — synthèse 4.8/5 avec distribution barres par étoiles + liste reviews triables (récents/meilleures/pires) + badge "Achat vérifié" + fallback 4 reviews silver-eco.
+  - Nouveau composant `CrossSellProducts.jsx` — 4 produits de la même `category`, avec fallback 4 produits démo.
+  - `NarrativeSections`, `TechSpecs`, `ProductFAQ` ont maintenant des **fallbacks premium** (2 sections narratives + 8 specs techniques + 5 questions FAQ par défaut).
+  - Page refonte : breadcrumb taxonomique (Accueil > Collections > category > nom), rating + stock indicator en ligne, prix avec compare-at + badge -%, mention TVA/livraison, 4 trust badges (vs 2 avant), boutons CTA repensés.
+- Tests visuels OK sur les 4 pages statiques + page produit (avec produits démo seedés en DB pour visualiser).
+
+
 ## 2026-04-21 · Sprint 38 : Pages Collection (index + détail) avec filtres et SEO
 - **Backend** :
   - Ajout des champs `category: str` et `tags: List[str]` dans `ProductCreateInput` + `ProductUpdateInput` (taxonomie produit complète).

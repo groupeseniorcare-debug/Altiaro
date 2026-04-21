@@ -18,6 +18,7 @@ import {
   ShoppingBagOpen,
   ShieldCheck,
   Truck,
+  Star,
 } from "@phosphor-icons/react";
 import SEOHead from "../components/SEOHead";
 
@@ -50,6 +51,9 @@ import {
   TechSpecs,
   ProductFAQ,
 } from "../components/storefront/NarrativeProduct";
+import ProductGallery from "../components/storefront/ProductGallery";
+import ProductReviews from "../components/storefront/ProductReviews";
+import CrossSellProducts from "../components/storefront/CrossSellProducts";
 
 /* =========================================================
  * STOREFRONT HOME
@@ -266,52 +270,36 @@ export function StorefrontProduct() {
         }}
       />
       <div className="max-w-7xl mx-auto px-6 md:px-10 py-6 md:py-10">
-        <button
-          onClick={() => navigate(`/shop/${siteId}`)}
-          className="text-sm text-[#78716C] hover:text-[#1C1917] mb-6 inline-flex items-center gap-1"
-          data-testid="back-to-shop"
-        >
-          ← {t(lang, "back_to_shop")}
-        </button>
+        {/* Breadcrumb */}
+        <nav className="text-[12px] text-neutral-500 mb-6" data-testid="product-breadcrumb">
+          <Link to={`/shop/${siteId}`} className="hover:underline">Accueil</Link>
+          <span className="mx-2">/</span>
+          <Link to={`/shop/${siteId}/collections`} className="hover:underline">Collections</Link>
+          {p.category && (
+            <>
+              <span className="mx-2">/</span>
+              <Link to={`/shop/${siteId}/collection/${p.category}`} className="hover:underline capitalize">
+                {p.category}
+              </Link>
+            </>
+          )}
+          <span className="mx-2">/</span>
+          <span className="text-neutral-900">{pickLang(p.name, lang)}</span>
+        </nav>
 
-        {/* HERO PRODUCT (Apple-style split) */}
+        {/* HERO PRODUCT */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-20 mb-16 md:mb-24 items-start">
           {/* Gallery */}
-          <div className="sticky top-24">
-            <div className="aspect-square bg-[#F5F2EB] rounded-2xl overflow-hidden mb-3">
-              {p.images?.[0] ? (
-                <img
-                  src={p.images[0]}
-                  alt={pickLang(p.name, lang)}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-[#D6D3D1]">
-                  <ShoppingBagOpen size={80} weight="thin" />
-                </div>
-              )}
-            </div>
-            {p.images?.length > 1 && (
-              <div className="grid grid-cols-4 gap-2">
-                {p.images.slice(0, 4).map((img, i) => (
-                  <div key={i} className="aspect-square bg-[#F5F2EB] rounded-lg overflow-hidden">
-                    <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <ProductGallery images={p.images || []} name={pickLang(p.name, lang)} design={design} />
 
           {/* Buy panel */}
           <div className="md:pt-4">
-            {p.narrative?.headline && (
-              <div
-                className="text-[11px] uppercase tracking-[0.25em] mb-3 font-medium"
-                style={{ color: primary }}
-              >
-                {site?.name}
-              </div>
-            )}
+            <div
+              className="text-[11px] uppercase tracking-[0.25em] mb-3 font-medium"
+              style={{ color: primary }}
+            >
+              {site?.name}
+            </div>
             <h1
               className="text-3xl md:text-5xl font-semibold text-[#1C1917] leading-[1.05] tracking-tight"
               style={{ fontFamily: `"${fontHeading}", Georgia, serif` }}
@@ -325,17 +313,46 @@ export function StorefrontProduct() {
               </p>
             )}
 
+            {/* Rating + stock */}
+            <div className="flex items-center gap-4 mt-5 text-sm">
+              <div className="flex items-center gap-1.5">
+                <div className="flex" style={{ color: "#F59E0B" }}>
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} size={14} weight="fill" />
+                  ))}
+                </div>
+                <span className="font-semibold">{(p.rating?.score ?? 4.8).toFixed(1)}</span>
+                <span className="text-neutral-500">({p.rating?.count ?? 127} avis)</span>
+              </div>
+              <div className="w-px h-4 bg-neutral-200" />
+              <div className="flex items-center gap-1.5 text-emerald-700">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                {p.stock === null || (p.stock ?? 1) > 0 ? "En stock" : "Rupture"}
+              </div>
+            </div>
+
+            {/* Price */}
             <div className="flex items-baseline gap-3 mt-8" data-testid="product-price">
               <span className="text-3xl md:text-4xl font-semibold" style={{ color: primary }}>
                 {formatPrice(p.price, p.currency, lang)}
               </span>
               {p.compare_at_price && p.compare_at_price > p.price && (
-                <span className="text-xl text-[#A8A29E] line-through">
-                  {formatPrice(p.compare_at_price, p.currency, lang)}
-                </span>
+                <>
+                  <span className="text-xl text-[#A8A29E] line-through">
+                    {formatPrice(p.compare_at_price, p.currency, lang)}
+                  </span>
+                  <span
+                    className="text-white text-xs font-semibold px-2.5 py-1 rounded-full"
+                    style={{ background: primary }}
+                  >
+                    -{Math.round((1 - p.price / p.compare_at_price) * 100)}%
+                  </span>
+                </>
               )}
             </div>
+            <div className="text-xs text-neutral-500 mt-1">TVA incluse · livraison offerte dès 50 €</div>
 
+            {/* Quantity + Add */}
             <div className="mt-8 flex items-center gap-4">
               <div className="flex items-center border border-[#E7E5E4] rounded-full overflow-hidden bg-white">
                 <button
@@ -371,14 +388,23 @@ export function StorefrontProduct() {
               </button>
             </div>
 
+            {/* Trust badges */}
             <div className="mt-8 grid grid-cols-2 gap-3 text-sm">
               <div className="bg-[#FAF7F2] rounded-xl p-3 flex items-center gap-2">
-                <ShieldCheck size={16} weight="fill" style={{ color: primary }} />
-                <span className="text-[#57534E]">{t(lang, "secure_checkout")}</span>
+                <Truck size={16} weight="fill" style={{ color: primary }} />
+                <span className="text-[#57534E]">Livraison offerte dès 50 €</span>
               </div>
               <div className="bg-[#FAF7F2] rounded-xl p-3 flex items-center gap-2">
-                <Truck size={16} weight="fill" style={{ color: primary }} />
-                <span className="text-[#57534E]">{t(lang, "free_shipping_above")}</span>
+                <ShieldCheck size={16} weight="fill" style={{ color: primary }} />
+                <span className="text-[#57534E]">Garantie 2 ans</span>
+              </div>
+              <div className="bg-[#FAF7F2] rounded-xl p-3 flex items-center gap-2">
+                <ShieldCheck size={16} weight="fill" style={{ color: primary }} />
+                <span className="text-[#57534E]">Paiement sécurisé</span>
+              </div>
+              <div className="bg-[#FAF7F2] rounded-xl p-3 flex items-center gap-2">
+                <CheckCircle size={16} weight="fill" style={{ color: primary }} />
+                <span className="text-[#57534E]">Retour gratuit 14j</span>
               </div>
             </div>
 
@@ -394,6 +420,8 @@ export function StorefrontProduct() {
         <NarrativeSections sections={p.narrative?.sections} design={design} />
         <TechSpecs specs={p.narrative?.tech_specs} design={design} />
         <ProductFAQ faq={p.narrative?.faq} design={design} />
+        <ProductReviews product={p} design={design} />
+        <CrossSellProducts currentProduct={p} lang={lang} design={design} />
       </div>
 
       {/* Sticky mobile CTA */}
