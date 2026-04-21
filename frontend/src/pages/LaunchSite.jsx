@@ -59,6 +59,7 @@ export default function LaunchSite() {
     const groupId = data.group_id;
     let cancelled = false;
     let attempts = 0;
+    let errorStreak = 0;
     const poll = async () => {
       if (cancelled) return;
       attempts += 1;
@@ -67,10 +68,17 @@ export default function LaunchSite() {
       );
       if (cancelled) return;
       if (pErr) {
-        setError(pErr);
-        setLoading(false);
+        errorStreak += 1;
+        // Tolerate up to 4 consecutive transient errors (502/503/network) before giving up
+        if (errorStreak >= 4) {
+          setError(pErr);
+          setLoading(false);
+          return;
+        }
+        setTimeout(poll, 2500);
         return;
       }
+      errorStreak = 0;
       setScan(progress);
       // Presélectionne les GO/GO_WITH_RESERVE dès qu'ils apparaissent
       setSelected((prev) => {

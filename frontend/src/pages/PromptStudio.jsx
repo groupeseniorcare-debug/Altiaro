@@ -233,7 +233,7 @@ export default function PromptStudio() {
                 <button
                   onClick={() => setPaletteModal(true)}
                   data-testid="studio-palette-btn"
-                  className="h-9 px-3 rounded-lg bg-white hover:bg-white border border-neutral-900/20 text-xs font-medium flex items-center gap-1.5"
+                  className="h-9 px-3 rounded-lg bg-white hover:bg-neutral-100 border border-neutral-900/20 text-neutral-900 text-xs font-medium flex items-center gap-1.5"
                 >
                   <Palette size={14} weight="bold" />
                   Palette
@@ -241,7 +241,7 @@ export default function PromptStudio() {
                 <button
                   onClick={() => setKwModal(true)}
                   data-testid="studio-keywords-btn"
-                  className="h-9 px-3 rounded-lg bg-white hover:bg-white border border-neutral-900/20 text-xs font-medium flex items-center gap-1.5"
+                  className="h-9 px-3 rounded-lg bg-white hover:bg-neutral-100 border border-neutral-900/20 text-neutral-900 text-xs font-medium flex items-center gap-1.5"
                 >
                   <MagnifyingGlass size={14} weight="bold" />
                   Mots-clés
@@ -249,7 +249,7 @@ export default function PromptStudio() {
                 <button
                   onClick={() => setShowPreview(true)}
                   data-testid="studio-preview-btn"
-                  className="h-9 px-3 rounded-lg bg-white text-neutral-900 text-xs font-medium flex items-center gap-1.5"
+                  className="h-9 px-3 rounded-lg bg-white hover:bg-neutral-100 text-neutral-900 text-xs font-medium flex items-center gap-1.5"
                 >
                   <Eye size={14} weight="fill" />
                   Voir live
