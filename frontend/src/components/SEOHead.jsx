@@ -18,12 +18,21 @@ export default function SEOHead({
   langs,
   schema,
   type = "website",
+  siteName,
+  locale = "fr_FR",
+  keywords,
+  robots = "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
+  noindex = false,
 }) {
   useEffect(() => {
     if (title) document.title = title;
 
     const setMeta = (name, content, attr = "name") => {
-      if (!content) return;
+      if (content === null || content === undefined || content === "") {
+        const existing = document.head.querySelector(`meta[${attr}="${name}"]`);
+        if (existing) existing.remove();
+        return;
+      }
       let el = document.head.querySelector(`meta[${attr}="${name}"]`);
       if (!el) {
         el = document.createElement("meta");
@@ -34,11 +43,16 @@ export default function SEOHead({
     };
 
     setMeta("description", description);
+    setMeta("keywords", keywords);
+    setMeta("robots", noindex ? "noindex, nofollow" : robots);
     setMeta("og:title", title, "property");
     setMeta("og:description", description, "property");
     setMeta("og:type", type, "property");
+    setMeta("og:locale", locale, "property");
+    if (siteName) setMeta("og:site_name", siteName, "property");
     if (canonical) setMeta("og:url", canonical, "property");
     if (image) setMeta("og:image", image, "property");
+    if (image) setMeta("og:image:alt", title || "", "property");
     setMeta("twitter:card", image ? "summary_large_image" : "summary");
     setMeta("twitter:title", title);
     setMeta("twitter:description", description);
@@ -95,7 +109,7 @@ export default function SEOHead({
         document.head.appendChild(s);
       });
     }
-  }, [title, description, canonical, image, type, JSON.stringify(langs), JSON.stringify(schema)]);
+  }, [title, description, canonical, image, type, locale, siteName, keywords, robots, noindex, JSON.stringify(langs), JSON.stringify(schema)]);
 
   return null;
 }

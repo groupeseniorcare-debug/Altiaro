@@ -3,6 +3,30 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-21 · Sprint 40 : Hook IA Product Narrative + SEO ultra-développé + AEO
+### Volet 1 — Hook IA Product Narrative
+- **Nouveau module** `/app/backend/routes/product_narrative.py` :
+  - Fonction `enrich_product_narrative(product_id, force)` — appelle Claude Sonnet 4.5 avec un prompt copywriting premium (empathique, jamais infantilisant) pour générer `headline`, `subheadline`, 3 `sections` (title+body+bullet_points), 8 `tech_specs`, 5 `faq`.
+  - Endpoint `POST /api/products/{product_id}/enrich-narrative` (auth Concepteur) — enrichissement manuel ponctuel.
+  - Endpoint `POST /api/sites/{site_id}/products/enrich-narratives` (bulk) — enrichit jusqu'à 50 produits sans narrative.
+- **Auto-dispatch** post hook #16 (`step_side_effects.py`) : chaque produit importé du catalogue déclenche un `asyncio.create_task` qui l'enrichit en background, fire-and-forget.
+- **Stockage** : `product.narrative = { headline, subheadline, sections[], tech_specs[], faq[], enriched_at, enriched_model }`.
+- **Fallbacks premium** de la page Produit prennent le relais tant que l'AI n'a pas enrichi.
+- **Validé end-to-end** : test réel sur le produit Sereniva → Claude a généré 3 sections premium (« Se lever sans effort », « Un tissu pensé pour durer », « Livré, installé, testé ») + 3 bullet points ultra-concrets par section.
+
+### Volet 2 — SEO / AEO ultra-développé
+- **Sitemap.xml enrichi** (`routes/seo.py`) : accueil + `/collections` + chaque `/collection/:slug` + `/blog` + `/blog/:slug` + `/about` + `/faq` + `/contact` + `/livraison` + `/retours` + chaque `/product/:id` + pages légales. Priorités et `changefreq` adaptés par type.
+- **robots.txt refondé** : allowlist explicite des 9 principaux AI crawlers (GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot, anthropic-ai, PerplexityBot, Google-Extended, Applebot-Extended, CCBot) + disallow `/cart`, `/checkout`, `/account/` + Sitemap + llms.txt déclarés.
+- **Nouveau endpoint `/llms.txt`** (AEO / standard llmstxt.org) : résumé marque + 5 points clés + index des pages principales + liste des produits (avec prix) + 4 FAQ stratégiques. Format markdown prévu pour la citation par ChatGPT / Claude / Perplexity / Gemini.
+- **SEOHead enrichi** : props `siteName`, `keywords`, `locale`, `robots`, `noindex`. Nouveaux meta tags `robots` (max-image-preview:large, max-snippet:-1), `og:site_name`, `og:locale`, `og:image:alt`, `keywords`.
+- **Schemas JSON-LD enrichis sur Product** :
+  - `Product` avec `aggregateRating`, `review[]`, `offers.priceValidUntil`, `offers.shippingDetails`, `offers.hasMerchantReturnPolicy` (OfferShippingDetails + MerchantReturnPolicy = richesse d'éligibilité Rich Results Google).
+  - `BreadcrumbList` taxonomique.
+  - `FAQPage` injecté depuis `product.narrative.faq`.
+- **Homepage schemas** : Organization + sameAs social + WebSite avec SearchAction + ItemList + FAQPage.
+- **Performance LCP** : `preconnect` + `dns-prefetch` vers `images.unsplash.com` dans le `StorefrontLayout` pour accélérer le chargement du hero.
+
+
 ## 2026-04-21 · Sprint 39 : Pages statiques (About/Contact/Livraison/Retours) + Page Produit ultra-complète
 - **4 pages statiques premium** (`StorefrontPages.jsx` réécrit) avec chacune un `PageHero` éditorial (eyebrow + titre 6xl serif + subtitle) et du contenu structuré :
   - `/about` — Histoire de la marque + 4 piliers valeurs (Bienveillance/Exigence/Accompagnement/Responsabilité) + CTA contact.

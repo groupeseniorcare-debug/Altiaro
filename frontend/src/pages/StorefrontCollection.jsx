@@ -196,6 +196,8 @@ export function StorefrontCollection() {
         title={`${title} · ${site?.name || ""}`}
         description={description || `Découvrez notre collection ${title}`}
         canonical={canonical}
+        siteName={site?.name}
+        keywords={`${title}, ${site?.niche || ""}, produits senior`}
         langs={buildHreflangs(site, `/collection/${slug}`)}
         schema={[breadcrumbSchema, itemListSchema].filter(Boolean)}
       />

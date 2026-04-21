@@ -56,6 +56,7 @@ from routes import quick_scan as quick_scan_routes
 from routes import concepteur_cockpit as concepteur_cockpit_routes
 from routes import platform as platform_routes
 from routes import auth_signup as auth_signup_routes
+from routes import product_narrative as product_narrative_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -103,6 +104,7 @@ api.include_router(uploads_routes.router)
 api.include_router(search_routes.router)
 api.include_router(customers_routes.router)
 api.include_router(storefront_search_routes.router)
+api.include_router(product_narrative_routes.router)
 
 
 @app.on_event("startup")

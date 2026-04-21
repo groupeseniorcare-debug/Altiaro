@@ -96,6 +96,8 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
       data-testid="storefront-layout"
     >
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${fontsQuery}&display=swap`} />
+      <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="anonymous" />
+      <link rel="dns-prefetch" href="https://images.unsplash.com" />
 
       {/* ================= TRUST BAR ================= */}
       <div className="text-white text-[12.5px]" style={{ background: textCol }}>

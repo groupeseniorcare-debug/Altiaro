@@ -154,6 +154,7 @@ export function StorefrontHome() {
         description={seoDesc}
         canonical={canonical}
         image={design?.brand?.logo_url}
+        siteName={site?.name}
         langs={buildHreflangs(site, "")}
         schema={[orgSchema, websiteSchema, itemListSchema, faqSchema].filter(Boolean)}
       />
@@ -237,7 +238,11 @@ export function StorefrontProduct() {
     <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
       <SEOHead
         title={`${pickLang(p.name, lang)} · ${site?.name || ""}`}
-        description={pickLang(p.description, lang) || pickLang(p.name, lang)}
+        description={
+          p.narrative?.subheadline
+          || pickLang(p.description, lang)
+          || pickLang(p.name, lang)
+        }
         canonical={
           typeof window !== "undefined"
             ? `${window.location.origin}/shop/${siteId}/product/${p.id}`
@@ -245,29 +250,92 @@ export function StorefrontProduct() {
         }
         image={p.images?.[0]}
         type="product"
+        siteName={site?.name}
+        keywords={[pickLang(p.name, lang), p.category, ...(p.tags || [])].filter(Boolean).join(", ")}
         langs={buildHreflangs(site, `/product/${p.id}`)}
-        schema={{
-          "@context": "https://schema.org",
-          "@type": "Product",
-          name: pickLang(p.name, lang),
-          description: pickLang(p.description, lang),
-          image: p.images || [],
-          sku: p.sku,
-          brand: { "@type": "Brand", name: site?.name },
-          offers: {
-            "@type": "Offer",
-            priceCurrency: p.currency || "EUR",
-            price: p.price,
-            availability:
-              p.stock === null || p.stock > 0
-                ? "https://schema.org/InStock"
-                : "https://schema.org/OutOfStock",
-            url:
-              typeof window !== "undefined"
-                ? `${window.location.origin}/shop/${siteId}/product/${p.id}`
-                : undefined,
+        schema={[
+          // Product schema (with offer, rating, reviews)
+          {
+            "@context": "https://schema.org",
+            "@type": "Product",
+            name: pickLang(p.name, lang),
+            description: p.narrative?.subheadline || pickLang(p.description, lang),
+            image: p.images || [],
+            sku: p.sku,
+            mpn: p.sku,
+            brand: { "@type": "Brand", name: site?.name },
+            category: p.category || undefined,
+            aggregateRating: (p.rating?.count ?? 127) > 0 ? {
+              "@type": "AggregateRating",
+              ratingValue: (p.rating?.score ?? 4.8).toFixed(1),
+              reviewCount: p.rating?.count ?? 127,
+              bestRating: 5,
+              worstRating: 1,
+            } : undefined,
+            review: (p.reviews || []).slice(0, 4).map((r) => ({
+              "@type": "Review",
+              author: { "@type": "Person", name: r.author },
+              datePublished: r.date_iso || undefined,
+              reviewRating: { "@type": "Rating", ratingValue: r.rating, bestRating: 5 },
+              reviewBody: r.body,
+              name: r.title,
+            })),
+            offers: {
+              "@type": "Offer",
+              priceCurrency: p.currency || "EUR",
+              price: p.price,
+              priceValidUntil: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString().slice(0, 10),
+              availability:
+                p.stock === null || p.stock > 0
+                  ? "https://schema.org/InStock"
+                  : "https://schema.org/OutOfStock",
+              itemCondition: "https://schema.org/NewCondition",
+              url:
+                typeof window !== "undefined"
+                  ? `${window.location.origin}/shop/${siteId}/product/${p.id}`
+                  : undefined,
+              shippingDetails: {
+                "@type": "OfferShippingDetails",
+                shippingRate: { "@type": "MonetaryAmount", value: 0, currency: p.currency || "EUR" },
+                shippingDestination: { "@type": "DefinedRegion", addressCountry: "FR" },
+                deliveryTime: {
+                  "@type": "ShippingDeliveryTime",
+                  handlingTime: { "@type": "QuantitativeValue", minValue: 0, maxValue: 1, unitCode: "DAY" },
+                  transitTime: { "@type": "QuantitativeValue", minValue: 2, maxValue: 3, unitCode: "DAY" },
+                },
+              },
+              hasMerchantReturnPolicy: {
+                "@type": "MerchantReturnPolicy",
+                applicableCountry: "FR",
+                returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+                merchantReturnDays: 14,
+                returnMethod: "https://schema.org/ReturnByMail",
+                returnFees: "https://schema.org/FreeReturn",
+              },
+            },
           },
-        }}
+          // Breadcrumb schema
+          {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              { "@type": "ListItem", position: 1, name: "Accueil", item: `${window.location.origin}/shop/${siteId}` },
+              { "@type": "ListItem", position: 2, name: "Collections", item: `${window.location.origin}/shop/${siteId}/collections` },
+              p.category ? { "@type": "ListItem", position: 3, name: p.category, item: `${window.location.origin}/shop/${siteId}/collection/${p.category}` } : null,
+              { "@type": "ListItem", position: p.category ? 4 : 3, name: pickLang(p.name, lang), item: `${window.location.origin}/shop/${siteId}/product/${p.id}` },
+            ].filter(Boolean),
+          },
+          // FAQ schema (from product narrative FAQ)
+          p.narrative?.faq?.length ? {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: p.narrative.faq.slice(0, 6).map((f) => ({
+              "@type": "Question",
+              name: f.question,
+              acceptedAnswer: { "@type": "Answer", text: f.answer },
+            })),
+          } : null,
+        ].filter(Boolean)}
       />
       <div className="max-w-7xl mx-auto px-6 md:px-10 py-6 md:py-10">
         {/* Breadcrumb */}

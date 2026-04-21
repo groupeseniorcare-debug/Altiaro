@@ -351,6 +351,7 @@ Uniquement le JSON."""
     now_iso = datetime.now(timezone.utc).isoformat()
     existing_count = await db.products.count_documents({"site_id": step["site_id"]})
     inserted = 0
+    inserted_ids: list[str] = []
     for idx, p in enumerate(items[:20]):
         if not isinstance(p, dict) or not p.get("name"):
             continue
@@ -360,8 +361,9 @@ Uniquement le JSON."""
             margin_pct = 0.0
             if price > 0:
                 margin_pct = round(((price - supplier) / price) * 100, 1)
+            pid = str(uuid.uuid4())
             doc = {
-                "id": str(uuid.uuid4()),
+                "id": pid,
                 "site_id": step["site_id"],
                 "name": str(p["name"])[:120],
                 "description": str(p.get("description") or "")[:6000],
@@ -382,9 +384,25 @@ Uniquement le JSON."""
             }
             await db.products.insert_one(doc)
             inserted += 1
+            inserted_ids.append(pid)
         except Exception:
             logger.exception(f"[side-effect #16] product insert failed : {p}")
     logger.info(f"[side-effect #16] {inserted} products imported (site {step['site_id']})")
+
+    # -------- Fire-and-forget narrative enrichment for each imported product --------
+    if inserted_ids:
+        try:
+            from routes.product_narrative import enrich_product_narrative
+            async def _enrich_all():
+                for pid in inserted_ids:
+                    try:
+                        await enrich_product_narrative(pid, force=False)
+                    except Exception:
+                        logger.exception(f"[side-effect #16→narrative] failed pid={pid}")
+            asyncio.create_task(_enrich_all())
+            logger.info(f"[side-effect #16→narrative] queued {len(inserted_ids)} products for AI enrichment")
+        except Exception:
+            logger.exception("[side-effect #16→narrative] dispatch failed")
 
 
 # =====================================================================
