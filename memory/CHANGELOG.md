@@ -3,6 +3,23 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-22 · Upsells : association produit + recommandations storefront
+
+- **Étape 3 Cockpit unifiée** : extraction d'un composant `<SourcingPanel>` partagé avec l'étape 2. Même moteur d'import (search CJ/AE + URL + filtres providers) + bandeau IA en haut basé sur le catalogue.
+- **Associations upsell ↔ produit principal** :
+  - Sélecteur "Associer le(s) upsell(s) importé(s) à" (multi-pastilles) en tête de l'étape 3, défaut = tous les produits principaux cochés.
+  - Chaque upsell importé porte `linked_product_ids: []` stocké en DB.
+  - Bouton "Associé à X produits · Modifier" sur chaque carte upsell → modal pour éditer les liens après coup.
+  - Nouveau endpoint `PATCH /api/sites/{id}/products/{pid}/upsell-links` (valide que le produit est bien un upsell + nettoie les IDs qui ne sont plus des produits principaux du même site).
+- **Storefront** :
+  - Nouveau composant `<UpsellsRecommendations>` (mode "product" ou "post_purchase").
+  - Injection sur la fiche produit : "Souvent acheté avec" via `GET /api/public/sites/{id}/products/{pid}/upsells` — fallback : tous les upsells du site si aucun lien spécifique.
+  - Injection sur la page confirmation : "Complétez votre commande" via `POST /api/public/sites/{id}/upsells-for-products` avec les IDs de la commande.
+  - Le listing public `/products` filtre désormais `role:upsell` → les upsells n'apparaissent plus dans la boutique principale mais uniquement en recommandation.
+- **Testing** : lint OK, curl PATCH + GET + POST 100% fonctionnels, 2 screenshots validés (cockpit étape 3 + fiche produit storefront affichant l'upsell).
+
+
+
 ## 2026-04-22 · Sprint C : Fulfillment Concepteur UI
 
 - **Nouvelle page `/sites/:id/fulfillment`** (`SiteFulfillment.jsx`) routée dans `App.js` — le Concepteur voit d'un coup d'œil les commandes clients payées avec leur mapping CJ/AliExpress.

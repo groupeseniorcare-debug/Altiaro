@@ -49,7 +49,7 @@ async def public_products(
     if not site:
         raise HTTPException(status_code=404, detail="Site introuvable")
 
-    q: dict = {"site_id": site_id, "status": "active"}
+    q: dict = {"site_id": site_id, "status": "active", "role": {"$ne": "upsell"}}
     if collection:
         q["category"] = collection
     if tag:
@@ -142,6 +142,54 @@ async def public_product_detail(site_id: str, product_id: str):
     if not p:
         raise HTTPException(status_code=404, detail="Produit introuvable")
     return p
+
+
+@router.get("/sites/{site_id}/products/{product_id}/upsells")
+async def public_product_upsells(site_id: str, product_id: str, limit: int = 4):
+    """Return upsells linked to this main product.
+    Fallback: if no specific upsell is linked, return any active upsell of the site."""
+    # Linked first
+    linked = await db.products.find(
+        {"site_id": site_id, "status": "active", "role": "upsell",
+         "linked_product_ids": product_id},
+        {"_id": 0},
+    ).sort("created_at", -1).limit(max(1, min(limit, 12))).to_list(12)
+    if linked:
+        return linked
+    # Fallback to any upsell for this site (so new shops always see something)
+    return await db.products.find(
+        {"site_id": site_id, "status": "active", "role": "upsell"},
+        {"_id": 0},
+    ).sort("created_at", -1).limit(max(1, min(limit, 12))).to_list(12)
+
+
+@router.post("/sites/{site_id}/upsells-for-products")
+async def public_upsells_for_products(site_id: str, body: dict, limit: int = 6):
+    """Post-purchase: given a list of purchased product_ids, return aggregated upsells.
+    Body: { "product_ids": ["...", "..."] }
+    """
+    pids = body.get("product_ids") or []
+    if not isinstance(pids, list) or not pids:
+        return []
+    linked = await db.products.find(
+        {"site_id": site_id, "status": "active", "role": "upsell",
+         "linked_product_ids": {"$in": pids}},
+        {"_id": 0},
+    ).sort("created_at", -1).limit(max(1, min(limit, 12))).to_list(12)
+    if linked:
+        # De-dup by id
+        seen = set()
+        uniq = []
+        for x in linked:
+            if x["id"] not in seen:
+                uniq.append(x)
+                seen.add(x["id"])
+        return uniq[: max(1, min(limit, 12))]
+    # Fallback
+    return await db.products.find(
+        {"site_id": site_id, "status": "active", "role": "upsell"},
+        {"_id": 0},
+    ).sort("created_at", -1).limit(max(1, min(limit, 12))).to_list(12)
 
 
 @router.post("/sites/{site_id}/orders")

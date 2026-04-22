@@ -69,6 +69,39 @@ async def delete_product(site_id: str, product_id: str, user: dict = Depends(get
     return {"ok": True}
 
 
+class UpsellLinksInput(BaseModel):
+    linked_product_ids: list[str]
+
+
+@router.patch("/{product_id}/upsell-links")
+async def update_upsell_links(
+    site_id: str,
+    product_id: str,
+    data: UpsellLinksInput,
+    user: dict = Depends(get_current_user),
+):
+    """Update the list of main products an upsell is linked to.
+    Only valid on products with role='upsell'."""
+    await _check_site_access(site_id, user)
+    p = await db.products.find_one({"id": product_id, "site_id": site_id}, {"_id": 0, "role": 1})
+    if not p:
+        raise HTTPException(status_code=404, detail="Produit introuvable")
+    if p.get("role") != "upsell":
+        raise HTTPException(status_code=400, detail="Ce produit n'est pas un upsell")
+    # Keep only ids that actually belong to this site and are main products
+    valid = await db.products.find(
+        {"id": {"$in": data.linked_product_ids}, "site_id": site_id, "role": {"$ne": "upsell"}},
+        {"_id": 0, "id": 1},
+    ).to_list(200)
+    clean_ids = [v["id"] for v in valid]
+    await db.products.update_one(
+        {"id": product_id, "site_id": site_id},
+        {"$set": {"linked_product_ids": clean_ids,
+                  "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    return {"ok": True, "linked_product_ids": clean_ids}
+
+
 @router.post("/import")
 async def import_product_from_url(site_id: str, data: ImportInput, user: dict = Depends(get_current_user)):
     """Fetch a supplier URL and return a *draft* product (NOT persisted).

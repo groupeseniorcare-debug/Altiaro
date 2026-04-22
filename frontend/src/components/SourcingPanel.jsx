@@ -52,6 +52,8 @@ const SourcingPanel = forwardRef(function SourcingPanel(
   const [urlImport, setUrlImport] = useState("");
   const [urlImporting, setUrlImporting] = useState(false);
   const [catalog, setCatalog] = useState([]);
+  const [linkedIds, setLinkedIds] = useState([]); // main product ids to link upsells to
+  const [editingLinksFor, setEditingLinksFor] = useState(null); // upsell id being edited
 
   const load = useCallback(async () => {
     const [sRes, provRes, pRes] = await Promise.all([
@@ -65,7 +67,14 @@ const SourcingPanel = forwardRef(function SourcingPanel(
       setCountry(c);
     }
     if (provRes.data) setProviders(provRes.data.providers || []);
-    if (Array.isArray(pRes.data)) setCatalog(pRes.data);
+    if (Array.isArray(pRes.data)) {
+      setCatalog(pRes.data);
+      // Default link-all-main on first load
+      setLinkedIds((prev) => {
+        if (prev.length > 0) return prev;
+        return pRes.data.filter((p) => p.role !== "upsell").map((p) => p.id);
+      });
+    }
   }, [siteId]);
 
   useEffect(() => { load(); }, [load]);
@@ -120,6 +129,7 @@ const SourcingPanel = forwardRef(function SourcingPanel(
           supplier_url: item.supplier_url || "",
           sku: item.sku || "",
           role: context === "upsell" ? "upsell" : "main",
+          linked_product_ids: context === "upsell" ? linkedIds : [],
         },
         { timeout: 90000 }
       )
@@ -144,7 +154,11 @@ const SourcingPanel = forwardRef(function SourcingPanel(
     const { data, error, rawDetail } = await apiCall(() =>
       api.post(
         `/sites/${siteId}/sourcing/import-by-url`,
-        { url: u, role: context === "upsell" ? "upsell" : "main" },
+        {
+          url: u,
+          role: context === "upsell" ? "upsell" : "main",
+          linked_product_ids: context === "upsell" ? linkedIds : [],
+        },
         { timeout: 120000 }
       )
     );
@@ -171,15 +185,98 @@ const SourcingPanel = forwardRef(function SourcingPanel(
 
   const anyProviderEnabled = providers.some((p) => p.enabled);
   const isUpsell = context === "upsell";
+  const mainCatalog = catalog.filter((p) => p.role !== "upsell");
   const visibleCatalog = isUpsell
     ? catalog.filter((p) => p.role === "upsell")
-    : catalog.filter((p) => p.role !== "upsell");
+    : mainCatalog;
+
+  const toggleLink = (pid) => {
+    setLinkedIds((prev) => prev.includes(pid) ? prev.filter((x) => x !== pid) : [...prev, pid]);
+  };
+
+  const saveEditedLinks = async (upsellId, newIds) => {
+    const { error } = await apiCall(() =>
+      api.patch(`/sites/${siteId}/products/${upsellId}/upsell-links`, {
+        linked_product_ids: newIds,
+      })
+    );
+    if (error) { window.alert(error); return; }
+    setEditingLinksFor(null);
+    load();
+  };
 
   return (
     <>
       <p className="text-sm text-neutral-500 mb-5 max-w-2xl" data-testid="sourcing-destination">
         Destination : <strong>{site?.name || "…"}</strong> · {(site?.selected_countries || []).join(", ")}
       </p>
+
+      {/* Upsell linking selector — only in upsell context */}
+      {isUpsell && mainCatalog.length > 0 && (
+        <div className="bg-white rounded-2xl border border-neutral-200 p-5 mb-4" data-testid="upsell-link-selector">
+          <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+            <div>
+              <div className="text-sm font-semibold text-neutral-900 flex items-center gap-2">
+                Associer le(s) upsell(s) importé(s) à :
+              </div>
+              <div className="text-xs text-neutral-500 mt-0.5">
+                {linkedIds.length} / {mainCatalog.length} produit{mainCatalog.length > 1 ? "s" : ""} coché{mainCatalog.length > 1 ? "s" : ""}.
+                Les upsells importés ci-dessous seront recommandés sur ces fiches produit & après achat.
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setLinkedIds(mainCatalog.map((p) => p.id))}
+                data-testid="upsell-link-all"
+                className="h-8 px-3 rounded-lg bg-white border border-neutral-200 hover:border-neutral-900 text-xs"
+              >
+                Tout cocher
+              </button>
+              <button
+                type="button"
+                onClick={() => setLinkedIds([])}
+                data-testid="upsell-link-none"
+                className="h-8 px-3 rounded-lg bg-white border border-neutral-200 hover:border-neutral-900 text-xs"
+              >
+                Aucun
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {mainCatalog.map((p) => {
+              const active = linkedIds.includes(p.id);
+              const label = (p.name?.fr || p.name?.en || "(sans nom)").slice(0, 48);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => toggleLink(p.id)}
+                  data-testid={`link-toggle-${p.id}`}
+                  className={`flex items-center gap-2 h-9 px-3 rounded-full text-xs font-medium transition border ${
+                    active
+                      ? "bg-neutral-900 text-white border-neutral-900"
+                      : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-900"
+                  }`}
+                >
+                  {p.images?.[0] && (
+                    <img src={p.images[0]} alt="" className="w-5 h-5 rounded object-cover" />
+                  )}
+                  {label}
+                  {active && <CheckCircle size={12} weight="fill" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {isUpsell && mainCatalog.length === 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4 text-xs text-amber-800 flex items-start gap-2">
+          <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
+          <div>Importe d'abord au moins 1 produit principal à l'étape 2 pour pouvoir associer tes upsells.</div>
+        </div>
+      )}
 
       {/* Providers status */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
@@ -508,6 +605,15 @@ const SourcingPanel = forwardRef(function SourcingPanel(
                         </span>
                       )}
                     </div>
+                    {p.role === "upsell" && (
+                      <button
+                        onClick={() => setEditingLinksFor(p)}
+                        data-testid={`edit-links-${p.id}`}
+                        className="mt-2 w-full text-[11px] px-2 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-medium flex items-center justify-center gap-1"
+                      >
+                        Associé à {(p.linked_product_ids || []).length} produit{(p.linked_product_ids || []).length > 1 ? "s" : ""} · Modifier
+                      </button>
+                    )}
                     {Object.keys(ship).length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
                         {Object.entries(ship).map(([cc, info]) => {
@@ -549,8 +655,87 @@ const SourcingPanel = forwardRef(function SourcingPanel(
           </div>
         </div>
       )}
+
+      {/* Edit links modal */}
+      {editingLinksFor && (
+        <EditLinksModal
+          upsell={editingLinksFor}
+          mainCatalog={mainCatalog}
+          onClose={() => setEditingLinksFor(null)}
+          onSave={(ids) => saveEditedLinks(editingLinksFor.id, ids)}
+        />
+      )}
     </>
   );
 });
+
+function EditLinksModal({ upsell, mainCatalog, onClose, onSave }) {
+  const [ids, setIds] = useState(upsell.linked_product_ids || []);
+  const toggle = (pid) => setIds((prev) => prev.includes(pid) ? prev.filter((x) => x !== pid) : [...prev, pid]);
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 p-4"
+      onClick={onClose}
+      data-testid="edit-links-modal"
+    >
+      <div
+        className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-auto p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-1">Modifier les associations</div>
+            <h3 className="font-semibold text-neutral-900" style={{ fontFamily: "'Fraunces', serif" }}>
+              {upsell.name?.fr || "(sans nom)"}
+            </h3>
+            <div className="text-xs text-neutral-500 mt-1">
+              Choisis les produits principaux auxquels cet upsell sera recommandé (fiche produit + post-achat).
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-neutral-100 text-neutral-500">✕</button>
+        </div>
+        <div className="flex flex-wrap gap-2 mb-6">
+          {mainCatalog.length === 0 ? (
+            <div className="text-sm text-neutral-500">Aucun produit principal — importe-en d'abord à l'étape 2.</div>
+          ) : mainCatalog.map((p) => {
+            const active = ids.includes(p.id);
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => toggle(p.id)}
+                data-testid={`modal-link-${p.id}`}
+                className={`flex items-center gap-2 h-9 px-3 rounded-full text-xs font-medium transition border ${
+                  active
+                    ? "bg-neutral-900 text-white border-neutral-900"
+                    : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-900"
+                }`}
+              >
+                {p.images?.[0] && <img src={p.images[0]} alt="" className="w-5 h-5 rounded object-cover" />}
+                {(p.name?.fr || p.name?.en || "(sans nom)").slice(0, 40)}
+                {active && <CheckCircle size={12} weight="fill" />}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="h-10 px-4 rounded-lg bg-white border border-neutral-200 hover:border-neutral-400 text-sm"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={() => onSave(ids)}
+            data-testid="edit-links-save"
+            className="h-10 px-4 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium"
+          >
+            Enregistrer ({ids.length})
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default SourcingPanel;

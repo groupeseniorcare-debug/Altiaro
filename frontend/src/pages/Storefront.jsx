@@ -54,6 +54,7 @@ import {
 import ProductGallery from "../components/storefront/ProductGallery";
 import ProductReviews from "../components/storefront/ProductReviews";
 import CrossSellProducts from "../components/storefront/CrossSellProducts";
+import UpsellsRecommendations from "../components/storefront/UpsellsRecommendations";
 import DeliveryEstimate from "../components/storefront/DeliveryEstimate";
 import ProductBundle from "../components/storefront/ProductBundle";
 import PaymentOptions from "../components/storefront/PaymentOptions";
@@ -549,6 +550,13 @@ export function StorefrontProduct() {
         <PeopleAlsoAsk items={p.narrative?.seo?.people_also_ask} design={design} />
         <ProductReviews product={p} design={design} />
         <RelatedQueries queries={p.narrative?.seo?.related_queries} design={design} />
+        <UpsellsRecommendations
+          mode="product"
+          productId={p.id}
+          lang={lang}
+          design={design}
+          onAddToCart={(u) => { try { window.altiaroTrack?.addToCart?.(u, 1, lang); } catch (_) { /* noop */ } }}
+        />
         <CrossSellProducts currentProduct={p} lang={lang} design={design} />
         <LastUpdatedBadge date={p.narrative?.enriched_at || p.updated_at} design={design} />
       </div>
@@ -995,6 +1003,17 @@ export function StorefrontConfirmation() {
           ← {t(lang, "back_to_shop")}
         </Link>
       </div>
+
+      {paid && order?.items?.length > 0 && (
+        <div className="max-w-6xl mx-auto px-6 md:px-10 pb-16">
+          <UpsellsRecommendations
+            mode="post_purchase"
+            productIds={order.items.map((it) => it.product_id).filter(Boolean)}
+            lang={lang}
+            design={design}
+          />
+        </div>
+      )}
     </StorefrontLayout>
   );
 }

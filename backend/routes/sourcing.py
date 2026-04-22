@@ -18,7 +18,7 @@ import re as _re
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -322,6 +322,7 @@ class ImportInput(BaseModel):
     supplier_url: Optional[str] = ""
     sku: Optional[str] = ""
     role: Optional[str] = "main"  # "main" or "upsell"
+    linked_product_ids: Optional[List[str]] = None  # main products this upsell is linked to
 
 
 # Country → language mapping for translation targets
@@ -565,6 +566,7 @@ async def import_product(site_id: str, data: ImportInput, user: dict = Depends(g
         "status": "active",
         "featured": False,
         "role": "upsell" if (data.role or "main") == "upsell" else "main",
+        "linked_product_ids": list(data.linked_product_ids or []) if (data.role or "main") == "upsell" else [],
         "source": {"provider": data.provider, "product_id": data.product_id},
         "translation_status": "translated" if translations else "fallback_original",
         "translated_langs": list(translations.keys()),
@@ -587,6 +589,7 @@ async def import_product(site_id: str, data: ImportInput, user: dict = Depends(g
 class ImportUrlInput(BaseModel):
     url: str
     role: Optional[str] = "main"  # "main" or "upsell"
+    linked_product_ids: Optional[List[str]] = None
 
 
 def _parse_provider_url(url: str) -> tuple[str, str]:
@@ -687,6 +690,7 @@ async def import_by_url(site_id: str, data: ImportUrlInput, user: dict = Depends
         supplier_url=data.url,
         sku=sku,
         role=data.role or "main",
+        linked_product_ids=data.linked_product_ids or [],
     )
     # Respect CJ 1 QPS: sleep before the import (which will call detail again for specs)
     if provider == "cj":
