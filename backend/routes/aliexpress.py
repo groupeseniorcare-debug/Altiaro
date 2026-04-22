@@ -51,37 +51,55 @@ SYNC_API_URL = "https://api-sg.aliexpress.com/sync"
 # =====================================================================
 # OAuth — authorize + callback
 # =====================================================================
-def _sign_state(site_id: str) -> str:
-    """HMAC-sign the state to prevent CSRF and restore site_id safely on callback."""
-    raw = f"{site_id}.{int(time.time())}"
-    mac = hmac.new(APP_SECRET.encode(), raw.encode(), hashlib.sha256).hexdigest()[:16]
-    return f"{raw}.{mac}"
+# State = base64url(site_id | origin | ts) + "." + hmac_short
+# origin = URL of the Altiaro environment that initiated the flow
+# (altiaro.com in production, *.preview.emergentagent.com in dev).
+# This lets the single AliExpress callback URL relay the code back to the
+# right environment transparently — NO need to register multiple callbacks.
+import base64 as _b64
 
 
-def _verify_state(state: str) -> Optional[str]:
+def _sign_state(site_id: str, origin: str) -> str:
+    raw = f"{site_id}|{origin}|{int(time.time())}"
+    payload = _b64.urlsafe_b64encode(raw.encode()).decode().rstrip("=")
+    mac = hmac.new(APP_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()[:16]
+    return f"{payload}.{mac}"
+
+
+def _verify_state(state: str) -> Optional[tuple]:
+    """Returns (site_id, origin) or None."""
     try:
-        parts = state.split(".")
-        if len(parts) != 3:
-            return None
-        site_id, ts, mac = parts
-        expected = hmac.new(APP_SECRET.encode(), f"{site_id}.{ts}".encode(), hashlib.sha256).hexdigest()[:16]
+        payload, mac = state.split(".", 1)
+        expected = hmac.new(APP_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()[:16]
         if not hmac.compare_digest(mac, expected):
             return None
-        # 15 min validity window
-        if int(time.time()) - int(ts) > 900:
+        # Add back padding for b64 decode
+        pad = "=" * (-len(payload) % 4)
+        raw = _b64.urlsafe_b64decode(payload + pad).decode()
+        site_id, origin, ts = raw.split("|", 2)
+        if int(time.time()) - int(ts) > 900:  # 15 min window
             return None
-        return site_id
+        return (site_id, origin)
     except Exception:
         return None
 
 
+def _current_origin(request: Request) -> str:
+    """Infer the public origin of THIS server (preview vs prod)."""
+    # Trust x-forwarded-proto/host when behind an ingress
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.hostname
+    return f"{proto}://{host}".rstrip("/")
+
+
 @router.get("/aliexpress/authorize-url")
-async def get_authorize_url(site_id: str, user=Depends(get_current_user)):
+async def get_authorize_url(site_id: str, request: Request, user=Depends(get_current_user)):
     """Return the URL the Concepteur should be redirected to. Keeps all secrets server-side."""
     await _check_site_access(site_id, user)
     if not APP_KEY:
         raise HTTPException(503, "Intégration AliExpress non configurée côté serveur.")
-    state = _sign_state(site_id)
+    origin = _current_origin(request)
+    state = _sign_state(site_id, origin)
     params = {
         "response_type": "code",
         "client_id": APP_KEY,
@@ -89,10 +107,10 @@ async def get_authorize_url(site_id: str, user=Depends(get_current_user)):
         "state": state,
         "sp": "ae",
     }
-    return {"authorize_url": f"{AUTHORIZE_URL}?{urlencode(params)}", "state": state}
+    return {"authorize_url": f"{AUTHORIZE_URL}?{urlencode(params)}", "state": state, "origin": origin}
 
 
-@router.get("/aliexpress/oauth/callback", response_class=HTMLResponse)
+@router.get("/aliexpress/oauth/callback")
 async def aliexpress_oauth_callback(
     request: Request,
     code: Optional[str] = None,
@@ -100,7 +118,13 @@ async def aliexpress_oauth_callback(
     error: Optional[str] = None,
     error_description: Optional[str] = None,
 ):
-    """Registered in the AliExpress App Console. Always returns 200 for health checks."""
+    """
+    Registered in the AliExpress App Console.
+    Smart relay : if the state says this OAuth was initiated from another Altiaro
+    environment (e.g. preview), we redirect the code+state there so that
+    environment can do the token exchange against its own DB.
+    Otherwise we process locally.
+    """
     now = datetime.now(timezone.utc)
     try:
         await db.aliexpress_oauth_callbacks.insert_one({
@@ -108,6 +132,7 @@ async def aliexpress_oauth_callback(
             "error": error, "error_description": error_description,
             "ip": (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "")),
             "user_agent": request.headers.get("user-agent", ""),
+            "handled_by": _current_origin(request),
         })
     except Exception:
         logger.exception("[aliexpress] persist callback failed")
@@ -119,16 +144,54 @@ async def aliexpress_oauth_callback(
     if not code:
         return HTMLResponse(_page(title="Endpoint OAuth Altiaro × AliExpress", body="Ce point d'entrée est réservé au flow OAuth initié depuis votre cockpit."))
 
-    site_id = _verify_state(state or "")
-    if not site_id:
+    parsed = _verify_state(state or "")
+    if not parsed:
         return HTMLResponse(_page(title="Lien invalide ou expiré", body="Relancez la connexion depuis votre cockpit Altiaro.", ok=False))
+    site_id, origin = parsed
+    here = _current_origin(request)
 
+    # If the OAuth was initiated from a different Altiaro environment, relay there.
+    if origin and origin != here:
+        logger.info(f"[aliexpress] relaying OAuth from {here} → {origin}")
+        params = urlencode({"code": code, "state": state})
+        return RedirectResponse(
+            url=f"{origin}/api/aliexpress/oauth/relay?{params}",
+            status_code=302,
+        )
+
+    return await _finalize_oauth(site_id, code)
+
+
+@router.get("/aliexpress/oauth/relay")
+async def aliexpress_oauth_relay(
+    request: Request,
+    code: str,
+    state: str,
+):
+    """
+    Endpoint that receives a relayed OAuth code from the 'master' callback on
+    altiaro.com. Only accepts requests whose state verifies to THIS origin.
+    """
+    parsed = _verify_state(state)
+    if not parsed:
+        return HTMLResponse(_page(title="Lien invalide ou expiré", body="Relancez la connexion depuis votre cockpit Altiaro.", ok=False))
+    site_id, origin = parsed
+    here = _current_origin(request)
+    if origin != here:
+        logger.warning(f"[aliexpress] relay rejected : state origin {origin} != here {here}")
+        return HTMLResponse(_page(title="Environnement incorrect", body="Ce lien d'autorisation n'appartient pas à cet environnement.", ok=False))
+    return await _finalize_oauth(site_id, code)
+
+
+async def _finalize_oauth(site_id: str, code: str) -> HTMLResponse:
+    """Exchange the code for a token and persist on the site. Returns the success page."""
     try:
         token_payload = await _exchange_code_for_token(code)
     except Exception as e:
         logger.exception("[aliexpress] token exchange failed")
         return HTMLResponse(_page(title="Échec de la connexion", body=f"Erreur lors de l'échange du code : {str(e)[:200]}", ok=False))
 
+    now = datetime.now(timezone.utc)
     expires_in = int(token_payload.get("expires_in") or 172800)  # ~48h default
     refresh_in = int(token_payload.get("refresh_token_valid_time") or token_payload.get("refresh_expires_in") or 365 * 86400)
     expires_at = now + timedelta(seconds=expires_in)
