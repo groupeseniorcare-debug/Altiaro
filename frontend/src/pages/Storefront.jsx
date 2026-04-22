@@ -212,13 +212,18 @@ export function StorefrontProduct() {
   useEffect(() => {
     axios
       .get(`${BACKEND_URL}/api/public/sites/${siteId}/products/${productId}`)
-      .then(({ data }) => setP(data))
+      .then(({ data }) => {
+        setP(data);
+        // GA4 / Google Ads tracking
+        try { window.altiaroTrack?.viewItem?.(data, lang); } catch (_) {}
+      })
       .catch(() => setP(null))
       .finally(() => setLoading(false));
-  }, [siteId, productId]);
+  }, [siteId, productId, lang]);
 
   const handleAdd = () => {
     addToCart(siteId, p, lang, qty);
+    try { window.altiaroTrack?.addToCart?.(p, qty, lang); } catch (_) {}
     setAdded(true);
     // Auto-open the cart drawer to confirm
     window.dispatchEvent(new Event("cf_cart_open"));
@@ -745,6 +750,8 @@ export function StorefrontCheckout() {
     setSubmitting(true);
     setError("");
     try {
+      // GA4 / Google Ads tracking
+      try { window.altiaroTrack?.beginCheckout?.(items, totals.total, lang); } catch (_) {}
       const payload = {
         items: items.map((i) => ({
           product_id: i.product_id,
@@ -915,12 +922,18 @@ export function StorefrontConfirmation() {
     if (!orderNumber) return;
     let cancelled = false;
     let attempts = 0;
+    let fired = false;
     const fetchOrder = () => {
       axios
         .get(`${BACKEND_URL}/api/public/sites/${siteId}/orders/${orderNumber}`)
         .then(({ data }) => {
           if (cancelled) return;
           setOrder(data);
+          // GA4 / Google Ads purchase event — fired once when status becomes 'paid'
+          if (!fired && data?.status === "paid") {
+            fired = true;
+            try { window.altiaroTrack?.purchase?.(data, lang); } catch (_) {}
+          }
           attempts += 1;
           if (data.status === "pending_payment" && attempts < 20) {
             setTimeout(fetchOrder, 2000);
@@ -930,7 +943,7 @@ export function StorefrontConfirmation() {
     };
     fetchOrder();
     return () => { cancelled = true; };
-  }, [siteId, orderNumber]);
+  }, [siteId, orderNumber, lang]);
 
   const paid = order?.status === "paid";
   const failed = order?.status === "failed" || order?.status === "expired" || order?.status === "cancelled";

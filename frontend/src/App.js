@@ -18,6 +18,8 @@ import SiteAliExpressImport from "./pages/SiteAliExpressImport";
 import SitePricing from "./pages/SitePricing";
 import SiteForecast from "./pages/SiteForecast";
 import SiteUpsells from "./pages/SiteUpsells";
+import SiteDesign from "./pages/SiteDesign";
+import Sourcing from "./pages/Sourcing";
 import AdminIntegrations from "./pages/AdminIntegrations";
 import AdminReview from "./pages/AdminReview";
 import Empire from "./pages/Empire";
@@ -213,6 +215,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <SiteUpsells />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites/:id/design"
+            element={
+              <ProtectedRoute>
+                <SiteDesign />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites/:id/sourcing"
+            element={
+              <ProtectedRoute>
+                <Sourcing />
               </ProtectedRoute>
             }
           />

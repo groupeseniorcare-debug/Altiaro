@@ -93,6 +93,7 @@ export default function ProductBundle({ currentProduct, lang = "fr", design }) {
         image: p.images?.[0],
         quantity: 1,
       });
+      try { window.altiaroTrack?.addToCart?.(p, 1, lang); } catch (_) {}
     });
     toast.success(`${selectedItems.filter(p => !p._demo).length} produit(s) ajoutés au panier`);
   };

@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration 20 — Validated NEW Sprint B.2 additions: SiteDesign page, Sourcing re-routing, CockpitJourney step wiring, GA4 tracking hooks. 7/8 backend tests PASS (1 heavy /design/generate test FAILED due to ingress 60s timeout vs Claude/nano-banana 90s+ generation). Frontend: /design empty state + /sourcing both load correctly, CockpitJourney renders 9 steps with correct labels and `to=` props pointing to /sourcing (step 2) and /design (steps 5/6). GA4 helper window.altiaroTrack is GATED by site.design.tracking.ga4_measurement_id — without a configured measurement_id, tracking is silently disabled (cannot verify event firing end-to-end without seed config).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/sites/{id}/design/generate", "issue": "Ingress (k8s/Cloudflare) returns 502 'The preview environment is not responding' after ~60s while Claude+nano-banana generation can take 90-120s. Client-facing call therefore fails even when the backend is still processing. Backend timeout is 180s but external gateway cap is shorter. Frontend will show window.alert('Génération échouée: ...').", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/sites/{id}/design/publish", "issue": "Always sets published=true (default arg publish=True is a Query param but no body provided by frontend). togglePublish on UI flips local state optimistically but server cannot un-publish via this endpoint without ?publish=false in URL. Toggle truly toggles only because frontend infers state; backend semantically only PUBLISHES."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Storefront / GA4 verification", "issue": "Cannot verify view_item/add_to_cart/begin_checkout/purchase end-to-end on the live preview because (a) the seeded Sereniva storefront /shop/d7d84968-0a2e-44c4-880b-f5af736cc86d now returns 'Boutique introuvable' with 404s on initial GETs (the demo site appears unpublished or wiped), and (b) the test site Test Fauteuils Releveurs has no products/design and no tracking IDs. window.altiaroTrack is correctly registered only when site.design.tracking.ga4_measurement_id is set (StorefrontTracking.jsx line 17). The GA4 wiring code looks correct (gtag.js loaded, helpers expose viewItem/addToCart/beginCheckout/purchase, all wrapped in try/catch optional chaining at the call sites).", "affected_selectors": ["window.altiaroTrack", "window.dataLayer"]},
+      {"flow": "Design generate (full)", "issue": "Long Claude+nano-banana generation crosses the preview ingress 60s timeout — user sees generic alert. Suggest: split into 2 calls (Claude JSON first, nano-banana logo async/background) OR move to a job queue with polling endpoint."}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration20_design_logo.py",
+    "/app/test_reports/pytest/iter20.xml"
+  ],
+  "action_items": [
+    "[HIGH] /design/generate exceeds ingress 60s timeout. Move nano-banana logo generation to a non-blocking background task (return Claude JSON immediately, attach logo_url asynchronously), or persist a job and let frontend poll. Currently a successful generation can still surface as a 502 to the user.",
+    "[MEDIUM] publish endpoint should accept a JSON body { published: bool } so the togglePublish UI can really un-publish (today the body is empty and Query param defaults publish=True).",
+    "[MEDIUM] Re-seed or re-publish the Sereniva demo storefront (/shop/d7d84968-0a2e-44c4-880b-f5af736cc86d) — currently returns 'Boutique introuvable', breaking customer/buyer test scenarios and any GA4 verification path on a live storefront.",
+    "[LOW] To allow E1/QA to verify GA4 events end-to-end, seed `site.design.tracking = { ga4_measurement_id: 'G-TEST123' }` on at least one test site so window.altiaroTrack is exposed and events can be inspected in window.dataLayer."
+  ],
+  "critical_code_review_comments": [
+    "design.py POST /sites/{id}/design/brand/logo accepts ANY string ≥3 chars as logo_url — no validation that it points to /api/uploads/ or is a real image (could be exploited to set a remote tracking URL). Consider validating against the upload directory or a whitelist.",
+    "publish_design uses a Query param `publish: bool = True` while the frontend posts an empty body — endpoint can never set published=false from the current UI. Convert to a Pydantic body model with a default toggle behavior.",
+    "_nano_banana_logo silently returns None on any failure → caller proceeds without a logo and never warns the user. UX would benefit from a flag in the response (e.g., `logo_generation_failed: true`).",
+    "SiteDesign.jsx uses window.alert() for error reporting (4 places) — replace with toast/inline error to match app UX (also called out in iteration_19).",
+    "StorefrontTracking.jsx never tears down window.gtag/window.dataLayer on unmount — fine for SPAs but worth documenting; also `window.__altiaroTrackingLoaded` prevents re-init across navigations even if site changes.",
+    "design.py is now ~720 lines (Studio prompt logic + design + leads) — close to the 700-line guideline; consider splitting into design_core.py + design_studio.py + leads.py."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration20_design_logo.py (new)"
+  ],
+  "success_rate": {
+    "backend": "87.5% (7/8 — heavy generate test failed due to ingress timeout, NOT a logic bug)",
+    "frontend": "85% — /design and /sourcing pages render correctly; CockpitJourney wiring confirmed via source (to=/sourcing for step 2, to=/design for steps 5,6); GA4 events not verifiable without tracking IDs"
+  },
+  "test_credentials": "Concepteur: concepteur@conceptfactory.fr / Concepteur2026! — Site: 65964cb0-7a1a-4c11-9644-1ad8f2371d48",
+  "seed_data_creation": "Set design.brand.logo_url='/api/uploads/logos/test_logo_iter20.png' on test site via successful POST /design/brand/logo. No products created. Design generate (heavy) was attempted once but killed by ingress 60s timeout, may have partially run on backend.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Sereniva demo storefront (d7d84968-0a2e-44c4-880b-f5af736cc86d) is currently 404 on /shop — needs reseeding before any storefront/customer/GA4 testing. Test site 65964cb0... has no products and no tracking config. data-testids on SiteDesign: design-empty, design-dashboard, design-initial-brief, design-generate, design-brief, design-regen-all, design-publish, logo-upload, regen-{brand|logo|hero|about|benefits|faq|testimonials|contact|seo}, design-{hero|benefits|about|faq|contact|legal}. CockpitJourney testids: cockpit-journey, journey-step-{pricing|import|upsells|forecast|branding|pages|content|seo|qa}. To trigger /design/generate end-to-end, increase ingress/proxy timeout to 180s OR split nano-banana logo generation into a background task.",
+  "rca of the issue": "Design generate 502 RCA: emergent preview ingress kills HTTP requests at ~60s. The /design/generate handler awaits Claude (up to 180s) + nano-banana (up to 90s) sequentially in-line. Total wall-time often >60s. Mitigation: (1) make nano-banana fire-and-forget after returning the Claude JSON; (2) implement a job queue (POST returns job_id, GET /jobs/{id} returns status) and have the frontend poll; (3) reduce Claude prompt size or use a faster model for the initial pass."
+}

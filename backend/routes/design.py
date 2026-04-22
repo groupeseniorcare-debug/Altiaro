@@ -364,6 +364,24 @@ async def publish_design(site_id: str, publish: bool = True, user: dict = Depend
     return {"ok": True, "published": bool(publish)}
 
 
+class LogoUrlInput(BaseModel):
+    logo_url: str = Field(..., min_length=3, max_length=2048)
+
+
+@router.post("/sites/{site_id}/design/brand/logo")
+async def set_brand_logo(site_id: str, data: LogoUrlInput, user: dict = Depends(get_current_user)):
+    """Permet au Concepteur d'uploader son propre logo (via /uploads/image) puis
+    d'associer l'URL à design.brand.logo_url."""
+    await _check_site_access(site_id, user)
+    now = datetime.now(timezone.utc).isoformat()
+    await db.sites.update_one(
+        {"id": site_id},
+        {"$set": {"design.brand.logo_url": data.logo_url, "updated_at": now}},
+    )
+    return {"ok": True, "logo_url": data.logo_url}
+
+
+
 # ================== PUBLIC ================== #
 
 @router.get("/public/sites/{site_id}/design")
