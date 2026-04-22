@@ -154,6 +154,58 @@ async def my_orders(site_id: str, request: Request):
     return orders
 
 
+@router.get("/public/sites/{site_id}/customers/orders/{order_id}")
+async def my_order_detail(site_id: str, order_id: str, request: Request):
+    """Fully enriched order view for the authenticated customer."""
+    customer = await _auth_customer(request, site_id)
+    order = await db.orders.find_one(
+        {
+            "site_id": site_id,
+            "$or": [{"id": order_id}, {"order_number": order_id}],
+            "customer.email": customer["email"],
+        },
+        {"_id": 0, "_meta_ip": 0},
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande introuvable")
+    await _enrich_order_items(order)
+    order["review_invitations"] = await _fetch_review_links(site_id, order.get("id"))
+    return order
+
+
+async def _enrich_order_items(order: dict) -> None:
+    """Attach product image + name snapshot to every item in the order."""
+    ids = [it.get("product_id") for it in (order.get("items") or []) if it.get("product_id")]
+    if not ids:
+        return
+    products = await db.products.find(
+        {"id": {"$in": ids}},
+        {"_id": 0, "id": 1, "name": 1, "images": 1, "slug": 1},
+    ).to_list(len(ids))
+    by_id = {p["id"]: p for p in products}
+    for it in order.get("items", []):
+        p = by_id.get(it.get("product_id")) or {}
+        imgs = p.get("images") or []
+        it["product_image"] = (imgs[0] if isinstance(imgs, list) and imgs else "") or it.get("image", "")
+        it["product_name_current"] = p.get("name") or it.get("name") or ""
+        it["product_slug"] = p.get("slug") or ""
+
+
+async def _fetch_review_links(site_id: str, order_id: str) -> list:
+    """For delivered orders, expose pending review invitation tokens so
+    the customer can jump directly to the review form from the account area."""
+    if not order_id:
+        return []
+    invites = await db.review_invitations.find(
+        {"site_id": site_id, "order_id": order_id, "status": {"$in": ["pending", "sent"]}, "used_at": None},
+        {"_id": 0, "token": 1, "product_id": 1, "send_after": 1},
+    ).to_list(20)
+    for i in invites:
+        if isinstance(i.get("send_after"), datetime):
+            i["send_after"] = i["send_after"].isoformat()
+    return invites
+
+
 @router.get("/public/sites/{site_id}/orders/{order_number}")
 async def public_order_detail(site_id: str, order_number: str, email: str = ""):
     """Public order tracking : requires email for non-authenticated lookup."""
@@ -168,4 +220,5 @@ async def public_order_detail(site_id: str, order_number: str, email: str = ""):
         raise HTTPException(status_code=403, detail="Email ne correspond pas à cette commande")
     if not email:
         raise HTTPException(status_code=400, detail="Email requis pour consulter une commande")
+    await _enrich_order_items(order)
     return order

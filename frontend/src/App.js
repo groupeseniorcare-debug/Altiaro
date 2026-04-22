@@ -25,6 +25,8 @@ import SiteSettings from "./pages/SiteSettings";
 import StorefrontRegister from "./pages/StorefrontRegister";
 import StorefrontLogin from "./pages/StorefrontLogin";
 import StorefrontAccount from "./pages/StorefrontAccount";
+import StorefrontOrderDetail from "./pages/StorefrontOrderDetail";
+import StorefrontTrack from "./pages/StorefrontTrack";
 import StorefrontSearch from "./pages/StorefrontSearch";
 import GoogleAds from "./pages/GoogleAds";
 import Opportunities from "./pages/Opportunities";
@@ -213,7 +215,9 @@ function App() {
           {/* Storefront public pages — customer accounts + search */}
           <Route path="/shop/:siteId/account/register" element={<StorefrontRegister />} />
           <Route path="/shop/:siteId/account/login" element={<StorefrontLogin />} />
+          <Route path="/shop/:siteId/account/orders/:orderId" element={<StorefrontOrderDetail />} />
           <Route path="/shop/:siteId/account" element={<StorefrontAccount />} />
+          <Route path="/shop/:siteId/track" element={<StorefrontTrack />} />
           <Route path="/shop/:siteId/search" element={<StorefrontSearch />} />
 
           {/* Public Storefront (no auth) */}

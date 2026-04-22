@@ -235,14 +235,3 @@ async def public_create_order(site_id: str, data: OrderCreateInput, request: Req
     doc.pop("_id", None)
     doc.pop("_meta_ip", None)
     return doc
-
-
-@router.get("/sites/{site_id}/orders/{order_number}")
-async def public_order_lookup(site_id: str, order_number: str):
-    o = await db.orders.find_one(
-        {"site_id": site_id, "order_number": order_number},
-        {"_id": 0, "_meta_ip": 0, "status_history": 0}
-    )
-    if not o:
-        raise HTTPException(status_code=404, detail="Commande introuvable")
-    return o

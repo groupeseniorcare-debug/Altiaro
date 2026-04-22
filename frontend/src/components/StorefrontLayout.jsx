@@ -404,6 +404,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
             { label: "FAQ", href: `${shopRoot}#faq` },
             { label: "Livraison & délais", href: `${shopRoot}/livraison` },
             { label: "Retours & remboursements", href: `${shopRoot}/retours` },
+            { label: "Suivre ma commande", href: `${shopRoot}/track` },
             { label: customer ? "Mon compte" : "Se connecter", href: customer ? `${shopRoot}/account` : `${shopRoot}/account/login` },
           ]} />
 

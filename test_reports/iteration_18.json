@@ -1,0 +1,34 @@
+{
+  "summary": "Iteration 18 — Validated new customer storefront order-tracking feature (backend + frontend). All 14 pytest API cases green; all frontend flows (account list filters, delivered detail + review CTA, shipped detail + Colissimo tracking link, guest tracking success + error) verified against site Sereniva with buyer.demo@altiaro.fr.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration18_customer_orders.py",
+    "/app/test_reports/pytest/iter18.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "public_shop.py shadow route at former line 240 successfully removed — confirmed only /api/public/sites/{sid}/orders/{order_number} exists in customers.py with required email guard (400 if missing, 403 if mismatch).",
+    "_enrich_order_items correctly falls back to item.image and item.name when product was deleted — good defensive code.",
+    "_fetch_review_links filters on status in ['pending','sent'] and used_at=None — aligned with review invitation lifecycle.",
+    "Customer JWT uses HS256 with JWT_SECRET from env (fallback 'change-me' — ensure prod env always overrides). Token TTL 30 days is generous; consider shorter TTL or refresh flow in future iterations.",
+    "Login route is /shop/:siteId/account/login (not /shop/:siteId/login) — review_request mentioned '/shop/:siteId/account' which is correct; no discrepancy."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration18_customer_orders.py (new)"
+  ],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100% (all critical flows)"},
+  "test_credentials": "buyer.demo@altiaro.fr / Buyer2026! on site d7d84968-0a2e-44c4-880b-f5af736cc86d (Sereniva). Orders ALT-DEMO-0001 (shipped) & ALT-DEMO-0002 (delivered) pre-seeded.",
+  "seed_data_creation": "None — used existing seeded data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iteration 18 shipped: customer order detail (/shop/:siteId/account/orders/:orderId), guest tracking (/shop/:siteId/track), clickable rows + status filter on account page. All data-testids available: order-row-ALT-DEMO-XXXX, order-header, order-timeline, order-items, order-shipping-address, tracking-link, review-link-*, track-form, track-order-number, track-email, track-result, track-error. Customer login at /shop/:siteId/account/login (JWT Bearer auth, NOT cookies).",
+  "rca of the issue": "N/A — no bug found this iteration. Prior shadowing route in public_shop.py was already removed by main agent."
+}
