@@ -3,6 +3,21 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-22 · Sprint B.2 : Nouveau Parcours Cockpit linéaire (9 étapes) — remplace les 50 prompts
+
+- **Câblage complet** (ce qui manquait de la session précédente) :
+  - `cockpit_tools` router mounté dans `server.py` (routes `/api/sites/{id}/pricing-analysis|financial-forecast|upsell-recommendations`).
+  - Ajout des routes React `/sites/:id/pricing`, `/forecast`, `/upsells` dans `App.js`.
+  - `SiteDetail.jsx` : la liste des 50 prompts (8 blocs × phases × steps) est **entièrement remplacée** par `<CockpitJourney />` + `<SiteQAPanel />`.
+  - Compteur legacy "0/50 étapes validées" du header SiteDetail supprimé — le cockpit pilote désormais seul l'avancement.
+- **Nouveaux endpoints IA / calcul** :
+  - Claude Sonnet 4.5 analyse concurrence + recommande fourchettes de prix (entry / sweet-spot / premium) par type de produit.
+  - Forecast 30 j : prix moyen × CPA × budget pour produire CA / COGS / marge brute / ROAS / break-even CPA, verdict `healthy|acceptable|risky`.
+  - Upsells : Claude suggère 6-10 keywords AliExpress cohérents avec le catalogue.
+- **Wipe data de test** : sites, steps orphelins, quick_scans, ledger, ads_copy, site_submissions, niche_analyses → base prête pour le 1er lancement réel.
+- **Testing agent iteration 19** : 8/8 backend + 9/9 steps cockpit OK · Claude pricing end-to-end OK (~30 s).
+
+
 ## 2026-04-22 · Sprint 45 : Espace client Storefront — Suivi + Historique commandes
 ### Template partagé (toutes boutiques actuelles ET futures)
 - **Backend** :

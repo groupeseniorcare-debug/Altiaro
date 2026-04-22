@@ -316,16 +316,9 @@ export default function SiteDetail() {
             </div>
 
             <div className="text-right">
-              <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-1">Avancement</div>
-              <div className="text-3xl font-semibold text-neutral-900">{progress}%</div>
-              <div className="text-sm text-neutral-600 mt-1">
-                {totalValidated} / {steps.length} étapes validées
-              </div>
-              <div className="w-48 h-2 bg-neutral-200 rounded-full overflow-hidden mt-3">
-                <div
-                  className="h-full bg-white rounded-full transition-all duration-500"
-                  style={{ width: `${progress}%` }}
-                />
+              <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-1">Statut</div>
+              <div className="text-sm text-neutral-600 mt-1 max-w-[180px]">
+                Le parcours ci-dessous pilote désormais l'avancement du site.
               </div>
             </div>
           </div>
