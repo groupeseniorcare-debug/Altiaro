@@ -15,12 +15,11 @@ import SiteProducts from "./pages/SiteProducts";
 import SiteBlogPosts from "./pages/SiteBlogPosts";
 import SiteSEO from "./pages/SiteSEO";
 import SiteAliExpressImport from "./pages/SiteAliExpressImport";
-import AdsCopy from "./pages/AdsCopy";
+import AdminIntegrations from "./pages/AdminIntegrations";
 import Empire from "./pages/Empire";
 import Billing from "./pages/Billing";
 import Orders from "./pages/Orders";
 import AdminPayouts from "./pages/AdminPayouts";
-import Sourcing from "./pages/Sourcing";
 import Domains from "./pages/Domains";
 import SiteSettings from "./pages/SiteSettings";
 import StorefrontRegister from "./pages/StorefrontRegister";
@@ -190,18 +189,10 @@ function App() {
             }
           />
           <Route
-            path="/sites/:id/ads-copy"
+            path="/admin/integrations"
             element={
               <ProtectedRoute>
-                <AdsCopy />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/sites/:id/sourcing"
-            element={
-              <ProtectedRoute>
-                <Sourcing />
+                <AdminIntegrations />
               </ProtectedRoute>
             }
           />

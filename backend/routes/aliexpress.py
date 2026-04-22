@@ -48,6 +48,18 @@ REFRESH_URL = "https://api-sg.aliexpress.com/rest/auth/token/refresh"
 SYNC_API_URL = "https://api-sg.aliexpress.com/sync"
 
 
+async def _get_platform_settings() -> dict:
+    """Platform-level AliExpress connection (single Altiaro account, all sites inherit)."""
+    doc = await db.platform_settings.find_one({"key": "aliexpress"}, {"_id": 0})
+    return doc or {}
+
+
+async def _set_platform_settings(patch: dict) -> None:
+    await db.platform_settings.update_one(
+        {"key": "aliexpress"}, {"$set": patch}, upsert=True
+    )
+
+
 # =====================================================================
 # OAuth — authorize + callback
 # =====================================================================
@@ -90,24 +102,6 @@ def _current_origin(request: Request) -> str:
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme
     host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.hostname
     return f"{proto}://{host}".rstrip("/")
-
-
-@router.get("/aliexpress/authorize-url")
-async def get_authorize_url(site_id: str, request: Request, user=Depends(get_current_user)):
-    """Return the URL the Concepteur should be redirected to. Keeps all secrets server-side."""
-    await _check_site_access(site_id, user)
-    if not APP_KEY:
-        raise HTTPException(503, "Intégration AliExpress non configurée côté serveur.")
-    origin = _current_origin(request)
-    state = _sign_state(site_id, origin)
-    params = {
-        "response_type": "code",
-        "client_id": APP_KEY,
-        "redirect_uri": CALLBACK_URL,
-        "state": state,
-        "sp": "ae",
-    }
-    return {"authorize_url": f"{AUTHORIZE_URL}?{urlencode(params)}", "state": state, "origin": origin}
 
 
 @router.get("/aliexpress/oauth/callback")
@@ -184,7 +178,12 @@ async def aliexpress_oauth_relay(
 
 
 async def _finalize_oauth(site_id: str, code: str) -> HTMLResponse:
-    """Exchange the code for a token and persist on the site. Returns the success page."""
+    """
+    Platform-level OAuth finalization.
+    We ignore `site_id` in the sense that tokens are stored globally (on
+    `db.platform_settings.key=aliexpress`) — every Altiaro store inherits them.
+    The site_id is only used to attribute who initiated the connection.
+    """
     try:
         token_payload = await _exchange_code_for_token(code)
     except Exception as e:
@@ -192,69 +191,91 @@ async def _finalize_oauth(site_id: str, code: str) -> HTMLResponse:
         return HTMLResponse(_page(title="Échec de la connexion", body=f"Erreur lors de l'échange du code : {str(e)[:200]}", ok=False))
 
     now = datetime.now(timezone.utc)
-    expires_in = int(token_payload.get("expires_in") or 172800)  # ~48h default
+    expires_in = int(token_payload.get("expires_in") or 172800)
     refresh_in = int(token_payload.get("refresh_token_valid_time") or token_payload.get("refresh_expires_in") or 365 * 86400)
     expires_at = now + timedelta(seconds=expires_in)
     refresh_at = now + timedelta(seconds=refresh_in)
 
-    await db.sites.update_one(
-        {"id": site_id},
-        {"$set": {
-            "design.aliexpress": {
-                "connected": True,
-                "access_token": token_payload.get("access_token"),
-                "refresh_token": token_payload.get("refresh_token"),
-                "expires_at": expires_at.isoformat(),
-                "refresh_expires_at": refresh_at.isoformat(),
-                "user_id": token_payload.get("user_id") or token_payload.get("account_id") or "",
-                "user_nick": token_payload.get("user_nick") or token_payload.get("seller_id") or "",
-                "connected_at": now.isoformat(),
-                "last_refreshed_at": None,
-            }
-        }}
-    )
-    logger.info(f"[aliexpress] site {site_id} connected (user_id={token_payload.get('user_id')})")
+    await _set_platform_settings({
+        "key": "aliexpress",
+        "connected": True,
+        "access_token": token_payload.get("access_token"),
+        "refresh_token": token_payload.get("refresh_token"),
+        "expires_at": expires_at.isoformat(),
+        "refresh_expires_at": refresh_at.isoformat(),
+        "user_id": token_payload.get("user_id") or token_payload.get("account_id") or "",
+        "user_nick": token_payload.get("user_nick") or token_payload.get("seller_id") or "",
+        "connected_at": now.isoformat(),
+        "connected_by_site_id": site_id,
+        "last_refreshed_at": None,
+    })
+    logger.info(f"[aliexpress] PLATFORM connected (user_id={token_payload.get('user_id')} by site={site_id})")
 
     return HTMLResponse(_page(
         title="Connexion AliExpress confirmée",
-        body="Votre boutique Altiaro est maintenant liée à votre compte AliExpress Dropshipping. Vous pouvez fermer cette fenêtre et retourner dans votre cockpit.",
+        body="La plateforme Altiaro est maintenant liée à votre compte AliExpress Dropshipping. Tous les sites en bénéficient. Vous pouvez fermer cette fenêtre.",
         ok=True,
     ))
 
 
 # =====================================================================
-# Status + disconnect
+# Admin-only status + disconnect (platform-level)
 # =====================================================================
-@router.get("/sites/{site_id}/aliexpress/status")
-async def aliexpress_status(site_id: str, user=Depends(get_current_user)):
-    await _check_site_access(site_id, user)
-    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "design.aliexpress": 1})
-    ali = ((site or {}).get("design") or {}).get("aliexpress") or {}
+def _require_admin(user):
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Admin uniquement.")
+
+
+@router.get("/admin/aliexpress/status")
+async def aliexpress_status_admin(user=Depends(get_current_user)):
+    _require_admin(user)
+    pl = await _get_platform_settings()
     return {
-        "connected": bool(ali.get("connected") and ali.get("access_token")),
-        "user_nick": ali.get("user_nick") or "",
-        "connected_at": ali.get("connected_at"),
-        "expires_at": ali.get("expires_at"),
-        "last_refreshed_at": ali.get("last_refreshed_at"),
+        "connected": bool(pl.get("connected") and pl.get("access_token")),
+        "user_nick": pl.get("user_nick") or "",
+        "connected_at": pl.get("connected_at"),
+        "expires_at": pl.get("expires_at"),
+        "last_refreshed_at": pl.get("last_refreshed_at"),
         "configured_server_side": bool(APP_KEY and APP_SECRET),
     }
 
 
-@router.post("/sites/{site_id}/aliexpress/disconnect")
-async def aliexpress_disconnect(site_id: str, user=Depends(get_current_user)):
-    await _check_site_access(site_id, user)
-    await db.sites.update_one(
-        {"id": site_id},
-        {"$set": {"design.aliexpress": {"connected": False, "disconnected_at": datetime.now(timezone.utc).isoformat()}}},
-    )
+@router.post("/admin/aliexpress/disconnect")
+async def aliexpress_disconnect_admin(user=Depends(get_current_user)):
+    _require_admin(user)
+    await _set_platform_settings({
+        "connected": False,
+        "access_token": None,
+        "refresh_token": None,
+        "disconnected_at": datetime.now(timezone.utc).isoformat(),
+    })
     return {"status": "ok"}
 
 
+@router.get("/admin/aliexpress/authorize-url")
+async def get_authorize_url_admin(request: Request, user=Depends(get_current_user)):
+    """Admin-triggered OAuth — initiated from /admin/integrations page."""
+    _require_admin(user)
+    if not APP_KEY:
+        raise HTTPException(503, "Intégration AliExpress non configurée côté serveur.")
+    origin = _current_origin(request)
+    # Encode a neutral site_id since this is platform-level
+    state = _sign_state("_admin_", origin)
+    params = {
+        "response_type": "code",
+        "client_id": APP_KEY,
+        "redirect_uri": CALLBACK_URL,
+        "state": state,
+        "sp": "ae",
+    }
+    return {"authorize_url": f"{AUTHORIZE_URL}?{urlencode(params)}", "state": state, "origin": origin}
+
+
 # =====================================================================
-# Token helpers (private)
+# Token helpers (platform-level)
 # =====================================================================
 async def _exchange_code_for_token(code: str) -> dict:
-    """Exchange OAuth code → access_token. AliExpress uses a /rest/auth/token/create endpoint with signed request."""
+    """Exchange OAuth code → access_token."""
     params = {
         "code": code,
         "uuid": uuid.uuid4().hex,
@@ -262,41 +283,38 @@ async def _exchange_code_for_token(code: str) -> dict:
     return await _signed_post(TOKEN_URL, params, need_access_token=False)
 
 
-async def _refresh_access_token(site_id: str) -> dict:
-    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "design.aliexpress": 1})
-    ali = ((site or {}).get("design") or {}).get("aliexpress") or {}
-    refresh_token = ali.get("refresh_token")
+async def _refresh_access_token() -> dict:
+    pl = await _get_platform_settings()
+    refresh_token = pl.get("refresh_token")
     if not refresh_token:
-        raise HTTPException(401, "Site non connecté à AliExpress.")
-    params = {"refresh_token": refresh_token}
-    resp = await _signed_post(REFRESH_URL, params, need_access_token=False)
+        raise HTTPException(401, "Plateforme non connectée à AliExpress.")
+    resp = await _signed_post(REFRESH_URL, {"refresh_token": refresh_token}, need_access_token=False)
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(seconds=int(resp.get("expires_in") or 172800))
-    await db.sites.update_one(
-        {"id": site_id},
-        {"$set": {
-            "design.aliexpress.access_token": resp.get("access_token"),
-            "design.aliexpress.refresh_token": resp.get("refresh_token") or refresh_token,
-            "design.aliexpress.expires_at": expires_at.isoformat(),
-            "design.aliexpress.last_refreshed_at": now.isoformat(),
-        }},
-    )
+    await _set_platform_settings({
+        "access_token": resp.get("access_token"),
+        "refresh_token": resp.get("refresh_token") or refresh_token,
+        "expires_at": expires_at.isoformat(),
+        "last_refreshed_at": now.isoformat(),
+    })
     return resp
 
 
-async def _get_valid_access_token(site_id: str) -> str:
-    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "design.aliexpress": 1})
-    ali = ((site or {}).get("design") or {}).get("aliexpress") or {}
-    token = ali.get("access_token")
+async def _get_valid_access_token(site_id: Optional[str] = None) -> str:
+    """
+    Returns a valid platform-level AliExpress access token. `site_id` is kept
+    as a parameter for backward compat but the token is global.
+    """
+    pl = await _get_platform_settings()
+    token = pl.get("access_token")
     if not token:
-        raise HTTPException(401, "Site non connecté à AliExpress. Cliquez sur 'Connecter AliExpress' depuis le cockpit.")
-    # Proactive refresh if expiring within 5 min
-    expires_at = ali.get("expires_at")
+        raise HTTPException(401, "Plateforme non connectée à AliExpress. L'Admin doit connecter AliExpress dans Paramètres → Intégrations.")
+    expires_at = pl.get("expires_at")
     if expires_at:
         try:
             dt = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
             if dt < (datetime.now(timezone.utc) + timedelta(minutes=5)):
-                resp = await _refresh_access_token(site_id)
+                resp = await _refresh_access_token()
                 return resp.get("access_token")
         except Exception:
             pass
@@ -321,8 +339,6 @@ async def _signed_post(url: str, biz_params: dict, need_access_token: bool = Tru
     params["sign_method"] = "sha256"
     params["timestamp"] = str(int(time.time() * 1000))
     if need_access_token:
-        if not site_id:
-            raise HTTPException(500, "site_id manquant pour appel authentifié")
         params["session"] = await _get_valid_access_token(site_id)
     params["sign"] = _sign_params(params, APP_SECRET)
     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -549,11 +565,10 @@ async def auto_place_aliexpress_order(order: dict) -> dict:
     if not site_id:
         return {"skipped": "no_site"}
 
-    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "design.aliexpress": 1})
-    ali = ((site or {}).get("design") or {}).get("aliexpress") or {}
-    if not (ali.get("connected") and ali.get("access_token")):
-        logger.info(f"[ae-auto-order] site {site_id} non connecté AliExpress — skip")
-        return {"skipped": "not_connected"}
+    pl = await _get_platform_settings()
+    if not (pl.get("connected") and pl.get("access_token")):
+        logger.info("[ae-auto-order] plateforme non connectée AliExpress — skip")
+        return {"skipped": "platform_not_connected"}
 
     items = order.get("items") or []
     addr = order.get("shipping_address") or {}

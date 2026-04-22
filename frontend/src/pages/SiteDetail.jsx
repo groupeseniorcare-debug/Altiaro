@@ -5,7 +5,6 @@ import { useAuth } from "../lib/auth";
 import Layout from "../components/Layout";
 import StepPanel from "../components/StepPanel";
 import BlockOutputModal from "../components/BlockOutputModal";
-import AliExpressConnect from "../components/AliExpressConnect";
 import {
   ArrowLeft,
   Lock,
@@ -16,8 +15,6 @@ import {
   Link as LinkIcon,
   Package,
   Eye,
-  Megaphone,
-  Copy,
   Globe,
   ArrowClockwise,
   Warning,
@@ -58,10 +55,6 @@ export default function SiteDetail() {
   const [domainInput, setDomainInput] = useState("");
   const [domainBusy, setDomainBusy] = useState(false);
   const [domainMsg, setDomainMsg] = useState(null);
-  const [showDuplicate, setShowDuplicate] = useState(false);
-  const [dupName, setDupName] = useState("");
-  const [dupCopyProducts, setDupCopyProducts] = useState(true);
-  const [duplicating, setDuplicating] = useState(false);
   const [showScale, setShowScale] = useState(false);
   const [scaleResult, setScaleResult] = useState(null);
   const [scaling, setScaling] = useState(false);
@@ -144,23 +137,6 @@ export default function SiteDetail() {
     setDomainMsg(null);
     const refresh = await apiCall(() => api.get(`/sites/${id}/domain`));
     if (refresh.data) setDomainStatus(refresh.data);
-  };
-
-  const handleDuplicate = async () => {
-    setDuplicating(true);
-    const { data, error } = await apiCall(() =>
-      api.post(`/sites/${id}/duplicate`, {
-        name: dupName.trim() || undefined,
-        copy_products: dupCopyProducts,
-      })
-    );
-    setDuplicating(false);
-    if (error) {
-      window.alert(`Duplication impossible : ${error}`);
-      return;
-    }
-    setShowDuplicate(false);
-    navigate(`/sites/${data.id}`);
   };
 
   const handleScale = async (payload) => {
@@ -283,10 +259,6 @@ export default function SiteDetail() {
                 )}
               </div>
 
-              <div className="mt-5">
-                <AliExpressConnect siteId={id} />
-              </div>
-
               <div className="flex flex-wrap gap-2 mt-5">
                 <button
                   onClick={() => navigate(`/sites/${id}/products`)}
@@ -294,13 +266,6 @@ export default function SiteDetail() {
                   className="h-10 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium flex items-center gap-2 transition"
                 >
                   <Package size={16} weight="bold" /> Gérer les produits
-                </button>
-                <button
-                  onClick={() => navigate(`/sites/${id}/sourcing`)}
-                  data-testid="nav-sourcing"
-                  className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
-                >
-                  <Package size={16} weight="duotone" /> Sourcing
                 </button>
                 <button
                   onClick={() => navigate(`/sites/${id}/blog-posts`)}
@@ -315,13 +280,6 @@ export default function SiteDetail() {
                   className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
                 >
                   <Sparkle size={16} weight="duotone" /> Santé SEO
-                </button>
-                <button
-                  onClick={() => navigate(`/sites/${id}/ads-copy`)}
-                  data-testid="ads-copy-link"
-                  className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
-                >
-                  <Megaphone size={16} weight="duotone" /> Google Ads Copy
                 </button>
                 <a
                   href={`/shop/${id}`}
@@ -351,16 +309,6 @@ export default function SiteDetail() {
                   className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
                 >
                   <Gear size={16} weight="duotone" /> Politique plateforme
-                </button>
-                <button
-                  onClick={() => {
-                    setDupName(`${site.name} (copie)`);
-                    setShowDuplicate(true);
-                  }}
-                  data-testid="duplicate-site"
-                  className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition"
-                >
-                  <Copy size={16} /> Dupliquer
                 </button>
                 <button
                   onClick={() => setShowScale(true)}
@@ -523,19 +471,6 @@ export default function SiteDetail() {
         />
       )}
 
-      {showDuplicate && (
-        <DuplicateModal
-          siteName={site.name}
-          dupName={dupName}
-          setDupName={setDupName}
-          copyProducts={dupCopyProducts}
-          setCopyProducts={setDupCopyProducts}
-          duplicating={duplicating}
-          onClose={() => setShowDuplicate(false)}
-          onConfirm={handleDuplicate}
-        />
-      )}
-
       {showScale && (
         <ScaleModal
           site={site}
@@ -685,83 +620,6 @@ function DomainModal({ status, input, setInput, busy, msg, onSave, onVerify, onC
     </div>
   );
 }
-
-function DuplicateModal({ siteName, dupName, setDupName, copyProducts, setCopyProducts, duplicating, onClose, onConfirm }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 p-4" onClick={onClose}>
-      <div
-        className="bg-white rounded-md w-full max-w-md p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-        data-testid="duplicate-modal"
-      >
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-neutral-200 flex items-center justify-center">
-              <Copy size={18} weight="duotone" className="text-neutral-900" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-neutral-900">Dupliquer le site</h2>
-              <p className="text-xs text-neutral-500">Copie de « {siteName} » — idéal pour scaler sur un nouveau pays.</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-neutral-200" data-testid="dup-modal-close">
-            <XIcon size={16} className="mx-auto" />
-          </button>
-        </div>
-
-        <label className="block text-xs font-medium text-neutral-600 mb-1.5">Nom du nouveau site</label>
-        <input
-          type="text"
-          value={dupName}
-          onChange={(e) => setDupName(e.target.value)}
-          data-testid="dup-name"
-          className="w-full h-11 px-3 rounded-lg border border-neutral-200 bg-white text-sm mb-4 focus:outline-none focus:border-neutral-400"
-        />
-
-        <label className="flex items-center gap-2 text-sm text-neutral-600 mb-4 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={copyProducts}
-            onChange={(e) => setCopyProducts(e.target.checked)}
-            data-testid="dup-copy-products"
-            className="accent-[#B84B31]"
-          />
-          Cloner aussi le catalogue produits (en statut <em>draft</em>)
-        </label>
-
-        <div className="bg-amber-500/10 rounded-lg p-3 mb-4 text-xs text-amber-300 flex gap-2">
-          <Warning size={14} weight="fill" className="shrink-0 mt-0.5" />
-          <div>
-            Les <strong>commandes</strong>, <strong>Ads Copy</strong> et <strong>étapes validées</strong> ne sont pas copiés.
-            Le nouveau site démarre à l'étape #1.
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={duplicating}
-            className="h-10 px-4 rounded-lg text-sm text-neutral-600 hover:bg-neutral-200"
-          >
-            Annuler
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={duplicating}
-            data-testid="dup-confirm"
-            className="h-10 px-4 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium disabled:opacity-50 flex items-center gap-2"
-          >
-            {duplicating ? <ArrowClockwise size={14} className="animate-spin" /> : <Copy size={14} />}
-            Dupliquer
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 
 function ScaleModal({ site, scaling, result, onClose, onConfirm, onOpenSite }) {
   const alreadyCovered = new Set(site.selected_countries || []);

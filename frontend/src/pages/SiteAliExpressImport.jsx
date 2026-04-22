@@ -5,11 +5,11 @@ import {
   Storefront, Sparkle,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
-import AliExpressConnect from "../components/AliExpressConnect";
 
 /**
- * Cockpit page — search AliExpress Dropshipping catalog and import products
- * into the current site. The site must be connected via OAuth first.
+ * Cockpit page — search AliExpress Dropshipping catalog and import products.
+ * AliExpress is connected at the PLATFORM level (admin-only, once) — every
+ * site inherits automatically, so the Concepteur never sees a "Connect" button.
  */
 export default function SiteAliExpressImport() {
   const { id: siteId } = useParams();
@@ -86,11 +86,6 @@ export default function SiteAliExpressImport() {
           <p className="text-sm text-neutral-500 mt-2 max-w-2xl">
             Recherchez dans le catalogue Dropshipping AliExpress. Chaque produit importé est enrichi automatiquement par l'IA (titre SEO, description, FAQ) puis disponible dans votre catalogue.
           </p>
-        </div>
-
-        {/* Connection status */}
-        <div className="mb-6">
-          <AliExpressConnect siteId={siteId} />
         </div>
 
         {/* Search bar */}
