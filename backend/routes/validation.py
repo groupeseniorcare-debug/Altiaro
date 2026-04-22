@@ -159,11 +159,18 @@ async def _run_qa_snapshot(site_id: str) -> dict:
     contact = design.get("contact") or {}
     blog_posts = design.get("blog_posts") or []
     legal = design.get("legal") or {}
+    navigation = design.get("navigation") or {}
+    financial_forecast = design.get("financial_forecast") or {}
+    journey_validated = set(site.get("journey_validated") or [])
 
     products = await db.products.find(
         {"site_id": site_id, "status": "active"},
-        {"_id": 0, "id": 1, "name": 1, "description": 1, "images": 1, "price": 1, "seo": 1}
+        {"_id": 0, "id": 1, "name": 1, "description": 1, "images": 1, "price": 1,
+         "seo": 1, "narrative": 1, "role": 1, "linked_product_ids": 1},
     ).to_list(500)
+    main_products = [p for p in products if p.get("role") != "upsell"]
+    upsells_list = [p for p in products if p.get("role") == "upsell"]
+    collections_count = await db.collections.count_documents({"site_id": site_id})
 
     checks = []
 
@@ -173,15 +180,33 @@ async def _run_qa_snapshot(site_id: str) -> dict:
             "critical": critical, "detail": detail,
         })
 
-    # ---- Catalog
-    add("catalog-min", "Au moins 5 produits actifs", len(products) >= 5, True,
-        f"{len(products)} produits actifs")
-    products_with_image = sum(1 for p in products if (p.get("images") or []))
-    add("catalog-images", "100 % des produits avec image", products_with_image == len(products) and products,
-        True, f"{products_with_image}/{len(products)} avec image")
-    products_with_seo = sum(1 for p in products if (p.get("seo") or {}).get("description"))
-    add("catalog-seo", "Narratif IA enrichi", products and products_with_seo >= max(1, len(products) // 2),
-        False, f"{products_with_seo}/{len(products)} enrichis par IA")
+    # ---- Catalog (main products)
+    add("catalog-min", "Au moins 5 produits principaux actifs", len(main_products) >= 5, True,
+        f"{len(main_products)} produits principaux")
+    products_with_image = sum(1 for p in main_products if (p.get("images") or []))
+    add("catalog-images", "100 % des produits avec image",
+        len(main_products) > 0 and products_with_image == len(main_products), True,
+        f"{products_with_image}/{len(main_products)} avec image")
+    products_with_seo = sum(
+        1 for p in main_products
+        if (p.get("seo") or {}).get("description") or (p.get("narrative") or {}).get("seo")
+    )
+    add("catalog-seo", "Narratif IA enrichi (≥50% des produits)",
+        len(main_products) > 0 and products_with_seo >= max(1, len(main_products) // 2),
+        False, f"{products_with_seo}/{len(main_products)} enrichis par IA · relance le bulk optimize SEO")
+
+    # ---- Upsells
+    add("upsells-imported", "Au moins 2 upsells importés", len(upsells_list) >= 2, False,
+        f"{len(upsells_list)} upsells · ajoute-en à l'étape 3")
+    if upsells_list and main_products:
+        main_ids = {p["id"] for p in main_products}
+        covered = {
+            mid for u in upsells_list for mid in (u.get("linked_product_ids") or []) if mid in main_ids
+        }
+        coverage_pct = (len(covered) / len(main_ids)) * 100 if main_ids else 0
+        add("upsells-linked", "Upsells associés aux produits (≥80%)",
+            coverage_pct >= 80, False,
+            f"Couverture {coverage_pct:.0f}% · associe depuis l'étape 3")
 
     # ---- Branding
     add("brand-name", "Nom de marque défini", bool(brand.get("name") or site.get("name")), True)
@@ -189,22 +214,62 @@ async def _run_qa_snapshot(site_id: str) -> dict:
     add("brand-colors", "Couleurs de marque", bool(brand.get("primary_color")), False)
     add("brand-tagline", "Accroche / baseline", bool(brand.get("tagline") or brand.get("baseline")), False)
 
+    # ---- Navigation
+    nav_header = navigation.get("header") or []
+    add("nav-header", "Menu principal configuré (≥3 liens)", len(nav_header) >= 3, False,
+        f"{len(nav_header)} lien(s) dans le header · Étape 5 → Navigation")
+
+    # ---- Collections
+    add("collections-min", "Au moins 1 collection créée", collections_count >= 1, False,
+        f"{collections_count} collection(s) · Étape 5 → Collections")
+
     # ---- Pages
-    add("page-about", "Page 'À propos' remplie", bool((about.get("paragraphs") or about.get("content")) or False), True)
-    add("page-contact", "Coordonnées de contact", bool(contact.get("email") or contact.get("address")), True)
+    add("page-about", "Page 'À propos' remplie",
+        bool((about.get("paragraphs") or about.get("content"))), True)
+    add("page-contact", "Coordonnées de contact",
+        bool(contact.get("email") or contact.get("address")), True)
     add("page-legal-cgv", "CGV publiées", bool(legal.get("cgv") or legal.get("terms")), True)
-    add("page-legal-mentions", "Mentions légales", bool(legal.get("mentions") or legal.get("imprint")), True)
+    add("page-legal-mentions", "Mentions légales",
+        bool(legal.get("mentions") or legal.get("imprint")), True)
     add("page-legal-privacy", "Politique de confidentialité", bool(legal.get("privacy")), False)
 
     # ---- Content marketing
     add("blog-min", "Au moins 3 articles publiés", len(blog_posts) >= 3, False,
-        f"{len(blog_posts)} articles")
+        f"{len(blog_posts)} articles · Étape 7")
+
+    # ---- Financial forecast
+    gate_status = (financial_forecast.get("launch_gate") or {}).get("status")
+    add("forecast-computed", "Prévisionnel 30 jours calculé",
+        bool(financial_forecast.get("generated_at")), True,
+        "Lance l'Étape 4 pour le calculer")
+    add("forecast-gate-ok", "Launch gate : marge / CPA viable",
+        gate_status in {"ok", "warning"}, True,
+        f"Gate = {gate_status or '—'}" + (
+            " · ta marge par commande est trop faible face au CPA"
+            if gate_status == "blocked" else ""
+        ))
+
+    # ---- Journey progression (all steps validated)
+    required_steps = {"pricing", "import", "upsells", "forecast", "branding", "pages", "content", "seo"}
+    missing = required_steps - journey_validated
+    add("journey-complete", "Toutes les étapes du cockpit validées",
+        not missing, False,
+        f"Manque : {', '.join(sorted(missing)) if missing else '—'}")
 
     # ---- SEO
     add("seo-published", "Site publié (pas en brouillon)",
-        (site.get("status") in {"in_review", "approved", "live"}) or bool(site.get("published")),
+        (site.get("status") in {"in_review", "approved", "live"}) or bool(site.get("published"))
+        or bool(design.get("published")),
         False)
-    add("seo-tracking-ga4", "Tracking GA4 configuré", bool(tracking.get("ga4_measurement_id")), False)
+    add("seo-tracking-ga4", "Tracking GA4 configuré",
+        bool(tracking.get("ga4_measurement_id")), False,
+        "Ajoute ton GA4 Measurement ID dans les paramètres du site")
+    add("seo-bulk-optimize",
+        "Optimisation SEO IA des produits (≥80%)",
+        len(main_products) > 0
+        and sum(1 for p in main_products if (p.get("narrative") or {}).get("seo")) >= int(0.8 * len(main_products)),
+        False,
+        "Lance SEO → Studio AEO → Optimisation IA en masse")
 
     # ---- Aggregate
     passed = sum(1 for c in checks if c["pass"])

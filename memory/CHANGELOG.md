@@ -3,6 +3,21 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-22 · Étape 9 QA enrichi · intégration de toutes les nouveautés
+
+- **`_run_qa_snapshot` étendu** de 13 → 23 contrôles pour refléter tout ce qu'on vient de bâtir :
+  - **Catalog** : produits principaux (filtre `role != upsell`), narratif IA (check étendu à `narrative.seo`)
+  - **Upsells** : ≥2 importés + couverture ≥80% (linked_product_ids)
+  - **Navigation** : menu header ≥3 liens
+  - **Collections** : ≥1 créée dans `db.collections`
+  - **Financial forecast** : prévisionnel calculé (critique) + launch gate status viable (critique) — empêche la soumission si marge/CPA < 1.5×
+  - **Journey** : toutes les étapes du cockpit validées (pricing → import → upsells → forecast → branding → pages → content → seo)
+  - **SEO bulk** : optimisation Studio AEO ≥80% des produits
+  - Détails actionnables avec renvoi explicite vers chaque étape ("Étape 5 → Navigation", "Studio AEO → Optimisation IA en masse")
+- **Testing** : curl QA retourne score 48/100 · 5 blockers · détail par check cohérent avec état du site (launch gate ok ✓, forecast calculé ✓, upsells linked 100% ✓).
+
+
+
 ## 2026-04-22 · SEO/AEO Studio · étape 6 bouclée
 
 **Backend — nouveau module `seo_studio.py`** (4 endpoints puissants) :
