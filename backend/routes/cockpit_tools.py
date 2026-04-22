@@ -111,7 +111,8 @@ async def pricing_analysis_get(site_id: str, user=Depends(get_current_user)):
 
 
 # =====================================================================
-# 2. Financial forecast — 30 days projection
+# =====================================================================
+# 2. Financial forecast — 30 days projection, 3 scenarios, per-market detail
 # =====================================================================
 class ForecastInput(BaseModel):
     site_id: str
@@ -119,8 +120,57 @@ class ForecastInput(BaseModel):
     concepteur_share_eur: float = 15.0        # per market
 
 
+# VAT rates by country — used to convert TTC revenue to HT
+VAT_BY_COUNTRY = {
+    "FR": 0.20, "DE": 0.19, "CH": 0.081, "BE": 0.21, "LU": 0.17,
+    "UK": 0.20, "NL": 0.21, "IT": 0.22, "ES": 0.21, "AT": 0.20, "IE": 0.23,
+}
+
+# Scenario multipliers — conversion rate & upsell attach rate benchmarks
+# for Silver Economy e-commerce (2024 industry data).
+SCENARIOS = {
+    "pessimistic": {
+        "label": "Pessimiste",
+        "conv_rate_pct": 0.8,
+        "upsell_attach_rate_pct": 15,
+        "cpc_multiplier": 1.15,       # assume 15% CPC inflation (competition spike)
+        "description": "CR 0,8%, attach 15%, CPC +15%. Si tes Ads sous-performent.",
+    },
+    "realistic": {
+        "label": "Réaliste",
+        "conv_rate_pct": 1.5,
+        "upsell_attach_rate_pct": 25,
+        "cpc_multiplier": 1.0,
+        "description": "CR 1,5%, attach 25%, CPC Google estimé. Benchmark Silver Eco 2024.",
+    },
+    "optimistic": {
+        "label": "Optimiste",
+        "conv_rate_pct": 2.5,
+        "upsell_attach_rate_pct": 40,
+        "cpc_multiplier": 0.9,         # assume CPC optimization
+        "description": "CR 2,5%, attach 40%, CPC -10%. Ads optimisées, UX performante.",
+    },
+}
+
+# Default fallbacks when Google data is missing (per-market typical CPC for FR senior niches)
+DEFAULT_CPC_BY_COUNTRY = {
+    "FR": 1.20, "DE": 1.50, "CH": 2.20, "BE": 1.10, "UK": 1.80,
+    "NL": 1.30, "IT": 0.95, "ES": 0.90, "LU": 1.00, "AT": 1.30,
+}
+
+
+def _product_name_text(p):
+    n = p.get("name")
+    if isinstance(n, dict):
+        return n.get("fr") or n.get("en") or next(iter(n.values()), "") or "(sans nom)"
+    return str(n or "") or "(sans nom)"
+
+
 @router.post("/sites/{site_id}/financial-forecast")
 async def financial_forecast(site_id: str, body: ForecastInput, user=Depends(get_current_user)):
+    """30-day projection with 3 scenarios (pessimistic / realistic / optimistic),
+    per-market breakdown + global consolidation, integrating main products,
+    upsells attach rate, Google CPC data, and actionable insights."""
     await _check_site_access(site_id, user)
     site = await db.sites.find_one({"id": site_id}, {"_id": 0})
     if not site:
@@ -129,89 +179,314 @@ async def financial_forecast(site_id: str, body: ForecastInput, user=Depends(get
     countries = site.get("selected_countries") or ["FR"]
     days = 30
 
+    # --- 1. Catalog snapshot (main + upsells) ---------------------------
     products = await db.products.find(
         {"site_id": site_id, "status": "active"},
-        {"_id": 0, "id": 1, "price": 1, "source_id": 1, "variants": 1, "cost": 1, "aliexpress_raw": 1},
-    ).to_list(200)
+        {"_id": 0, "id": 1, "name": 1, "price": 1, "cost_price_ht": 1,
+         "role": 1, "linked_product_ids": 1, "supplier_url": 1},
+    ).to_list(500)
 
-    if not products:
-        raise HTTPException(400, "Aucun produit actif. Importe au moins 1 produit avant d'estimer le prévisionnel.")
+    main_products = [p for p in products if p.get("role") != "upsell"]
+    upsells = [p for p in products if p.get("role") == "upsell"]
 
-    # Average retail price (across active products)
-    prices = [float(p.get("price") or 0) for p in products if (p.get("price") or 0) > 0]
-    avg_price = round(sum(prices) / len(prices), 2) if prices else 0
+    if not main_products:
+        raise HTTPException(400, "Aucun produit principal actif. Importe au moins 1 produit à l'étape 2.")
 
-    # Average supplier cost — use variant.price if available, else 40% of retail
-    def _est_cost(p):
-        variants = p.get("variants") or []
-        if variants:
-            vcosts = [float(v.get("price") or 0) for v in variants if (v.get("price") or 0) > 0]
-            if vcosts:
-                return min(vcosts)
-        return round(float(p.get("price") or 0) * 0.40, 2)
+    def _avg(lst):
+        lst = [x for x in lst if x > 0]
+        return round(sum(lst) / len(lst), 2) if lst else 0
 
-    costs = [_est_cost(p) for p in products]
-    avg_cost = round(sum(costs) / len(costs), 2) if costs else 0
+    main_prices = [float(p.get("price") or 0) for p in main_products]
+    main_costs = [float(p.get("cost_price_ht") or 0) for p in main_products]
+    avg_main_price = _avg(main_prices) or 1.0
+    avg_main_cost = _avg(main_costs) or (avg_main_price * 0.40)  # fallback 40%
+    avg_main_margin_pct = round(((avg_main_price - avg_main_cost) / avg_main_price) * 100, 1) if avg_main_price else 0
 
-    # Pull estimated CPA from the latest niche analysis (per market average)
+    # Upsell economics (with -20% impulse discount assumption)
+    IMPULSE_DISCOUNT = 0.20
+    upsell_prices_discounted = [float(p.get("price") or 0) * (1 - IMPULSE_DISCOUNT) for p in upsells]
+    upsell_costs = [float(p.get("cost_price_ht") or 0) for p in upsells]
+    avg_upsell_price = _avg(upsell_prices_discounted)
+    avg_upsell_cost = _avg(upsell_costs)
+    avg_upsell_margin_pct = (
+        round(((avg_upsell_price - avg_upsell_cost) / avg_upsell_price) * 100, 1)
+        if avg_upsell_price > 0 else 0
+    )
+
+    # % of main products that have at least 1 linked upsell (or any upsell exists site-wide)
+    if upsells:
+        any_upsell_unlinked = any(not (u.get("linked_product_ids") or []) for u in upsells)
+        if any_upsell_unlinked:
+            upsell_coverage_pct = 100.0  # global fallback → every main gets recommendation
+        else:
+            main_ids = {p["id"] for p in main_products}
+            covered = set()
+            for u in upsells:
+                covered.update(m for m in (u.get("linked_product_ids") or []) if m in main_ids)
+            upsell_coverage_pct = round((len(covered) / max(1, len(main_ids))) * 100, 1)
+    else:
+        upsell_coverage_pct = 0.0
+
+    # --- 2. Google CPC data per market (from niche_analysis) ------------
     niche_an = site.get("design", {}).get("niche_analysis") or {}
     results = niche_an.get("results") or []
-    # Filter results to the selected countries
-    sel = [r for r in results if r.get("country") in countries]
-    cpas = [float((r.get("metrics") or {}).get("estimated_cpa_eur") or 0) for r in sel]
-    avg_cpa = round(sum(cpas) / len(cpas), 2) if cpas else max(avg_price * 0.30, 30)
+    cpc_by_market = {}
+    volume_by_market = {}
+    competition_by_market = {}
+    for r in results:
+        cc = r.get("country")
+        if cc in countries:
+            m = r.get("metrics") or {}
+            cpc_by_market[cc] = float(m.get("cpc_weighted_eur") or 0) or DEFAULT_CPC_BY_COUNTRY.get(cc, 1.2)
+            volume_by_market[cc] = int(m.get("volume_total") or 0)
+            competition_by_market[cc] = int(m.get("competition_weighted") or 0)
+    # Fallback for markets missing from niche_analysis
+    for cc in countries:
+        cpc_by_market.setdefault(cc, DEFAULT_CPC_BY_COUNTRY.get(cc, 1.2))
+        volume_by_market.setdefault(cc, 0)
+        competition_by_market.setdefault(cc, 0)
 
-    # Compute
-    n_markets = len(countries)
-    daily_budget_total = body.daily_budget_total_eur * n_markets
-    monthly_budget_total = daily_budget_total * days
-    concepteur_monthly = body.concepteur_share_eur * n_markets * days
-    platform_monthly = monthly_budget_total - concepteur_monthly
+    # --- 3. Compute each scenario × each market -------------------------
+    daily_budget_per_market = float(body.daily_budget_total_eur or 30)
+    concepteur_share_per_market = float(body.concepteur_share_eur or 15)
+    SHIPPING_COST_PER_ORDER = 6.0  # avg supplier fulfillment + carrier fee
 
-    conversions_monthly = round(monthly_budget_total / avg_cpa) if avg_cpa > 0 else 0
-    revenue_monthly = round(conversions_monthly * avg_price, 2)
-    cogs_monthly = round(conversions_monthly * avg_cost, 2)
-    shipping_monthly = round(conversions_monthly * 8, 2)  # avg shipping allowance
-    gross_margin = round(revenue_monthly - cogs_monthly - shipping_monthly, 2)
-    net_margin = round(gross_margin - concepteur_monthly, 2)  # concepteur's POV (he funded his 50%)
-    roas = round(revenue_monthly / monthly_budget_total, 2) if monthly_budget_total > 0 else 0
-    break_even_cpa = round(avg_price - avg_cost - 8, 2)
+    def _compute_scenario(scen_key, scen):
+        conv_rate = scen["conv_rate_pct"] / 100.0
+        attach = scen["upsell_attach_rate_pct"] / 100.0 if upsells else 0.0
+        cpc_mult = scen["cpc_multiplier"]
+
+        # Per-order economics (same across markets, differs by scenario via attach rate)
+        aov = avg_main_price + (attach * avg_upsell_price)
+        per_order_cogs = avg_main_cost + (attach * avg_upsell_cost)
+        per_order_gross = aov - per_order_cogs - SHIPPING_COST_PER_ORDER
+
+        per_market = {}
+        total = {
+            "clicks": 0, "conversions": 0,
+            "revenue_ttc_eur": 0.0, "revenue_ht_eur": 0.0,
+            "cogs_eur": 0.0, "shipping_eur": 0.0,
+            "ad_spend_eur": 0.0, "gross_margin_eur": 0.0,
+            "net_margin_concepteur_eur": 0.0,
+        }
+        for cc in countries:
+            cpc = round(cpc_by_market.get(cc, 1.2) * cpc_mult, 2)
+            vat = VAT_BY_COUNTRY.get(cc, 0.20)
+            daily_clicks = daily_budget_per_market / cpc if cpc > 0 else 0
+            daily_conv = daily_clicks * conv_rate
+            monthly_conv = daily_conv * days
+            monthly_revenue_ttc = monthly_conv * aov
+            monthly_revenue_ht = monthly_revenue_ttc / (1 + vat)
+            monthly_cogs = monthly_conv * per_order_cogs
+            monthly_shipping = monthly_conv * SHIPPING_COST_PER_ORDER
+            monthly_ad_spend = daily_budget_per_market * days
+            monthly_gross = monthly_revenue_ht - monthly_cogs - monthly_shipping - monthly_ad_spend
+            monthly_net_concepteur = monthly_gross * 0.50  # 50/50 split with platform
+            roas = monthly_revenue_ttc / monthly_ad_spend if monthly_ad_spend > 0 else 0
+            per_market[cc] = {
+                "cpc_eur": cpc,
+                "vat_pct": round(vat * 100, 1),
+                "daily_clicks": round(daily_clicks, 1),
+                "daily_conversions": round(daily_conv, 2),
+                "monthly_conversions": round(monthly_conv),
+                "revenue_ttc_eur": round(monthly_revenue_ttc, 2),
+                "revenue_ht_eur": round(monthly_revenue_ht, 2),
+                "cogs_eur": round(monthly_cogs, 2),
+                "shipping_eur": round(monthly_shipping, 2),
+                "ad_spend_eur": round(monthly_ad_spend, 2),
+                "gross_margin_eur": round(monthly_gross, 2),
+                "net_margin_concepteur_eur": round(monthly_net_concepteur, 2),
+                "roas": round(roas, 2),
+                "search_volume_monthly": volume_by_market.get(cc, 0),
+                "competition_index": competition_by_market.get(cc, 0),
+            }
+            total["clicks"] += daily_clicks * days
+            total["conversions"] += monthly_conv
+            total["revenue_ttc_eur"] += monthly_revenue_ttc
+            total["revenue_ht_eur"] += monthly_revenue_ht
+            total["cogs_eur"] += monthly_cogs
+            total["shipping_eur"] += monthly_shipping
+            total["ad_spend_eur"] += monthly_ad_spend
+            total["gross_margin_eur"] += monthly_gross
+            total["net_margin_concepteur_eur"] += monthly_net_concepteur
+
+        roas_global = total["revenue_ttc_eur"] / total["ad_spend_eur"] if total["ad_spend_eur"] > 0 else 0
+        return {
+            "key": scen_key,
+            "label": scen["label"],
+            "description": scen["description"],
+            "params": {
+                "conv_rate_pct": scen["conv_rate_pct"],
+                "upsell_attach_rate_pct": scen["upsell_attach_rate_pct"] if upsells else 0,
+                "cpc_multiplier": cpc_mult,
+                "avg_order_value_eur": round(aov, 2),
+                "gross_per_order_eur": round(per_order_gross, 2),
+                "shipping_cost_per_order_eur": SHIPPING_COST_PER_ORDER,
+            },
+            "per_market": per_market,
+            "global": {
+                "clicks": round(total["clicks"]),
+                "conversions": round(total["conversions"]),
+                "revenue_ttc_eur": round(total["revenue_ttc_eur"], 2),
+                "revenue_ht_eur": round(total["revenue_ht_eur"], 2),
+                "cogs_eur": round(total["cogs_eur"], 2),
+                "shipping_eur": round(total["shipping_eur"], 2),
+                "ad_spend_eur": round(total["ad_spend_eur"], 2),
+                "gross_margin_eur": round(total["gross_margin_eur"], 2),
+                "net_margin_concepteur_eur": round(total["net_margin_concepteur_eur"], 2),
+                "roas": round(roas_global, 2),
+            },
+        }
+
+    scenarios_out = {k: _compute_scenario(k, v) for k, v in SCENARIOS.items()}
+
+    # --- 4. Verdict based on realistic scenario -------------------------
+    realistic_g = scenarios_out["realistic"]["global"]
+    realistic_roas = realistic_g["roas"]
+    realistic_net = realistic_g["net_margin_concepteur_eur"]
+    verdict = (
+        "healthy" if realistic_roas >= 2.5 and realistic_net > 0
+        else "acceptable" if realistic_roas >= 1.8 and realistic_net > -100
+        else "risky"
+    )
+
+    # --- 5. Actionable insights -----------------------------------------
+    insights = []
+    low_margin_products = [
+        p for p in main_products
+        if p.get("price") and p.get("cost_price_ht")
+        and p["price"] > 0
+        and ((p["price"] - p["cost_price_ht"]) / p["price"]) < 0.40
+    ]
+    if low_margin_products:
+        insights.append({
+            "severity": "warning",
+            "title": f"{len(low_margin_products)} produit(s) à marge faible (<40%)",
+            "body": "Les CAC Ads mangent ta marge. Cherche des alternatives à marge ≥ 50% sur CJ/AliExpress.",
+            "products": [
+                {"id": p["id"], "name": _product_name_text(p)[:60],
+                 "margin_pct": round(((p["price"] - p["cost_price_ht"]) / p["price"]) * 100, 1)}
+                for p in low_margin_products[:5]
+            ],
+            "action": "reimport_products",
+        })
+
+    if not upsells:
+        potential_extra_rev = realistic_g["revenue_ttc_eur"] * 0.12  # attach 25% × upsell price ≈ +12% CA typique
+        insights.append({
+            "severity": "info",
+            "title": "Aucun upsell importé",
+            "body": f"En ajoutant 3-5 upsells à l'étape 3 (avec -20% impulse au drawer panier), tu pourrais gagner ~{round(potential_extra_rev)}€ de revenue/mois en scénario réaliste.",
+            "action": "add_upsells",
+        })
+    elif upsell_coverage_pct < 80:
+        insights.append({
+            "severity": "info",
+            "title": f"Couverture upsell incomplète ({upsell_coverage_pct:.0f}%)",
+            "body": "Certains produits principaux n'ont pas d'upsell associé — ils ratent des cross-sells storefront.",
+            "action": "link_upsells",
+        })
+
+    # Per-market red flags
+    for cc in countries:
+        pm = scenarios_out["realistic"]["per_market"][cc]
+        if pm["gross_margin_eur"] < 0:
+            insights.append({
+                "severity": "warning",
+                "title": f"Marché {cc} : marge brute négative",
+                "body": (
+                    f"CPC {pm['cpc_eur']}€ × {days}j / CR 1,5% ne génère pas assez de CA pour couvrir "
+                    f"le budget Ads ({pm['ad_spend_eur']}€). Ton panier moyen doit être plus élevé OU "
+                    f"supprime ce marché."
+                ),
+                "market": cc,
+                "action": "remove_market_or_raise_aov",
+            })
+        if pm["competition_index"] > 70:
+            insights.append({
+                "severity": "warning",
+                "title": f"Marché {cc} : concurrence saturée ({pm['competition_index']}/100)",
+                "body": "CPC risque de grimper. Privilégie des mots-clés long-tail ou pivote sur un autre marché.",
+                "market": cc,
+                "action": "pivot_keywords",
+            })
+
+    # ROAS insight
+    if realistic_roas < 2.0:
+        insights.append({
+            "severity": "warning",
+            "title": f"ROAS réaliste faible ({realistic_roas}x)",
+            "body": "En dessous de 2x, ton business est fragile. Augmente tes prix, améliore tes upsells, ou change de niche.",
+            "action": "raise_prices_or_pivot",
+        })
+    elif realistic_roas >= 3.0:
+        insights.append({
+            "severity": "success",
+            "title": f"ROAS réaliste solide ({realistic_roas}x)",
+            "body": "Tu peux scale avec confiance. Duplique ton site sur d'autres marchés depuis la Scale station.",
+            "action": "scale",
+        })
+
+    # --- 6. Sensitivity analysis (what-if) ------------------------------
+    real_global = scenarios_out["realistic"]["global"]
+    # Impact if attach rate +10pts
+    if upsells:
+        extra_rev_per_attach_pt = real_global["revenue_ttc_eur"] * (avg_upsell_price / max(
+            scenarios_out["realistic"]["params"]["avg_order_value_eur"], 1
+        )) / 100
+        sens_upsell_10 = round(extra_rev_per_attach_pt * 10, 2)
+    else:
+        sens_upsell_10 = 0
+    # Impact if avg main price +10€
+    extra_rev_price = real_global["conversions"] * 10
+    sens_price_plus_10 = round(extra_rev_price, 2)
+    # Impact if daily budget x2
+    sens_double_budget = round(real_global["revenue_ttc_eur"], 2)  # linear assumption
 
     forecast = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "markets": countries,
         "days": days,
-        "assumptions": {
-            "avg_retail_price_eur": avg_price,
-            "avg_supplier_cost_eur": avg_cost,
-            "avg_shipping_cost_eur": 8.0,
-            "estimated_cpa_eur": avg_cpa,
-            "break_even_cpa_eur": break_even_cpa,
-            "active_products": len(products),
-        },
+        "verdict": verdict,
         "budget": {
-            "daily_per_market_eur": body.daily_budget_total_eur,
-            "concepteur_daily_per_market_eur": body.concepteur_share_eur,
-            "platform_daily_per_market_eur": body.daily_budget_total_eur - body.concepteur_share_eur,
-            "total_daily_eur": daily_budget_total,
-            "total_monthly_eur": monthly_budget_total,
-            "concepteur_monthly_eur": concepteur_monthly,
-            "platform_monthly_eur": platform_monthly,
+            "daily_per_market_eur": daily_budget_per_market,
+            "concepteur_daily_per_market_eur": concepteur_share_per_market,
+            "platform_daily_per_market_eur": daily_budget_per_market - concepteur_share_per_market,
+            "total_daily_eur": daily_budget_per_market * len(countries),
+            "total_monthly_eur": daily_budget_per_market * len(countries) * days,
+            "concepteur_monthly_eur": concepteur_share_per_market * len(countries) * days,
+            "platform_monthly_eur": (daily_budget_per_market - concepteur_share_per_market) * len(countries) * days,
         },
-        "projection": {
-            "estimated_conversions": conversions_monthly,
-            "estimated_revenue_eur": revenue_monthly,
-            "estimated_cogs_eur": cogs_monthly,
-            "estimated_shipping_eur": shipping_monthly,
-            "gross_margin_eur": gross_margin,
-            "net_margin_concepteur_eur": net_margin,
-            "roas": roas,
+        "catalog": {
+            "main_products_count": len(main_products),
+            "upsells_count": len(upsells),
+            "avg_main_price_eur": avg_main_price,
+            "avg_main_cost_eur": avg_main_cost,
+            "avg_main_margin_pct": avg_main_margin_pct,
+            "avg_upsell_price_eur": round(avg_upsell_price, 2),
+            "avg_upsell_cost_eur": avg_upsell_cost,
+            "avg_upsell_margin_pct": avg_upsell_margin_pct,
+            "upsell_coverage_pct": upsell_coverage_pct,
+            "impulse_discount_pct": round(IMPULSE_DISCOUNT * 100),
         },
-        "verdict": (
-            "healthy" if roas >= 2.5 and gross_margin > concepteur_monthly
-            else "acceptable" if roas >= 1.8
-            else "risky"
-        ),
+        "google_data": {
+            "per_market": {
+                cc: {
+                    "cpc_eur": cpc_by_market[cc],
+                    "volume_monthly": volume_by_market[cc],
+                    "competition_index": competition_by_market[cc],
+                    "has_real_data": cc in {r.get("country") for r in results},
+                }
+                for cc in countries
+            },
+        },
+        "scenarios": scenarios_out,
+        "sensitivity": {
+            "revenue_gain_if_upsell_attach_plus_10pts_eur": sens_upsell_10,
+            "revenue_gain_if_avg_price_plus_10eur": sens_price_plus_10,
+            "revenue_gain_if_daily_budget_doubled_eur": sens_double_budget,
+        },
+        "insights": insights,
     }
 
     await db.sites.update_one(
