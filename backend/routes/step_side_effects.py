@@ -483,19 +483,33 @@ async def _hook_blog_seed(step: dict) -> None:
     # Mock user object for the admin dispatch (ai_draft requires auth dep, we call directly)
     admin = {"role": "admin", "email": "system", "id": "blog_hook"}
 
+    # Bounded: max 3 consecutive failures then abort to avoid event-loop starvation
+    # when Claude 502s repeatedly. Each article has a hard 90s timeout.
     generated = 0
+    consecutive_failures = 0
     for kw in keywords[:10]:
+        if consecutive_failures >= 3:
+            logger.warning(f"[side-effect #27] abandon après 3 échecs consécutifs — {generated}/{len(keywords)} articles générés")
+            break
         try:
             body = AIDraftInput(
                 keyword=kw.get("keyword") if isinstance(kw, dict) else kw,
                 angle=(kw.get("angle") if isinstance(kw, dict) else "") or "",
                 length="long",
             )
-            await ai_draft_blog_post(site["id"], body, user=admin)
+            await asyncio.wait_for(
+                ai_draft_blog_post(site["id"], body, user=admin),
+                timeout=90.0,
+            )
             generated += 1
+            consecutive_failures = 0
             # Gentle pacing to respect Claude rate limits
             await asyncio.sleep(2)
+        except asyncio.TimeoutError:
+            consecutive_failures += 1
+            logger.warning(f"[side-effect #27] timeout 90s sur keyword={kw}")
         except Exception:
+            consecutive_failures += 1
             logger.exception(f"[side-effect #27] article échoué pour keyword={kw}")
 
     logger.info(f"[side-effect #27] {generated}/{len(keywords)} articles SEO générés pour site {site['id']}")

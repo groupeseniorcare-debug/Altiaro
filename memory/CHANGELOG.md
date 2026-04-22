@@ -3,6 +3,23 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-22 · Sprint 44 : SEO Dashboard + hardening Hook #27
+### Dashboard SEO Cockpit (P0)
+- **Endpoint** `GET /api/sites/{id}/seo-audit` branché dans `server.py` (oubli du sprint précédent corrigé).
+- Score global 0-100 calculé sur **6 dimensions** : Catalogue, Contenu, Structure, Confiance, AEO, Fraîcheur.
+- Couverture chiffrée (produits enrichis IA / avec avis / avec bundles / blog posts / collections) + 9 contrôles booléens (publié, brand book, logo, légal complet, about, contact, valeurs, founder story).
+- **Recommandations hiérarchisées** (critical/high/medium/low) avec action concrète pour chaque lacune (ex : "Déclencher Auto-bundles IA", "Valider le prompt #27").
+- **Frontend** `/sites/:id/seo` (nouvelle page `SiteSEO.jsx`) avec :
+  - Gauge SVG circulaire animée sur score global
+  - 6 cartes dimensions colorées par palier (rouge/orange/ambre/vert)
+  - Bannière rouge si boutique non publiée (signal critique)
+  - Bouton "Rafraîchir l'audit" avec spinner
+- Bouton d'accès "Santé SEO" ajouté dans la barre d'actions du cockpit (`SiteDetail.jsx`).
+
+### Hook #27 hardening (P1)
+- `_hook_blog_seed` maintenant **bounded** : timeout 90s par article + abandon après 3 échecs consécutifs → évite la saturation du loop asyncio quand Claude retourne des 502 en rafale (issue détectée par le testing agent iteration 17).
+- Test agent iteration 17 : **7/7 backend + 100% frontend PASS**.
+
 ## 2026-04-21 · Sprint 43 : SEO Expert-level + Éditeur Blog WYSIWYG + Hook Review J+14
 ### Volet 1 — SEO ultra-expert sur page Produit (🎯 l'objectif : trafic organique + citation IA)
 - **Prompt narrative Claude refondu** : ajoute un bloc `seo` complet avec 9 champs optimisés top 1% mondial :

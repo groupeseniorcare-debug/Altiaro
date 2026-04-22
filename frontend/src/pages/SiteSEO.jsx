@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft, ArrowClockwise, CheckCircle, Warning, XCircle,
@@ -29,15 +29,15 @@ export default function SiteSEO() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = async (fromRefresh = false) => {
+  const load = useCallback(async (fromRefresh = false) => {
     fromRefresh ? setRefreshing(true) : setLoading(true);
     const { data } = await apiCall(() => api.get(`/sites/${siteId}/seo-audit`));
     if (data) setAudit(data);
     setLoading(false);
     setRefreshing(false);
-  };
+  }, [siteId]);
 
-  useEffect(() => { load(); }, [siteId]);
+  useEffect(() => { load(); }, [load]);
 
   if (loading) {
     return (
