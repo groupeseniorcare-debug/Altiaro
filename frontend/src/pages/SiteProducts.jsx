@@ -398,24 +398,29 @@ export default function SiteProducts() {
                       </div>
                     );
                   })()}
-                  {/* Shipping status */}
+                  {/* Shipping status (informative only — CJ API can't reliably confirm country-level coverage) */}
                   {p.shipping && Object.keys(p.shipping).length > 0 && (
                     <div className="mt-2 pt-2 border-t border-neutral-100">
                       <div className="text-[10px] uppercase tracking-widest text-neutral-500 mb-1">Livraison</div>
                       <div className="flex flex-wrap gap-1">
-                        {Object.entries(p.shipping).map(([cc, info]) => (
-                          <span
-                            key={cc}
-                            title={info.available ? `${info.carrier} · ${info.delivery_days}j · $${info.price_usd?.toFixed(2)}` : "Pas de livraison disponible"}
-                            className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                              info.available
-                                ? "bg-emerald-50 text-emerald-700"
-                                : "bg-red-50 text-red-700"
-                            }`}
-                          >
-                            {info.available ? "✓" : "✗"} {cc}
-                          </span>
-                        ))}
+                        {Object.entries(p.shipping).map(([cc, info]) => {
+                          const status = info?.available;
+                          return (
+                            <span
+                              key={cc}
+                              title={status === true ? `${info.carrier} · ${info.delivery_days}j` :
+                                     status === false ? "Non couvert par l'API freight" :
+                                     "À vérifier sur la fiche CJ (lien dans l'édition)"}
+                              className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                                status === true ? "bg-emerald-50 text-emerald-700" :
+                                status === false ? "bg-red-50 text-red-700" :
+                                "bg-neutral-100 text-neutral-600"
+                              }`}
+                            >
+                              {status === true ? "✓" : status === false ? "✗" : "?"} {cc}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -709,40 +714,51 @@ function ProductEditor({ siteId, initial, onClose, onSaved, onEnrichNarrative, e
               )}
             </div>
 
-            {/* Shipping per country */}
+            {/* Shipping per country — informational only (CJ API cannot reliably confirm country coverage) */}
             {Object.keys(shipping).length > 0 && (
               <div className="mt-3 pt-3 border-t border-neutral-100">
-                <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-2">Livraison par pays</div>
+                <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-2 flex items-center gap-1">
+                  Livraison par pays
+                  <span className="text-[9px] normal-case tracking-normal text-neutral-400">(à vérifier sur CJ)</span>
+                </div>
                 <div className="space-y-1">
-                  {Object.entries(shipping).map(([cc, info]) => (
-                    <div
-                      key={cc}
-                      className={`flex items-center justify-between text-xs px-3 py-1.5 rounded-lg ${
-                        info.available ? "bg-emerald-50" : "bg-red-50"
-                      }`}
-                      data-testid={`ship-${cc}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className={info.available ? "text-emerald-700" : "text-red-700"}>
-                          {info.available ? "✓" : "✗"}
-                        </span>
-                        <span className="font-semibold">{cc}</span>
-                        {info.available && (
-                          <span className="text-neutral-600">
-                            {info.carrier} · {info.delivery_days}j
+                  {Object.entries(shipping).map(([cc, info]) => {
+                    const status = info?.available;
+                    return (
+                      <div
+                        key={cc}
+                        className={`flex items-center justify-between text-xs px-3 py-1.5 rounded-lg ${
+                          status === true ? "bg-emerald-50" :
+                          status === false ? "bg-red-50" :
+                          "bg-neutral-50"
+                        }`}
+                        data-testid={`ship-${cc}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={
+                            status === true ? "text-emerald-700" :
+                            status === false ? "text-red-700" :
+                            "text-neutral-500"
+                          }>
+                            {status === true ? "✓" : status === false ? "✗" : "?"}
                           </span>
+                          <span className="font-semibold">{cc}</span>
+                          {status === true && (
+                            <span className="text-neutral-600">{info.carrier} · {info.delivery_days}j</span>
+                          )}
+                        </div>
+                        {status === true && (
+                          <span className="font-mono text-[11px] text-neutral-700">${info.price_usd?.toFixed(2)}</span>
+                        )}
+                        {status === null && (
+                          <span className="text-[10px] text-neutral-500 font-medium">À vérifier sur la fiche CJ</span>
+                        )}
+                        {status === false && (
+                          <span className="text-[10px] text-red-700 font-medium">Non couvert</span>
                         )}
                       </div>
-                      {info.available && (
-                        <span className="font-mono text-[11px] text-neutral-700">
-                          ${info.price_usd?.toFixed(2)}
-                        </span>
-                      )}
-                      {!info.available && (
-                        <span className="text-[10px] text-red-700 font-medium">Non disponible</span>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

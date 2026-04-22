@@ -509,51 +509,24 @@ async def import_product(site_id: str, data: ImportInput, user: dict = Depends(g
                     "sell_price_usd": v.get("variantSellPrice"),
                     "weight_g": v.get("variantWeight"),
                 })
-        # Check shipping availability to each target country
-        first_vid = variants[0]["vid"] if variants else ""
-        if first_vid:
-            for cc in countries[:6]:  # Cap at 6 to respect rate-limit
-                await asyncio.sleep(1.1)  # Respect CJ 1 QPS
-                options = await _cj_freight_to_country(data.product_id, first_vid, (cc or "FR").upper())
-                if options:
-                    # Pick cheapest
-                    cheapest = min(
-                        options,
-                        key=lambda o: float(o.get("logisticPrice") or 9999) if o.get("logisticPrice") is not None else 9999,
-                    )
-                    shipping_by_country[cc.upper()] = {
-                        "available": True,
-                        "carrier": cheapest.get("logisticName") or cheapest.get("logisticAliasName") or "CJ",
-                        "price_usd": float(cheapest.get("logisticPrice") or 0),
-                        "delivery_days": cheapest.get("logisticAging") or "",
-                        "options_count": len(options),
-                    }
-                else:
-                    shipping_by_country[cc.upper()] = {"available": False}
+        # Check shipping availability to each target country.
+        # NOTE: the CJ freight endpoint requires full address (province+city) to return
+        # real results — country-only calls return empty even for products that DO ship.
+        # We mark everything as "unknown" for now; Concepteur verifies on CJ listing page.
+        for cc in countries[:6]:
+            shipping_by_country[cc.upper()] = {"available": None, "note": "À vérifier sur CJ"}
 
     # Strip HTML from CJ description
     if raw_desc:
         raw_desc = _re.sub(r"<[^>]+>", " ", raw_desc)
         raw_desc = _re.sub(r"\s+", " ", raw_desc).strip()[:3000]
 
-    # 🔒 BLOCK import if any target country has no shipping option.
-    # The Concepteur can't sell a product that can't be delivered to the site's markets.
-    missing_countries = [
-        cc for cc, info in shipping_by_country.items()
-        if isinstance(info, dict) and not info.get("available")
-    ]
-    if missing_countries and data.provider == "cj":
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": "shipping_unavailable",
-                "missing_countries": missing_countries,
-                "shipping": shipping_by_country,
-                "message": f"Ce produit ne peut pas être livré dans : {', '.join(missing_countries)}. "
-                           f"Le site dessert {', '.join(countries)}. Choisis un autre produit "
-                           f"expédié depuis la Chine ou l'entrepôt EU (pas UK).",
-            },
-        )
+    # Note: we DON'T block the import based on the freight check. The CJ freight
+    # endpoint requires a full shipping address (province, city) to work reliably;
+    # a country-only call often returns empty even for products that DO ship to FR.
+    # We keep the shipping map in `shipping_by_country` for informational display
+    # in the product editor, but the Concepteur must verify on the CJ listing page
+    # before committing to an Ads budget.
 
     # Translate via Claude (non-blocking error)
     translations = await _translate_product(data.title, raw_desc, target_langs)
@@ -588,7 +561,7 @@ async def import_product(site_id: str, data: ImportInput, user: dict = Depends(g
         "stock": None,
         "supplier_url": data.supplier_url or "",
         "sku": data.sku or f"{data.provider.upper()}-{data.product_id[:12]}",
-        "status": "draft",
+        "status": "active",
         "featured": False,
         "source": {"provider": data.provider, "product_id": data.product_id},
         "translation_status": "translated" if translations else "fallback_original",
