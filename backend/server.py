@@ -300,6 +300,20 @@ async def startup():
             id="reviews_check_due", replace_existing=True, misfire_grace_time=3600,
         )
 
+        # Daily 05:30 UTC — AliExpress tracking sync for all open order mappings
+        async def _scheduled_ae_tracking_sync():
+            try:
+                from routes.aliexpress import sync_all_aliexpress_tracking
+                result = await sync_all_aliexpress_tracking()
+                logger.info(f"[scheduler] AliExpress tracking sync : {result}")
+            except Exception:
+                logger.exception("[scheduler] AliExpress tracking sync failed")
+        scheduler.add_job(
+            _scheduled_ae_tracking_sync,
+            CronTrigger(hour=5, minute=30),
+            id="ae_tracking_sync", replace_existing=True, misfire_grace_time=3600,
+        )
+
         # Monday 05:00 UTC — Scan opportunités Google (détection spikes)
         async def _scheduled_opportunity_scan():
             logger.info("[scheduler] opportunity scan start")

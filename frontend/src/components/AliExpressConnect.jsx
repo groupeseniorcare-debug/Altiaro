@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Link as LinkIcon, CheckCircle, ArrowSquareOut } from "@phosphor-icons/react";
+import { Link } from "react-router-dom";
+import { Link as LinkIcon, CheckCircle, ArrowSquareOut, DownloadSimple } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 
 /**
@@ -65,13 +66,22 @@ export default function AliExpressConnect({ siteId }) {
             </div>
           </div>
         </div>
-        <button
-          onClick={disconnect}
-          data-testid="ali-disconnect"
-          className="h-8 px-3 rounded-lg bg-white border border-emerald-200 text-xs font-medium text-neutral-700 hover:border-rose-300 hover:text-rose-700"
-        >
-          Déconnecter
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Link
+            to={`/sites/${siteId}/aliexpress/import`}
+            data-testid="ali-goto-import"
+            className="h-8 px-3 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium flex items-center gap-1.5"
+          >
+            <DownloadSimple size={12} weight="bold" /> Importer produits
+          </Link>
+          <button
+            onClick={disconnect}
+            data-testid="ali-disconnect"
+            className="h-8 px-3 rounded-lg bg-white border border-emerald-200 text-xs font-medium text-neutral-700 hover:border-rose-300 hover:text-rose-700"
+          >
+            Déconnecter
+          </button>
+        </div>
       </div>
     );
   }

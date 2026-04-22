@@ -314,8 +314,107 @@ async def aliexpress_product_import(data: ProductImportInput, user=Depends(get_c
         "target_language": "FR",
     }
     raw = await _signed_post(SYNC_API_URL, biz, site_id=data.site_id)
-    # TODO (next step) : normalise raw → upsert in db.products with site_id
-    return {"raw": raw, "note": "Normalisation vers db.products à finaliser en sandbox"}
+
+    # Normalise the AliExpress response into our internal product shape.
+    # AliExpress wraps the data under either `aliexpress_ds_product_get_response` or
+    # `result`, depending on response variant — we defend against both.
+    payload = raw.get("aliexpress_ds_product_get_response") or raw
+    result = payload.get("result") or payload
+    base = result.get("ae_item_base_info_dto") or {}
+    multimedia = result.get("ae_multimedia_info_dto") or {}
+    skus = (result.get("ae_item_sku_info_dtos") or {}).get("ae_item_sku_info_d_t_o") or []
+    store = result.get("ae_store_info") or {}
+    price_info = (result.get("ae_item_properties") or {})
+
+    # Extract price (min across SKUs, fallback to base price)
+    min_price = None
+    if isinstance(skus, list) and skus:
+        prices = [float(s.get("offer_sale_price") or s.get("sku_price") or 0) for s in skus if (s.get("offer_sale_price") or s.get("sku_price"))]
+        if prices:
+            min_price = min(prices)
+    if not min_price:
+        try:
+            min_price = float(base.get("sale_price") or base.get("price") or 0)
+        except Exception:
+            min_price = 0.0
+
+    # Images
+    image_urls = []
+    raw_imgs = multimedia.get("image_urls") or base.get("product_image_url") or ""
+    if isinstance(raw_imgs, str):
+        image_urls = [u.strip() for u in raw_imgs.split(";") if u.strip()]
+    elif isinstance(raw_imgs, list):
+        image_urls = [str(u) for u in raw_imgs if u]
+    if not image_urls and base.get("main_image_url"):
+        image_urls = [base["main_image_url"]]
+
+    title = base.get("subject") or base.get("product_title") or f"Produit AliExpress {data.product_id}"
+    category = base.get("category_id") or ""
+    currency = base.get("currency_code") or "EUR"
+
+    # Our internal product schema mirrors what SiteProducts.jsx expects.
+    product_id_internal = f"ae-{data.product_id}"
+    now_iso = datetime.now(timezone.utc).isoformat()
+    product_doc = {
+        "id": product_id_internal,
+        "site_id": data.site_id,
+        "status": "active",
+        "source": "aliexpress",
+        "source_id": str(data.product_id),
+        "supplier": "AliExpress",
+        "supplier_url": f"https://www.aliexpress.com/item/{data.product_id}.html",
+        "name": {"fr": title, "en": title},
+        "description": {"fr": "", "en": ""},
+        "price": round(min_price or 0.0, 2),
+        "currency": currency,
+        "category": str(category),
+        "images": image_urls[:10],
+        "tags": [],
+        "variants": [
+            {
+                "sku_id": str(s.get("sku_id") or ""),
+                "sku_code": str(s.get("sku_code") or ""),
+                "sku_attr": str(s.get("sku_attr") or ""),
+                "price": float(s.get("offer_sale_price") or s.get("sku_price") or 0),
+                "stock": int(s.get("sku_available_stock") or 0),
+                "properties": s.get("ae_sku_property_dtos") or s.get("properties") or [],
+            }
+            for s in (skus if isinstance(skus, list) else [])
+        ],
+        "store": {"name": store.get("store_name") or "", "id": str(store.get("store_id") or "")},
+        "aliexpress_raw": {
+            "category_id": category,
+            "properties": price_info,
+        },
+        "created_at": now_iso,
+        "updated_at": now_iso,
+        "imported_at": now_iso,
+    }
+
+    # Upsert on (site_id, source_id) so re-importing updates in place.
+    await db.products.update_one(
+        {"site_id": data.site_id, "source": "aliexpress", "source_id": str(data.product_id)},
+        {"$set": {k: v for k, v in product_doc.items() if k != "created_at"},
+         "$setOnInsert": {"created_at": now_iso}},
+        upsert=True,
+    )
+
+    # Fire AI narrative enrichment in background (reuses existing hook)
+    try:
+        from routes.product_narrative import enrich_product_narrative
+        import asyncio as _aio
+        _aio.create_task(enrich_product_narrative(product_id_internal))
+    except Exception:
+        logger.exception("[aliexpress] narrative hook dispatch failed")
+
+    return {
+        "ok": True,
+        "product_id": product_id_internal,
+        "name": title,
+        "price": product_doc["price"],
+        "image": image_urls[0] if image_urls else "",
+        "variants_count": len(product_doc["variants"]),
+    }
 
 
 class OrderPlaceInput(BaseModel):
@@ -372,6 +471,198 @@ async def aliexpress_order_tracking(ae_order_id: str, site_id: str, user=Depends
         "language": "en_US",
     }
     return await _signed_post(SYNC_API_URL, biz, site_id=site_id)
+
+
+# =====================================================================
+# Auto-order hook (called from Mollie webhook on paid transition)
+# =====================================================================
+async def auto_place_aliexpress_order(order: dict) -> dict:
+    """
+    When a customer order is paid, walk through each AliExpress-sourced item
+    and place the corresponding order on AliExpress. Persists a mapping per
+    line item so tracking can later reconcile. Non-blocking, logs failures.
+    """
+    site_id = order.get("site_id")
+    if not site_id:
+        return {"skipped": "no_site"}
+
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "design.aliexpress": 1})
+    ali = ((site or {}).get("design") or {}).get("aliexpress") or {}
+    if not (ali.get("connected") and ali.get("access_token")):
+        logger.info(f"[ae-auto-order] site {site_id} non connecté AliExpress — skip")
+        return {"skipped": "not_connected"}
+
+    items = order.get("items") or []
+    addr = order.get("shipping_address") or {}
+    customer = order.get("customer") or {}
+    placed = []
+    errors = []
+
+    for it in items:
+        pid = it.get("product_id")
+        if not pid:
+            continue
+        product = await db.products.find_one(
+            {"id": pid, "site_id": site_id, "source": "aliexpress"},
+            {"_id": 0, "source_id": 1, "variants": 1, "name": 1},
+        )
+        if not product:
+            continue  # not an AliExpress product — handled by local fulfilment
+
+        source_id = product.get("source_id")
+        # Pick the variant the customer selected (if any) else fall back to the 1st
+        variants = product.get("variants") or []
+        selected = None
+        if it.get("sku_id"):
+            selected = next((v for v in variants if str(v.get("sku_id")) == str(it["sku_id"])), None)
+        if not selected and variants:
+            selected = variants[0]
+        sku_attr = (selected or {}).get("sku_attr") or ""
+        if not sku_attr:
+            errors.append({"product_id": pid, "reason": "no_sku_attr"})
+            continue
+
+        biz = {
+            "method": "aliexpress.ds.order.create",
+            "ds_extend_request": "",
+            "param_place_order_request4_open_api_d_t_o": _json_str({
+                "product_items": [{
+                    "product_id": source_id,
+                    "sku_attr": sku_attr,
+                    "product_count": int(it.get("quantity", 1)),
+                }],
+                "logistics_address": {
+                    "address":        addr.get("line1") or addr.get("address_line1") or "",
+                    "address2":       addr.get("line2") or addr.get("address_line2") or "",
+                    "city":           addr.get("city") or "",
+                    "contact_person": addr.get("full_name") or customer.get("name") or "",
+                    "country":        (addr.get("country_code") or addr.get("country") or "FR")[:2].upper(),
+                    "full_name":      addr.get("full_name") or customer.get("name") or "",
+                    "mobile_no":      addr.get("phone") or customer.get("phone") or "",
+                    "phone_country":  "33",
+                    "zip":            addr.get("postal_code") or "",
+                    "province":       addr.get("state") or addr.get("region") or "",
+                },
+            }),
+        }
+
+        try:
+            resp = await _signed_post(SYNC_API_URL, biz, site_id=site_id)
+            ae_order_id = _extract_order_id(resp)
+            await db.order_mappings.insert_one({
+                "id": uuid.uuid4().hex,
+                "site_id": site_id,
+                "customer_order_id": order.get("id"),
+                "customer_order_number": order.get("order_number"),
+                "product_id_internal": pid,
+                "product_id_aliexpress": source_id,
+                "sku_attr": sku_attr,
+                "quantity": int(it.get("quantity", 1)),
+                "aliexpress_order_id": ae_order_id,
+                "status": "placed" if ae_order_id else "failed",
+                "raw_response": resp if not ae_order_id else None,
+                "placed_at": datetime.now(timezone.utc).isoformat(),
+            })
+            if ae_order_id:
+                placed.append(ae_order_id)
+            else:
+                errors.append({"product_id": pid, "response": resp})
+        except Exception as e:
+            logger.exception(f"[ae-auto-order] failed for product {pid}")
+            errors.append({"product_id": pid, "error": str(e)[:200]})
+
+    logger.info(f"[ae-auto-order] order {order.get('order_number')} — placed={len(placed)} errors={len(errors)}")
+    return {"placed": placed, "errors": errors}
+
+
+def _json_str(obj: dict) -> str:
+    import json as _json
+    return _json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
+
+
+def _extract_order_id(resp: dict):
+    """Probe common response shapes for the AliExpress order id."""
+    probes = [
+        resp.get("aliexpress_ds_order_create_response", {}).get("result", {}).get("order_list", {}).get("number", [None])[0],
+        resp.get("aliexpress_ds_order_create_response", {}).get("result", {}).get("order_list", [None])[0] if isinstance(resp.get("aliexpress_ds_order_create_response", {}).get("result", {}).get("order_list"), list) else None,
+        (resp.get("result") or {}).get("order_id"),
+        resp.get("order_id"),
+    ]
+    for p in probes:
+        if p:
+            return str(p)
+    return None
+
+
+# =====================================================================
+# Daily cron — refresh tracking for all open order mappings
+# =====================================================================
+_AE_STATUS_MAP = {
+    "WAIT_SELLER_SEND_GOODS": "paid",
+    "SELLER_PART_SEND_GOODS": "shipped",
+    "WAIT_BUYER_ACCEPT_GOODS": "shipped",
+    "IN_TRANSIT": "shipped",
+    "FINISH": "delivered",
+    "FUND_PROCESSING": "refunded",
+    "WAIT_GROUP_SUCCESS": "paid",
+}
+
+
+async def sync_all_aliexpress_tracking() -> dict:
+    """Iterate all open AliExpress order mappings and refresh their tracking info.
+    Also pushes the tracking_number + carrier onto the parent customer order so the
+    client storefront timeline picks it up.
+    """
+    cursor = db.order_mappings.find(
+        {"aliexpress_order_id": {"$ne": None},
+         "status": {"$in": ["placed", "paid", "shipped"]}},
+        {"_id": 0}
+    )
+    mappings = await cursor.to_list(500)
+    ok, err = 0, 0
+    for m in mappings:
+        try:
+            biz = {
+                "method": "aliexpress.logistics.ds.trackinginfo.get",
+                "ae_order_id": m["aliexpress_order_id"],
+                "language": "en_US",
+            }
+            resp = await _signed_post(SYNC_API_URL, biz, site_id=m["site_id"])
+            payload = (resp.get("aliexpress_logistics_ds_trackinginfo_get_response") or resp).get("result") or {}
+            tracking_number = payload.get("official_tracking_no") or payload.get("tracking_number") or ""
+            carrier = payload.get("official_carrier_name") or payload.get("carrier_name") or ""
+            ae_status = payload.get("status") or payload.get("logistics_status") or ""
+            internal = _AE_STATUS_MAP.get(ae_status.upper(), m.get("status"))
+
+            updates = {
+                "tracking_number": tracking_number,
+                "carrier": carrier,
+                "ae_status": ae_status,
+                "status": internal,
+                "last_sync_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.order_mappings.update_one({"id": m["id"]}, {"$set": updates})
+
+            # Push onto parent customer order (non-destructive)
+            if tracking_number:
+                parent_updates = {"tracking_number": tracking_number, "carrier": carrier}
+                if internal == "shipped":
+                    parent_updates["status"] = "shipped"
+                await db.orders.update_one(
+                    {"id": m["customer_order_id"]},
+                    {"$set": parent_updates,
+                     "$push": {"status_history": {
+                         "status": internal,
+                         "at": datetime.now(timezone.utc).isoformat(),
+                         "source": "aliexpress_tracking",
+                         "ae_status": ae_status,
+                     }}},
+                )
+            ok += 1
+        except Exception:
+            logger.exception(f"[ae-tracking-sync] failed for mapping {m.get('id')}")
+            err += 1
+    return {"total": len(mappings), "ok": ok, "errors": err}
 
 
 # =====================================================================

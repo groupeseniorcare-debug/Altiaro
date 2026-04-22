@@ -216,6 +216,15 @@ async def mollie_webhook(request: Request):
                             await send_admin_new_order(refreshed, site)
                 except Exception:
                     logger.exception("Failed to send confirmation emails")
+                # Auto-forward to AliExpress for any line item sourced from them
+                try:
+                    from routes.aliexpress import auto_place_aliexpress_order
+                    import asyncio as _aio
+                    refreshed2 = await db.orders.find_one({"id": order["id"]}, {"_id": 0})
+                    if refreshed2:
+                        _aio.create_task(auto_place_aliexpress_order(refreshed2))
+                except Exception:
+                    logger.exception("Failed to dispatch AliExpress auto-order")
         else:
             await db.orders.update_one({"id": order["id"]}, {"$set": updates})
 

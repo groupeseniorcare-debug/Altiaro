@@ -14,6 +14,7 @@ import NicheAnalysisDetail from "./pages/NicheAnalysisDetail";
 import SiteProducts from "./pages/SiteProducts";
 import SiteBlogPosts from "./pages/SiteBlogPosts";
 import SiteSEO from "./pages/SiteSEO";
+import SiteAliExpressImport from "./pages/SiteAliExpressImport";
 import AdsCopy from "./pages/AdsCopy";
 import Empire from "./pages/Empire";
 import Billing from "./pages/Billing";
@@ -177,6 +178,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <SiteSEO />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites/:id/aliexpress/import"
+            element={
+              <ProtectedRoute>
+                <SiteAliExpressImport />
               </ProtectedRoute>
             }
           />
