@@ -39,6 +39,7 @@ _HANDLERS: dict[int, str] = {
     9: "legal_docs",
     16: "product_import",
     17: "template_scaffold",
+    27: "blog_seed",
 }
 
 
@@ -449,12 +450,125 @@ async def _hook_template_scaffold(step: dict) -> None:
     logger.info(f"[side-effect #17] template 'altiaro-premium-light' applied to site {step['site_id']}")
 
 
+async def _hook_blog_seed(step: dict) -> None:
+    """
+    Hook #27 — Génère 10 articles SEO en une passe via Claude.
+    Liste de keywords extraits du step.ai_response (ou générés depuis la niche),
+    puis chaque keyword → article complet via le endpoint AI-draft.
+    """
+    try:
+        from routes.blog_posts import ai_draft_blog_post, AIDraftInput
+    except Exception:
+        logger.exception("[side-effect #27] blog_posts import failed")
+        return
+
+    site = await db.sites.find_one(
+        {"id": step["site_id"]},
+        {"_id": 0, "id": 1, "name": 1, "niche": 1, "design": 1},
+    )
+    if not site:
+        return
+
+    existing = (site.get("design") or {}).get("blog_posts") or []
+    if len(existing) >= 10:
+        logger.info(f"[side-effect #27] blog déjà alimenté ({len(existing)} articles) — skip")
+        return
+
+    # Try to extract keywords from the step's AI response (prompt #27 output)
+    ai_resp = step.get("ai_response") or step.get("ai_output") or ""
+    keywords = _extract_blog_keywords(ai_resp, site)
+
+    logger.info(f"[side-effect #27] démarrage génération de {len(keywords)} articles pour site {site['id']}")
+
+    # Mock user object for the admin dispatch (ai_draft requires auth dep, we call directly)
+    admin = {"role": "admin", "email": "system", "id": "blog_hook"}
+
+    generated = 0
+    for kw in keywords[:10]:
+        try:
+            body = AIDraftInput(
+                keyword=kw.get("keyword") if isinstance(kw, dict) else kw,
+                angle=(kw.get("angle") if isinstance(kw, dict) else "") or "",
+                length="long",
+            )
+            await ai_draft_blog_post(site["id"], body, user=admin)
+            generated += 1
+            # Gentle pacing to respect Claude rate limits
+            await asyncio.sleep(2)
+        except Exception:
+            logger.exception(f"[side-effect #27] article échoué pour keyword={kw}")
+
+    logger.info(f"[side-effect #27] {generated}/{len(keywords)} articles SEO générés pour site {site['id']}")
+
+    # Fire IndexNow for all blog URLs at once
+    try:
+        from routes.indexnow import fire_and_forget_indexnow
+        origin = os.environ.get("PUBLIC_ORIGIN") or "https://senior-france.preview.emergentagent.com"
+        s2 = await db.sites.find_one({"id": site["id"]}, {"_id": 0, "design": 1})
+        posts = ((s2 or {}).get("design") or {}).get("blog_posts") or []
+        urls = [f"{origin}/shop/{site['id']}/blog"] + [
+            f"{origin}/shop/{site['id']}/blog/{p.get('slug')}" for p in posts if p.get("slug")
+        ]
+        fire_and_forget_indexnow(urls)
+    except Exception:
+        logger.exception("[side-effect #27→indexnow] dispatch failed")
+
+
+def _extract_blog_keywords(ai_response: str, site: dict) -> list[dict]:
+    """
+    Tries to parse a JSON list of keywords from the step response.
+    Falls back to 10 silver-eco defaults derived from the site's niche.
+    """
+    import json as _json
+    text = _strip_json_fence(ai_response or "")
+    candidates = []
+
+    # 1. Look for a JSON structure anywhere
+    try:
+        obj = _json.loads(text)
+        if isinstance(obj, dict):
+            kws = obj.get("keywords") or obj.get("articles") or obj.get("topics")
+            if isinstance(kws, list):
+                candidates = kws
+        elif isinstance(obj, list):
+            candidates = obj
+    except Exception:
+        pass
+
+    # 2. Normalise to [{keyword, angle}]
+    clean: list[dict] = []
+    for c in candidates:
+        if isinstance(c, dict) and c.get("keyword"):
+            clean.append({"keyword": str(c["keyword"])[:120], "angle": str(c.get("angle") or "")[:80]})
+        elif isinstance(c, str) and len(c) > 3:
+            clean.append({"keyword": c[:120], "angle": ""})
+
+    if clean:
+        return clean[:10]
+
+    # 3. Fallback — 10 topics silver-eco génériques dérivés de la niche
+    niche = (site.get("niche") or "produits senior").strip()
+    return [
+        {"keyword": f"Bien choisir {niche} — guide complet", "angle": "guide d'achat"},
+        {"keyword": f"{niche} — 5 critères essentiels", "angle": "checklist"},
+        {"keyword": f"Meilleur {niche} en 2026", "angle": "comparatif"},
+        {"keyword": f"{niche} remboursement sécurité sociale et mutuelle", "angle": "FAQ financement"},
+        {"keyword": f"Comment entretenir son {niche}", "angle": "guide pratique"},
+        {"keyword": f"{niche} pour personne de plus de 80 ans", "angle": "profil utilisateur"},
+        {"keyword": f"Installation et prise en main {niche}", "angle": "tutoriel"},
+        {"keyword": f"Erreurs courantes lors du choix d'un {niche}", "angle": "conseils d'experts"},
+        {"keyword": f"{niche} après hospitalisation — quel choisir", "angle": "convalescence"},
+        {"keyword": f"Maintien à domicile et {niche}", "angle": "lifestyle senior"},
+    ]
+
+
 _DISPATCH = {
     "rename_site": _hook_rename_site,
     "brand_book": _hook_brand_book,
     "legal_docs": _hook_legal_docs,
     "product_import": _hook_product_import,
     "template_scaffold": _hook_template_scaffold,
+    "blog_seed": _hook_blog_seed,
 }
 
 

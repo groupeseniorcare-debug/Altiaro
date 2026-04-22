@@ -28,8 +28,16 @@ logger = logging.getLogger("conceptfactory.reviews")
 router = APIRouter()
 
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+SENDER_EMAIL = os.environ.get("RESEND_DEFAULT_FROM", "onboarding@resend.dev")
 REVIEW_DELAY_DAYS = 14
 REVIEW_WINDOW_DAYS = 60
+
+if RESEND_API_KEY:
+    try:
+        import resend
+        resend.api_key = RESEND_API_KEY
+    except ImportError:
+        logger.warning("[reviews] resend SDK not installed")
 
 
 async def _create_invitations_for_order(order: dict) -> int:
@@ -102,38 +110,51 @@ async def check_due_invitations() -> dict:
 
 
 async def _send_review_email(invitation: dict):
-    """Minimal Resend integration. Caller must ensure RESEND_API_KEY is set."""
-    import httpx
+    """Send review-request email via Resend SDK (non-blocking via asyncio.to_thread)."""
+    import asyncio
+    import resend
     origin = os.environ.get("PUBLIC_ORIGIN") or "https://senior-france.preview.emergentagent.com"
     review_url = f"{origin}/shop/{invitation['site_id']}/review/{invitation['token']}"
-    site = await db.sites.find_one({"id": invitation["site_id"]}, {"_id": 0, "name": 1})
+    site = await db.sites.find_one({"id": invitation["site_id"]}, {"_id": 0, "name": 1, "design": 1})
     brand = (site or {}).get("name", "Notre maison")
+    primary = (((site or {}).get("design") or {}).get("brand") or {}).get("primary_color") or "#B84B31"
 
-    html = f"""
-    <div style="font-family:system-ui,sans-serif;max-width:560px;margin:40px auto;padding:30px;background:#FDFBF7;border-radius:16px;">
-      <h1 style="font-family:Georgia,serif;font-size:24px;color:#1C1917;margin:0 0 20px;">Merci pour votre confiance 🙏</h1>
-      <p style="font-size:16px;color:#57534E;line-height:1.6;">
+    html = f"""<!doctype html>
+<html><body style="margin:0;background:#FDFBF7;font-family:Georgia,serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#FDFBF7;padding:40px 20px;">
+  <tr><td align="center">
+    <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;padding:40px;max-width:560px;">
+      <tr><td style="font-family:Georgia,serif;font-size:28px;color:#1C1917;padding-bottom:20px;font-weight:600;">
+        Merci pour votre confiance
+      </td></tr>
+      <tr><td style="font-family:system-ui,sans-serif;font-size:16px;color:#57534E;line-height:1.7;padding-bottom:24px;">
         Bonjour {invitation.get('customer_name') or ''},<br/><br/>
-        Nous espérons que votre commande chez <strong>{brand}</strong> correspond à vos attentes.<br/><br/>
+        Nous espérons que votre commande chez <strong style="color:#1C1917;">{brand}</strong> correspond à vos attentes.<br/><br/>
         Accepteriez-vous de nous laisser votre avis ? Cela aide d'autres familles à faire le bon choix — et nous aide à nous améliorer.
-      </p>
-      <p style="margin:24px 0;">
-        <a href="{review_url}" style="background:#B84B31;color:white;text-decoration:none;padding:14px 28px;border-radius:999px;font-weight:500;display:inline-block;">Laisser mon avis (1 min)</a>
-      </p>
-      <p style="color:#78716C;font-size:13px;">Lien valide 60 jours.</p>
-    </div>
-    """
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        await client.post(
-            "https://api.resend.com/emails",
-            headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
-            json={
-                "from": f"{brand} <reviews@resend.dev>",
-                "to": [invitation["customer_email"]],
-                "subject": f"Votre avis sur votre commande {brand} 🙏",
-                "html": html,
-            },
-        )
+      </td></tr>
+      <tr><td align="center" style="padding:16px 0 24px;">
+        <a href="{review_url}"
+           style="background:{primary};color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:999px;font-family:system-ui,sans-serif;font-weight:500;font-size:15px;display:inline-block;">
+          Laisser mon avis (1 min)
+        </a>
+      </td></tr>
+      <tr><td style="font-family:system-ui,sans-serif;color:#A8A29E;font-size:12px;padding-top:16px;border-top:1px solid #F5F2EB;">
+        Lien valide 60 jours. Si vous ne souhaitez plus recevoir ces emails, <a href="#" style="color:#A8A29E;">cliquez ici</a>.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"""
+
+    params = {
+        "from": f"{brand} <{SENDER_EMAIL}>",
+        "to": [invitation["customer_email"]],
+        "subject": f"Votre avis sur votre commande {brand}",
+        "html": html,
+    }
+    result = await asyncio.to_thread(resend.Emails.send, params)
+    logger.info(f"[reviews] email sent to {invitation['customer_email']} · id={result.get('id') if isinstance(result, dict) else result}")
+    return result
 
 
 # =====================================================================
