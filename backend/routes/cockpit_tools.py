@@ -277,26 +277,43 @@ async def financial_forecast(site_id: str, body: ForecastInput, user=Depends(get
             monthly_conv = daily_conv * days
             monthly_revenue_ttc = monthly_conv * aov
             monthly_revenue_ht = monthly_revenue_ttc / (1 + vat)
+            monthly_vat_collected = monthly_revenue_ttc - monthly_revenue_ht
             monthly_cogs = monthly_conv * per_order_cogs
             monthly_shipping = monthly_conv * SHIPPING_COST_PER_ORDER
             monthly_ad_spend = daily_budget_per_market * days
             monthly_gross = monthly_revenue_ht - monthly_cogs - monthly_shipping - monthly_ad_spend
             monthly_net_concepteur = monthly_gross * 0.50  # 50/50 split with platform
+            monthly_commission_altiaro = monthly_gross * 0.50
             roas = monthly_revenue_ttc / monthly_ad_spend if monthly_ad_spend > 0 else 0
+            cpa_real = monthly_ad_spend / monthly_conv if monthly_conv > 0 else 0
+            aov_ht = aov / (1 + vat)
+            break_even_conv = (
+                monthly_ad_spend / max(aov_ht - per_order_cogs - SHIPPING_COST_PER_ORDER, 0.01)
+                if (aov_ht - per_order_cogs - SHIPPING_COST_PER_ORDER) > 0
+                else None
+            )
+            gross_margin_pct = (monthly_gross / monthly_revenue_ht * 100) if monthly_revenue_ht > 0 else 0
             per_market[cc] = {
                 "cpc_eur": cpc,
                 "vat_pct": round(vat * 100, 1),
                 "daily_clicks": round(daily_clicks, 1),
                 "daily_conversions": round(daily_conv, 2),
                 "monthly_conversions": round(monthly_conv),
+                "aov_ttc_eur": round(aov, 2),
+                "aov_ht_eur": round(aov_ht, 2),
                 "revenue_ttc_eur": round(monthly_revenue_ttc, 2),
                 "revenue_ht_eur": round(monthly_revenue_ht, 2),
+                "vat_collected_eur": round(monthly_vat_collected, 2),
                 "cogs_eur": round(monthly_cogs, 2),
                 "shipping_eur": round(monthly_shipping, 2),
                 "ad_spend_eur": round(monthly_ad_spend, 2),
                 "gross_margin_eur": round(monthly_gross, 2),
+                "gross_margin_pct": round(gross_margin_pct, 1),
+                "commission_altiaro_eur": round(monthly_commission_altiaro, 2),
                 "net_margin_concepteur_eur": round(monthly_net_concepteur, 2),
                 "roas": round(roas, 2),
+                "cpa_real_eur": round(cpa_real, 2),
+                "break_even_monthly_conv": round(break_even_conv, 1) if break_even_conv is not None else None,
                 "search_volume_monthly": volume_by_market.get(cc, 0),
                 "competition_index": competition_by_market.get(cc, 0),
             }
@@ -304,13 +321,19 @@ async def financial_forecast(site_id: str, body: ForecastInput, user=Depends(get
             total["conversions"] += monthly_conv
             total["revenue_ttc_eur"] += monthly_revenue_ttc
             total["revenue_ht_eur"] += monthly_revenue_ht
+            total.setdefault("vat_collected_eur", 0.0)
+            total["vat_collected_eur"] += monthly_vat_collected
             total["cogs_eur"] += monthly_cogs
             total["shipping_eur"] += monthly_shipping
             total["ad_spend_eur"] += monthly_ad_spend
             total["gross_margin_eur"] += monthly_gross
             total["net_margin_concepteur_eur"] += monthly_net_concepteur
+            total.setdefault("commission_altiaro_eur", 0.0)
+            total["commission_altiaro_eur"] += monthly_commission_altiaro
 
         roas_global = total["revenue_ttc_eur"] / total["ad_spend_eur"] if total["ad_spend_eur"] > 0 else 0
+        cpa_real_global = total["ad_spend_eur"] / total["conversions"] if total["conversions"] > 0 else 0
+        gross_margin_pct_global = (total["gross_margin_eur"] / total["revenue_ht_eur"] * 100) if total["revenue_ht_eur"] > 0 else 0
         return {
             "key": scen_key,
             "label": scen["label"],
@@ -319,8 +342,9 @@ async def financial_forecast(site_id: str, body: ForecastInput, user=Depends(get
                 "conv_rate_pct": scen["conv_rate_pct"],
                 "upsell_attach_rate_pct": scen["upsell_attach_rate_pct"] if upsells else 0,
                 "cpc_multiplier": cpc_mult,
-                "avg_order_value_eur": round(aov, 2),
+                "avg_order_value_ttc_eur": round(aov, 2),
                 "gross_per_order_eur": round(per_order_gross, 2),
+                "cogs_per_order_eur": round(per_order_cogs, 2),
                 "shipping_cost_per_order_eur": SHIPPING_COST_PER_ORDER,
             },
             "per_market": per_market,
@@ -329,12 +353,16 @@ async def financial_forecast(site_id: str, body: ForecastInput, user=Depends(get
                 "conversions": round(total["conversions"]),
                 "revenue_ttc_eur": round(total["revenue_ttc_eur"], 2),
                 "revenue_ht_eur": round(total["revenue_ht_eur"], 2),
+                "vat_collected_eur": round(total["vat_collected_eur"], 2),
                 "cogs_eur": round(total["cogs_eur"], 2),
                 "shipping_eur": round(total["shipping_eur"], 2),
                 "ad_spend_eur": round(total["ad_spend_eur"], 2),
                 "gross_margin_eur": round(total["gross_margin_eur"], 2),
+                "gross_margin_pct": round(gross_margin_pct_global, 1),
+                "commission_altiaro_eur": round(total["commission_altiaro_eur"], 2),
                 "net_margin_concepteur_eur": round(total["net_margin_concepteur_eur"], 2),
                 "roas": round(roas_global, 2),
+                "cpa_real_eur": round(cpa_real_global, 2),
             },
         }
 
@@ -432,7 +460,7 @@ async def financial_forecast(site_id: str, body: ForecastInput, user=Depends(get
     # Impact if attach rate +10pts
     if upsells:
         extra_rev_per_attach_pt = real_global["revenue_ttc_eur"] * (avg_upsell_price / max(
-            scenarios_out["realistic"]["params"]["avg_order_value_eur"], 1
+            scenarios_out["realistic"]["params"]["avg_order_value_ttc_eur"], 1
         )) / 100
         sens_upsell_10 = round(extra_rev_per_attach_pt * 10, 2)
     else:
