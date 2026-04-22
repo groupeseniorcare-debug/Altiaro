@@ -47,7 +47,7 @@ AUTHORIZE_URL = "https://api-sg.aliexpress.com/oauth/authorize"
 OAUTH_TOKEN_URL = "https://oauth.aliexpress.com/token"
 # Fallback : signed REST endpoint (rarely needed since OAuth2 is canonical)
 TOKEN_URL = "https://api-sg.aliexpress.com/rest/auth/token/create"
-REFRESH_URL = "https://oauth.aliexpress.com/token"
+REFRESH_URL = "https://api-sg.aliexpress.com/rest/auth/token/refresh"
 SYNC_API_URL = "https://api-sg.aliexpress.com/sync"
 
 
@@ -321,49 +321,37 @@ async def get_authorize_url_admin(request: Request, user=Depends(get_current_use
 # =====================================================================
 async def _exchange_code_for_token(code: str) -> dict:
     """
-    Exchange OAuth code → access_token.
-    Try standard OAuth2 endpoint first (simpler, no signature). Fall back to
-    the signed REST endpoint if it fails.
+    Exchange OAuth code → access_token via the AliExpress signed REST endpoint.
+    Logs the raw response for debugging.
     """
-    # Attempt 1 : standard OAuth2 token endpoint (oauth.aliexpress.com/token)
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            r = await client.post(
-                OAUTH_TOKEN_URL,
-                data={
-                    "grant_type": "authorization_code",
-                    "client_id": APP_KEY,
-                    "client_secret": APP_SECRET,
-                    "code": code,
-                    "redirect_uri": CALLBACK_URL,
-                    "sp": "ae",
-                },
-            )
-        logger.info(f"[aliexpress] OAuth2 token endpoint → HTTP {r.status_code}")
-        data = r.json()
-        # Persist the raw response for debugging
-        try:
-            await db.aliexpress_oauth_callbacks.insert_one({
-                "received_at": datetime.now(timezone.utc),
-                "stage": "oauth2_token_response",
-                "http_status": r.status_code,
-                "raw_keys": list(data.keys()) if isinstance(data, dict) else [],
-                "raw_preview": {k: str(v)[:200] for k, v in data.items()} if isinstance(data, dict) else str(data)[:500],
-            })
-        except Exception:
-            pass
-        if isinstance(data, dict) and data.get("access_token"):
-            return data
-        logger.warning(f"[aliexpress] OAuth2 endpoint did not return access_token, keys={list(data.keys()) if isinstance(data,dict) else 'non-dict'} — falling back to REST")
-    except Exception:
-        logger.exception("[aliexpress] OAuth2 token endpoint failed — falling back to REST")
-
-    # Attempt 2 : signed REST endpoint (legacy / some accounts)
     params = {
         "code": code,
         "uuid": uuid.uuid4().hex,
     }
-    return await _signed_post(TOKEN_URL, params, need_access_token=False)
+    try:
+        data = await _signed_post(TOKEN_URL, params, need_access_token=False)
+    except HTTPException as he:
+        # _signed_post raises HTTPException with detail being the error dict — surface it
+        try:
+            await db.aliexpress_oauth_callbacks.insert_one({
+                "received_at": datetime.now(timezone.utc),
+                "stage": "token_exchange_http_exception",
+                "detail": str(he.detail)[:500],
+            })
+        except Exception:
+            pass
+        raise
+    # Persist raw for debug
+    try:
+        await db.aliexpress_oauth_callbacks.insert_one({
+            "received_at": datetime.now(timezone.utc),
+            "stage": "rest_token_response",
+            "raw_keys": list(data.keys()) if isinstance(data, dict) else [],
+            "raw_preview": {k: str(v)[:300] for k, v in data.items()} if isinstance(data, dict) else str(data)[:500],
+        })
+    except Exception:
+        pass
+    return data
 
 
 async def _refresh_access_token() -> dict:
@@ -371,20 +359,7 @@ async def _refresh_access_token() -> dict:
     refresh_token = pl.get("refresh_token")
     if not refresh_token:
         raise HTTPException(401, "Plateforme non connectée à AliExpress.")
-    # Standard OAuth2 refresh
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        r = await client.post(
-            REFRESH_URL,
-            data={
-                "grant_type": "refresh_token",
-                "client_id": APP_KEY,
-                "client_secret": APP_SECRET,
-                "refresh_token": refresh_token,
-                "sp": "ae",
-            },
-        )
-        r.raise_for_status()
-        resp = r.json()
+    resp = await _signed_post(REFRESH_URL, {"refresh_token": refresh_token}, need_access_token=False)
     if not resp.get("access_token"):
         raise HTTPException(502, f"AliExpress refresh failed : {resp}")
     now = datetime.now(timezone.utc)
@@ -422,10 +397,29 @@ async def _get_valid_access_token(site_id: Optional[str] = None) -> str:
 # =====================================================================
 # AliExpress signature (SHA256) + signed POST helper
 # =====================================================================
-def _sign_params(params: dict, secret: str) -> str:
-    """AliExpress signature algorithm : concat sorted k+v then HMAC-SHA256 hex upper."""
+def _sign_params(params: dict, secret: str, path: str = "") -> str:
+    """
+    AliExpress signature (system/REST APIs) :
+      concat = "".join(sorted(k+v))
+      base   = path + concat   (path is included for /rest/* endpoints)
+      sign   = HMAC-SHA256(secret, base) hex upper
+    """
     concat = "".join(f"{k}{v}" for k, v in sorted(params.items()) if v is not None)
-    return hmac.new(secret.encode(), concat.encode(), hashlib.sha256).hexdigest().upper()
+    base = (path or "") + concat
+    return hmac.new(secret.encode(), base.encode(), hashlib.sha256).hexdigest().upper()
+
+
+def _extract_path_for_signing(url: str) -> str:
+    """
+    For REST endpoints (/rest/...), AliExpress requires the path to be
+    prepended to the signature base string. For the /sync endpoint, the path
+    is NOT included.
+    """
+    from urllib.parse import urlparse
+    path = urlparse(url).path or ""
+    if path.startswith("/rest"):
+        return path[len("/rest"):]  # e.g. "/auth/token/create"
+    return ""  # /sync → no path
 
 
 async def _signed_post(url: str, biz_params: dict, need_access_token: bool = True, site_id: Optional[str] = None) -> dict:
@@ -438,7 +432,8 @@ async def _signed_post(url: str, biz_params: dict, need_access_token: bool = Tru
     params["timestamp"] = str(int(time.time() * 1000))
     if need_access_token:
         params["session"] = await _get_valid_access_token(site_id)
-    params["sign"] = _sign_params(params, APP_SECRET)
+    path = _extract_path_for_signing(url)
+    params["sign"] = _sign_params(params, APP_SECRET, path=path)
     async with httpx.AsyncClient(timeout=30.0) as client:
         r = await client.post(url, data=params)
         r.raise_for_status()
