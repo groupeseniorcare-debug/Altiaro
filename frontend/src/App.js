@@ -191,7 +191,7 @@ function App() {
           <Route
             path="/admin/integrations"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute adminOnly>
                 <AdminIntegrations />
               </ProtectedRoute>
             }
