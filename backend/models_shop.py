@@ -59,6 +59,7 @@ class OrderItem(BaseModel):
     quantity: int = Field(gt=0, le=99)
     currency: str = "EUR"
     image: Optional[str] = None
+    upsell_discount_pct: Optional[float] = None  # 0-50 — applied server-side if product.role == "upsell"
 
 
 class ShippingAddress(BaseModel):

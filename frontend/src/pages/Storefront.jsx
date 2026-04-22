@@ -768,6 +768,7 @@ export function StorefrontCheckout() {
           quantity: i.quantity,
           currency: i.currency || "EUR",
           image: i.image,
+          upsell_discount_pct: i.upsell_discount_pct || 0,
         })),
         customer: { name: form.name, email: form.email, phone: form.phone },
         shipping_address: {

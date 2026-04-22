@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { X, Trash, Plus, Minus, ShoppingBag, Truck, ShieldCheck, ArrowRight } from "@phosphor-icons/react";
-import { readCart, cartTotals, removeFromCart, updateQty } from "../lib/cart";
+import axios from "axios";
+import { X, Trash, Plus, Minus, ShoppingBag, Truck, ShieldCheck, ArrowRight, Sparkle } from "@phosphor-icons/react";
+import { readCart, cartTotals, removeFromCart, updateQty, addToCart } from "../lib/cart";
+import { BACKEND_URL } from "./storefront/storefrontUtils";
+
+const IMPULSE_DISCOUNT_PCT = 20;
 
 /**
  * Slide-in cart drawer. Open via window.dispatchEvent(new Event('cf_cart_open'))
@@ -10,6 +14,7 @@ export default function CartDrawer({ design }) {
   const { siteId } = useParams();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);
+  const [impulseUpsell, setImpulseUpsell] = useState(null);
 
   useEffect(() => {
     const refresh = () => setItems(readCart(siteId));
@@ -32,6 +37,27 @@ export default function CartDrawer({ design }) {
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
+  // Fetch an impulse upsell recommended from the current cart — skip if the
+  // cart already contains any upsell (avoid duplicate offers).
+  useEffect(() => {
+    if (!open || !siteId) return;
+    const cartIds = items.map((i) => i.product_id).filter(Boolean);
+    if (cartIds.length === 0) { setImpulseUpsell(null); return; }
+    let cancelled = false;
+    axios
+      .post(`${BACKEND_URL}/api/public/sites/${siteId}/upsells-for-products?limit=3`, {
+        product_ids: cartIds,
+      })
+      .then(({ data }) => {
+        if (cancelled) return;
+        const alreadyInCart = new Set(cartIds);
+        const candidate = (data || []).find((p) => !alreadyInCart.has(p.id));
+        setImpulseUpsell(candidate || null);
+      })
+      .catch(() => { if (!cancelled) setImpulseUpsell(null); });
+    return () => { cancelled = true; };
+  }, [open, siteId, JSON.stringify(items.map((i) => i.product_id))]);
+
   const totals = cartTotals(items);
   const primary = design?.brand?.primary_color || "#1C1917";
   const accent = design?.brand?.accent_color || "#F5F2EB";
@@ -45,6 +71,18 @@ export default function CartDrawer({ design }) {
   const handleRemove = (productId) => {
     const updated = removeFromCart(siteId, productId);
     setItems(updated);
+  };
+
+  const handleAddImpulse = () => {
+    if (!impulseUpsell) return;
+    const updated = addToCart(siteId, impulseUpsell, "fr", 1, {
+      discount_pct: IMPULSE_DISCOUNT_PCT,
+    });
+    setItems(updated);
+    try {
+      window.altiaroTrack?.upsellImpulse?.(impulseUpsell, IMPULSE_DISCOUNT_PCT, "fr");
+    } catch (_) { /* noop */ }
+    setImpulseUpsell(null);
   };
 
   if (!open) return null;
@@ -112,7 +150,17 @@ export default function CartDrawer({ design }) {
                         <Trash size={16} />
                       </button>
                     </div>
-                    <div className="text-xs text-neutral-500 mb-2">{Number(it.price).toFixed(2)} €</div>
+                    <div className="text-xs text-neutral-500 mb-2">
+                      {Number(it.price).toFixed(2)} €
+                      {it.upsell_discount_pct > 0 && it.original_price && (
+                        <>
+                          {" "}
+                          <span className="line-through">{Number(it.original_price).toFixed(2)} €</span>
+                          {" "}
+                          <span className="text-emerald-700 font-semibold">-{it.upsell_discount_pct}%</span>
+                        </>
+                      )}
+                    </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-0 border border-neutral-300 rounded-full h-8">
                         <button
@@ -139,6 +187,58 @@ export default function CartDrawer({ design }) {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Impulse upsell offer — shown only when cart is non-empty AND a
+              suitable upsell exists AND it's not already in the cart. */}
+          {items.length > 0 && impulseUpsell && (
+            <div
+              className="mt-6 rounded-2xl border-2 border-dashed p-4 relative"
+              style={{ borderColor: primary, background: `${primary}08` }}
+              data-testid="cart-impulse-upsell"
+            >
+              <div
+                className="absolute -top-3 left-4 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-widest font-semibold text-white"
+                style={{ background: primary }}
+              >
+                <Sparkle size={9} weight="fill" className="inline mr-1" />
+                Offre exclusive
+              </div>
+              <div className="flex gap-3 items-start mt-1">
+                <div className="w-16 h-16 rounded-lg overflow-hidden bg-neutral-100 shrink-0">
+                  {impulseUpsell.images?.[0] && (
+                    <img src={impulseUpsell.images[0]} alt="" className="w-full h-full object-cover" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold line-clamp-2" style={{ fontFamily: `${fontHeading}, serif` }}>
+                    {impulseUpsell.name?.fr || impulseUpsell.name?.en || "Accessoire recommandé"}
+                  </div>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-base font-semibold" style={{ color: primary }}>
+                      {(Number(impulseUpsell.price) * (1 - IMPULSE_DISCOUNT_PCT / 100)).toFixed(2)} €
+                    </span>
+                    <span className="text-xs text-neutral-500 line-through">
+                      {Number(impulseUpsell.price).toFixed(2)} €
+                    </span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                      -{IMPULSE_DISCOUNT_PCT}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <label className="mt-3 flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  onChange={(e) => e.target.checked && handleAddImpulse()}
+                  data-testid="impulse-upsell-checkbox"
+                  className="w-4 h-4 accent-neutral-900"
+                />
+                <span className="text-xs font-medium text-neutral-800">
+                  Oui, j'ajoute cet accessoire à -{IMPULSE_DISCOUNT_PCT}% à ma commande
+                </span>
+              </label>
             </div>
           )}
         </div>

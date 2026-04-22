@@ -225,18 +225,28 @@ async def public_create_order(site_id: str, data: OrderCreateInput, request: Req
         prod = await db.products.find_one(
             {"id": item.product_id, "site_id": site_id, "status": "active"},
             {"_id": 0, "price": 1, "currency": 1, "name": 1, "images": 1,
-             "cost_price_ht": 1, "vat_rate": 1, "sku": 1}
+             "cost_price_ht": 1, "vat_rate": 1, "sku": 1, "role": 1}
         )
         if not prod:
             raise HTTPException(
                 status_code=400,
                 detail=f"Produit {item.product_id} introuvable ou inactif"
             )
+        # Impulse-cart upsell discount — only applies to products with role=upsell,
+        # capped to 50% to prevent abuse.
+        discount_pct = float(item.upsell_discount_pct or 0)
+        discount_pct = max(0.0, min(discount_pct, 50.0))
+        original_price = float(prod["price"])
+        applied_price = original_price
+        if discount_pct > 0 and prod.get("role") == "upsell":
+            applied_price = round(original_price * (1 - discount_pct / 100.0), 2)
         canonical_items.append({
             "product_id": item.product_id,
             "name": item.name,
             "sku": prod.get("sku") or "",
-            "price": prod["price"],                         # TTC
+            "price": applied_price,                         # TTC (discounted if upsell impulse)
+            "original_price": original_price,
+            "upsell_discount_pct": discount_pct if applied_price != original_price else 0,
             "cost_price_ht": float(prod.get("cost_price_ht") or 0),   # snapshot achat HT
             "item_vat_rate": prod.get("vat_rate"),          # override line-level si défini
             "quantity": item.quantity,

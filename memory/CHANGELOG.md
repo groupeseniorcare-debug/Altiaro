@@ -3,6 +3,26 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-22 · Impulse-buy drawer panier + GA4 tracking enrichi
+
+- **Panneau "Offre exclusive"** dans le drawer panier (`CartDrawer.jsx`) :
+  - Fetch auto d'un upsell recommandé selon les produits du panier (`POST /public/sites/{id}/upsells-for-products`).
+  - Carte mise en avant : prix barré + prix remisé + badge "-20%" + encadrement pointillé coloré.
+  - Checkbox "Oui, j'ajoute cet accessoire à -20% à ma commande" → ajout au panier avec discount.
+  - Le panneau se cache dès que l'upsell est dans le panier (pas de doublon d'offre).
+- **Prix canoniques sécurisés côté backend** :
+  - `OrderItem.upsell_discount_pct: Optional[float]` ajouté.
+  - `public_create_order` : la remise n'est appliquée **que** si `product.role == "upsell"` + cap à 50%. Sinon, prix canonique serveur forcé. Impossible d'abuser en envoyant `-50%` sur un produit main.
+  - `canonical_items` stocke `original_price` et `upsell_discount_pct` pour audit/facturation.
+- **GA4 / Google Ads tracking** :
+  - Nouvelle méthode `window.altiaroTrack.upsellImpulse(product, pct, lang)` → firing double event : `add_to_cart` (avec `item_category: 'upsell_impulse'` + `discount` en euros) **et** un event custom `upsell_impulse` pour segmentation.
+  - Branchement `onAddToCart` sur fiche produit upsells + clic checkbox cart drawer.
+- **lib/cart.js** : `addToCart` accepte `{discount_pct}` et stocke `original_price` + `upsell_discount_pct` sur l'item localStorage.
+- **Checkout submit** propage `upsell_discount_pct` dans le payload POST `/orders`.
+- **Testing** : lint OK, 2 tests curl (commande avec remise valide + tentative d'abus sur produit main **rejetée**), screenshot drawer fonctionnel.
+
+
+
 ## 2026-04-22 · Upsells : association produit + recommandations storefront
 
 - **Étape 3 Cockpit unifiée** : extraction d'un composant `<SourcingPanel>` partagé avec l'étape 2. Même moteur d'import (search CJ/AE + URL + filtres providers) + bandeau IA en haut basé sur le catalogue.

@@ -18,20 +18,33 @@ function writeCart(siteId, items) {
   window.dispatchEvent(new CustomEvent("cf_cart_updated", { detail: { siteId } }));
 }
 
-export function addToCart(siteId, product, lang = "fr", quantity = 1) {
+export function addToCart(siteId, product, lang = "fr", quantity = 1, opts = {}) {
   const items = readCart(siteId);
   const existing = items.find((i) => i.product_id === product.id);
   const name =
     typeof product.name === "string"
       ? product.name
       : product.name?.[lang] || product.name?.fr || "";
+  const discountPct = Math.max(0, Math.min(Number(opts.discount_pct || 0), 50));
+  const basePrice = Number(product.price) || 0;
+  const effectivePrice = discountPct > 0
+    ? Math.round(basePrice * (1 - discountPct / 100) * 100) / 100
+    : basePrice;
   if (existing) {
     existing.quantity += quantity;
+    // Keep best discount between previous and new
+    if (discountPct > (existing.upsell_discount_pct || 0)) {
+      existing.upsell_discount_pct = discountPct;
+      existing.original_price = basePrice;
+      existing.price = effectivePrice;
+    }
   } else {
     items.push({
       product_id: product.id,
       name,
-      price: product.price,
+      price: effectivePrice,
+      original_price: basePrice,
+      upsell_discount_pct: discountPct,
       quantity,
       currency: product.currency || "EUR",
       image: product.images?.[0] || null,

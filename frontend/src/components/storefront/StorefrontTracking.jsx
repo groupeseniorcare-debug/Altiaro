@@ -70,6 +70,37 @@ export default function StorefrontTracking({ site }) {
           });
         } catch (e) { /* no-op */ }
       },
+      /**
+       * Impulse-cart upsell click ("Ajouter avec -X%" inside the cart drawer).
+       * Fires BOTH `add_to_cart` (with discounted value) and a custom
+       * `upsell_impulse` event so marketers can segment high-intent carts.
+       */
+      upsellImpulse: (product, discountPct = 20, lang = "fr") => {
+        try {
+          const basePrice = Number(product.price || 0);
+          const discounted = Math.round(basePrice * (1 - discountPct / 100) * 100) / 100;
+          const itemName = (product.name?.[lang] || product.name || "").toString();
+          gtag("event", "add_to_cart", {
+            currency: product.currency || "EUR",
+            value: discounted,
+            items: [{
+              item_id: product.id,
+              item_name: itemName,
+              price: discounted,
+              discount: Math.round((basePrice - discounted) * 100) / 100,
+              item_category: "upsell_impulse",
+              quantity: 1,
+            }],
+          });
+          gtag("event", "upsell_impulse", {
+            currency: product.currency || "EUR",
+            value: discounted,
+            discount_pct: discountPct,
+            item_id: product.id,
+            item_name: itemName,
+          });
+        } catch (e) { /* no-op */ }
+      },
       beginCheckout: (items, total, currency = "EUR") => {
         try {
           gtag("event", "begin_checkout", {
