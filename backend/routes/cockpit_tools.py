@@ -251,7 +251,9 @@ async def upsell_recommendations(site_id: str, _body: UpsellInput, user=Depends(
             pricing_context += f"- {r.get('segment','')}: {r.get('entry','?')}–{r.get('premium','?')}€ (sweet-spot {r.get('sweet_spot','?')}€)\n"
 
     products = await db.products.find(
-        {"site_id": site_id, "status": {"$in": ["active", "draft"]}},
+        {"site_id": site_id,
+         "status": {"$in": ["active", "draft"]},
+         "role": {"$ne": "upsell"}},
         {"_id": 0, "name": 1, "price": 1}
     ).to_list(50)
 

@@ -321,6 +321,7 @@ class ImportInput(BaseModel):
     cost_eur: float
     supplier_url: Optional[str] = ""
     sku: Optional[str] = ""
+    role: Optional[str] = "main"  # "main" or "upsell"
 
 
 # Country → language mapping for translation targets
@@ -563,6 +564,7 @@ async def import_product(site_id: str, data: ImportInput, user: dict = Depends(g
         "sku": data.sku or f"{data.provider.upper()}-{data.product_id[:12]}",
         "status": "active",
         "featured": False,
+        "role": "upsell" if (data.role or "main") == "upsell" else "main",
         "source": {"provider": data.provider, "product_id": data.product_id},
         "translation_status": "translated" if translations else "fallback_original",
         "translated_langs": list(translations.keys()),
@@ -584,6 +586,7 @@ async def import_product(site_id: str, data: ImportInput, user: dict = Depends(g
 # =====================================================================
 class ImportUrlInput(BaseModel):
     url: str
+    role: Optional[str] = "main"  # "main" or "upsell"
 
 
 def _parse_provider_url(url: str) -> tuple[str, str]:
@@ -683,6 +686,7 @@ async def import_by_url(site_id: str, data: ImportUrlInput, user: dict = Depends
         cost_eur=cost_eur,
         supplier_url=data.url,
         sku=sku,
+        role=data.role or "main",
     )
     # Respect CJ 1 QPS: sleep before the import (which will call detail again for specs)
     if provider == "cj":
