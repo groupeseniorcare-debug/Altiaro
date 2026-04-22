@@ -3,6 +3,22 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-22 · Sprint C : Fulfillment Concepteur UI
+
+- **Nouvelle page `/sites/:id/fulfillment`** (`SiteFulfillment.jsx`) routée dans `App.js` — le Concepteur voit d'un coup d'œil les commandes clients payées avec leur mapping CJ/AliExpress.
+  - 5 compteurs : En attente · Commandé fournisseur · Expédié · Livré · Erreur
+  - Par commande : order_number, client, total, mapping fournisseur (ID CJ/AE, statut, tracking, dernier sync)
+  - Bouton "Réessayer" sur les commandes en erreur ou pending (→ POST `/sites/{id}/orders/{oid}/supplier-retry`)
+- **Bouton navigation** "Commandes fournisseurs" (data-testid=`nav-fulfillment`) ajouté dans `SiteDetail.jsx` à côté de Produits / Blog / SEO.
+- **Chaîne complète dropshipping 100% automatique validée** :
+  1. Client paie sur storefront → webhook Mollie `paid`
+  2. `auto_place_cj_order` / `auto_place_aliexpress_order` commande chez le fournisseur
+  3. Cron `sync_all_cj_tracking` + AE (scheduler APScheduler) récupère tracking quotidien
+  4. Au passage en `shipped`, email "expédié" envoyé une fois (flag `shipping_email_sent` anti-doublon)
+- **Testing** : iter 21 — backend 4/4 pass + capture UI vérifiée (2 commandes CJ réelles affichées : CF-1776885171-3362 placed + CF-1776884932-B6CC pending).
+
+
+
 ## 2026-04-22 · Sprint B.3 : Design editor + Sourcing re-routing + GA4 + async design.generate
 
 - **Nouvelle page `/sites/:id/design`** (`SiteDesign.jsx`) : l'éditeur branding complet que la Sprint B.2 avait oublié. 
