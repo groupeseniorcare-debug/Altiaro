@@ -15,6 +15,9 @@ import SiteProducts from "./pages/SiteProducts";
 import SiteBlogPosts from "./pages/SiteBlogPosts";
 import SiteSEO from "./pages/SiteSEO";
 import SiteAliExpressImport from "./pages/SiteAliExpressImport";
+import SitePricing from "./pages/SitePricing";
+import SiteForecast from "./pages/SiteForecast";
+import SiteUpsells from "./pages/SiteUpsells";
 import AdminIntegrations from "./pages/AdminIntegrations";
 import AdminReview from "./pages/AdminReview";
 import Empire from "./pages/Empire";
@@ -186,6 +189,30 @@ function App() {
             element={
               <ProtectedRoute>
                 <SiteAliExpressImport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites/:id/pricing"
+            element={
+              <ProtectedRoute>
+                <SitePricing />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites/:id/forecast"
+            element={
+              <ProtectedRoute>
+                <SiteForecast />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites/:id/upsells"
+            element={
+              <ProtectedRoute>
+                <SiteUpsells />
               </ProtectedRoute>
             }
           />

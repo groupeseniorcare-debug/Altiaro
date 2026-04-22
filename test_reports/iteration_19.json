@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 19 — Validated new linear 9-step Cockpit Journey (replaces 50-prompt blocks). Backend: 8/8 active tests passed on /api/sites/{id}/{pricing-analysis,financial-forecast,upsell-recommendations} (1 scoping test skipped — only 1 site exists in wiped DB). Frontend: CockpitJourney renders all 9 steps with correct hrefs, /pricing /forecast /upsells pages load, Concepteur sidebar has no legacy Sourcing/Duplicate/Ads Copy/Connect AliExpress entries. Claude pricing-analysis call SUCCEEDED end-to-end (~30s, snapshot persisted).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "SiteDetail header", "issue": "Header still displays legacy counter '0 / 50 étapes validées' (with 50-step progress bar) directly above the new CockpitJourney panel showing '0/9 étapes complétées'. Two competing progress indicators are confusing for the user.", "selector": ".site detail header (top of /sites/{id})", "priority": "MEDIUM"},
+      {"component": "CockpitJourney completion sync", "issue": "After Claude pricing-analysis succeeds and persists, returning to /sites/{id} sometimes shows pricing step as not done (CTA still 'Lancer l'analyse IA' and counter 0/9). Initial measure during test reported 1/9 then a second navigation showed 0/9 — suspect a race between CockpitJourney's internal Promise.all GET and React state hydration of `pricing` flag, or projection bug. Verify GET /api/sites/{id}/pricing-analysis returns the stored snapshot consistently.", "selector": "[data-testid='cockpit-journey']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration19_cockpit_tools.py",
+    "/app/test_reports/pytest/iter19.xml"
+  ],
+  "action_items": [
+    "Remove or hide the legacy '0 / 50 étapes validées' counter and progress bar from SiteDetail header now that <CockpitJourney /> owns progress display (handoff said legacy steps collection stays in DB but should not be displayed).",
+    "Investigate intermittent CockpitJourney refresh: ensure pricing/forecast/upsells GETs return the saved snapshot reliably and the `done` flag toggles green after first POST without manual refresh."
+  ],
+  "critical_code_review_comments": [
+    "cockpit_tools.py uses bare `except Exception` in _claude_json — fine for graceful degradation but logs the full traceback (good).",
+    "_claude_json silently returns None for both 'no API key' and 'API failure' cases — caller raises 502, but distinguishing 402 (budget) vs 502 (other) would give cleaner UX. Currently any LLM failure surfaces as 502.",
+    "financial_forecast: avg_cpa fallback is `max(avg_price * 0.30, 30)` — fine, but if niche_analysis has no entries for selected_countries this fallback is silently used; consider exposing this in the response so user knows the forecast is heuristic.",
+    "Three new endpoints all do `_check_site_access` upfront — good consistency. ObjectId not exposed (uses {_id: 0} projection consistently).",
+    "SitePricing.jsx uses `window.alert(error)` for failures — replace with a proper toast/inline error block to match the rest of the app's UX.",
+    "CockpitJourney.jsx imports `CurrencyEur` from @phosphor-icons/react — verify the icon name exists in the installed version (no console error observed, so OK).",
+    "SiteDetail.jsx still mounts the legacy 50-step progress header — needs cleanup (see action item)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration19_cockpit_tools.py (new)"
+  ],
+  "success_rate": {"backend": "100% (8/8 ran, 1 skipped)", "frontend": "95% — all flows reachable; minor counter sync/legacy header issue"},
+  "test_credentials": "Concepteur: concepteur@conceptfactory.fr / Concepteur2026! · Site: 65964cb0-7a1a-4c11-9644-1ad8f2371d48 (Test Fauteuils Releveurs, FR, niche fauteuils releveurs)",
+  "seed_data_creation": "Backend test populated design.pricing_analysis on the test site via successful Claude call (~30s). No products were created — forecast/upsells correctly returned 400.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All 3 new cockpit endpoints work. EMERGENT_LLM_KEY is currently FUNCTIONAL (Claude responded under 30s on pricing-analysis). data-testids: cockpit-journey, journey-step-{pricing,import,upsells,forecast,branding,pages,content,seo,qa}, pricing-run, pricing-result. Forecast/Upsells pages don't yet expose data-testids on their main CTA buttons — recommend adding for stability. Single test site exists; for proper site-scoping verification create a 2nd Concepteur or 2nd site.",
+  "rca of the issue": "N/A — no critical bug. Minor UI cleanup needed for legacy 50-step header on SiteDetail."
+}

@@ -6,6 +6,7 @@ import Layout from "../components/Layout";
 import StepPanel from "../components/StepPanel";
 import BlockOutputModal from "../components/BlockOutputModal";
 import SiteQAPanel from "../components/SiteQAPanel";
+import CockpitJourney from "../components/CockpitJourney";
 import {
   ArrowLeft,
   Lock,
@@ -331,114 +332,11 @@ export default function SiteDetail() {
         </div>
 
         <div className="mb-10">
-          <SiteQAPanel site={site} />
+          <CockpitJourney site={site} onRefresh={load} />
         </div>
 
-        <div className="space-y-10">
-          {sortedBlocks.map((block) => {
-            const blockStepsFlat = Object.values(block.phases).flatMap((p) => p.steps);
-            const blockValidated = blockStepsFlat.filter((s) => s.status === "validated").length;
-            const blockPct = blockStepsFlat.length
-              ? Math.round((blockValidated / blockStepsFlat.length) * 100)
-              : 0;
-            const totalBlocks = sortedBlocks.length;
-            return (
-              <div key={block.id} data-testid={`block-${block.id}`}>
-                <div className="flex items-center gap-4 mb-5 pb-3 border-b border-neutral-200">
-                  <div className="text-3xl">{block.emoji}</div>
-                  <div className="flex-1">
-                    <div className="text-[11px] uppercase tracking-widest text-neutral-500">
-                      Bloc {block.order} / {totalBlocks}
-                    </div>
-                    <h2 className="text-xl font-semibold text-neutral-900">
-                      {block.name}
-                    </h2>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right pl-3 border-l border-neutral-200">
-                      <div className="text-lg font-semibold text-neutral-900">
-                        {blockPct}%
-                      </div>
-                      <div className="text-xs text-neutral-500">
-                        {blockValidated} / {blockStepsFlat.length} validées
-                      </div>
-                      <div className="w-32 h-1.5 bg-neutral-200 rounded-full overflow-hidden mt-1.5">
-                        <div
-                          className="h-full bg-neutral-900 rounded-full transition-all duration-500"
-                          style={{ width: `${blockPct}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-6 pl-2">
-                  {Object.values(block.phases).map((group) => {
-                    const phaseValidated = group.steps.filter((s) => s.status === "validated").length;
-                    return (
-                      <div key={group.code} data-testid={`phase-${group.code}`}>
-                        <div className="flex items-baseline gap-3 mb-3">
-                          <div className="w-7 h-7 rounded-md bg-neutral-900 text-white flex items-center justify-center font-heading font-semibold text-xs">
-                            {group.code}
-                          </div>
-                          <h3 className="font-heading text-base font-semibold text-neutral-900">
-                            {group.name}
-                          </h3>
-                          <div className="text-xs text-neutral-500 font-medium">
-                            {phaseValidated}/{group.steps.length}
-                          </div>
-                        </div>
-
-                        <div className="relative">
-                          <div className="absolute left-[13px] top-5 bottom-5 w-px bg-[#E7E5E4]" />
-                          <div className="space-y-2">
-                            {group.steps.map((step) => {
-                              const cfg = STATUS_CONFIG[step.status] || STATUS_CONFIG.locked;
-                              const Icon = cfg.icon;
-                              const clickable = step.status !== "locked";
-                              return (
-                                <button
-                                  key={step.id}
-                                  disabled={!clickable}
-                                  onClick={() => setSelectedStep(step)}
-                                  data-testid={`step-${step.number}`}
-                                  className={`w-full flex items-center gap-4 text-left rounded-xl border px-5 py-3.5 transition-all duration-200 ${
-                                    clickable
-                                      ? "bg-white border-neutral-200 hover:border-[#B84B31]/50 hover:shadow-sm cursor-pointer"
-                                      : "bg-neutral-100/40 border-neutral-200 cursor-not-allowed opacity-70"
-                                  }`}
-                                >
-                                  <div
-                                    className="relative z-10 w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                                    style={{ backgroundColor: cfg.bg }}
-                                  >
-                                    <Icon size={12} weight="bold" style={{ color: cfg.text }} />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-baseline gap-2 mb-0.5">
-                                      <span className="text-xs font-mono text-neutral-500">#{step.number}</span>
-                                      <span className="font-medium text-neutral-900">{step.title}</span>
-                                    </div>
-                                    <div className="text-sm text-neutral-500 truncate">{step.summary}</div>
-                                  </div>
-                                  <span
-                                    className="text-[10px] uppercase tracking-widest px-2 py-1 rounded-full whitespace-nowrap"
-                                    style={{ backgroundColor: cfg.bg, color: cfg.text }}
-                                  >
-                                    {cfg.label}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+        <div className="mb-10">
+          <SiteQAPanel site={site} />
         </div>
       </div>
 
