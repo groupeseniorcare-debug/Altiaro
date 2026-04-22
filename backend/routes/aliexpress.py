@@ -322,14 +322,9 @@ async def get_authorize_url_admin(request: Request, user=Depends(get_current_use
 async def _exchange_code_for_token(code: str) -> dict:
     """
     Exchange OAuth code → access_token via the AliExpress signed REST endpoint.
-    AliExpress requires the exact same redirect_uri that was used during authorize.
+    Minimal params — AliExpress is strict about extra fields.
     """
-    params = {
-        "code": code,
-        "uuid": uuid.uuid4().hex,
-        "redirect_uri": CALLBACK_URL,
-        "need_refresh_token": "true",
-    }
+    params = {"code": code}
     try:
         data = await _signed_post(TOKEN_URL, params, need_access_token=False)
     except HTTPException as he:
