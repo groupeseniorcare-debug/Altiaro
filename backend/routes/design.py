@@ -149,6 +149,15 @@ async def _claude_json(system: str, user: str, session_id: str, timeout: int = 1
             last_err = e
             # Emergent LLM Key budget exhausted → clear actionable message, no retry
             if "Budget has been exceeded" in msg or "budget" in msg.lower() and "exceeded" in msg.lower():
+                try:
+                    await db.platform_health.update_one(
+                        {"key": "llm"},
+                        {"$set": {"key": "llm", "status": "budget_exhausted",
+                                  "last_error_at": datetime.now(timezone.utc).isoformat()}},
+                        upsert=True,
+                    )
+                except Exception:
+                    pass
                 raise HTTPException(
                     status_code=402,
                     detail="Budget Emergent LLM Key épuisé. Recharge la clé depuis Profile → Universal Key → Add Balance.",

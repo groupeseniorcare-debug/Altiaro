@@ -133,19 +133,48 @@ export default function SiteProducts() {
   const handleEnrichNarrative = async (p) => {
     setEnriching(p.id);
     setAiToast(null);
-    const { data, error } = await apiCall(() =>
+    // Kick async job
+    const { data: kick, error: kickErr } = await apiCall(() =>
       api.post(`/products/${p.id}/enrich-narrative?force=true`)
     );
-    setEnriching(null);
-    if (error) {
-      setAiToast({ type: "error", msg: error });
-    } else if (data?.status === "ok") {
-      setAiToast({ type: "ok", msg: `Narratif IA régénéré pour « ${p.name?.fr || "produit"} »` });
-      load();
-    } else {
-      setAiToast({ type: "error", msg: "Budget LLM insuffisant ou timeout. Réessayez." });
+    if (kickErr) {
+      setEnriching(null);
+      setAiToast({ type: "error", msg: kickErr });
+      setTimeout(() => setAiToast(null), 6000);
+      return;
     }
-    setTimeout(() => setAiToast(null), 5000);
+    if (!kick?.job_id) {
+      setEnriching(null);
+      setAiToast({ type: "error", msg: "Impossible de lancer la génération IA." });
+      return;
+    }
+    // Poll every 3 s, max 3 min
+    let attempts = 0;
+    const poll = async () => {
+      attempts += 1;
+      const { data: s } = await apiCall(() => api.get(`/products/${p.id}/enrich-narrative/status`));
+      if (s?.status === "done") {
+        setEnriching(null);
+        setAiToast({ type: "ok", msg: `Narratif IA régénéré pour « ${p.name?.fr || "produit"} »` });
+        setTimeout(() => setAiToast(null), 5000);
+        load();
+        return;
+      }
+      if (s?.status === "failed") {
+        setEnriching(null);
+        setAiToast({ type: "error", msg: s.error || "Échec de la génération IA." });
+        setTimeout(() => setAiToast(null), 8000);
+        return;
+      }
+      if (attempts < 60) { // 60 × 3 s = 3 min
+        setTimeout(poll, 3000);
+      } else {
+        setEnriching(null);
+        setAiToast({ type: "error", msg: "Timeout après 3 min — le job continue en arrière-plan, recharge la page plus tard." });
+        setTimeout(() => setAiToast(null), 8000);
+      }
+    };
+    setTimeout(poll, 3000);
   };
 
   const handleAutoBundles = async () => {

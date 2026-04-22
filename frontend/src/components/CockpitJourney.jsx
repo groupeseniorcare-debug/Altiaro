@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   CheckCircle, Circle, ArrowRight, CurrencyEur, ChartLineUp, Package, Stack,
-  Sparkle, ShieldCheck, PaintBrush, Target, ClipboardText, Rocket,
+  Sparkle, ShieldCheck, PaintBrush, Target, ClipboardText, Rocket, Warning,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 
@@ -15,21 +15,32 @@ export default function CockpitJourney({ site, onRefresh }) {
   const [forecast, setForecast] = useState(null);
   const [upsells, setUpsells] = useState(null);
   const [qa, setQa] = useState(null);
+  const [llmStatus, setLlmStatus] = useState("ok");
+  const [clearingLlm, setClearingLlm] = useState(false);
 
   const load = useCallback(async () => {
-    const [p, f, u, q] = await Promise.all([
+    const [p, f, u, q, h] = await Promise.all([
       apiCall(() => api.get(`/sites/${site.id}/pricing-analysis`)),
       apiCall(() => api.get(`/sites/${site.id}/financial-forecast`)),
       apiCall(() => api.get(`/sites/${site.id}/upsell-recommendations`)),
       apiCall(() => api.get(`/sites/${site.id}/qa-audit`)),
+      apiCall(() => api.get(`/platform/llm-status`)),
     ]);
     setPricing(p.data && p.data.generated_at ? p.data : null);
     setForecast(f.data && f.data.generated_at ? f.data : null);
     setUpsells(u.data && u.data.generated_at ? u.data : null);
     setQa(q.data || null);
+    setLlmStatus(h.data?.status || "ok");
   }, [site.id]);
 
   useEffect(() => { load(); }, [load]);
+
+  const clearLlmFlag = async () => {
+    setClearingLlm(true);
+    await apiCall(() => api.post(`/platform/llm-status/clear`));
+    setClearingLlm(false);
+    setLlmStatus("ok");
+  };
 
   const products = site.products_count || 0;
   const hasBrand = !!(site.design?.brand?.name || site.name);
@@ -140,6 +151,29 @@ export default function CockpitJourney({ site, onRefresh }) {
 
   return (
     <div className="bg-white border border-neutral-200 rounded-2xl p-6" data-testid="cockpit-journey">
+      {llmStatus === "budget_exhausted" && (
+        <div
+          className="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3"
+          data-testid="llm-budget-banner"
+        >
+          <Warning size={20} weight="fill" className="text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 text-sm">
+            <div className="font-semibold text-red-900 mb-0.5">Budget IA épuisé</div>
+            <div className="text-red-700 leading-relaxed">
+              Toutes les actions IA (analyse pricing, design, upsells, enrichissement produits) sont désactivées.
+              Recharge ton Universal Key depuis <strong>Profile → Universal Key → Add Balance</strong> sur la plateforme Emergent, puis clique « J'ai rechargé » ci-contre.
+            </div>
+          </div>
+          <button
+            onClick={clearLlmFlag}
+            disabled={clearingLlm}
+            data-testid="clear-llm-banner"
+            className="h-9 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium disabled:opacity-60 whitespace-nowrap"
+          >
+            {clearingLlm ? "…" : "J'ai rechargé"}
+          </button>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
         <div>
           <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-1 flex items-center gap-2">

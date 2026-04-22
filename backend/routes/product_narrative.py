@@ -43,10 +43,12 @@ def _pick_text(val, lang: str = "fr") -> str:
     return str(val or "")
 
 
-async def _call_claude_json(system: str, user: str, timeout: int = 90) -> Optional[dict]:
+async def _call_claude_json(system: str, user: str, timeout: int = 90) -> tuple[Optional[dict], Optional[str]]:
+    """Returns (result, error_code).
+    error_code values: 'no_key' | 'budget_exceeded' | 'timeout' | 'invalid_json' | 'upstream' | None (success)"""
     if not EMERGENT_LLM_KEY:
         logger.warning("No EMERGENT_LLM_KEY — narrative enrichment skipped")
-        return None
+        return None, "no_key"
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
         chat = (
@@ -59,13 +61,30 @@ async def _call_claude_json(system: str, user: str, timeout: int = 90) -> Option
         )
         raw = await asyncio.wait_for(chat.send_message(UserMessage(text=user)), timeout=timeout)
         text = raw if isinstance(raw, str) else str(raw)
-        return json.loads(_strip_json_fence(text))
-    except (asyncio.TimeoutError, json.JSONDecodeError) as e:
-        logger.error(f"Narrative Claude call failed: {e}")
-        return None
-    except Exception:
+        try:
+            return json.loads(_strip_json_fence(text)), None
+        except json.JSONDecodeError:
+            logger.error(f"Narrative Claude returned invalid JSON: {text[:300]}")
+            return None, "invalid_json"
+    except asyncio.TimeoutError:
+        return None, "timeout"
+    except Exception as e:
+        msg = str(e)
+        if "Budget has been exceeded" in msg or ("budget" in msg.lower() and "exceeded" in msg.lower()):
+            logger.warning("Narrative Claude: LLM budget exhausted")
+            # Record a platform-level health flag for the UI banner
+            try:
+                await db.platform_health.update_one(
+                    {"key": "llm"},
+                    {"$set": {"key": "llm", "status": "budget_exhausted",
+                              "last_error_at": datetime.now(timezone.utc).isoformat()}},
+                    upsert=True,
+                )
+            except Exception:
+                pass
+            return None, "budget_exceeded"
         logger.exception("Narrative Claude unexpected error")
-        return None
+        return None, "upstream"
 
 
 async def enrich_product_narrative(product_id: str, force: bool = False) -> dict:
@@ -204,9 +223,11 @@ RÈGLES DURES :
 - Jamais de "nos chers seniors" ni "personnes âgées" (dire "seniors").
 - Français naturel, niveau Le Monde / Figaro."""
 
-    data = await _call_claude_json(system, user)
+    data, err = await _call_claude_json(system, user)
+    if err == "budget_exceeded":
+        return {"status": "llm_budget_exceeded", "product_id": product_id}
     if not data or not isinstance(data, dict):
-        return {"status": "llm_failed", "product_id": product_id}
+        return {"status": "llm_failed", "product_id": product_id, "error_code": err}
 
     seo_data = data.get("seo") or {}
     seo = {
@@ -279,12 +300,66 @@ class EnrichBulkInput(BaseModel):
 
 @router.post("/products/{product_id}/enrich-narrative")
 async def enrich_one(product_id: str, force: bool = False, user=Depends(get_current_user)):
-    result = await enrich_product_narrative(product_id, force=force)
-    if result.get("status") == "not_found":
+    """Async job pattern — returns immediately with a job_id.
+    Client polls GET /products/{id}/enrich-narrative/status.
+    Bypasses the 60 s ingress timeout for Claude calls."""
+    product = await db.products.find_one({"id": product_id}, {"_id": 0, "site_id": 1})
+    if not product:
         raise HTTPException(404, "Produit introuvable")
-    if result.get("status") == "llm_failed":
-        raise HTTPException(502, "Échec de l'enrichissement IA (budget ou timeout). Réessayez.")
-    return result
+
+    job_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    await db.narrative_jobs.insert_one({
+        "id": job_id,
+        "product_id": product_id,
+        "site_id": product.get("site_id"),
+        "user_id": user.get("id"),
+        "status": "running",
+        "created_at": now,
+    })
+
+    async def _run():
+        try:
+            result = await enrich_product_narrative(product_id, force=force)
+            status = result.get("status")
+            if status == "ok":
+                await db.narrative_jobs.update_one(
+                    {"id": job_id},
+                    {"$set": {"status": "done", "finished_at": datetime.now(timezone.utc).isoformat()}},
+                )
+            elif status == "llm_budget_exceeded":
+                await db.narrative_jobs.update_one(
+                    {"id": job_id},
+                    {"$set": {"status": "failed",
+                              "error": "Budget Emergent LLM Key épuisé. Recharge la clé depuis Profile → Universal Key → Add Balance.",
+                              "finished_at": datetime.now(timezone.utc).isoformat()}},
+                )
+            else:
+                await db.narrative_jobs.update_one(
+                    {"id": job_id},
+                    {"$set": {"status": "failed",
+                              "error": f"Échec IA ({status}). Réessayez dans 1 min.",
+                              "finished_at": datetime.now(timezone.utc).isoformat()}},
+                )
+        except Exception as e:
+            logger.exception("Narrative job failed")
+            await db.narrative_jobs.update_one(
+                {"id": job_id},
+                {"$set": {"status": "failed", "error": str(e)[:300],
+                          "finished_at": datetime.now(timezone.utc).isoformat()}},
+            )
+
+    asyncio.create_task(_run())
+    return {"ok": True, "job_id": job_id, "status": "running"}
+
+
+@router.get("/products/{product_id}/enrich-narrative/status")
+async def enrich_status(product_id: str, user=Depends(get_current_user)):
+    """Latest narrative job status for a product."""
+    job = await db.narrative_jobs.find_one(
+        {"product_id": product_id}, {"_id": 0}, sort=[("created_at", -1)]
+    )
+    return job or {"status": "idle"}
 
 
 @router.post("/sites/{site_id}/products/enrich-narratives")

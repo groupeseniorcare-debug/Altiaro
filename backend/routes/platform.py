@@ -63,3 +63,36 @@ async def platform_policy_public():
         "customer_service": p["customer_service"],
     }
 
+
+
+@router.get("/llm-status")
+async def llm_status():
+    """Returns the current LLM (Emergent Key) health status.
+    Used by the Cockpit to show a banner when the key has run out of budget.
+    Reads from `platform_health.llm` updated by any LLM route that hits 402.
+    """
+    from deps import db
+    from datetime import datetime, timezone, timedelta
+    doc = await db.platform_health.find_one({"key": "llm"}, {"_id": 0}) or {}
+    status = doc.get("status") or "ok"
+    last_err = doc.get("last_error_at")
+    # Auto-clear stale flag after 2h — manual recheck will re-flip if still broken
+    if status == "budget_exhausted" and last_err:
+        try:
+            ts = datetime.fromisoformat(last_err.replace("Z", "+00:00"))
+            if datetime.now(timezone.utc) - ts > timedelta(hours=2):
+                status = "ok"
+        except (ValueError, TypeError):
+            pass
+    return {"status": status, "last_error_at": last_err}
+
+
+@router.post("/llm-status/clear")
+async def llm_status_clear():
+    """Clear the LLM error flag — called when user confirms they've recharged the key."""
+    from deps import db
+    await db.platform_health.update_one(
+        {"key": "llm"}, {"$set": {"key": "llm", "status": "ok", "last_error_at": None}},
+        upsert=True,
+    )
+    return {"ok": True, "status": "ok"}

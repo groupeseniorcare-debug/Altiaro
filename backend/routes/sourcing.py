@@ -9,9 +9,11 @@ Endpoints:
 - POST /api/sites/{id}/sourcing/import      → import a product into site catalog
 """
 from __future__ import annotations
+import asyncio
 import hmac
 import hashlib
 import os
+import re as _re
 import time
 import uuid
 from datetime import datetime, timezone
@@ -98,12 +100,51 @@ async def _cj_search(keyword: str, page: int = 1, size: int = 20) -> list:
             "title": it.get("productNameEn") or it.get("productName") or "",
             "image": it.get("productImage") or (it.get("productImageSet") or [None])[0],
             "price_usd": sell,
-            "cost_usd": sell or ship,  # sellPrice est le coût fournisseur CJ
+            "cost_usd": sell,
+            "shipping_usd": ship,
             "supplier_url": f"https://cjdropshipping.com/product/{it.get('pid','')}",
             "sku": it.get("productSku") or "",
             "category": it.get("categoryName") or "",
         })
     return out
+
+
+async def _translate_keyword_fr_to_en(keyword: str) -> Optional[str]:
+    """Translate a French search keyword to English for CJ/AliExpress catalogs.
+    Returns None if already ASCII-only English or if Claude fails.
+    Uses a small cache and a fast prompt."""
+    # ASCII-only heuristic: looks like it's already English, skip
+    if all(ord(c) < 128 for c in keyword) and not any(w in keyword.lower() for w in [
+        "fauteuil", "releveur", "pilulier", "loupe", "canne", "déambulateur", "marche",
+        "senior", "aide", "audition", "confort", "dos", "coussin", "orthopédique",
+        "domicile", "salle", "bain", "siège"
+    ]):
+        return None
+    from deps import EMERGENT_LLM_KEY
+    if not EMERGENT_LLM_KEY:
+        return None
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"kw-trans-{uuid.uuid4().hex[:6]}",
+            system_message=(
+                "You translate French e-commerce search keywords to English. "
+                "Output ONLY the English keyword, 2-5 words, no punctuation, no quotes. "
+                "Use terms that appear in AliExpress/CJ Dropshipping product titles."
+            ),
+        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+        raw = await asyncio.wait_for(
+            chat.send_message(UserMessage(text=f"Translate: {keyword}")),
+            timeout=10,
+        )
+        en = (raw if isinstance(raw, str) else str(raw)).strip().strip('"').strip("'").lower()
+        # Basic sanity check
+        if 0 < len(en) < 100 and not en.startswith("i "):
+            return en
+    except Exception:
+        pass
+    return None
 
 
 # ============= ALIEXPRESS AFFILIATE ============= #
@@ -204,24 +245,28 @@ async def search(data: SearchInput, user: dict = Depends(get_current_user)):
     kw = data.keyword.strip()
     if not kw:
         raise HTTPException(400, "Mot-clé requis")
+    # Auto-translate FR → EN for CJ/AliExpress catalogs (both are English-indexed)
+    en_kw = await _translate_keyword_fr_to_en(kw)
+    effective_kw = en_kw or kw
     want = set(data.providers or ["cj", "aliexpress"])
     results = []
     errors = []
     if "cj" in want and CJ_API_KEY:
         try:
-            results.extend(await _cj_search(kw, data.page, data.size))
+            results.extend(await _cj_search(effective_kw, data.page, data.size))
         except HTTPException as e:
             errors.append({"provider": "cj", "detail": e.detail})
         except Exception as e:
             errors.append({"provider": "cj", "detail": str(e)[:200]})
     if "aliexpress" in want and AE_APP_KEY and AE_APP_SECRET:
         try:
-            results.extend(await _ae_search(kw, data.page, data.size, data.country))
+            results.extend(await _ae_search(effective_kw, data.page, data.size, data.country))
         except HTTPException as e:
             errors.append({"provider": "aliexpress", "detail": e.detail})
         except Exception as e:
             errors.append({"provider": "aliexpress", "detail": str(e)[:200]})
     return {"count": len(results), "results": results, "errors": errors,
+            "translated_keyword": en_kw or None,
             "providers_available": {"cj": bool(CJ_API_KEY),
                                     "aliexpress": bool(AE_APP_KEY and AE_APP_SECRET)}}
 
@@ -345,7 +390,6 @@ async def import_product(site_id: str, data: ImportInput, user: dict = Depends(g
             extra_images = [i for i in imgs if isinstance(i, str)][:5]
 
     # Strip HTML from CJ description
-    import re as _re
     if raw_desc:
         raw_desc = _re.sub(r"<[^>]+>", " ", raw_desc)
         raw_desc = _re.sub(r"\s+", " ", raw_desc).strip()[:3000]
@@ -393,3 +437,106 @@ async def import_product(site_id: str, data: ImportInput, user: dict = Depends(g
     await db.products.insert_one(dict(doc))
     doc.pop("_id", None)
     return {"ok": True, "product": doc}
+
+
+
+# =====================================================================
+# IMPORT BY URL — paste a CJ or AliExpress product URL
+# =====================================================================
+class ImportUrlInput(BaseModel):
+    url: str
+
+
+def _parse_provider_url(url: str) -> tuple[str, str]:
+    """Extract (provider, product_id) from a CJ or AliExpress URL.
+    Raises HTTPException if unrecognized."""
+    u = url.strip()
+    # CJ: https://cjdropshipping.com/product/xxx-{pid}.html or /product/{uuid}
+    m = _re.search(r"cjdropshipping\.com/product/([A-Za-z0-9\-]{8,})(?:\.html|$|\?)", u)
+    if m:
+        return "cj", m.group(1)
+    # AliExpress: /item/{pid}.html or /i/{pid}.html or aliexpress.*//item/{pid}
+    m = _re.search(r"aliexpress\.[a-z.]+/(?:item|i)/(\d{6,})", u)
+    if m:
+        return "aliexpress", m.group(1)
+    # AliExpress mobile / a.aliexpress.com/_{pid}
+    m = _re.search(r"a\.aliexpress\.com/_[A-Za-z0-9]+", u)
+    if m:
+        raise HTTPException(400, "Lien AliExpress court non supporté. Ouvre le lien et copie l'URL complète (avec /item/…).")
+    raise HTTPException(400, "URL non reconnue. Formats acceptés : https://cjdropshipping.com/product/… ou https://www.aliexpress.com/item/…")
+
+
+@router.post("/sites/{site_id}/sourcing/import-by-url")
+async def import_by_url(site_id: str, data: ImportUrlInput, user: dict = Depends(get_current_user)):
+    """Import a product directly from its provider URL (no search needed)."""
+    await _check_site_access(site_id, user)
+    provider, product_id = _parse_provider_url(data.url)
+
+    # Load product meta from the provider
+    title = ""
+    image = ""
+    cost_usd = 0.0
+    sku = ""
+
+    if provider == "cj":
+        detail = await _cj_product_detail(product_id)
+        if not detail:
+            raise HTTPException(404, "Produit CJ introuvable. Vérifie l'URL ou ton accès CJ.")
+        title = detail.get("productNameEn") or detail.get("productName") or ""
+        imgs = detail.get("productImageSet") or detail.get("productImages") or []
+        if isinstance(imgs, list) and imgs:
+            image = imgs[0] if isinstance(imgs[0], str) else ""
+        sku = detail.get("productSku") or ""
+        # Price: `sellPrice` at the top level
+        sell = detail.get("sellPrice")
+        if sell is not None:
+            s = str(sell).split("--")[0].split("~")[0].replace("$", "").replace("US", "").strip()
+            try:
+                cost_usd = float(s)
+            except (ValueError, TypeError):
+                cost_usd = 0.0
+    elif provider == "aliexpress":
+        if not (AE_APP_KEY and AE_APP_SECRET):
+            raise HTTPException(503, "AliExpress Affiliate non configuré.")
+        try:
+            resp = await _ae_call(
+                "aliexpress.affiliate.productdetail.get",
+                {"product_ids": product_id, "target_currency": "USD", "target_language": "EN",
+                 "tracking_id": AE_TRACKING_ID or "default"},
+            )
+            items = (((resp or {}).get("aliexpress_affiliate_productdetail_get_response") or {})
+                     .get("resp_result") or {}).get("result") or {}
+            prods = (items.get("products") or {}).get("product") or []
+            if prods:
+                p = prods[0]
+                title = p.get("product_title") or ""
+                image = p.get("product_main_image_url") or ""
+                try:
+                    cost_usd = float(p.get("target_sale_price") or p.get("sale_price") or 0)
+                except (ValueError, TypeError):
+                    cost_usd = 0.0
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(502, f"AliExpress indisponible : {str(e)[:180]}")
+
+    if not title:
+        raise HTTPException(404, "Impossible de lire le produit depuis cette URL.")
+
+    # Default margin ×2.5 (concepteur ajustera ensuite son prix de vente)
+    rate = 0.92 if provider == "cj" else 1.0
+    cost_eur = round(cost_usd * rate, 2)
+    price_eur = round(cost_eur * 2.5, 2) if cost_eur > 0 else 0.0
+
+    import_payload = ImportInput(
+        provider=provider,
+        product_id=product_id,
+        title=title,
+        image=image,
+        price_eur=price_eur,
+        cost_eur=cost_eur,
+        supplier_url=data.url,
+        sku=sku,
+    )
+    # Delegate to the existing importer (handles translation + save)
+    return await import_product(site_id, import_payload, user)
