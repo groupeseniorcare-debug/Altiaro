@@ -43,6 +43,9 @@ CALLBACK_URL = os.environ.get(
 )
 
 AUTHORIZE_URL = "https://api-sg.aliexpress.com/oauth/authorize"
+# Standard OAuth2 token endpoint (preferred) — takes form-urlencoded with client_id+secret+code
+OAUTH_TOKEN_URL = "https://api-sg.aliexpress.com/oauth/token"
+# Fallback : signed REST endpoint (used if OAuth2 endpoint returns error)
 TOKEN_URL = "https://api-sg.aliexpress.com/rest/auth/token/create"
 REFRESH_URL = "https://api-sg.aliexpress.com/rest/auth/token/refresh"
 SYNC_API_URL = "https://api-sg.aliexpress.com/sync"
@@ -190,6 +193,33 @@ async def _finalize_oauth(site_id: str, code: str) -> HTMLResponse:
         logger.exception("[aliexpress] token exchange failed")
         return HTMLResponse(_page(title="Échec de la connexion", body=f"Erreur lors de l'échange du code : {str(e)[:200]}", ok=False))
 
+    # AliExpress may wrap the response under varying keys — unwrap defensively
+    for wrapper in ("aliexpress_system_oauth2_token", "auth_token_create_response", "result", "data"):
+        if wrapper in token_payload and isinstance(token_payload[wrapper], dict):
+            inner = token_payload[wrapper]
+            # Merge: outer keys stay, inner overrides
+            merged = {**token_payload, **inner}
+            token_payload = merged
+            break
+
+    access_token = token_payload.get("access_token")
+    if not access_token:
+        logger.error(f"[aliexpress] token response missing access_token — raw keys: {list(token_payload.keys())}")
+        try:
+            await db.aliexpress_oauth_callbacks.insert_one({
+                "received_at": datetime.now(timezone.utc),
+                "stage": "token_exchange_missing_access_token",
+                "raw_response_keys": list(token_payload.keys()),
+                "raw_response_preview": {k: str(v)[:200] for k, v in token_payload.items()},
+            })
+        except Exception:
+            pass
+        return HTMLResponse(_page(
+            title="Réponse AliExpress incomplète",
+            body=f"La réponse AliExpress ne contient pas d'access_token. Clés reçues : <code>{', '.join(token_payload.keys())}</code>. Cette info a été loggée — je peux corriger en 2 min.",
+            ok=False,
+        ))
+
     now = datetime.now(timezone.utc)
     expires_in = int(token_payload.get("expires_in") or 172800)
     refresh_in = int(token_payload.get("refresh_token_valid_time") or token_payload.get("refresh_expires_in") or 365 * 86400)
@@ -199,12 +229,12 @@ async def _finalize_oauth(site_id: str, code: str) -> HTMLResponse:
     await _set_platform_settings({
         "key": "aliexpress",
         "connected": True,
-        "access_token": token_payload.get("access_token"),
+        "access_token": access_token,
         "refresh_token": token_payload.get("refresh_token"),
         "expires_at": expires_at.isoformat(),
         "refresh_expires_at": refresh_at.isoformat(),
         "user_id": token_payload.get("user_id") or token_payload.get("account_id") or "",
-        "user_nick": token_payload.get("user_nick") or token_payload.get("seller_id") or "",
+        "user_nick": token_payload.get("user_nick") or token_payload.get("seller_id") or token_payload.get("account") or "",
         "connected_at": now.isoformat(),
         "connected_by_site_id": site_id,
         "last_refreshed_at": None,
@@ -275,7 +305,44 @@ async def get_authorize_url_admin(request: Request, user=Depends(get_current_use
 # Token helpers (platform-level)
 # =====================================================================
 async def _exchange_code_for_token(code: str) -> dict:
-    """Exchange OAuth code → access_token."""
+    """
+    Exchange OAuth code → access_token.
+    Try standard OAuth2 endpoint first (simpler, no signature). Fall back to
+    the signed REST endpoint if it fails.
+    """
+    # Attempt 1 : standard OAuth2 token endpoint
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.post(
+                OAUTH_TOKEN_URL,
+                data={
+                    "grant_type": "authorization_code",
+                    "client_id": APP_KEY,
+                    "client_secret": APP_SECRET,
+                    "code": code,
+                    "redirect_uri": CALLBACK_URL,
+                },
+            )
+        logger.info(f"[aliexpress] OAuth2 token endpoint → HTTP {r.status_code}")
+        data = r.json()
+        # Persist the raw response for debugging
+        try:
+            await db.aliexpress_oauth_callbacks.insert_one({
+                "received_at": datetime.now(timezone.utc),
+                "stage": "oauth2_token_response",
+                "http_status": r.status_code,
+                "raw_keys": list(data.keys()) if isinstance(data, dict) else [],
+                "raw_preview": {k: str(v)[:200] for k, v in data.items()} if isinstance(data, dict) else str(data)[:500],
+            })
+        except Exception:
+            pass
+        if isinstance(data, dict) and data.get("access_token"):
+            return data
+        logger.warning(f"[aliexpress] OAuth2 endpoint did not return access_token, keys={list(data.keys()) if isinstance(data,dict) else 'non-dict'} — falling back to REST")
+    except Exception:
+        logger.exception("[aliexpress] OAuth2 token endpoint failed — falling back to REST")
+
+    # Attempt 2 : signed REST endpoint (legacy / some accounts)
     params = {
         "code": code,
         "uuid": uuid.uuid4().hex,
