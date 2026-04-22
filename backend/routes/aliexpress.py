@@ -43,11 +43,11 @@ CALLBACK_URL = os.environ.get(
 )
 
 AUTHORIZE_URL = "https://api-sg.aliexpress.com/oauth/authorize"
-# Standard OAuth2 token endpoint (preferred) — takes form-urlencoded with client_id+secret+code
-OAUTH_TOKEN_URL = "https://api-sg.aliexpress.com/oauth/token"
-# Fallback : signed REST endpoint (used if OAuth2 endpoint returns error)
+# Standard OAuth2 token endpoint — separate domain from the API
+OAUTH_TOKEN_URL = "https://oauth.aliexpress.com/token"
+# Fallback : signed REST endpoint (rarely needed since OAuth2 is canonical)
 TOKEN_URL = "https://api-sg.aliexpress.com/rest/auth/token/create"
-REFRESH_URL = "https://api-sg.aliexpress.com/rest/auth/token/refresh"
+REFRESH_URL = "https://oauth.aliexpress.com/token"
 SYNC_API_URL = "https://api-sg.aliexpress.com/sync"
 
 
@@ -282,6 +282,21 @@ async def aliexpress_disconnect_admin(user=Depends(get_current_user)):
     return {"status": "ok"}
 
 
+@router.get("/admin/aliexpress/debug")
+async def aliexpress_debug(user=Depends(get_current_user)):
+    """Last OAuth callbacks + current platform settings (tokens REDACTED)."""
+    _require_admin(user)
+    pl = await _get_platform_settings()
+    safe_pl = {k: v for k, v in (pl or {}).items() if k not in {"access_token", "refresh_token"}}
+    safe_pl["has_access_token"] = bool((pl or {}).get("access_token"))
+    safe_pl["has_refresh_token"] = bool((pl or {}).get("refresh_token"))
+    cbs = await db.aliexpress_oauth_callbacks.find({}, {"_id": 0, "code": 0}).sort("received_at", -1).to_list(10)
+    for cb in cbs:
+        if isinstance(cb.get("received_at"), datetime):
+            cb["received_at"] = cb["received_at"].isoformat()
+    return {"platform_settings": safe_pl, "callbacks": cbs}
+
+
 @router.get("/admin/aliexpress/authorize-url")
 async def get_authorize_url_admin(request: Request, user=Depends(get_current_user)):
     """Admin-triggered OAuth — initiated from /admin/integrations page."""
@@ -310,7 +325,7 @@ async def _exchange_code_for_token(code: str) -> dict:
     Try standard OAuth2 endpoint first (simpler, no signature). Fall back to
     the signed REST endpoint if it fails.
     """
-    # Attempt 1 : standard OAuth2 token endpoint
+    # Attempt 1 : standard OAuth2 token endpoint (oauth.aliexpress.com/token)
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             r = await client.post(
@@ -321,6 +336,7 @@ async def _exchange_code_for_token(code: str) -> dict:
                     "client_secret": APP_SECRET,
                     "code": code,
                     "redirect_uri": CALLBACK_URL,
+                    "sp": "ae",
                 },
             )
         logger.info(f"[aliexpress] OAuth2 token endpoint → HTTP {r.status_code}")
@@ -355,7 +371,22 @@ async def _refresh_access_token() -> dict:
     refresh_token = pl.get("refresh_token")
     if not refresh_token:
         raise HTTPException(401, "Plateforme non connectée à AliExpress.")
-    resp = await _signed_post(REFRESH_URL, {"refresh_token": refresh_token}, need_access_token=False)
+    # Standard OAuth2 refresh
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        r = await client.post(
+            REFRESH_URL,
+            data={
+                "grant_type": "refresh_token",
+                "client_id": APP_KEY,
+                "client_secret": APP_SECRET,
+                "refresh_token": refresh_token,
+                "sp": "ae",
+            },
+        )
+        r.raise_for_status()
+        resp = r.json()
+    if not resp.get("access_token"):
+        raise HTTPException(502, f"AliExpress refresh failed : {resp}")
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(seconds=int(resp.get("expires_in") or 172800))
     await _set_platform_settings({
