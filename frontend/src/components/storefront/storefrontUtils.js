@@ -6,7 +6,7 @@ import {
   ShieldCheck, Truck, Clock, Heart, Star, Leaf, Package, Headset,
 } from "@phosphor-icons/react";
 
-export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+export const BACKEND_URL = "";
 
 // Icon name (from Prompt Studio schema) → Phosphor component
 export const BENEFIT_ICON = {

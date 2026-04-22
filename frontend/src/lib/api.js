@@ -1,6 +1,15 @@
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+// Runtime-resolved backend origin — avoids CORS when the frontend is served
+// from a custom domain (e.g. altiaro.com) different from the build-time
+// REACT_APP_BACKEND_URL baked by Webpack.
+export const BACKEND_URL =
+  (typeof window !== "undefined" &&
+   window.location &&
+   window.location.origin &&
+   !window.location.origin.startsWith("http://localhost"))
+    ? window.location.origin
+    : (process.env.REACT_APP_BACKEND_URL || "");
 
 export const api = axios.create({
   baseURL: `${BACKEND_URL}/api`,

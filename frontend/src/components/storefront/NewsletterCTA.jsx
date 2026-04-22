@@ -3,7 +3,7 @@ import { Envelope, ArrowRight, CheckCircle } from "@phosphor-icons/react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
 
-const BACKEND = process.env.REACT_APP_BACKEND_URL;
+const BACKEND = "";
 
 /**
  * Newsletter signup CTA before footer.

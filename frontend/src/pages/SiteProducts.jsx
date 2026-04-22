@@ -23,7 +23,7 @@ import {
   Package,
 } from "@phosphor-icons/react";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = "";
 
 const LANGS = [
   { code: "fr", label: "FR 🇫🇷" },

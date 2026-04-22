@@ -4,7 +4,7 @@ import axios from "axios";
 import StorefrontLayout, { useSiteData } from "../components/StorefrontLayout";
 import { MagnifyingGlass } from "@phosphor-icons/react";
 
-const BACKEND = process.env.REACT_APP_BACKEND_URL;
+const BACKEND = "";
 
 export default function StorefrontSearch() {
   const { siteId } = useParams();

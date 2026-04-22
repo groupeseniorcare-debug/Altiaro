@@ -9,7 +9,7 @@ import OrderTimeline from "../components/storefront/OrderTimeline";
 import { getToken, authHeaders } from "../lib/customerAuth";
 import { pickLang } from "../lib/i18n";
 
-const BACKEND = process.env.REACT_APP_BACKEND_URL;
+const BACKEND = "";
 
 const STATUS_BADGE = {
   pending_payment: { label: "En attente de paiement", color: "bg-amber-100 text-amber-800" },

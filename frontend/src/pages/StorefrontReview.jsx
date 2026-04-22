@@ -5,7 +5,7 @@ import { Star, CheckCircle, Warning } from "@phosphor-icons/react";
 import StorefrontLayout, { fetchPublicSite } from "../components/StorefrontLayout";
 import SEOHead from "../components/SEOHead";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = "";
 
 export default function StorefrontReview() {
   const { siteId, token } = useParams();

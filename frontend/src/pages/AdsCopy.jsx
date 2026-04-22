@@ -14,7 +14,7 @@ import {
   Warning,
 } from "@phosphor-icons/react";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = "";
 
 const COUNTRIES = [
   { code: "FR", name: "France", flag: "🇫🇷", lang: "fr" },

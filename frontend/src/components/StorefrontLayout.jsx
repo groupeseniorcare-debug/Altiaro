@@ -11,7 +11,7 @@ import {
   CreditCard, EnvelopeSimple, MapPin, CaretRight,
 } from "@phosphor-icons/react";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = "";
 
 /* ------- Nav items (pages naturelles du template) ------- */
 const navItems = (shopRoot) => [

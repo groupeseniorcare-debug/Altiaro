@@ -7,7 +7,7 @@ import SEOHead from "../components/SEOHead";
 import { pickLang } from "../lib/i18n";
 import { buildHreflangs, designAccents } from "../components/storefront/storefrontUtils";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = "";
 
 /* Same fallback posts as BlogTeaser, full body included */
 const FALLBACK_POSTS = [

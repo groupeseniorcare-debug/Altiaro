@@ -63,7 +63,7 @@ export default function Orders() {
   const handleExport = () => {
     const params = new URLSearchParams();
     if (filters.status) params.set("status", filters.status);
-    const url = `${process.env.REACT_APP_BACKEND_URL}/api/admin/orders/export.csv?${params.toString()}`;
+    const url = `/api/admin/orders/export.csv?${params.toString()}`;
     window.open(url, "_blank");
   };
 

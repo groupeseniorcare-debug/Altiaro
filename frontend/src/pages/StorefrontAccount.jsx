@@ -5,7 +5,7 @@ import { getToken, getCustomer, clearSession, authHeaders } from "../lib/custome
 import StorefrontLayout, { useSiteData } from "../components/StorefrontLayout";
 import { User, Receipt, SignOut, Package, CaretRight, FunnelSimple } from "@phosphor-icons/react";
 
-const BACKEND = process.env.REACT_APP_BACKEND_URL;
+const BACKEND = "";
 
 const STATUS_FILTERS = [
   { key: "all", label: "Toutes" },

@@ -5,7 +5,7 @@ import { MagnifyingGlass, ShieldCheck, Warning } from "@phosphor-icons/react";
 import StorefrontLayout, { useSiteData } from "../components/StorefrontLayout";
 import OrderTimeline from "../components/storefront/OrderTimeline";
 
-const BACKEND = process.env.REACT_APP_BACKEND_URL;
+const BACKEND = "";
 
 const STATUS_LABEL = {
   pending_payment: "En attente de paiement",

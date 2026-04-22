@@ -409,7 +409,7 @@ export default function StepPanel({ step: initialStep, site, isAdmin, onClose, o
                     {step.deliverable_files.map((f, i) => (
                       <a
                         key={i}
-                        href={`${process.env.REACT_APP_BACKEND_URL}${f.url}`}
+                        href={`${f.url}`}
                         target="_blank"
                         rel="noreferrer"
                         className="flex items-center gap-2 p-2.5 rounded-lg bg-white border border-[#E7E5E4] hover:border-[#B84B31]/50 text-sm text-[#57534E] hover:text-[#1C1917] transition"

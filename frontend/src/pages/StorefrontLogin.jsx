@@ -4,7 +4,7 @@ import axios from "axios";
 import { setSession } from "../lib/customerAuth";
 import StorefrontLayout, { useSiteData } from "../components/StorefrontLayout";
 
-const BACKEND = process.env.REACT_APP_BACKEND_URL;
+const BACKEND = "";
 
 export default function StorefrontLogin() {
   const { siteId } = useParams();
