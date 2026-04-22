@@ -62,51 +62,84 @@ async def _cj_auth() -> str:
 
 
 async def _cj_search(keyword: str, page: int = 1, size: int = 20) -> list:
+    """Search CJ catalog. The public API does AND-substring match on productNameEn
+    and NOT fuzzy matching (the CJ website uses a different Elasticsearch endpoint
+    not exposed publicly). Strategy: try full phrase, then last 2 words, then last
+    word — fall through until we get results. Respect 1 QPS rate limit."""
     token = await _cj_auth()
-    async with httpx.AsyncClient(timeout=25) as c:
-        r = await c.get(f"{CJ_BASE}/product/list",
-                        params={"pageNum": page, "pageSize": size, "productNameEn": keyword},
-                        headers={"CJ-Access-Token": token})
-        if r.status_code != 200:
-            return []
-        items = (r.json().get("data") or {}).get("list") or []
 
     def _to_float(v) -> float:
-        """CJ renvoie parfois des prix 'range' ex '0.48 -- 0.67'. On prend le low."""
         if v is None:
             return 0.0
         s = str(v).strip()
         if not s:
             return 0.0
-        # Split sur -- / - / ~ / , / ' to ' → low price
         for sep in ("--", "~", " to ", ","):
             if sep in s:
                 s = s.split(sep, 1)[0].strip()
                 break
-        # enlève devise
         s = s.replace("$", "").replace("€", "").replace("US", "").strip()
         try:
             return float(s)
         except (ValueError, TypeError):
             return 0.0
 
-    out = []
-    for it in items:
-        sell = _to_float(it.get("sellPrice"))
-        ship = _to_float(it.get("cheapestShippingPrice"))
-        out.append({
-            "provider": "cj",
-            "product_id": str(it.get("pid") or it.get("productId") or ""),
-            "title": it.get("productNameEn") or it.get("productName") or "",
-            "image": it.get("productImage") or (it.get("productImageSet") or [None])[0],
-            "price_usd": sell,
-            "cost_usd": sell,
-            "shipping_usd": ship,
-            "supplier_url": f"https://cjdropshipping.com/product/{it.get('pid','')}",
-            "sku": it.get("productSku") or "",
-            "category": it.get("categoryName") or "",
-        })
-    return out
+    # Build progressively simpler query variants. The most specific product-type
+    # word is usually the last word ("electric lift chair" → "chair" is too generic,
+    # but "lift chair" captures the intent).
+    words = keyword.strip().split()
+    variants = []
+    if len(words) >= 3:
+        variants.append(keyword)
+        variants.append(" ".join(words[-2:]))   # e.g., "lift chair"
+    elif len(words) == 2:
+        variants.append(keyword)
+    else:
+        variants.append(keyword)
+    # Dedupe keeping order
+    seen = set()
+    variants = [v for v in variants if not (v.lower() in seen or seen.add(v.lower()))]
+
+    async with httpx.AsyncClient(timeout=25) as c:
+        for i, q in enumerate(variants):
+            if i > 0:
+                await asyncio.sleep(1.1)  # Respect CJ's 1 QPS throttle
+            r = await c.get(
+                f"{CJ_BASE}/product/list",
+                params={"pageNum": page, "pageSize": size, "productNameEn": q},
+                headers={"CJ-Access-Token": token},
+            )
+            if r.status_code == 429:
+                await asyncio.sleep(1.2)
+                r = await c.get(
+                    f"{CJ_BASE}/product/list",
+                    params={"pageNum": page, "pageSize": size, "productNameEn": q},
+                    headers={"CJ-Access-Token": token},
+                )
+            if r.status_code != 200:
+                continue
+            items = (r.json().get("data") or {}).get("list") or []
+            if items:
+                # Found results → return them
+                out = []
+                for it in items:
+                    sell = _to_float(it.get("sellPrice"))
+                    ship = _to_float(it.get("cheapestShippingPrice"))
+                    out.append({
+                        "provider": "cj",
+                        "product_id": str(it.get("pid") or it.get("productId") or ""),
+                        "title": it.get("productNameEn") or it.get("productName") or "",
+                        "image": it.get("productImage") or (it.get("productImageSet") or [None])[0],
+                        "price_usd": sell,
+                        "cost_usd": sell,
+                        "shipping_usd": ship,
+                        "supplier_url": f"https://cjdropshipping.com/product/{it.get('pid','')}",
+                        "sku": it.get("productSku") or "",
+                        "category": it.get("categoryName") or "",
+                        "_matched_query": q,
+                    })
+                return out
+    return []
 
 
 async def _translate_keyword_fr_to_en(keyword: str) -> Optional[str]:
@@ -129,9 +162,16 @@ async def _translate_keyword_fr_to_en(keyword: str) -> Optional[str]:
             api_key=EMERGENT_LLM_KEY,
             session_id=f"kw-trans-{uuid.uuid4().hex[:6]}",
             system_message=(
-                "You translate French e-commerce search keywords to English. "
-                "Output ONLY the English keyword, 2-5 words, no punctuation, no quotes. "
-                "Use terms that appear in AliExpress/CJ Dropshipping product titles."
+                "You translate French e-commerce search keywords to English for "
+                "dropshipping catalog search (CJ / AliExpress). "
+                "Output ONLY the English product type in 1-2 words (no adjectives, no filler). "
+                "Examples: "
+                "'fauteuil releveur' → 'lift chair' | "
+                "'pilulier électronique' → 'pill dispenser' | "
+                "'déambulateur' → 'walker' | "
+                "'loupe grossissante' → 'magnifier' | "
+                "'canne de marche' → 'walking cane'. "
+                "No punctuation, no quotes, lowercase."
             ),
         ).with_model("anthropic", "claude-sonnet-4-5-20250929")
         raw = await asyncio.wait_for(
