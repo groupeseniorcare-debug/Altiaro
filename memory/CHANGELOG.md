@@ -3,6 +3,26 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-22 · Launch Gate : garde-fou marge vs CPA
+
+- **Backend** : nouveau bloc `launch_gate` dans le forecast avec statut `ok | warning | blocked` basé sur le ratio `marge/commande HT / CPA`.
+  - `ok` : ratio ≥ 2× ET net par vente ≥ 30 € → feu vert
+  - `warning` : 1,5 ≤ ratio < 2 → lancement possible mais risqué
+  - `blocked` : ratio < 1,5 → stop, message explicite + liste d'actions ordonnées (remplacer produits à marge < 50%, monter prix de X €, ajouter upsells, pivoter niche)
+- **Endpoint `/journey/validate-step`** : bloque désormais la validation de `forecast` si `launch_gate.status == "blocked"` (HTTP 400 avec message détaillé).
+- **Frontend (`SiteForecast.jsx`)** :
+  - Bannière `LaunchGateBanner` en tête de page (vert / ambre / rouge) avec 3 KPI clés : Marge/commande HT · CPA · Net profit / vente (ratio + seuil min affiché).
+  - Bouton "Valider l'étape 4" (Rocket icon) affiché en bas uniquement si `gate.status !== "blocked"`.
+  - Badge "validé" sur la bannière une fois l'étape cochée.
+  - Liste numérotée "Comment débloquer" quand bloqué.
+- **Testing** :
+  - Cas réel (fauteuil 684€) → `status: ok`, marge 297€ vs CPA 80€, ratio 3.7×, net +217€. ✅
+  - Cas simulé faible marge (prix 150€, coût 130€) → `status: blocked`, marge -11€ vs CPA 80€. Actions générées : "Remplace les 1 produit(s) à marge <50%" + "Monte tes prix de +91 €/commande". ✅
+  - Tentative de validate-step sur cas bloqué → HTTP 400 avec message explicite. ✅
+  - Screenshot UI validé (bannière feu vert affichée).
+
+
+
 ## 2026-04-22 · Impulse-buy drawer panier + GA4 tracking enrichi
 
 - **Panneau "Offre exclusive"** dans le drawer panier (`CartDrawer.jsx`) :

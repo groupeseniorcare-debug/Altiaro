@@ -378,6 +378,70 @@ async def financial_forecast(site_id: str, body: ForecastInput, user=Depends(get
         else "risky"
     )
 
+    # --- 4.b Launch gate — THE critical safety check --------------------
+    # Per-order gross margin HT must cover the CPA (ads cost per acquisition)
+    # with a safety buffer. This prevents launching products where the ad
+    # cost eats the whole margin (e.g. fauteuils releveurs: 100€ margin vs 90€ CPA).
+    MIN_SAFETY_RATIO = 1.5  # margin/CPA < 1.5 = blocked
+    OK_SAFETY_RATIO = 2.0   # margin/CPA ≥ 2.0 = safe launch
+    real_conv = max(realistic_g["conversions"], 1)
+    per_order_margin_ht = (
+        realistic_g["revenue_ht_eur"] - realistic_g["cogs_eur"] - realistic_g["shipping_eur"]
+    ) / real_conv
+    per_order_cpa = realistic_g["cpa_real_eur"]
+    safety_ratio = per_order_margin_ht / per_order_cpa if per_order_cpa > 0 else 999
+
+    if safety_ratio >= OK_SAFETY_RATIO and per_order_margin_ht - per_order_cpa >= 30:
+        gate_status = "ok"
+        gate_message = (
+            f"Feu vert : ta marge par commande ({per_order_margin_ht:.0f} € HT) couvre "
+            f"{safety_ratio:.1f}× ton coût d'acquisition ({per_order_cpa:.0f} €). "
+            f"Tu gagnes ~{per_order_margin_ht - per_order_cpa:.0f} € net par vente."
+        )
+        gate_blocker = None
+    elif safety_ratio >= MIN_SAFETY_RATIO:
+        gate_status = "warning"
+        gate_message = (
+            f"Marge fine : {per_order_margin_ht:.0f} € HT de marge vs {per_order_cpa:.0f} € de CPA "
+            f"({safety_ratio:.1f}×). Ça passe mais le moindre CPC qui monte te fait basculer. "
+            f"Augmente tes prix, ajoute des upsells ou monte le budget pour baisser le CPA."
+        )
+        gate_blocker = None
+    else:
+        gate_status = "blocked"
+        gate_message = (
+            f"Stop : tu ne peux pas lancer ce projet. Ta marge brute par commande "
+            f"({per_order_margin_ht:.0f} € HT) est trop faible face à ton coût d'acquisition "
+            f"({per_order_cpa:.0f} €). Le moindre clic te fait perdre de l'argent."
+        )
+        actions = []
+        if low_margin_count := len([
+            p for p in main_products
+            if p.get("price") and p.get("cost_price_ht") and p["price"] > 0
+            and ((p["price"] - p["cost_price_ht"]) / p["price"]) < 0.50
+        ]):
+            actions.append(f"Remplace les {low_margin_count} produit(s) à marge <50%")
+        if not upsells or upsell_coverage_pct < 80:
+            actions.append("Ajoute des upsells (+25% panier moyen)")
+        if per_order_margin_ht < per_order_cpa:
+            actions.append(f"Monte tes prix d'au moins +{per_order_cpa - per_order_margin_ht:.0f} €/commande")
+        gate_blocker = {
+            "reason": "margin_below_cpa",
+            "actions": actions or ["Pivote sur une niche moins concurrentielle (CPC plus bas)"],
+        }
+
+    launch_gate = {
+        "status": gate_status,                                  # ok | warning | blocked
+        "per_order_margin_ht_eur": round(per_order_margin_ht, 2),
+        "per_order_cpa_eur": round(per_order_cpa, 2),
+        "per_order_net_profit_eur": round(per_order_margin_ht - per_order_cpa, 2),
+        "safety_ratio": round(safety_ratio, 2),
+        "min_safety_ratio_required": MIN_SAFETY_RATIO,
+        "ok_safety_ratio": OK_SAFETY_RATIO,
+        "message": gate_message,
+        "blocker": gate_blocker,
+    }
+
     # --- 5. Actionable insights -----------------------------------------
     insights = []
     low_margin_products = [
@@ -514,6 +578,7 @@ async def financial_forecast(site_id: str, body: ForecastInput, user=Depends(get
             "revenue_gain_if_avg_price_plus_10eur": sens_price_plus_10,
             "revenue_gain_if_daily_budget_doubled_eur": sens_double_budget,
         },
+        "launch_gate": launch_gate,
         "insights": insights,
     }
 
@@ -633,9 +698,28 @@ async def validate_journey_step(
     if body.step not in VALID_STEP_KEYS:
         raise HTTPException(400, f"Étape inconnue : {body.step}")
 
-    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "journey_validated": 1})
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "journey_validated": 1, "design.financial_forecast": 1})
     validated = set((site or {}).get("journey_validated") or [])
     if body.validated:
+        # Launch gate : block validation of "forecast" step if the realistic
+        # scenario cannot sustain the CPA (margin per order too thin).
+        if body.step == "forecast":
+            fc = ((site or {}).get("design") or {}).get("financial_forecast") or {}
+            gate = fc.get("launch_gate") or {}
+            if gate.get("status") == "blocked":
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Étape bloquée : marge par commande trop faible face au CPA. "
+                        + (gate.get("message") or "")
+                        + " Corrige tes prix, marges ou upsells avant de lancer."
+                    ),
+                )
+            if not fc.get("generated_at"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Calcule d'abord ton prévisionnel avant de valider cette étape.",
+                )
         validated.add(body.step)
     else:
         validated.discard(body.step)

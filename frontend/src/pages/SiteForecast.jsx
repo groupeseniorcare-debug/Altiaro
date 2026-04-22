@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft, ChartLineUp, Sparkle, ArrowClockwise, TrendUp, Warning, CheckCircle,
   Info, Globe, Lightbulb, ArrowUp, Question, Receipt, CaretDown, Calculator,
+  LockSimple, Rocket,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 
@@ -35,10 +36,16 @@ export default function SiteForecast() {
   const [concepteurShare, setConcepteurShare] = useState(15);
   const [activeScenario, setActiveScenario] = useState("realistic");
   const [showFormulas, setShowFormulas] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [isValidated, setIsValidated] = useState(false);
 
   useEffect(() => {
-    apiCall(() => api.get(`/sites/${siteId}/financial-forecast`)).then(({ data }) => {
-      if (data && data.generated_at) setForecast(data);
+    Promise.all([
+      apiCall(() => api.get(`/sites/${siteId}/financial-forecast`)),
+      apiCall(() => api.get(`/sites/${siteId}`)),
+    ]).then(([fc, s]) => {
+      if (fc.data && fc.data.generated_at) setForecast(fc.data);
+      setIsValidated((s.data?.journey_validated || []).includes("forecast"));
     });
   }, [siteId]);
 
@@ -58,6 +65,18 @@ export default function SiteForecast() {
 
   const verdict = forecast ? VERDICT_META[forecast.verdict] : null;
   const scen = forecast?.scenarios?.[activeScenario];
+  const gate = forecast?.launch_gate;
+
+  const validateStep = async () => {
+    if (!gate || gate.status === "blocked") return;
+    setValidating(true);
+    const { error } = await apiCall(() =>
+      api.post(`/sites/${siteId}/journey/validate-step`, { step: "forecast", validated: true })
+    );
+    setValidating(false);
+    if (error) { window.alert(error); return; }
+    setIsValidated(true);
+  };
 
   return (
     <div className="min-h-screen bg-[#FAF7F2]">
@@ -107,6 +126,11 @@ export default function SiteForecast() {
 
         {forecast && (
           <div className="space-y-6" data-testid="forecast-result">
+            {/* LAUNCH GATE — the critical safety check */}
+            {gate && (
+              <LaunchGateBanner gate={gate} isValidated={isValidated} />
+            )}
+
             {/* Verdict */}
             {verdict && (
               <div className={`rounded-2xl border p-5 ${verdict.bg} ${verdict.border} flex items-start gap-3`}>
@@ -434,6 +458,39 @@ export default function SiteForecast() {
             <div className="text-[11px] text-neutral-400 text-right">
               Généré le {new Date(forecast.generated_at).toLocaleString("fr-FR")}
             </div>
+
+            {/* Launch validation CTA — only if gate allows */}
+            {gate && gate.status !== "blocked" && !isValidated && (
+              <div className="bg-neutral-900 text-white rounded-2xl p-6 flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.2em] text-white/60 mb-1">
+                    Prêt à lancer ?
+                  </div>
+                  <div className="text-lg font-semibold" style={{ fontFamily: "'Fraunces', serif" }}>
+                    Valide l'étape 4 pour débloquer la suite du cockpit
+                  </div>
+                  <div className="text-sm text-white/70 mt-1 max-w-2xl">
+                    Tu pourras toujours recalculer ton prévisionnel plus tard si tu modifies ton catalogue ou tes upsells.
+                  </div>
+                </div>
+                <button
+                  onClick={validateStep}
+                  disabled={validating}
+                  data-testid="validate-forecast-btn"
+                  className="h-12 px-6 rounded-xl bg-white text-neutral-900 hover:bg-neutral-100 font-semibold text-sm flex items-center gap-2 disabled:opacity-60 transition"
+                >
+                  {validating
+                    ? <><ArrowClockwise size={16} className="animate-spin" /> Validation…</>
+                    : <><Rocket size={16} weight="fill" /> Valider l'étape 4</>}
+                </button>
+              </div>
+            )}
+            {isValidated && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-2 text-sm text-emerald-800" data-testid="forecast-validated-badge">
+                <CheckCircle size={16} weight="fill" className="text-emerald-600" />
+                Étape 4 validée · prochaine étape débloquée dans le cockpit
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -498,6 +555,78 @@ function Sensitivity({ label, value, hint }) {
         +{fmtEur(value)}
       </div>
       <div className="text-[10px] text-neutral-500 mt-1">{hint}</div>
+    </div>
+  );
+}
+
+function LaunchGateBanner({ gate, isValidated }) {
+  const META = {
+    ok:      { Icon: CheckCircle, bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-900", fill: "text-emerald-600", label: "Feu vert pour lancer" },
+    warning: { Icon: Warning, bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-900", fill: "text-amber-600", label: "Lancement possible mais risqué" },
+    blocked: { Icon: LockSimple, bg: "bg-rose-50", border: "border-rose-300", text: "text-rose-900", fill: "text-rose-600", label: "Lancement bloqué" },
+  };
+  const m = META[gate.status] || META.warning;
+  return (
+    <div className={`rounded-2xl border-2 p-5 ${m.bg} ${m.border}`} data-testid={`launch-gate-${gate.status}`}>
+      <div className="flex items-start gap-3">
+        <m.Icon size={28} weight="fill" className={`${m.fill} flex-shrink-0 mt-0.5`} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className={`text-lg font-semibold ${m.text}`} style={{ fontFamily: "'Fraunces', serif" }}>
+              {m.label}
+            </div>
+            {isValidated && (
+              <span className="text-[10px] uppercase tracking-widest font-semibold px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-50">
+                validé
+              </span>
+            )}
+          </div>
+          <div className={`text-sm ${m.text} opacity-90 mt-1 leading-relaxed`}>{gate.message}</div>
+
+          <div className="grid grid-cols-3 gap-3 mt-4">
+            <div className="bg-white/70 rounded-xl p-3 border border-white/60">
+              <div className="text-[10px] uppercase tracking-widest text-neutral-500">Marge / commande HT</div>
+              <div className="text-xl font-semibold text-neutral-900 tabular-nums" style={{ fontFamily: "'Fraunces', serif" }}>
+                {fmtEur(gate.per_order_margin_ht_eur)}
+              </div>
+              <div className="text-[10px] text-neutral-500">CA HT − coûts − livraison</div>
+            </div>
+            <div className="bg-white/70 rounded-xl p-3 border border-white/60">
+              <div className="text-[10px] uppercase tracking-widest text-neutral-500">Coût d'acquisition (CPA)</div>
+              <div className="text-xl font-semibold text-neutral-900 tabular-nums" style={{ fontFamily: "'Fraunces', serif" }}>
+                {fmtEur(gate.per_order_cpa_eur)}
+              </div>
+              <div className="text-[10px] text-neutral-500">Budget Ads par vente</div>
+            </div>
+            <div className="bg-white/70 rounded-xl p-3 border border-white/60">
+              <div className="text-[10px] uppercase tracking-widest text-neutral-500">Net profit / vente</div>
+              <div className={`text-xl font-semibold tabular-nums ${gate.per_order_net_profit_eur > 0 ? "text-emerald-700" : "text-rose-700"}`}
+                   style={{ fontFamily: "'Fraunces', serif" }}>
+                {gate.per_order_net_profit_eur >= 0 ? "+" : ""}{fmtEur(gate.per_order_net_profit_eur)}
+              </div>
+              <div className="text-[10px] text-neutral-500">
+                ratio <strong>{gate.safety_ratio}×</strong> · seuil min {gate.min_safety_ratio_required}×
+              </div>
+            </div>
+          </div>
+
+          {gate.status === "blocked" && gate.blocker?.actions?.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-rose-200">
+              <div className="text-xs font-semibold text-rose-900 mb-2">Comment débloquer :</div>
+              <ul className="space-y-1.5" data-testid="gate-actions">
+                {gate.blocker.actions.map((a, i) => (
+                  <li key={i} className="text-sm text-rose-800 flex items-start gap-2">
+                    <span className="w-5 h-5 rounded-full bg-rose-200 text-rose-900 text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                      {i + 1}
+                    </span>
+                    {a}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
