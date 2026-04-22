@@ -363,65 +363,88 @@ export default function SiteProducts() {
                   </div>
                 </div>
                 <div className="p-4">
-                  <div className="font-medium text-neutral-900 truncate">
+                  <div className="font-medium text-neutral-900 line-clamp-2 min-h-[2.5rem]" title={p.name?.fr}>
                     {p.name?.fr || "(sans nom)"}
                   </div>
-                  <div className="text-sm text-neutral-600 mt-1">
-                    {p.price}€ TTC {p.compare_at_price ? `(avant ${p.compare_at_price}€)` : ""}
+                  {/* Prices row */}
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="bg-neutral-50 rounded-lg px-2.5 py-1.5">
+                      <div className="text-[10px] uppercase tracking-widest text-neutral-500">Achat HT</div>
+                      <div className="font-mono text-sm font-semibold text-neutral-900">
+                        {p.cost_price_ht?.toFixed(2) || "—"}€
+                      </div>
+                    </div>
+                    <div className="bg-amber-50 rounded-lg px-2.5 py-1.5">
+                      <div className="text-[10px] uppercase tracking-widest text-amber-700">Vente TTC</div>
+                      <div className="font-mono text-sm font-semibold text-amber-900">
+                        {p.price?.toFixed(2) || "—"}€
+                      </div>
+                    </div>
                   </div>
-                  {p.cost_price_ht > 0 && (
-                    <div className="text-[11px] text-neutral-500 mt-0.5 flex items-center gap-1.5">
-                      <span>Achat&nbsp;: {p.cost_price_ht}€ HT</span>
-                      {(() => {
-                        const ht = p.price / 1.2;
-                        const m = ht - (p.cost_price_ht || 0);
-                        const pct = ht > 0 ? (m / ht) * 100 : 0;
-                        return (
+                  {/* Margin */}
+                  {p.cost_price_ht > 0 && p.price > 0 && (() => {
+                    const ht = p.price / 1.2;
+                    const m = ht - p.cost_price_ht;
+                    const pct = ht > 0 ? (m / ht) * 100 : 0;
+                    return (
+                      <div className="mt-1.5 flex items-center justify-between text-[11px]">
+                        <span className="text-neutral-500">Marge</span>
+                        <span
+                          className="font-semibold"
+                          style={{ color: m <= 0 ? "#BE123C" : pct < 30 ? "#854D0E" : "#047857" }}
+                        >
+                          {m.toFixed(2)}€ · {pct.toFixed(0)}%
+                        </span>
+                      </div>
+                    );
+                  })()}
+                  {/* Shipping status */}
+                  {p.shipping && Object.keys(p.shipping).length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-neutral-100">
+                      <div className="text-[10px] uppercase tracking-widest text-neutral-500 mb-1">Livraison</div>
+                      <div className="flex flex-wrap gap-1">
+                        {Object.entries(p.shipping).map(([cc, info]) => (
                           <span
-                            className="font-medium"
-                            style={{ color: m <= 0 ? "#BE123C" : pct < 30 ? "#854D0E" : "#047857" }}
+                            key={cc}
+                            title={info.available ? `${info.carrier} · ${info.delivery_days}j · $${info.price_usd?.toFixed(2)}` : "Pas de livraison disponible"}
+                            className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                              info.available
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-red-50 text-red-700"
+                            }`}
                           >
-                            · Marge {m.toFixed(2)}€ ({pct.toFixed(0)}%)
+                            {info.available ? "✓" : "✗"} {cc}
                           </span>
-                        );
-                      })()}
+                        ))}
+                      </div>
                     </div>
                   )}
+                  {/* Specs mini */}
+                  {p.specs?.weight_kg && (
+                    <div className="mt-2 text-[11px] text-neutral-500">
+                      {p.specs.weight_kg}kg · {p.images?.length || 0} photos
+                      {p.variants?.length > 1 ? ` · ${p.variants.length} variantes` : ""}
+                    </div>
+                  )}
+                  {/* Warnings */}
+                  {p.translation_status === "fallback_original" && (
+                    <div className="mt-2 text-[10px] bg-amber-50 text-amber-700 px-2 py-1 rounded flex items-center gap-1">
+                      <Warning size={10} weight="fill" /> Traduction IA à refaire
+                    </div>
+                  )}
+                  {/* Actions (edit + delete only — IA & resync moved to side panel) */}
                   <div className="flex items-center gap-2 mt-3">
                     <button
                       onClick={() => setEditing(p)}
                       data-testid={`edit-${p.id}`}
-                      className="flex-1 h-9 rounded-lg bg-white border border-neutral-200 hover:border-[#B84B31] text-[13px] text-neutral-900 flex items-center justify-center gap-1.5 transition"
+                      className="flex-1 h-9 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-[13px] text-white font-medium flex items-center justify-center gap-1.5 transition"
                     >
                       <PencilSimple size={14} /> Éditer
                     </button>
                     <button
-                      onClick={() => handleEnrichNarrative(p)}
-                      disabled={enriching === p.id}
-                      data-testid={`enrich-narrative-${p.id}`}
-                      title={p.narrative ? "Régénérer le narratif IA (écrase l'existant)" : "Générer le narratif IA (sections, specs, FAQ)"}
-                      className={`h-9 w-9 rounded-lg border flex items-center justify-center transition disabled:opacity-50 ${
-                        p.narrative
-                          ? "border-emerald-200 text-emerald-700 hover:border-emerald-400"
-                          : "border-neutral-200 text-neutral-500 hover:border-[#B84B31] hover:text-neutral-900"
-                      }`}
-                    >
-                      <SparkleIcon size={14} weight={p.narrative ? "fill" : "regular"} className={enriching === p.id ? "animate-pulse" : ""} />
-                    </button>
-                    {p.supplier_url && (
-                      <button
-                        onClick={() => handleResync(p)}
-                        disabled={syncing === p.id}
-                        data-testid={`resync-${p.id}`}
-                        title="Re-vérifier le prix fournisseur"
-                        className="h-9 w-9 rounded-lg border border-neutral-200 hover:border-[#B84B31] text-neutral-500 hover:text-neutral-900 flex items-center justify-center transition disabled:opacity-50"
-                      >
-                        <ArrowsClockwise size={14} className={syncing === p.id ? "animate-spin" : ""} />
-                      </button>
-                    )}
-                    <button
                       onClick={() => handleDelete(p)}
                       data-testid={`delete-${p.id}`}
+                      title="Supprimer ce produit"
                       className="h-9 w-9 rounded-lg border border-neutral-200 hover:border-[#BE123C] hover:text-red-400 text-neutral-500 flex items-center justify-center transition"
                     >
                       <Trash size={14} />
@@ -443,6 +466,10 @@ export default function SiteProducts() {
             setEditing(null);
             load();
           }}
+          onEnrichNarrative={() => handleEnrichNarrative(editing)}
+          enriching={enriching === editing.id}
+          onResync={() => handleResync(editing)}
+          syncing={syncing === editing.id}
         />
       )}
 
@@ -549,8 +576,12 @@ function ResyncModal({ result, onClose, onApply }) {
   );
 }
 
-function ProductEditor({ siteId, initial, onClose, onSaved }) {
+function ProductEditor({ siteId, initial, onClose, onSaved, onEnrichNarrative, enriching, onResync, syncing }) {
   const isNew = !initial.id;
+  const hasSupplier = !!(initial.supplier_url && initial.source);
+  const specs = initial.specs || {};
+  const shipping = initial.shipping || {};
+  const variants = initial.variants || [];
   const [form, setForm] = useState(() => ({
     ...initial,
     name: { fr: "", en: "", de: "", nl: "", ...(initial.name || {}) },
@@ -600,7 +631,7 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
             <div className="text-[11px] uppercase tracking-widest text-neutral-500">
               {isNew ? "Nouveau" : "Édition"}
             </div>
-            <div className="text-base font-semibold text-neutral-900">
+            <div className="text-base font-semibold text-neutral-900 line-clamp-1">
               {form.name?.fr || "Produit"}
             </div>
           </div>
@@ -608,6 +639,135 @@ function ProductEditor({ siteId, initial, onClose, onSaved }) {
             <X size={20} />
           </button>
         </div>
+
+        {/* Supplier actions bar (only for imported products) */}
+        {!isNew && hasSupplier && (
+          <div className="border-b border-neutral-200 bg-neutral-50 px-6 py-3 flex items-center gap-2 flex-wrap">
+            <div className="text-[11px] uppercase tracking-widest text-neutral-500 mr-2">Actions fournisseur</div>
+            <button
+              type="button"
+              onClick={onEnrichNarrative}
+              disabled={enriching}
+              data-testid="panel-enrich-ia"
+              className={`h-8 px-3 rounded-lg border text-[12px] font-medium flex items-center gap-1.5 transition disabled:opacity-50 ${
+                initial.narrative
+                  ? "border-emerald-200 bg-white text-emerald-700 hover:border-emerald-400"
+                  : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-900"
+              }`}
+            >
+              <SparkleIcon size={12} weight={initial.narrative ? "fill" : "regular"} className={enriching ? "animate-pulse" : ""} />
+              {enriching ? "Génération…" : initial.narrative ? "Régénérer IA" : "Générer IA"}
+            </button>
+            <button
+              type="button"
+              onClick={onResync}
+              disabled={syncing}
+              data-testid="panel-resync"
+              className="h-8 px-3 rounded-lg border border-neutral-200 bg-white text-[12px] font-medium text-neutral-700 hover:border-neutral-900 flex items-center gap-1.5 transition disabled:opacity-50"
+            >
+              <ArrowsClockwise size={12} className={syncing ? "animate-spin" : ""} />
+              {syncing ? "Sync…" : "Vérifier prix fournisseur"}
+            </button>
+            {initial.supplier_url && (
+              <a
+                href={initial.supplier_url}
+                target="_blank"
+                rel="noreferrer"
+                className="h-8 px-3 rounded-lg border border-neutral-200 bg-white text-[12px] font-medium text-neutral-700 hover:border-neutral-900 flex items-center gap-1.5 transition"
+              >
+                Voir fiche {(initial.source?.provider || "").toUpperCase()} ↗
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Supplier data summary */}
+        {!isNew && hasSupplier && (
+          <div className="border-b border-neutral-200 px-6 py-4 bg-white" data-testid="supplier-panel">
+            <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-2">Données fournisseur</div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+              {specs.weight_kg && (
+                <Info label="Poids" value={`${specs.weight_kg} kg`} />
+              )}
+              {specs.category && (
+                <Info label="Catégorie" value={specs.category.split("/").slice(-1)[0]} />
+              )}
+              {specs.material && (
+                <Info label="Matériau" value={specs.material} />
+              )}
+              {specs.packing && (
+                <Info label="Emballage" value={specs.packing} />
+              )}
+              {specs.supplier_sku && (
+                <Info label="SKU fournisseur" value={specs.supplier_sku} mono />
+              )}
+              {initial.suggested_sell_price_usd && (
+                <Info label="Prix suggéré (USD)" value={`$${initial.suggested_sell_price_usd.toFixed(2)}`} />
+              )}
+              {variants.length > 0 && (
+                <Info label="Variantes" value={`${variants.length}`} />
+              )}
+            </div>
+
+            {/* Shipping per country */}
+            {Object.keys(shipping).length > 0 && (
+              <div className="mt-3 pt-3 border-t border-neutral-100">
+                <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-2">Livraison par pays</div>
+                <div className="space-y-1">
+                  {Object.entries(shipping).map(([cc, info]) => (
+                    <div
+                      key={cc}
+                      className={`flex items-center justify-between text-xs px-3 py-1.5 rounded-lg ${
+                        info.available ? "bg-emerald-50" : "bg-red-50"
+                      }`}
+                      data-testid={`ship-${cc}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={info.available ? "text-emerald-700" : "text-red-700"}>
+                          {info.available ? "✓" : "✗"}
+                        </span>
+                        <span className="font-semibold">{cc}</span>
+                        {info.available && (
+                          <span className="text-neutral-600">
+                            {info.carrier} · {info.delivery_days}j
+                          </span>
+                        )}
+                      </div>
+                      {info.available && (
+                        <span className="font-mono text-[11px] text-neutral-700">
+                          ${info.price_usd?.toFixed(2)}
+                        </span>
+                      )}
+                      {!info.available && (
+                        <span className="text-[10px] text-red-700 font-medium">Non disponible</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Variants list */}
+            {variants.length > 1 && (
+              <div className="mt-3 pt-3 border-t border-neutral-100">
+                <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-2">
+                  Variantes importées
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {variants.map((v) => (
+                    <span
+                      key={v.vid}
+                      title={`${v.sku} · ${v.sell_price_usd || "—"}$`}
+                      className="text-[11px] px-2 py-1 rounded-full bg-neutral-100 text-neutral-700"
+                    >
+                      {v.name || v.sku}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <form onSubmit={submit} className="p-6 space-y-6">
           {/* Tabs i18n */}
@@ -996,3 +1156,15 @@ function ImagesField({ images, onChange }) {
   );
 }
 
+
+
+function Info({ label, value, mono }) {
+  return (
+    <div className="bg-neutral-50 rounded-lg px-2.5 py-1.5">
+      <div className="text-[10px] uppercase tracking-widest text-neutral-500 truncate">{label}</div>
+      <div className={`text-[12px] font-semibold text-neutral-900 truncate ${mono ? "font-mono" : ""}`} title={value}>
+        {value}
+      </div>
+    </div>
+  );
+}

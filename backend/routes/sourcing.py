@@ -10,6 +10,7 @@ Endpoints:
 """
 from __future__ import annotations
 import asyncio
+import json
 import hmac
 import hashlib
 import os
@@ -341,11 +342,40 @@ async def _cj_product_detail(product_id: str) -> dict:
             r = await c.get(f"{CJ_BASE}/product/query",
                             params={"pid": product_id},
                             headers={"CJ-Access-Token": token})
+            if r.status_code == 429:
+                # Respect QPS limit then retry once
+                await asyncio.sleep(1.2)
+                r = await c.get(f"{CJ_BASE}/product/query",
+                                params={"pid": product_id},
+                                headers={"CJ-Access-Token": token})
             if r.status_code != 200:
                 return {}
             return (r.json().get("data") or {}) or {}
     except Exception:
         return {}
+
+
+async def _cj_freight_to_country(pid: str, vid: str, country_code: str) -> list:
+    """Call CJ freight API to check if product ships to `country_code`.
+    Returns list of shipping options (may be empty = no shipping available).
+    Each option = {logisticName, logisticAging, logisticPrice, ...}"""
+    token = await _cj_auth()
+    try:
+        async with httpx.AsyncClient(timeout=25) as c:
+            r = await c.post(
+                f"{CJ_BASE}/logistic/freightCalculate",
+                headers={"CJ-Access-Token": token},
+                json={
+                    "startCountryCode": "CN",
+                    "endCountryCode": country_code,
+                    "products": [{"quantity": 1, "vid": vid}],
+                },
+            )
+            if r.status_code != 200:
+                return []
+            return r.json().get("data") or []
+    except Exception:
+        return []
 
 
 async def _translate_product(title_en: str, desc_en: str, target_langs: list) -> dict:
@@ -410,24 +440,96 @@ Languages to produce: {", ".join(langs)}
 @router.post("/sites/{site_id}/sourcing/import")
 async def import_product(site_id: str, data: ImportInput, user: dict = Depends(get_current_user)):
     await _check_site_access(site_id, user)
-    # Load site to determine target translation languages
+    # Load site to determine target translation languages + shipping destinations
     site = await db.sites.find_one({"id": site_id}, {"_id": 0, "selected_countries": 1})
     countries = (site or {}).get("selected_countries") or ["FR"]
     target_langs = list(set(LANG_BY_COUNTRY.get((c or "").upper(), "fr") for c in countries))
     if "fr" not in target_langs:
         target_langs.append("fr")
 
-    # Fetch CJ detail for richer description + better images
+    # Fetch CJ detail for richer description + better images + specs
     detail = {}
     raw_desc = ""
     extra_images = []
+    specs = {}
+    variants = []
+    shipping_by_country = {}
+    suggested_sell_price_usd = None
     if data.provider == "cj" and data.product_id:
         detail = await _cj_product_detail(data.product_id)
         raw_desc = detail.get("description") or detail.get("productDescription") or ""
         # Extra images from CJ detail
         imgs = detail.get("productImageSet") or detail.get("productImages") or []
         if isinstance(imgs, list):
-            extra_images = [i for i in imgs if isinstance(i, str)][:5]
+            extra_images = [i for i in imgs if isinstance(i, str)][:8]
+        # Specs from CJ response
+        weight_raw = detail.get("productWeight")
+        try:
+            weight_g = float(weight_raw) if weight_raw not in (None, "") else None
+        except (ValueError, TypeError):
+            weight_g = None
+        material_en_set = detail.get("materialNameEnSet") or detail.get("materialNameEn") or []
+        if isinstance(material_en_set, str):
+            try:
+                material_en_set = json.loads(material_en_set)
+            except (json.JSONDecodeError, TypeError):
+                material_en_set = [material_en_set]
+        packing_en = detail.get("packingNameEnSet") or detail.get("packingNameEn") or []
+        if isinstance(packing_en, str):
+            try:
+                packing_en = json.loads(packing_en)
+            except (json.JSONDecodeError, TypeError):
+                packing_en = [packing_en]
+        specs = {
+            "weight_g": weight_g,
+            "weight_kg": round(weight_g / 1000.0, 2) if weight_g else None,
+            "category": detail.get("categoryName") or "",
+            "material": ", ".join(material_en_set) if isinstance(material_en_set, list) else "",
+            "packing": ", ".join(packing_en) if isinstance(packing_en, list) else "",
+            "product_type": detail.get("productType") or "",
+            "supplier_sku": detail.get("productSku") or "",
+        }
+        # Suggested sell price by CJ (USD)
+        try:
+            if detail.get("suggestSellPrice"):
+                suggested_sell_price_usd = float(detail.get("suggestSellPrice"))
+        except (ValueError, TypeError):
+            pass
+        # Variants: keep minimal info
+        raw_variants = detail.get("variants") or []
+        if isinstance(raw_variants, list):
+            for v in raw_variants[:20]:
+                if not isinstance(v, dict):
+                    continue
+                variants.append({
+                    "vid": str(v.get("vid") or ""),
+                    "sku": v.get("variantSku") or "",
+                    "name": v.get("variantNameEn") or v.get("variantName") or "",
+                    "image": v.get("variantImage") or "",
+                    "sell_price_usd": v.get("variantSellPrice"),
+                    "weight_g": v.get("variantWeight"),
+                })
+        # Check shipping availability to each target country
+        first_vid = variants[0]["vid"] if variants else ""
+        if first_vid:
+            for cc in countries[:6]:  # Cap at 6 to respect rate-limit
+                await asyncio.sleep(1.1)  # Respect CJ 1 QPS
+                options = await _cj_freight_to_country(data.product_id, first_vid, (cc or "FR").upper())
+                if options:
+                    # Pick cheapest
+                    cheapest = min(
+                        options,
+                        key=lambda o: float(o.get("logisticPrice") or 9999) if o.get("logisticPrice") is not None else 9999,
+                    )
+                    shipping_by_country[cc.upper()] = {
+                        "available": True,
+                        "carrier": cheapest.get("logisticName") or cheapest.get("logisticAliasName") or "CJ",
+                        "price_usd": float(cheapest.get("logisticPrice") or 0),
+                        "delivery_days": cheapest.get("logisticAging") or "",
+                        "options_count": len(options),
+                    }
+                else:
+                    shipping_by_country[cc.upper()] = {"available": False}
 
     # Strip HTML from CJ description
     if raw_desc:
@@ -463,7 +565,7 @@ async def import_product(site_id: str, data: ImportInput, user: dict = Depends(g
         "cost_price_ht": round(data.cost_eur, 2),
         "compare_at_price": None,
         "currency": "EUR",
-        "images": images[:6],
+        "images": images[:8],
         "stock": None,
         "supplier_url": data.supplier_url or "",
         "sku": data.sku or f"{data.provider.upper()}-{data.product_id[:12]}",
@@ -472,6 +574,11 @@ async def import_product(site_id: str, data: ImportInput, user: dict = Depends(g
         "source": {"provider": data.provider, "product_id": data.product_id},
         "translation_status": "translated" if translations else "fallback_original",
         "translated_langs": list(translations.keys()),
+        "specs": specs,
+        "variants": variants,
+        "shipping": shipping_by_country,
+        "suggested_sell_price_usd": suggested_sell_price_usd,
+        "raw_description_en": raw_desc,  # useful for later re-translation
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.products.insert_one(dict(doc))
@@ -585,5 +692,8 @@ async def import_by_url(site_id: str, data: ImportUrlInput, user: dict = Depends
         supplier_url=data.url,
         sku=sku,
     )
-    # Delegate to the existing importer (handles translation + save)
+    # Respect CJ 1 QPS: sleep before the import (which will call detail again for specs)
+    if provider == "cj":
+        await asyncio.sleep(1.2)
+    # Delegate to the existing importer (handles translation + specs + shipping + save)
     return await import_product(site_id, import_payload, user)
