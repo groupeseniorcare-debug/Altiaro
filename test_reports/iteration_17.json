@@ -1,0 +1,44 @@
+{
+  "summary": "Iteration 17 validation of SEO Dashboard (backend + frontend), reviews cron, mark-delivered, and hook #27 scheduling. 7/7 backend tests passed. Full frontend SEO dashboard UI validated for Concepteur user on Sereniva site (score 24, all 6 dimensions rendered, refresh works, nav from site detail works). One operational concern flagged: hook #27 blocks backend event loop when Claude 502s.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "/api/steps/{id}/validate (#27 side-effect)",
+        "issue": "When prompt #27 is validated, _hook_blog_seed schedules 10 sequential AI blog draft calls. Claude litellm returns 502s repeatedly and retries, saturating the event loop — backend became unresponsive to all other HTTP calls (localhost:8001 returned 000) until supervisor restart. Scheduling itself fires correctly (logs show `[side-effect #27] démarrage génération de 10 articles`).",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/sites/:id/seo", "issues": ["ESLint warning: useEffect in SiteSEO.jsx line 40 missing 'load' dependency (non-blocking)"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration17_seo_reviews.py",
+    "/app/test_reports/pytest/iter17_results.xml"
+  ],
+  "action_items": [
+    "Hook #27 operational hardening: make blog generation truly async/detached (asyncio.create_task with semaphore + bounded retries) so a failing LLM doesn't starve the event loop. Current implementation awaits sequentially inside a background task and combined with emergentintegrations retry loops caused total backend stall during testing.",
+    "Optional: silence eslint react-hooks/exhaustive-deps warning in SiteSEO.jsx by wrapping `load` in useCallback or adding // eslint-disable-next-line."
+  ],
+  "critical_code_review_comments": [
+    "seo_audit.py is clean and read-only, no ObjectId leak (uses projection {_id:0}). Good.",
+    "SiteSEO.jsx uses data-testid attributes consistently. Good.",
+    "_hook_blog_seed (step_side_effects.py:~494) calls ai_draft_blog_post(...) sequentially inside await loop — combine with LLM retries this can monopolise the worker. Should batch-bound retries or move to a proper queue.",
+    "reviews_hook.py mark_delivered and check_due endpoints return well-structured responses (total_due/sent/skipped_no_resend)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration17_seo_reviews.py (new)"
+  ],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% (SEO page + nav button)"},
+  "test_credentials": "Concepteur: concepteur@conceptfactory.fr / Concepteur2026! ; Admin: admin@conceptfactory.fr / Factory2026! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None. Used existing Sereniva site d7d84968-0a2e-44c4-880b-f5af736cc86d.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend /api/sites/{id}/seo-audit works and returns 6 dimensions + coverage + checks + recommendations. Frontend SiteSEO page at /sites/:id/seo renders all testids (seo-overall-card, seo-dim-{catalog,content,structure,trust,aeo,freshness}, seo-coverage-card, seo-checks-card, seo-recommendations-card, seo-refresh-btn, seo-back-to-site). nav-seo-dashboard button on SiteDetail correctly routes to SEO page. IMPORTANT: During testing the backend became unresponsive for ~5 minutes because validating prompt #27 triggers sequential blog drafts; Claude kept 502-ing. Had to `sudo supervisorctl restart backend`. Next tester should either skip the #27 validate test or reset backend afterwards.",
+  "rca of the issue": "Validating step #27 triggers _hook_blog_seed background task, which awaits ai_draft_blog_post 10× sequentially. When Claude is unavailable (502), emergentintegrations + litellm perform multiple internal retries per call; combined × 10 keywords this keeps the worker busy and effectively starves the public URL of responses. Mitigation: run the hook with asyncio.create_task (fire-and-forget), add per-call timeout, and cap retries. Reproduction: POST /api/steps/{step27_id}/validate as admin while Claude is degraded → subsequent API calls from same worker will time out."
+}

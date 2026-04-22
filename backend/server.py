@@ -61,6 +61,7 @@ from routes import product_bundles as product_bundles_routes
 from routes import blog_posts as blog_posts_routes
 from routes import reviews_hook as reviews_hook_routes
 from routes import indexnow as indexnow_routes
+from routes import seo_audit as seo_audit_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -113,6 +114,7 @@ api.include_router(product_bundles_routes.router)
 api.include_router(blog_posts_routes.router)
 api.include_router(reviews_hook_routes.router)
 api.include_router(indexnow_routes.router)
+api.include_router(seo_audit_routes.router)
 
 
 @app.on_event("startup")

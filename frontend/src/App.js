@@ -13,6 +13,7 @@ import NicheEngine from "./pages/Analyzer";
 import NicheAnalysisDetail from "./pages/NicheAnalysisDetail";
 import SiteProducts from "./pages/SiteProducts";
 import SiteBlogPosts from "./pages/SiteBlogPosts";
+import SiteSEO from "./pages/SiteSEO";
 import AdsCopy from "./pages/AdsCopy";
 import Empire from "./pages/Empire";
 import Billing from "./pages/Billing";
@@ -166,6 +167,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <SiteBlogPosts />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites/:id/seo"
+            element={
+              <ProtectedRoute>
+                <SiteSEO />
               </ProtectedRoute>
             }
           />

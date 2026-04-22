@@ -145,7 +145,7 @@ async def seo_audit(site_id: str, user=Depends(get_current_user)):
         recos.append({"severity": "high", "text": f"Seulement {total_products} produit(s) actif(s). Les sites avec <10 produits rankent difficilement.", "action": "Ajouter plus de produits (catalogue #16)"})
     if total_products > 0 and enriched_products < total_products:
         missing = total_products - enriched_products
-        recos.append({"severity": "high", "text": f"{missing} produit(s) sans narratif IA (SEO + AEO incomplet).", "action": f"Déclencher 'Auto-bundles IA' et 'Régénérer IA' sur ces produits"})
+        recos.append({"severity": "high", "text": f"{missing} produit(s) sans narratif IA (SEO + AEO incomplet).", "action": "Déclencher 'Auto-bundles IA' et 'Régénérer IA' sur ces produits"})
     if blog_count < 10:
         recos.append({"severity": "high", "text": f"{blog_count} article(s) blog — 10+ articles sont recommandés pour un ranking organique sérieux.", "action": "Valider le prompt #27 (génération auto 10 articles) ou utiliser 'Rédiger avec l'IA'"})
     if total_products > 0 and products_with_bundles == 0:
