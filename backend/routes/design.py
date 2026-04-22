@@ -126,21 +126,39 @@ def _strip(text: str) -> str:
 
 async def _claude_json(system: str, user: str, session_id: str, timeout: int = 180) -> dict:
     from emergentintegrations.llm.chat import LlmChat, UserMessage
-    chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=session_id, system_message=system)\
-        .with_model("anthropic", "claude-sonnet-4-5-20250929")
-    try:
-        raw = await asyncio.wait_for(chat.send_message(UserMessage(text=user)), timeout=timeout)
-    except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="L'IA a mis trop de temps à répondre. Réessaye.")
-    except Exception as e:
-        logger.exception("Claude design call failed")
-        raise HTTPException(status_code=502, detail=f"IA indisponible : {str(e)[:180]}")
-    payload = _strip(raw if isinstance(raw, str) else str(raw))
-    try:
-        return json.loads(payload)
-    except json.JSONDecodeError as e:
-        logger.error(f"Design prompt returned invalid JSON : {e}\n{payload[:500]}")
-        raise HTTPException(status_code=502, detail="L'IA a retourné un JSON invalide. Réessaye.")
+    last_err: Optional[Exception] = None
+    # Simple retry (up to 3 tries) on transient upstream failures (502, 503, 504).
+    for attempt in range(3):
+        chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"{session_id}-{attempt}", system_message=system)\
+            .with_model("anthropic", "claude-sonnet-4-5-20250929")
+        try:
+            raw = await asyncio.wait_for(chat.send_message(UserMessage(text=user)), timeout=timeout)
+            payload = _strip(raw if isinstance(raw, str) else str(raw))
+            try:
+                return json.loads(payload)
+            except json.JSONDecodeError as e:
+                logger.error(f"Design prompt returned invalid JSON (try {attempt+1}): {e}\n{payload[:400]}")
+                last_err = e
+                await asyncio.sleep(2)
+                continue
+        except asyncio.TimeoutError:
+            raise HTTPException(status_code=504, detail="L'IA a mis trop de temps à répondre. Réessaye.")
+        except Exception as e:
+            msg = str(e)
+            logger.warning(f"Claude design call failed (try {attempt+1}/3) : {msg[:200]}")
+            last_err = e
+            # Emergent LLM Key budget exhausted → clear actionable message, no retry
+            if "Budget has been exceeded" in msg or "budget" in msg.lower() and "exceeded" in msg.lower():
+                raise HTTPException(
+                    status_code=402,
+                    detail="Budget Emergent LLM Key épuisé. Recharge la clé depuis Profile → Universal Key → Add Balance.",
+                )
+            # Retry only on transient gateway errors
+            if any(code in msg for code in ("502", "503", "504", "BadGateway", "ServiceUnavailable")):
+                await asyncio.sleep(2 + attempt)
+                continue
+            raise HTTPException(status_code=502, detail=f"IA indisponible : {msg[:180]}")
+    raise HTTPException(status_code=502, detail=f"IA indisponible après 3 tentatives : {str(last_err)[:180]}")
 
 
 async def _nano_banana_logo(prompt: str, site_id: str) -> Optional[str]:
@@ -245,6 +263,8 @@ async def get_design(site_id: str, user: dict = Depends(get_current_user)):
 
 @router.post("/sites/{site_id}/design/generate")
 async def generate_design(site_id: str, data: GenerateInput, user: dict = Depends(get_current_user)):
+    """Kick off an async design generation job to bypass ingress 60 s timeouts.
+    Returns immediately with a job_id. Frontend polls /design/generate/status."""
     await _check_site_access(site_id, user)
     site = await db.sites.find_one({"id": site_id}, {"_id": 0})
     if not site:
@@ -262,25 +282,65 @@ async def generate_design(site_id: str, data: GenerateInput, user: dict = Depend
         slug=_slugify(site.get("name")),
     )
 
-    session = f"design-{site_id}-{uuid.uuid4().hex[:6]}"
-    design = await _claude_json(SYSTEM, user_prompt, session)
+    job_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    await db.design_jobs.insert_one({
+        "id": job_id,
+        "site_id": site_id,
+        "user_id": user.get("id"),
+        "status": "running",
+        "with_logo": bool(data.with_logo),
+        "tweak": data.tweak or "",
+        "created_at": now,
+    })
 
-    # Génère le logo en parallèle (non bloquant si échec)
-    if data.with_logo:
-        logo_prompt = design.get("brand", {}).get("logo_style_prompt") or \
-            f"{site.get('niche')} brand, warm colors"
-        logo_url = await _nano_banana_logo(logo_prompt, site_id)
-        if logo_url:
-            design.setdefault("brand", {})["logo_url"] = logo_url
+    async def _run():
+        try:
+            session = f"design-{site_id}-{uuid.uuid4().hex[:6]}"
+            design = await _claude_json(SYSTEM, user_prompt, session)
+            if data.with_logo:
+                logo_prompt = design.get("brand", {}).get("logo_style_prompt") or \
+                    f"{site.get('niche')} brand, warm colors"
+                logo_url = await _nano_banana_logo(logo_prompt, site_id)
+                if logo_url:
+                    design.setdefault("brand", {})["logo_url"] = logo_url
+            design = _inject_legal(design, site)
+            design["generated_at"] = datetime.now(timezone.utc).isoformat()
+            design["generated_by"] = user.get("id")
+            design["tweak"] = data.tweak or ""
+            design["published"] = False
+            await db.sites.update_one(
+                {"id": site_id},
+                {"$set": {"design": design, "updated_at": design["generated_at"]}},
+            )
+            await db.design_jobs.update_one(
+                {"id": job_id},
+                {"$set": {"status": "done", "finished_at": datetime.now(timezone.utc).isoformat()}},
+            )
+        except HTTPException as he:
+            await db.design_jobs.update_one(
+                {"id": job_id},
+                {"$set": {"status": "failed", "error": he.detail, "finished_at": datetime.now(timezone.utc).isoformat()}},
+            )
+        except Exception as e:
+            logger.exception("Design job failed")
+            await db.design_jobs.update_one(
+                {"id": job_id},
+                {"$set": {"status": "failed", "error": str(e)[:300], "finished_at": datetime.now(timezone.utc).isoformat()}},
+            )
 
-    design = _inject_legal(design, site)
-    design["generated_at"] = datetime.now(timezone.utc).isoformat()
-    design["generated_by"] = user.get("id")
-    design["tweak"] = data.tweak or ""
-    design["published"] = False   # le Concepteur doit publier explicitement
+    asyncio.create_task(_run())
+    return {"ok": True, "job_id": job_id, "status": "running"}
 
-    await db.sites.update_one({"id": site_id}, {"$set": {"design": design, "updated_at": design["generated_at"]}})
-    return {"ok": True, "design": design}
+
+@router.get("/sites/{site_id}/design/generate/status")
+async def generate_design_status(site_id: str, user: dict = Depends(get_current_user)):
+    """Returns the status of the latest design generation job for this site."""
+    await _check_site_access(site_id, user)
+    job = await db.design_jobs.find_one(
+        {"site_id": site_id}, {"_id": 0}, sort=[("created_at", -1)]
+    )
+    return job or {"status": "idle"}
 
 
 class RegenInput(BaseModel):

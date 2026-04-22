@@ -6,6 +6,9 @@ import React, { useEffect } from "react";
  *
  * Fired events : page_view (auto), view_item, add_to_cart, begin_checkout, purchase.
  * Call the helpers exposed on window.altiaroTrack from product / cart / checkout pages.
+ *
+ * Even when NO GA4/Ads IDs are configured, the helpers still push events to
+ * `window.dataLayer` so Google Tag Manager users can pick them up.
  */
 export default function StorefrontTracking({ site }) {
   const tracking = site?.design?.tracking || {};
@@ -14,27 +17,30 @@ export default function StorefrontTracking({ site }) {
   const gadsLabel = tracking.gads_conversion_label || "";
 
   useEffect(() => {
-    if (!ga4Id && !gadsId) return;
     if (window.__altiaroTrackingLoaded) return;
     window.__altiaroTrackingLoaded = true;
 
-    const firstTagId = ga4Id || gadsId;
-
-    // Load gtag.js
-    const s = document.createElement("script");
-    s.async = true;
-    s.src = `https://www.googletagmanager.com/gtag/js?id=${firstTagId}`;
-    document.head.appendChild(s);
-
+    // Always initialize the dataLayer + gtag stub so events can queue even
+    // before gtag.js is loaded.
     window.dataLayer = window.dataLayer || [];
     function gtag() { window.dataLayer.push(arguments); }
     window.gtag = gtag;
     gtag("js", new Date());
 
-    if (ga4Id) gtag("config", ga4Id, { send_page_view: true });
-    if (gadsId) gtag("config", gadsId);
+    // Load gtag.js only if at least one ID is configured (saves ~40 KB otherwise).
+    const firstTagId = ga4Id || gadsId;
+    if (firstTagId) {
+      const s = document.createElement("script");
+      s.async = true;
+      s.src = `https://www.googletagmanager.com/gtag/js?id=${firstTagId}`;
+      document.head.appendChild(s);
+      if (ga4Id) gtag("config", ga4Id, { send_page_view: true });
+      if (gadsId) gtag("config", gadsId);
+    }
 
-    // Public helper exposed to the rest of the storefront
+    // Public helper exposed to the rest of the storefront. Always defined so
+    // product/cart/checkout calls don't need to null-check; events always push
+    // to dataLayer (GTM compatible) even without GA4/Ads IDs.
     window.altiaroTrack = {
       viewItem: (product, lang = "fr") => {
         try {
@@ -92,7 +98,7 @@ export default function StorefrontTracking({ site }) {
               quantity: it.quantity || 1,
             })),
           });
-          // Google Ads conversion
+          // Google Ads conversion (only if Ads conversion fully configured)
           if (gadsId && gadsLabel) {
             gtag("event", "conversion", {
               send_to: `${gadsId}/${gadsLabel}`,

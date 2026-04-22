@@ -24,6 +24,7 @@ export default function SiteDesign() {
   const [siteName, setSiteName] = useState("");
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [genStatus, setGenStatus] = useState("");
   const [regenerating, setRegenerating] = useState(null);
   const [publishing, setPublishing] = useState(false);
   const [tweak, setTweak] = useState("");
@@ -40,16 +41,58 @@ export default function SiteDesign() {
 
   useEffect(() => { reload(); }, [siteId]); // eslint-disable-line
 
+  // On mount + whenever generating flag on, poll for a running job and resume UX
+  useEffect(() => {
+    let cancelled = false;
+    let timer = null;
+    const poll = async () => {
+      const { data } = await apiCall(() => api.get(`/sites/${siteId}/design/generate/status`));
+      if (cancelled) return;
+      const status = data?.status;
+      if (status === "running") {
+        setGenerating(true);
+        setGenStatus("Génération IA en cours (30-90s)…");
+        timer = setTimeout(poll, 3000);
+      } else if (status === "done") {
+        setGenerating(false);
+        setGenStatus("");
+        await reload();
+      } else if (status === "failed") {
+        setGenerating(false);
+        setGenStatus("");
+        if (data?.error) window.alert(`Génération échouée : ${data.error}`);
+      } else {
+        setGenerating(false);
+      }
+    };
+    poll();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [siteId]); // eslint-disable-line
+
   const generateAll = async () => {
     if (design?.brand?.name && !window.confirm("Un design existe déjà. Tout régénérer ?")) return;
     setGenerating(true);
-    const { error } = await apiCall(() =>
+    setGenStatus("Démarrage…");
+    const { data, error } = await apiCall(() =>
       api.post(`/sites/${siteId}/design/generate`, { with_logo: true, tweak })
     );
-    setGenerating(false);
-    if (error) { window.alert(`Génération échouée : ${error}`); return; }
+    if (error) {
+      setGenerating(false);
+      setGenStatus("");
+      window.alert(`Démarrage échoué : ${error}`);
+      return;
+    }
     setTweak("");
-    await reload();
+    // Kick the polling loop
+    setGenStatus("Génération IA en cours (30-90s)…");
+    const poll = async () => {
+      const { data: s } = await apiCall(() => api.get(`/sites/${siteId}/design/generate/status`));
+      if (s?.status === "running") { setTimeout(poll, 3000); return; }
+      if (s?.status === "done") { setGenerating(false); setGenStatus(""); await reload(); return; }
+      if (s?.status === "failed") { setGenerating(false); setGenStatus(""); window.alert(`Génération échouée : ${s?.error || ""}`); return; }
+      setGenerating(false); setGenStatus("");
+    };
+    setTimeout(poll, 3000);
   };
 
   const regenSection = async (section) => {
@@ -153,6 +196,7 @@ export default function SiteDesign() {
             setTweak={setTweak}
             onGenerate={generateAll}
             loading={generating}
+            statusLabel={genStatus}
           />
         ) : (
           <div className="space-y-6" data-testid="design-dashboard">
@@ -340,7 +384,7 @@ function Section({ title, children, testid }) {
   );
 }
 
-function EmptyState({ tweak, setTweak, onGenerate, loading }) {
+function EmptyState({ tweak, setTweak, onGenerate, loading, statusLabel }) {
   return (
     <div className="bg-white border border-neutral-200 rounded-2xl p-10 text-center" data-testid="design-empty">
       <PaintBrush size={40} weight="duotone" className="mx-auto text-neutral-400 mb-4" />
@@ -365,7 +409,7 @@ function EmptyState({ tweak, setTweak, onGenerate, loading }) {
           className="h-11 px-6 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium inline-flex items-center gap-2 disabled:opacity-60"
         >
           {loading ? <ArrowClockwise size={14} className="animate-spin" /> : <Sparkle size={14} weight="fill" />}
-          {loading ? "Génération en cours (60-90s)…" : "Générer mon site (IA)"}
+          {loading ? (statusLabel || "Génération en cours…") : "Générer mon site (IA)"}
         </button>
       </div>
     </div>

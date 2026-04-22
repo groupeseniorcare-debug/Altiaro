@@ -3,6 +3,36 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-22 · Sprint B.3 : Design editor + Sourcing re-routing + GA4 + async design.generate
+
+- **Nouvelle page `/sites/:id/design`** (`SiteDesign.jsx`) : l'éditeur branding complet que la Sprint B.2 avait oublié. 
+  - Empty state + bouton « Générer mon site (IA) » avec brief optionnel
+  - Vue complète post-génération : nom marque, baseline, logo, palette, hero, bénéfices, about, FAQ, contact, pages légales CGV/mentions/confidentialité
+  - Régénération par section (brand, logo, hero, about, benefits, faq, testimonials, contact, SEO) via boutons cliquables
+  - Upload de logo custom → `/uploads/image` puis `POST /design/brand/logo` (nouvel endpoint)
+  - Toggle Publier / Publié
+- **Sourcing re-routé** : `/sites/:id/sourcing` remis dans `App.js` (existait déjà dans `Sourcing.jsx` mais n'était plus accessible). CJ Dropshipping fonctionne (1 résultat retourné sur « fauteuil releveur »), AliExpress affiche « connecté » mais reste en cooldown 48h.
+- **CockpitJourney relinké** :
+  - Étape 2 « Import du catalogue » → `/sites/:id/sourcing` (avant : `/aliexpress/import` seul)
+  - Étapes 5 & 6 « Branding » et « Pages essentielles » → `/sites/:id/design` (avant : redirigeaient à tort vers `/products`)
+- **GA4 / Google Ads conversion tracking câblé** :
+  - `StorefrontProduct` → `view_item` au chargement
+  - `StorefrontProduct.handleAdd` + `ProductBundle.addAll` → `add_to_cart`
+  - `StorefrontCheckout.submit` → `begin_checkout`
+  - `StorefrontConfirmation` → `purchase` quand order.status devient `paid` (fire-once)
+  - Helpers `window.altiaroTrack.*` poussent toujours vers `window.dataLayer` même sans GA4 ID configuré (GTM-compatible)
+- **`/design/generate` refactoré en job async + polling** pour contourner le cap ingress K8s de 60 s :
+  - POST retourne `{job_id, status:"running"}` en < 1 s
+  - Nouveau endpoint `GET /design/generate/status` à poller toutes les 3 s
+  - Collection `design_jobs` stocke l'état + erreur éventuelle
+- **Retry + erreur actionnable dans `_claude_json`** :
+  - Retry jusqu'à 3× sur 502/503/504/BadGateway (Emergent LLM proxy flaky)
+  - Si « Budget has been exceeded » → HTTP 402 avec message clair « Recharge la clé depuis Profile → Universal Key → Add Balance »
+- **Clean DB** : steps orphelins (300), ledger, quick_scans, niche_analyses tous vidés → prêt pour le premier lancement réel.
+
+⚠️ **Blocker utilisateur** : la clé Emergent LLM est actuellement à court de budget (cost 17.08 / max 17.00). Toutes les fonctions IA (design.generate, pricing-analysis, upsells) échoueront avec un message actionnable jusqu'au rechargement.
+
+
 ## 2026-04-22 · Sprint B.2 : Nouveau Parcours Cockpit linéaire (9 étapes) — remplace les 50 prompts
 
 - **Câblage complet** (ce qui manquait de la session précédente) :
