@@ -58,8 +58,10 @@ async def create_payment(data: CreatePaymentInput, request: Request):
 
     # Redirect customer back to the storefront success page
     redirect_url = f"{FRONTEND_URL}/shop/{data.site_id}/checkout/success?order={data.order_number}"
-    # Webhook URL must be publicly reachable — use the backend URL
-    webhook_url = str(request.url_for("mollie_webhook"))
+    # Webhook URL MUST be publicly reachable (Mollie validates this).
+    # request.url_for() returns the internal host — use FRONTEND_URL domain instead
+    # (frontend + backend share the same public hostname on Emergent, /api is proxied).
+    webhook_url = f"{FRONTEND_URL}/api/webhooks/mollie"
 
     payment_data = {
         "amount": {"currency": currency, "value": f"{total:.2f}"},

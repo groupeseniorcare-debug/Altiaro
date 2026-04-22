@@ -116,16 +116,16 @@ export default function CartDrawer({ design }) {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-0 border border-neutral-300 rounded-full h-8">
                         <button
-                          onClick={() => handleQty(it.product_id, it.qty - 1)}
+                          onClick={() => handleQty(it.product_id, it.quantity - 1)}
                           data-testid={`cart-drawer-qty-minus-${it.product_id}`}
                           className="w-8 h-8 flex items-center justify-center hover:bg-neutral-50"
-                          disabled={it.qty <= 1}
+                          disabled={it.quantity <= 1}
                         >
                           <Minus size={12} />
                         </button>
-                        <span className="w-8 text-center text-sm tabular-nums">{it.qty}</span>
+                        <span className="w-8 text-center text-sm tabular-nums">{it.quantity}</span>
                         <button
-                          onClick={() => handleQty(it.product_id, it.qty + 1)}
+                          onClick={() => handleQty(it.product_id, it.quantity + 1)}
                           data-testid={`cart-drawer-qty-plus-${it.product_id}`}
                           className="w-8 h-8 flex items-center justify-center hover:bg-neutral-50"
                         >
@@ -133,7 +133,7 @@ export default function CartDrawer({ design }) {
                         </button>
                       </div>
                       <div className="font-semibold tabular-nums text-sm">
-                        {(it.price * it.qty).toFixed(2)} €
+                        {(Number(it.price) * Number(it.quantity || 1)).toFixed(2)} €
                       </div>
                     </div>
                   </div>
