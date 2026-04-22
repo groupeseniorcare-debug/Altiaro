@@ -91,7 +91,7 @@ export default function Sourcing() {
     const costEur = Math.round(item.cost_usd * rate * 100) / 100;
     // Default retail price = cost × 2.5 (Concepteur will adjust after import based on his pricing study)
     const priceEur = Math.round(costEur * 2.5 * 100) / 100;
-    const { data, error } = await apiCall(() =>
+    const { data, error, rawDetail } = await apiCall(() =>
       api.post(
         `/sites/${siteId}/sourcing/import`,
         {
@@ -109,7 +109,13 @@ export default function Sourcing() {
     );
     if (error) {
       setImported((prev) => ({ ...prev, [key]: "error" }));
-      window.alert(`Import impossible : ${error}`);
+      // Shipping-unavailable 422 carries a structured detail
+      const detail = rawDetail;
+      if (detail && typeof detail === "object" && detail.error === "shipping_unavailable") {
+        window.alert(`❌ Import bloqué\n\n${detail.message}\n\nPays non couverts : ${detail.missing_countries.join(", ")}.`);
+      } else {
+        window.alert(`Import impossible : ${error}`);
+      }
       return;
     }
     setImported((prev) => ({
@@ -124,11 +130,19 @@ export default function Sourcing() {
     const u = urlImport.trim();
     if (!u) return;
     setUrlImporting(true);
-    const { data, error } = await apiCall(() =>
+    const { data, error, rawDetail } = await apiCall(() =>
       api.post(`/sites/${siteId}/sourcing/import-by-url`, { url: u }, { timeout: 120000 })
     );
     setUrlImporting(false);
-    if (error) { window.alert(`Import URL impossible : ${error}`); return; }
+    if (error) {
+      const detail = rawDetail;
+      if (detail && typeof detail === "object" && detail.error === "shipping_unavailable") {
+        window.alert(`❌ Import bloqué\n\n${detail.message}\n\nPays non couverts : ${detail.missing_countries.join(", ")}.`);
+      } else {
+        window.alert(`Import URL impossible : ${error}`);
+      }
+      return;
+    }
     setUrlImport("");
     window.alert(`✓ Produit importé en draft : "${(data.product?.name?.fr || data.product?.name?.en || "").slice(0, 80)}"`);
     navigate(`/sites/${siteId}/products`);

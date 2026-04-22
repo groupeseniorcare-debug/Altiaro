@@ -238,8 +238,20 @@ class UpsellInput(BaseModel):
 @router.post("/sites/{site_id}/upsell-recommendations")
 async def upsell_recommendations(site_id: str, _body: UpsellInput, user=Depends(get_current_user)):
     await _check_site_access(site_id, user)
+    # Load products + the pricing_analysis from step 1 (used as IA context)
+    site = await db.sites.find_one(
+        {"id": site_id},
+        {"_id": 0, "niche": 1, "selected_countries": 1, "design.pricing_analysis": 1},
+    )
+    pricing_context = ""
+    pa = ((site or {}).get("design") or {}).get("pricing_analysis") or {}
+    if pa.get("ranges"):
+        pricing_context = "\n\nPOSITIONNEMENT PRIX CIBLE (étape 1 d'analyse de marché) :\n"
+        for r in pa.get("ranges", [])[:4]:
+            pricing_context += f"- {r.get('segment','')}: {r.get('entry','?')}–{r.get('premium','?')}€ (sweet-spot {r.get('sweet_spot','?')}€)\n"
+
     products = await db.products.find(
-        {"site_id": site_id, "status": "active"},
+        {"site_id": site_id, "status": {"$in": ["active", "draft"]}},
         {"_id": 0, "name": 1, "price": 1}
     ).to_list(50)
 
@@ -255,8 +267,8 @@ async def upsell_recommendations(site_id: str, _body: UpsellInput, user=Depends(
     catalog_text = "\n".join([f"- {_name(p)} ({p.get('price')}€)" for p in products[:20]])
 
     system = """Tu es un expert e-commerce Silver Economy spécialiste des upsells/cross-sells.
-À partir d'un catalogue principal, recommande 6 à 10 upsells/accessoires complémentaires,
-parfaits pour augmenter le panier moyen ou la marge.
+À partir d'un catalogue principal ET du positionnement prix cible du site, recommande 6 à 10 upsells/accessoires complémentaires, parfaits pour augmenter le panier moyen ou la marge.
+Respecte la cohérence de gamme : si le site est positionné premium, ne recommande pas d'accessoires low-cost.
 Réponds en JSON strict :
 {
   "upsells": [
@@ -266,11 +278,14 @@ Réponds en JSON strict :
   ]
 }"""
 
-    user = f"""Catalogue principal actuel :
+    user = f"""Niche : {(site or {}).get('niche','')}
+Marchés : {', '.join((site or {}).get('selected_countries') or ['FR'])}
+Catalogue principal actuel :
 {catalog_text}
+{pricing_context}
 
-Liste 6 à 10 upsells (accessoires, garanties, consommables) que je peux rechercher sur AliExpress via mots-clés.
-Priorise ceux avec une vraie utilité (pas juste un gadget) et une forte marge."""
+Liste 6 à 10 upsells (accessoires, garanties, consommables) que je peux rechercher sur AliExpress/CJ via mots-clés.
+Priorise ceux avec une vraie utilité (pas juste un gadget), cohérents avec le positionnement prix, et à forte marge."""
 
     data = await _claude_json(system, user, timeout=60)
     if not data or not data.get("upsells"):
@@ -278,6 +293,7 @@ Priorise ceux avec une vraie utilité (pas juste un gadget) et une forte marge."
 
     snapshot = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "used_pricing_context": bool(pricing_context),
         **data,
     }
     await db.sites.update_one(
@@ -285,6 +301,47 @@ Priorise ceux avec une vraie utilité (pas juste un gadget) et une forte marge."
         {"$set": {"design.upsell_recommendations": snapshot}},
     )
     return snapshot
+
+
+# =====================================================================
+# 4. Manual step validation — Concepteur can mark a journey step as "done"
+#    regardless of auto-completion heuristics.
+# =====================================================================
+VALID_STEP_KEYS = {
+    "pricing", "import", "upsells", "forecast",
+    "branding", "pages", "content", "seo", "qa",
+}
+
+
+class StepValidateInput(BaseModel):
+    step: str
+    validated: bool = True
+
+
+@router.post("/sites/{site_id}/journey/validate-step")
+async def validate_journey_step(
+    site_id: str, body: StepValidateInput, user=Depends(get_current_user),
+):
+    """Mark a cockpit journey step as validated (or un-validate it).
+    The Concepteur drives his own progress — there are no product-count gates."""
+    await _check_site_access(site_id, user)
+    if body.step not in VALID_STEP_KEYS:
+        raise HTTPException(400, f"Étape inconnue : {body.step}")
+
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "journey_validated": 1})
+    validated = set((site or {}).get("journey_validated") or [])
+    if body.validated:
+        validated.add(body.step)
+    else:
+        validated.discard(body.step)
+    await db.sites.update_one(
+        {"id": site_id},
+        {"$set": {
+            "journey_validated": sorted(validated),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    return {"ok": True, "validated_steps": sorted(validated)}
 
 
 @router.get("/sites/{site_id}/upsell-recommendations")

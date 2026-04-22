@@ -49,6 +49,7 @@ USER_TMPL = """Contexte :
 - Produit phare : {flagship}
 - Bénéfices clés des produits : {benefits_hint}
 - Voix de marque existante (si présente) : {brand_voice}
+- Positionnement prix issu de l'analyse marché (étape 1) : {pricing_hint}
 - Directive spécifique du Concepteur : {tweak}
 
 Objectif : produire la configuration COMPLÈTE du storefront en 1 shot.
@@ -235,7 +236,14 @@ async def _gather_context(site: dict) -> dict:
         bv = payload.get("brand_voice") or {}
         if bv:
             brand_voice = json.dumps(bv, ensure_ascii=False)[:500]
-    return {"flagship": flagship or "N/A", "benefits_hint": benefits_hint or "N/A", "brand_voice": brand_voice or "N/A"}
+    # Pricing analysis from step 1 (market positioning context)
+    pricing_hint = ""
+    pa = (site.get("design") or {}).get("pricing_analysis") or {}
+    if pa.get("ranges"):
+        sweet = [r.get("sweet_spot") for r in pa.get("ranges", []) if r.get("sweet_spot")]
+        if sweet:
+            pricing_hint = f"Positionnement prix sweet-spot : {min(sweet)}-{max(sweet)}€"
+    return {"flagship": flagship or "N/A", "benefits_hint": benefits_hint or "N/A", "brand_voice": brand_voice or "N/A", "pricing_hint": pricing_hint or "N/A"}
 
 
 def _inject_legal(design: dict, site: dict) -> dict:
@@ -287,6 +295,7 @@ async def generate_design(site_id: str, data: GenerateInput, user: dict = Depend
         flagship=ctx["flagship"],
         benefits_hint=ctx["benefits_hint"],
         brand_voice=ctx["brand_voice"],
+        pricing_hint=ctx["pricing_hint"],
         tweak=data.tweak or "aucune (défaut)",
         slug=_slugify(site.get("name")),
     )
@@ -396,6 +405,7 @@ async def regenerate_section(site_id: str, section: str, data: RegenInput, user:
         flagship=ctx["flagship"],
         benefits_hint=ctx["benefits_hint"],
         brand_voice=ctx["brand_voice"],
+        pricing_hint=ctx["pricing_hint"],
         tweak=section_directive,
         slug=_slugify(site.get("name")),
     )

@@ -29,8 +29,13 @@ export const formatError = (detail) => {
 export const apiCall = async (fn) => {
   try {
     const { data } = await fn();
-    return { data, error: null };
+    return { data, error: null, rawDetail: null };
   } catch (e) {
-    return { data: null, error: formatError(e.response?.data?.detail) || e.message };
+    const detail = e.response?.data?.detail;
+    return {
+      data: null,
+      error: formatError(detail) || e.message,
+      rawDetail: detail,
+    };
   }
 };

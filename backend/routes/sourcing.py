@@ -536,6 +536,25 @@ async def import_product(site_id: str, data: ImportInput, user: dict = Depends(g
         raw_desc = _re.sub(r"<[^>]+>", " ", raw_desc)
         raw_desc = _re.sub(r"\s+", " ", raw_desc).strip()[:3000]
 
+    # 🔒 BLOCK import if any target country has no shipping option.
+    # The Concepteur can't sell a product that can't be delivered to the site's markets.
+    missing_countries = [
+        cc for cc, info in shipping_by_country.items()
+        if isinstance(info, dict) and not info.get("available")
+    ]
+    if missing_countries and data.provider == "cj":
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "shipping_unavailable",
+                "missing_countries": missing_countries,
+                "shipping": shipping_by_country,
+                "message": f"Ce produit ne peut pas être livré dans : {', '.join(missing_countries)}. "
+                           f"Le site dessert {', '.join(countries)}. Choisis un autre produit "
+                           f"expédié depuis la Chine ou l'entrepôt EU (pas UK).",
+            },
+        )
+
     # Translate via Claude (non-blocking error)
     translations = await _translate_product(data.title, raw_desc, target_langs)
 
