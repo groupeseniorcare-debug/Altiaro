@@ -16,6 +16,7 @@ import SiteBlogPosts from "./pages/SiteBlogPosts";
 import SiteSEO from "./pages/SiteSEO";
 import SiteAliExpressImport from "./pages/SiteAliExpressImport";
 import AdminIntegrations from "./pages/AdminIntegrations";
+import AdminReview from "./pages/AdminReview";
 import Empire from "./pages/Empire";
 import Billing from "./pages/Billing";
 import Orders from "./pages/Orders";
@@ -193,6 +194,14 @@ function App() {
             element={
               <ProtectedRoute adminOnly>
                 <AdminIntegrations />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/review"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminReview />
               </ProtectedRoute>
             }
           />

@@ -5,6 +5,7 @@ import { useAuth } from "../lib/auth";
 import Layout from "../components/Layout";
 import StepPanel from "../components/StepPanel";
 import BlockOutputModal from "../components/BlockOutputModal";
+import SiteQAPanel from "../components/SiteQAPanel";
 import {
   ArrowLeft,
   Lock,
@@ -310,13 +311,6 @@ export default function SiteDetail() {
                 >
                   <Gear size={16} weight="duotone" /> Politique plateforme
                 </button>
-                <button
-                  onClick={() => setShowScale(true)}
-                  data-testid="scale-site"
-                  className="h-10 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium flex items-center gap-2 transition active:scale-[0.98]"
-                >
-                  <Rocket size={16} weight="fill" /> Scaler sur plusieurs pays
-                </button>
               </div>
             </div>
 
@@ -334,6 +328,10 @@ export default function SiteDetail() {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="mb-10">
+          <SiteQAPanel site={site} />
         </div>
 
         <div className="space-y-10">

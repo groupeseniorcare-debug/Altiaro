@@ -5,6 +5,7 @@ import { LANGUAGES, t } from "../lib/i18n";
 import { readCart, cartTotals } from "../lib/cart";
 import { getCustomer } from "../lib/customerAuth";
 import CartDrawer from "./CartDrawer";
+import StorefrontTracking from "./storefront/StorefrontTracking";
 import {
   ShoppingBag, Phone, ShieldCheck, Truck, MagnifyingGlass, User,
   List, X, FacebookLogo, InstagramLogo, YoutubeLogo, LinkedinLogo,
@@ -98,6 +99,8 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
       <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=${fontsQuery}&display=swap`} />
       <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="anonymous" />
       <link rel="dns-prefetch" href="https://images.unsplash.com" />
+
+      <StorefrontTracking site={site} />
 
       {/* ================= TRUST BAR ================= */}
       <div className="text-white text-[12.5px]" style={{ background: textCol }}>

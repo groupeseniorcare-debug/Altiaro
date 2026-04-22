@@ -258,7 +258,7 @@ export default function LaunchSite() {
                   result={r}
                   selected={!!selected[r.country]}
                   onToggle={() => {
-                    if (r.verdict === "NO_GO" || r.verdict === "ERROR") return;
+                    if (r.verdict === "ERROR") return;
                     setSelected((s) => ({ ...s, [r.country]: !s[r.country] }));
                   }}
                 />
@@ -278,19 +278,44 @@ export default function LaunchSite() {
           </div>
         )}
 
-        {/* Step 3 — Launch */}
-        {scan && !loading && (scan.summary.go + scan.summary.go_with_reserve) > 0 && (
+        {/* Step 3 — Launch (accessible as soon as any market is returned) */}
+        {scan && !loading && (scan.results || []).some((r) => r.verdict !== "ERROR") && (
           <div className="bg-white rounded-md border border-neutral-300 p-5" data-testid="launch-step3">
             <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-700 font-medium mb-2">
               03 · Lance ton site
             </div>
+
+            {/* Budget transparency — key trust moment */}
+            <div className="rounded-lg border border-neutral-200 bg-[#FDFBF7] p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                  <Lightning size={16} weight="fill" className="text-amber-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-neutral-900 mb-1">Budget publicitaire par marché</div>
+                  <div className="text-xs text-neutral-600 leading-relaxed">
+                    <strong className="text-neutral-900">30 €/jour par marché sélectionné</strong> — réparti 50/50 :
+                    <span className="font-mono mx-1">15 €</span> de ta poche · <span className="font-mono mx-1">15 €</span> financés par Altiaro.
+                    Facturés mensuellement à la validation du site. {selectedCountries.length > 0 && (
+                      <span className="block mt-1.5 pt-1.5 border-t border-neutral-200">
+                        <strong className="text-neutral-900">Ton engagement :</strong>{" "}
+                        <span className="font-mono">{selectedCountries.length * 15} €/jour</span>
+                        {" · "}
+                        <span className="font-mono">{selectedCountries.length * 15 * 30} €/mois</span> sur {selectedCountries.length} marché{selectedCountries.length > 1 ? "s" : ""}.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="text-sm text-neutral-600 mb-3">
-              Ton site sera créé avec le nom provisoire <span className="font-mono text-neutral-900">« Projet {product.trim()} »</span>. Tu le nommeras définitivement à l'étape <strong>#5 — Génération nom de marque + domaine</strong> dans le cockpit.
+              Ton site sera créé avec le nom provisoire <span className="font-mono text-neutral-900">« Projet {product.trim()} »</span>. Tu le nommeras définitivement à l'étape branding du cockpit.
             </div>
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="text-xs text-neutral-500">
                 {selectedCountries.length === 0 ? (
-                  <span className="text-red-400">Sélectionne au moins 1 marché GO ↑</span>
+                  <span className="text-red-500">Sélectionne au moins 1 marché ↑</span>
                 ) : (
                   <>
                     <span className="text-neutral-700 font-medium">{selectedCountries.length}</span>{" "}
@@ -303,7 +328,7 @@ export default function LaunchSite() {
                 onClick={createSite}
                 disabled={creating || selectedCountries.length === 0}
                 data-testid="launch-create"
-                className="h-9 px-4 rounded-md bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 text-white font-medium text-sm flex items-center gap-1.5 transition-colors"
+                className="h-10 px-5 rounded-md bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 text-white font-medium text-sm flex items-center gap-2 transition-colors"
               >
                 {creating ? (
                   <>
@@ -311,7 +336,7 @@ export default function LaunchSite() {
                   </>
                 ) : (
                   <>
-                    <Rocket size={14} weight="fill" /> Créer &amp; lancer le studio
+                    <Rocket size={14} weight="fill" /> Valider les marchés &amp; lancer le cockpit
                     <ArrowRight size={12} weight="bold" />
                   </>
                 )}
@@ -327,9 +352,11 @@ export default function LaunchSite() {
               <Info size={14} className="text-neutral-400 shrink-0 mt-0.5" />
               <div className="text-[11px] text-neutral-500 leading-relaxed">
                 <span className="text-neutral-700 font-medium">Comment ça marche</span> — Claude +
-                Google Keyword Planner en parallèle sur 6 marchés (FR / DE / BE+LU / NL / CH / UK). Un
-                verdict par marché sur 3 critères obligatoires (prix ≥ 50€, volume ≥ 5 000/mois, CPA
-                Ads ≤ 40%) + concurrence (soft ≤ 75/100, au-delà warning "concurrence élevée").
+                Google Keyword Planner en parallèle sur 6 marchés (FR / DE / BE+LU / NL / CH / UK).
+                Chaque marché reçoit un verdict indicatif (GO / RESERVE / NO-GO) sur le prix moyen,
+                le volume mensuel, le coût par conversion et la concurrence.{" "}
+                <strong className="text-neutral-700">Aucun critère n'est bloquant</strong> — tu
+                peux lancer sur n'importe quel marché, la décision reste la tienne.
               </div>
             </div>
           </div>
@@ -344,7 +371,8 @@ export default function LaunchSite() {
  * ========================================================= */
 function MarketCard({ result, selected, onToggle }) {
   const meta = VERDICT_META[result.verdict] || VERDICT_META.ERROR;
-  const canSelect = result.verdict === "GO" || result.verdict === "GO_WITH_RESERVE";
+  // Non-blocking : every non-error market is selectable (we just inform honestly)
+  const canSelect = result.verdict !== "ERROR";
   const m = result.metrics || {};
 
   return (
@@ -407,11 +435,18 @@ function MarketCard({ result, selected, onToggle }) {
               warn={m.competition_weighted > 75}
             />
             <Stat
-              label="CPA/prix"
-              value={`${Math.round(m.acq_cost_pct || 0)}%`}
-              warn={m.acq_cost_pct > 40}
+              label="Coût/Conv"
+              value={`${Math.round(m.estimated_cpa_eur || 0)}€`}
+              warn={(m.estimated_cpa_eur || 0) > (m.avg_price_median || 0) * 0.4}
             />
           </div>
+
+          {(m.estimated_cpa_eur || 0) > (m.avg_price_median || 0) * 0.4 && (
+            <div className="flex items-start gap-1.5 text-[10px] text-amber-800 bg-amber-50 border border-amber-200 p-1.5 rounded mb-2">
+              <Warning size={10} weight="fill" className="shrink-0 mt-0.5 text-amber-600" />
+              <span>Coût d'acquisition élevé · à surveiller</span>
+            </div>
+          )}
 
           {result.competition_high && (
             <div className="flex items-start gap-1.5 text-[10px] text-amber-300 bg-amber-500/5 border border-amber-500/20 p-1.5 rounded mb-2">
