@@ -491,11 +491,18 @@ def _parse_provider_url(url: str) -> tuple[str, str]:
     """Extract (provider, product_id) from a CJ or AliExpress URL.
     Raises HTTPException if unrecognized."""
     u = url.strip()
-    # CJ: https://cjdropshipping.com/product/xxx-{pid}.html or /product/{uuid}
-    m = _re.search(r"cjdropshipping\.com/product/([A-Za-z0-9\-]{8,})(?:\.html|$|\?)", u)
+    # CJ formats:
+    #   - SEO slug + PID: /product/{slug}-p-{pid}.html  (current CJ format, 2024+)
+    #   - Legacy PID only: /product/{pid}.html
+    #   - UUID: /product/{uuid} (rare)
+    m = _re.search(r"cjdropshipping\.com/product/(?:.*?-p-)?(\d{10,})(?:\.html|[?&#]|$)", u)
     if m:
         return "cj", m.group(1)
-    # AliExpress: /item/{pid}.html or /i/{pid}.html or aliexpress.*//item/{pid}
+    # Fallback: UUID-style CJ product IDs (hex-dash format)
+    m = _re.search(r"cjdropshipping\.com/product/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})", u)
+    if m:
+        return "cj", m.group(1)
+    # AliExpress: /item/{pid}.html or /i/{pid}.html
     m = _re.search(r"aliexpress\.[a-z.]+/(?:item|i)/(\d{6,})", u)
     if m:
         return "aliexpress", m.group(1)
