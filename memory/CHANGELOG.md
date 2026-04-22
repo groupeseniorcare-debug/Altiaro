@@ -3,6 +3,22 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-22 · Sprint 45 : Espace client Storefront — Suivi + Historique commandes
+### Template partagé (toutes boutiques actuelles ET futures)
+- **Backend** :
+  - Nouveau endpoint `GET /api/public/sites/{id}/customers/orders/{order_id}` (JWT customer) — détail enrichi : items avec `product_image` + `product_name_current` (résolus depuis la collection `products`), `status_history` complet, `review_invitations[]` pour les commandes livrées avec invitation pending.
+  - Helper `_enrich_order_items` partagé (réutilisé aussi par le guest tracking).
+  - **Fix sécurité** : suppression de l'endpoint shadow `/public/sites/{id}/orders/{num}` dans `public_shop.py` qui renvoyait n'importe quelle commande sans vérification d'email. La route sécurisée de `customers.py` (email obligatoire en query + match strict) reprend la main.
+- **Frontend** (pages dans `/app/frontend/src/pages/`) :
+  - `StorefrontOrderDetail.jsx` — route `/shop/:siteId/account/orders/:orderId` : header + badge statut, timeline 4 étapes (Commande reçue / Paiement / Acheminement / Livrée) avec dates réelles extraites de `status_history`, lien direct vers le transporteur (Colissimo, Chronopost, Mondial Relay, DHL, UPS, FedEx, GLS), bloc "Laisser mon avis" si livrée + invitation pending, articles avec miniatures, totaux détaillés (sous-total / livraison / TVA / remise / total), adresse de livraison, encart d'aide.
+  - `StorefrontTrack.jsx` — route publique `/shop/:siteId/track` : formulaire N° commande + email (pas de compte requis) qui appelle le endpoint sécurisé et affiche la timeline + récap.
+  - `StorefrontAccount.jsx` amélioré : lignes de commandes cliquables, 4 filtres de statut (Toutes / En cours / Livrées / Archivées), chevron hover.
+- **Composants partagés** :
+  - `components/storefront/OrderTimeline.jsx` — timeline réutilisée par les 2 pages, gère les états terminaux (cancelled/refunded → bannière), auto-résout la couleur accent depuis `site.design.brand.primary_color`.
+  - `components/StorefrontLayout.jsx` : ajout du lien "Suivre ma commande" dans le footer "Service client" (visible sur toutes les pages du storefront).
+- **Routes ajoutées dans `App.js`** : `/shop/:siteId/account/orders/:orderId` + `/shop/:siteId/track`.
+- **Testing agent iteration 18** : **14/14 backend + 100% frontend PASS**, aucun bug.
+
 ## 2026-04-22 · Sprint 44 : SEO Dashboard + hardening Hook #27
 ### Dashboard SEO Cockpit (P0)
 - **Endpoint** `GET /api/sites/{id}/seo-audit` branché dans `server.py` (oubli du sprint précédent corrigé).
