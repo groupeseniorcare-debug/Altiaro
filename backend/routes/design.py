@@ -794,3 +794,193 @@ async def studio_state(site_id: str, user: dict = Depends(get_current_user)):
         "updated_at": design.get("updated_at"),
         "default_prompts": DEFAULT_PROMPTS,
     }
+
+
+# =====================================================================
+# Brand patch — edit brand identity manually (name, tagline, voice, story, palette, fonts)
+# =====================================================================
+class BrandPatchInput(BaseModel):
+    name: Optional[str] = None
+    baseline: Optional[str] = None
+    tagline: Optional[str] = None
+    voice: Optional[str] = None
+    story: Optional[str] = None
+    primary_color: Optional[str] = None
+    secondary_color: Optional[str] = None
+    background_color: Optional[str] = None
+    text_color: Optional[str] = None
+    accent_color: Optional[str] = None
+    font_heading: Optional[str] = None
+    font_body: Optional[str] = None
+
+
+@router.patch("/sites/{site_id}/design/brand")
+async def brand_patch(site_id: str, data: BrandPatchInput, user: dict = Depends(get_current_user)):
+    """Edit individual fields of the brand identity without full regeneration."""
+    await _check_site_access(site_id, user)
+    patch = {}
+    for k, v in data.dict(exclude_none=True).items():
+        if k in {"primary_color", "secondary_color", "background_color", "text_color", "accent_color"}:
+            # store both flat (for palette_apply compat) and in palette dict
+            patch[f"design.brand.{k}"] = v
+            patch[f"design.brand.palette.{k.replace('_color', '')}"] = v
+        else:
+            patch[f"design.brand.{k}"] = v
+    if not patch:
+        return {"ok": True, "changed": 0}
+    patch["design.updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.sites.update_one({"id": site_id}, {"$set": patch})
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "design.brand": 1})
+    return {"ok": True, "brand": (site or {}).get("design", {}).get("brand") or {}}
+
+
+# =====================================================================
+# Navigation — header + footer menu items
+# =====================================================================
+class NavItem(BaseModel):
+    label: str
+    href: str
+    external: bool = False
+
+
+class NavigationInput(BaseModel):
+    header: list[NavItem] = []
+    footer: list[NavItem] = []
+
+
+@router.get("/sites/{site_id}/navigation")
+async def get_navigation(site_id: str, user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "design.navigation": 1})
+    nav = ((site or {}).get("design") or {}).get("navigation") or {}
+    return {
+        "header": nav.get("header") or [
+            {"label": "Accueil", "href": "/", "external": False},
+            {"label": "Collections", "href": "/collections", "external": False},
+            {"label": "À propos", "href": "/a-propos", "external": False},
+            {"label": "Contact", "href": "/contact", "external": False},
+        ],
+        "footer": nav.get("footer") or [
+            {"label": "CGV", "href": "/cgv", "external": False},
+            {"label": "Mentions légales", "href": "/mentions", "external": False},
+            {"label": "Confidentialité", "href": "/confidentialite", "external": False},
+        ],
+    }
+
+
+@router.put("/sites/{site_id}/navigation")
+async def update_navigation(site_id: str, data: NavigationInput, user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    clean = {
+        "header": [i.dict() for i in data.header][:12],
+        "footer": [i.dict() for i in data.footer][:12],
+    }
+    await db.sites.update_one(
+        {"id": site_id},
+        {"$set": {
+            "design.navigation": clean,
+            "design.updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    return {"ok": True, "navigation": clean}
+
+
+# =====================================================================
+# Collections — CRUD
+# =====================================================================
+class CollectionInput(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    slug: Optional[str] = None
+    description: Optional[str] = ""
+    cover_image: Optional[str] = None
+    product_ids: list[str] = []
+    featured: bool = False
+
+
+def _slugify(s: str) -> str:
+    s = s.lower().strip()
+    s = re.sub(r"[^a-z0-9]+", "-", s)
+    return re.sub(r"-+", "-", s).strip("-")
+
+
+@router.get("/sites/{site_id}/collections")
+async def list_collections(site_id: str, user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    cols = await db.collections.find({"site_id": site_id}, {"_id": 0}).sort("created_at", 1).to_list(100)
+    return cols
+
+
+@router.post("/sites/{site_id}/collections")
+async def create_collection(site_id: str, data: CollectionInput, user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    slug = data.slug or _slugify(data.name)
+    # Validate uniqueness of slug per site
+    existing = await db.collections.find_one({"site_id": site_id, "slug": slug}, {"_id": 0, "id": 1})
+    if existing:
+        raise HTTPException(400, f"Une collection avec le slug '{slug}' existe déjà")
+    # Validate product ids belong to site
+    valid_ids = []
+    if data.product_ids:
+        found = await db.products.find(
+            {"site_id": site_id, "id": {"$in": data.product_ids}},
+            {"_id": 0, "id": 1}
+        ).to_list(200)
+        valid_ids = [p["id"] for p in found]
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "id": str(uuid.uuid4()),
+        "site_id": site_id,
+        "name": data.name,
+        "slug": slug,
+        "description": data.description or "",
+        "cover_image": data.cover_image or None,
+        "product_ids": valid_ids,
+        "featured": bool(data.featured),
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.collections.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+
+@router.patch("/sites/{site_id}/collections/{collection_id}")
+async def update_collection(site_id: str, collection_id: str, data: CollectionInput,
+                            user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    slug = data.slug or _slugify(data.name)
+    conflict = await db.collections.find_one(
+        {"site_id": site_id, "slug": slug, "id": {"$ne": collection_id}},
+        {"_id": 0, "id": 1},
+    )
+    if conflict:
+        raise HTTPException(400, f"Une autre collection utilise déjà le slug '{slug}'")
+    valid_ids = []
+    if data.product_ids:
+        found = await db.products.find(
+            {"site_id": site_id, "id": {"$in": data.product_ids}},
+            {"_id": 0, "id": 1}
+        ).to_list(200)
+        valid_ids = [p["id"] for p in found]
+    result = await db.collections.update_one(
+        {"id": collection_id, "site_id": site_id},
+        {"$set": {
+            "name": data.name,
+            "slug": slug,
+            "description": data.description or "",
+            "cover_image": data.cover_image or None,
+            "product_ids": valid_ids,
+            "featured": bool(data.featured),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(404, "Collection introuvable")
+    doc = await db.collections.find_one({"id": collection_id, "site_id": site_id}, {"_id": 0})
+    return doc
+
+
+@router.delete("/sites/{site_id}/collections/{collection_id}")
+async def delete_collection(site_id: str, collection_id: str, user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    await db.collections.delete_one({"id": collection_id, "site_id": site_id})
+    return {"ok": True}

@@ -3,6 +3,25 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-22 · Étape 5 · Studio de marque complet
+
+**Backend** (3 nouveaux endpoints dans `/routes/design.py`) :
+- `PATCH /api/sites/{id}/design/brand` — édition granulaire des champs brand (nom, tagline, voix, story, palette 5-couleurs, font heading/body)
+- `GET/PUT /api/sites/{id}/navigation` — menu header (≤12 items) + footer (≤12 items), ordre + external
+- `GET/POST/PATCH/DELETE /api/sites/{id}/collections` — CRUD collections (slug auto, validation produits du site, featured flag)
+
+**Frontend (`SiteDesign.jsx`)** — rewrite en studio tabbé `max-w-6xl` avec 4 onglets :
+1. **Identité** : formulaire éditable (nom + tagline + voix + storytelling), upload/regeneration de logo (Nano Banana), 5 colorpickers, 5 presets Silver Economy (Sénior chaleureux, Médical rassurant, Nature apaisant, Luxe minimal, Bien-être doux), sélecteur typographie avec 6 paires recommandées. Barre sticky "Enregistrer l'identité".
+2. **Navigation** : CRUD items header + footer, ↑/↓ pour réordonner, checkbox external.
+3. **Collections** : grille avec aperçu (cover + badge vedette), modal d'édition avec multi-select produits (filtre `role !== upsell`), slug auto.
+4. **Pages & contenu** (composant `BrandingContent.jsx` extrait) : régénération IA section par section (hero, bénéfices, about, FAQ, testimonials, contact, SEO), brief global pour régénérer tout, pages légales auto.
+- **UX EmptyState améliorée** : lien "remplir manuellement →" pour contourner la génération IA.
+- `hasDesign` détecté si au moins un champ brand est rempli (pas seulement `name`).
+
+**Testing** : lint OK, 4 endpoints curl testés (PATCH brand ok, GET+PUT navigation ok, POST collection ok `fauteuils-releveurs`), 2 screenshots validés (onglet Collections + onglet Identité avec preset palette + tagline pré-remplie).
+
+
+
 ## 2026-04-22 · Launch Gate : garde-fou marge vs CPA
 
 - **Backend** : nouveau bloc `launch_gate` dans le forecast avec statut `ok | warning | blocked` basé sur le ratio `marge/commande HT / CPA`.
