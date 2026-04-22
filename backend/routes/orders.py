@@ -40,6 +40,92 @@ async def list_orders(site_id: str, user: dict = Depends(get_current_user)):
     return items
 
 
+@router.get("/sites/{site_id}/fulfillment")
+async def fulfillment_summary(site_id: str, user: dict = Depends(get_current_user)):
+    """Per-order supplier/tracking summary. Each line = one customer order
+    joined with its CJ/AE mapping to show fulfillment status at a glance."""
+    await _check_site_access(site_id, user)
+    orders = await db.orders.find(
+        {"site_id": site_id, "status": {"$in": ["paid", "shipped", "delivered"]}},
+        {"_id": 0, "id": 1, "order_number": 1, "status": 1, "total": 1, "currency": 1,
+         "created_at": 1, "tracking_number": 1, "carrier": 1, "customer": 1,
+         "supplier_order_id": 1, "supplier_provider": 1},
+    ).sort("created_at", -1).limit(200).to_list(200)
+
+    # Fetch mappings in bulk
+    order_ids = [o["id"] for o in orders]
+    mappings_raw = await db.order_mappings.find(
+        {"customer_order_id": {"$in": order_ids}}, {"_id": 0}
+    ).to_list(400)
+    mapping_by_order = {}
+    for m in mappings_raw:
+        mapping_by_order.setdefault(m["customer_order_id"], []).append(m)
+
+    result = []
+    counters = {"pending_supplier": 0, "placed": 0, "shipped": 0, "delivered": 0, "error": 0}
+    for o in orders:
+        maps = mapping_by_order.get(o["id"]) or []
+        has_error = any(m.get("status") == "supplier_error" for m in maps)
+        if not maps and o.get("status") == "paid":
+            state = "pending_supplier"
+        elif has_error:
+            state = "error"
+        elif any(m.get("status") == "delivered" for m in maps):
+            state = "delivered"
+        elif any(m.get("status") == "shipped" for m in maps):
+            state = "shipped"
+        elif any(m.get("status") == "placed" for m in maps):
+            state = "placed"
+        else:
+            state = "pending_supplier"
+        counters[state] = counters.get(state, 0) + 1
+        result.append({
+            **o,
+            "fulfillment_state": state,
+            "supplier_mappings": [
+                {"provider": m.get("provider"),
+                 "supplier_order_id": m.get("cj_order_id") or m.get("aliexpress_order_id"),
+                 "status": m.get("status"),
+                 "tracking_number": m.get("tracking_number"),
+                 "carrier": m.get("carrier"),
+                 "last_sync_at": m.get("last_sync_at")}
+                for m in maps
+            ],
+        })
+    return {"counters": counters, "total": len(result), "orders": result}
+
+
+@router.post("/sites/{site_id}/orders/{order_id}/supplier-retry")
+async def retry_supplier_order(site_id: str, order_id: str, user: dict = Depends(get_current_user)):
+    """Manual retry of supplier auto-fulfillment (CJ or AE). Used when the auto-placement
+    failed at webhook time — Concepteur can re-attempt from the fulfillment dashboard."""
+    await _check_site_access(site_id, user)
+    order = await db.orders.find_one({"id": order_id, "site_id": site_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if order.get("status") not in ("paid", "shipped"):
+        raise HTTPException(400, "Order must be paid first")
+
+    # Detect providers present in this order's items
+    providers = set()
+    for item in order.get("items") or []:
+        p = await db.products.find_one({"id": item.get("product_id")}, {"_id": 0, "source": 1})
+        if p and (p.get("source") or {}).get("provider"):
+            providers.add((p["source"] or {})["provider"])
+
+    results = {}
+    if "cj" in providers:
+        from routes.sourcing import auto_place_cj_order
+        results["cj"] = await auto_place_cj_order(order_id)
+    if "aliexpress" in providers:
+        from routes.aliexpress import auto_place_aliexpress_order
+        results["aliexpress"] = await auto_place_aliexpress_order(order)
+    if not results:
+        raise HTTPException(400, "No CJ or AliExpress items in this order.")
+    return {"ok": True, "retried": results}
+
+
+
 @router.get("/admin/orders")
 async def admin_list_orders(
     status: Optional[str] = None,

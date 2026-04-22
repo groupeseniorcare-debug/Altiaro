@@ -318,6 +318,21 @@ async def startup():
             id="ae_tracking_sync", replace_existing=True, misfire_grace_time=3600,
         )
 
+        # Every 2h — CJ Dropshipping tracking sync (faster than AE because CJ updates
+        # statuses more granularly; keeps customer-facing tracking fresh).
+        async def _scheduled_cj_tracking_sync():
+            try:
+                from routes.sourcing import sync_all_cj_tracking
+                result = await sync_all_cj_tracking()
+                logger.info(f"[scheduler] CJ tracking sync : {result}")
+            except Exception:
+                logger.exception("[scheduler] CJ tracking sync failed")
+        scheduler.add_job(
+            _scheduled_cj_tracking_sync,
+            CronTrigger(hour="*/2", minute=15),
+            id="cj_tracking_sync", replace_existing=True, misfire_grace_time=1800,
+        )
+
         # Monday 05:00 UTC — Scan opportunités Google (détection spikes)
         async def _scheduled_opportunity_scan():
             logger.info("[scheduler] opportunity scan start")

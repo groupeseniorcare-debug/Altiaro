@@ -227,6 +227,13 @@ async def mollie_webhook(request: Request):
                         _aio.create_task(auto_place_aliexpress_order(refreshed2))
                 except Exception:
                     logger.exception("Failed to dispatch AliExpress auto-order")
+                # Auto-forward to CJ Dropshipping for any line item sourced from them
+                try:
+                    from routes.sourcing import auto_place_cj_order
+                    import asyncio as _aio
+                    _aio.create_task(auto_place_cj_order(order["id"]))
+                except Exception:
+                    logger.exception("Failed to dispatch CJ auto-order")
         else:
             await db.orders.update_one({"id": order["id"]}, {"$set": updates})
 

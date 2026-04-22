@@ -689,3 +689,309 @@ async def import_by_url(site_id: str, data: ImportUrlInput, user: dict = Depends
         await asyncio.sleep(1.2)
     # Delegate to the existing importer (handles translation + specs + shipping + save)
     return await import_product(site_id, import_payload, user)
+
+
+# =====================================================================
+# SPRINT C — CJ fulfillment automation
+# Auto-place a supplier order at CJ when the customer order becomes "paid",
+# and sync tracking back to the customer order periodically.
+# =====================================================================
+import logging
+logger = logging.getLogger(__name__)
+
+
+_CJ_STATUS_MAP = {
+    # CJ logistic statuses → internal
+    "CREATED": "placed",
+    "IN_CART": "placed",
+    "UNPAID": "placed",
+    "UNSHIPPED": "paid",
+    "PROCESSING": "paid",
+    "DISPATCHED": "shipped",
+    "SHIPPED": "shipped",
+    "DELIVERING": "shipped",
+    "IN_TRANSIT": "shipped",
+    "DELIVERED": "delivered",
+    "REFUNDED": "refunded",
+    "CANCELLED": "cancelled",
+}
+
+
+async def auto_place_cj_order(customer_order_id: str) -> dict:
+    """Triggered after Mollie confirms payment. For every CJ line item of the order,
+    place a supplier order at CJ and store a mapping in `order_mappings`. Idempotent
+    via the `(customer_order_id, cj_order_id)` unique index.
+
+    Returns dict with per-line status for logging.
+    """
+    if not CJ_API_KEY:
+        return {"ok": False, "reason": "no_api_key"}
+
+    order = await db.orders.find_one({"id": customer_order_id}, {"_id": 0})
+    if not order:
+        return {"ok": False, "reason": "order_not_found"}
+
+    # Build CJ product list — only lines whose product.source.provider == "cj"
+    cj_products = []
+    for item in (order.get("items") or []):
+        p = await db.products.find_one({"id": item.get("product_id")}, {"_id": 0})
+        if not p or (p.get("source") or {}).get("provider") != "cj":
+            continue
+        # CJ requires the VARIANT id (vid), NOT the product id. If no variants were
+        # imported, we can't place the order — skip and record an error.
+        variants = p.get("variants") or []
+        if not variants:
+            logger.warning(f"[cj-order] product {p.get('id')} has no variants — cannot order")
+            continue
+        vid = variants[0].get("vid")
+        if not vid:
+            continue
+        cj_products.append({
+            "vid": str(vid),
+            "quantity": int(item.get("quantity") or 1),
+            "customer_order_item_id": item.get("product_id"),
+            "source_product_id": (p.get("source") or {}).get("product_id", ""),
+        })
+
+    if not cj_products:
+        return {"ok": True, "placed": 0, "reason": "no_cj_items"}
+
+    # Compose CJ payload (/shopping/order/createOrder)
+    ship = order.get("shipping_address") or {}
+    customer = order.get("customer") or {}
+    first_name = (customer.get("name") or "").split(" ", 1)[0] or "Client"
+    last_name = (customer.get("name") or "").split(" ", 1)[1] if " " in (customer.get("name") or "") else first_name
+    cc = (ship.get("country_code") or "FR").upper()
+
+    # CJ expects BOTH shippingCountry (full English name) AND shippingCountryCode (ISO2)
+    country_names = {
+        "FR": "France", "DE": "Germany", "BE": "Belgium", "NL": "Netherlands",
+        "CH": "Switzerland", "UK": "United Kingdom", "GB": "United Kingdom",
+        "ES": "Spain", "IT": "Italy", "PT": "Portugal", "LU": "Luxembourg",
+        "AT": "Austria", "DK": "Denmark", "SE": "Sweden", "FI": "Finland",
+        "IE": "Ireland", "US": "United States", "CA": "Canada",
+    }
+    country_full = country_names.get(cc, ship.get("country") or "France")
+
+    # CJ requires a valid logisticName taken from their freightCalculate endpoint.
+    # Call it first with the real variant + destination to get a shipping option.
+    logistic_name = "CJPacket Ordinary"  # fallback
+    first_vid = cj_products[0]["vid"] if cj_products else ""
+    if first_vid:
+        try:
+            token_f = await _cj_auth()
+            async with httpx.AsyncClient(timeout=25) as c_f:
+                r_f = await c_f.post(
+                    f"{CJ_BASE}/logistic/freightCalculate",
+                    headers={"CJ-Access-Token": token_f},
+                    json={
+                        "startCountryCode": "CN",
+                        "endCountryCode": cc,
+                        "products": [{"quantity": p["quantity"], "vid": p["vid"]}
+                                     for p in cj_products],
+                    },
+                )
+                options = (r_f.json() or {}).get("data") or []
+                if options:
+                    cheapest = min(
+                        options,
+                        key=lambda o: float(o.get("logisticPrice") or 9999) if o.get("logisticPrice") is not None else 9999,
+                    )
+                    logistic_name = cheapest.get("logisticName") or logistic_name
+        except Exception:
+            logger.warning("[cj-order] freight calc failed, using fallback logistic name")
+
+    cj_body = {
+        "orderNumber": order.get("order_number") or customer_order_id,
+        "shippingCountry": country_full,
+        "shippingCountryCode": cc,
+        "shippingProvince": ship.get("state") or ship.get("city") or "",
+        "shippingCity": ship.get("city") or "",
+        "shippingCounty": "",
+        "shippingAddress": ship.get("line1", ""),
+        "shippingAddress2": ship.get("line2", "") or "",
+        "shippingCustomerName": customer.get("name") or f"{first_name} {last_name}",
+        "shippingZip": ship.get("postal_code") or "",
+        "shippingPhone": customer.get("phone") or "",
+        "email": customer.get("email") or "",
+        "remark": "Altiaro auto-fulfillment",
+        "fromCountryCode": "CN",
+        "logisticName": logistic_name,
+        "products": [
+            {"vid": p["vid"], "quantity": p["quantity"]}
+            for p in cj_products
+        ],
+    }
+
+    token = await _cj_auth()
+    try:
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.post(
+                f"{CJ_BASE}/shopping/order/createOrder",
+                headers={"CJ-Access-Token": token},
+                json=cj_body,
+            )
+            body = r.json()
+    except Exception as e:
+        logger.exception("CJ order createOrder failed")
+        await db.orders.update_one(
+            {"id": customer_order_id},
+            {"$push": {"status_history": {
+                "status": "supplier_error",
+                "at": datetime.now(timezone.utc).isoformat(),
+                "source": "cj_order",
+                "error": str(e)[:300],
+            }}},
+        )
+        return {"ok": False, "reason": "cj_request_failed", "error": str(e)[:300]}
+
+    if not body.get("result"):
+        err_msg = body.get("message") or "CJ rejected order"
+        logger.warning(f"[cj-order] failed for {customer_order_id}: {err_msg}")
+        await db.orders.update_one(
+            {"id": customer_order_id},
+            {"$push": {"status_history": {
+                "status": "supplier_error",
+                "at": datetime.now(timezone.utc).isoformat(),
+                "source": "cj_order",
+                "error": err_msg[:300],
+            }}},
+        )
+        return {"ok": False, "reason": "cj_rejected", "error": err_msg}
+
+    # CJ sometimes returns data as {orderId:...}, sometimes as a plain string = orderId.
+    raw_data = body.get("data")
+    if isinstance(raw_data, dict):
+        cj_order_id = raw_data.get("orderId") or raw_data.get("id") or ""
+    else:
+        cj_order_id = str(raw_data or "")
+
+    # Persist mapping (one per order for simplicity — CJ groups all lines)
+    mapping_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    await db.order_mappings.insert_one({
+        "id": mapping_id,
+        "customer_order_id": customer_order_id,
+        "site_id": order.get("site_id"),
+        "provider": "cj",
+        "cj_order_id": cj_order_id,
+        "status": "placed",
+        "tracking_number": None,
+        "carrier": None,
+        "cj_products": cj_products,
+        "created_at": now,
+        "last_sync_at": now,
+    })
+    await db.orders.update_one(
+        {"id": customer_order_id},
+        {"$set": {"supplier_order_id": cj_order_id, "supplier_provider": "cj"},
+         "$push": {"status_history": {
+             "status": "supplier_placed",
+             "at": now,
+             "source": "cj_order",
+             "cj_order_id": cj_order_id,
+         }}},
+    )
+    logger.info(f"[cj-order] placed cj_order_id={cj_order_id} for {customer_order_id}")
+    return {"ok": True, "cj_order_id": cj_order_id, "placed": len(cj_products)}
+
+
+async def sync_all_cj_tracking() -> dict:
+    """Cron: iterate all open CJ order mappings and refresh their tracking.
+    Pushes tracking_number onto the parent customer order and triggers the
+    shipping email once (using status_history to dedupe).
+    """
+    if not CJ_API_KEY:
+        return {"ok": False, "reason": "no_api_key"}
+
+    from routes.emails import send_shipping_update
+
+    cursor = db.order_mappings.find(
+        {"provider": "cj",
+         "cj_order_id": {"$ne": None},
+         "status": {"$in": ["placed", "paid", "shipped"]}},
+        {"_id": 0},
+    )
+    mappings = await cursor.to_list(500)
+    ok, err = 0, 0
+    token = await _cj_auth()
+    headers = {"CJ-Access-Token": token}
+
+    async with httpx.AsyncClient(timeout=25) as c:
+        for m in mappings:
+            try:
+                # 1. Query order status + tracking
+                await asyncio.sleep(1.1)  # Respect CJ 1 QPS
+                r = await c.get(
+                    f"{CJ_BASE}/shopping/order/query",
+                    params={"orderId": m["cj_order_id"]},
+                    headers=headers,
+                )
+                if r.status_code != 200:
+                    err += 1
+                    continue
+                data = (r.json().get("data") or {})
+                cj_status = (data.get("orderStatus") or data.get("status") or "").upper()
+                tracking_number = data.get("trackNumber") or data.get("trackingNumber") or ""
+                carrier = data.get("logisticsName") or data.get("logisticName") or ""
+                internal = _CJ_STATUS_MAP.get(cj_status, m.get("status"))
+
+                updates = {
+                    "tracking_number": tracking_number or m.get("tracking_number"),
+                    "carrier": carrier or m.get("carrier"),
+                    "cj_status": cj_status,
+                    "status": internal,
+                    "last_sync_at": datetime.now(timezone.utc).isoformat(),
+                }
+                await db.order_mappings.update_one({"id": m["id"]}, {"$set": updates})
+
+                # 2. Propagate to parent customer order
+                if tracking_number:
+                    parent_updates = {"tracking_number": tracking_number, "carrier": carrier}
+                    if internal == "shipped":
+                        parent_updates["status"] = "shipped"
+                    elif internal == "delivered":
+                        parent_updates["status"] = "delivered"
+                    await db.orders.update_one(
+                        {"id": m["customer_order_id"]},
+                        {"$set": parent_updates,
+                         "$push": {"status_history": {
+                             "status": internal,
+                             "at": datetime.now(timezone.utc).isoformat(),
+                             "source": "cj_tracking",
+                             "cj_status": cj_status,
+                             "tracking_number": tracking_number,
+                         }}},
+                    )
+
+                    # 3. Send "shipped" email once (dedup via already_sent flag)
+                    if internal == "shipped" and not m.get("shipping_email_sent"):
+                        parent_order = await db.orders.find_one(
+                            {"id": m["customer_order_id"]}, {"_id": 0}
+                        )
+                        site = await db.sites.find_one(
+                            {"id": m["site_id"]}, {"_id": 0}
+                        )
+                        if parent_order and site:
+                            try:
+                                await send_shipping_update(parent_order, site, tracking_number, carrier)
+                                await db.order_mappings.update_one(
+                                    {"id": m["id"]},
+                                    {"$set": {"shipping_email_sent": True}},
+                                )
+                            except Exception:
+                                logger.exception("[cj-tracking] shipping email failed")
+                ok += 1
+            except Exception:
+                logger.exception(f"[cj-tracking-sync] failed for mapping {m.get('id')}")
+                err += 1
+    return {"provider": "cj", "total": len(mappings), "ok": ok, "errors": err}
+
+
+@router.post("/sourcing/cj/sync-tracking")
+async def cj_sync_tracking_manual(user: dict = Depends(get_current_user)):
+    """Admin-triggered manual sync of all CJ trackings (same logic as the cron)."""
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Admin only")
+    return await sync_all_cj_tracking()
+

@@ -826,6 +826,19 @@ async def sync_all_aliexpress_tracking() -> dict:
                          "ae_status": ae_status,
                      }}},
                 )
+                # Send "expédié" email once
+                if internal == "shipped" and not m.get("shipping_email_sent"):
+                    try:
+                        from routes.emails import send_shipping_update
+                        parent_order = await db.orders.find_one({"id": m["customer_order_id"]}, {"_id": 0})
+                        site = await db.sites.find_one({"id": m["site_id"]}, {"_id": 0})
+                        if parent_order and site:
+                            await send_shipping_update(parent_order, site, tracking_number, carrier)
+                            await db.order_mappings.update_one(
+                                {"id": m["id"]}, {"$set": {"shipping_email_sent": True}},
+                            )
+                    except Exception:
+                        logger.exception("[ae-tracking] shipping email failed")
             ok += 1
         except Exception:
             logger.exception(f"[ae-tracking-sync] failed for mapping {m.get('id')}")
