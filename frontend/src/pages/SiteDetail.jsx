@@ -5,6 +5,7 @@ import { useAuth } from "../lib/auth";
 import Layout from "../components/Layout";
 import StepPanel from "../components/StepPanel";
 import BlockOutputModal from "../components/BlockOutputModal";
+import AliExpressConnect from "../components/AliExpressConnect";
 import {
   ArrowLeft,
   Lock,
@@ -280,6 +281,10 @@ export default function SiteDetail() {
                     <LinkIcon size={14} /> Shopify admin
                   </a>
                 )}
+              </div>
+
+              <div className="mt-5">
+                <AliExpressConnect siteId={id} />
               </div>
 
               <div className="flex flex-wrap gap-2 mt-5">
