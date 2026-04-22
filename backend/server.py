@@ -62,6 +62,7 @@ from routes import blog_posts as blog_posts_routes
 from routes import reviews_hook as reviews_hook_routes
 from routes import indexnow as indexnow_routes
 from routes import seo_audit as seo_audit_routes
+from routes import seo_studio as seo_studio_routes
 from routes import aliexpress as aliexpress_routes
 from routes import validation as validation_routes
 from routes import cockpit_tools as cockpit_tools_routes
@@ -118,6 +119,7 @@ api.include_router(blog_posts_routes.router)
 api.include_router(reviews_hook_routes.router)
 api.include_router(indexnow_routes.router)
 api.include_router(seo_audit_routes.router)
+api.include_router(seo_studio_routes.router)
 api.include_router(aliexpress_routes.router)
 api.include_router(validation_routes.router)
 api.include_router(cockpit_tools_routes.router)

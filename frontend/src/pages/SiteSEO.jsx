@@ -3,9 +3,10 @@ import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft, ArrowClockwise, CheckCircle, Warning, XCircle,
   MagnifyingGlass, Sparkle, TrendUp, Shield, ChartBar, Clock,
-  Lightbulb,
+  Lightbulb, Robot,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
+import SeoStudioPanel from "../components/SeoStudioPanel";
 
 const DIMENSION_ORDER = ["catalog", "content", "structure", "trust", "aeo", "freshness"];
 
@@ -28,6 +29,7 @@ export default function SiteSEO() {
   const [audit, setAudit] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [tab, setTab] = useState("audit");
 
   const load = useCallback(async (fromRefresh = false) => {
     fromRefresh ? setRefreshing(true) : setLoading(true);
@@ -91,7 +93,33 @@ export default function SiteSEO() {
           </button>
         </div>
 
-        {/* Published banner */}
+        {/* Tabs */}
+        <div className="bg-white rounded-2xl border border-neutral-200 p-1.5 mb-6 inline-flex gap-1" data-testid="seo-tabs">
+          <button
+            onClick={() => setTab("audit")}
+            data-testid="tab-audit"
+            className={`h-10 px-4 rounded-xl text-sm font-medium flex items-center gap-2 transition ${
+              tab === "audit" ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-100"
+            }`}
+          >
+            <ChartBar size={14} weight={tab === "audit" ? "fill" : "duotone"} /> Audit SEO
+          </button>
+          <button
+            onClick={() => setTab("aeo")}
+            data-testid="tab-aeo"
+            className={`h-10 px-4 rounded-xl text-sm font-medium flex items-center gap-2 transition ${
+              tab === "aeo" ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-100"
+            }`}
+          >
+            <Robot size={14} weight={tab === "aeo" ? "fill" : "duotone"} /> Studio AEO + mots-clés
+          </button>
+        </div>
+
+        {tab === "aeo" && <SeoStudioPanel siteId={siteId} />}
+
+        {tab === "audit" && (
+          <>
+            {/* Published banner */}
         {!audit.published && (
           <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 flex items-start gap-3" data-testid="seo-not-published-banner">
             <XCircle size={20} weight="fill" className="text-rose-600 flex-shrink-0 mt-0.5" />
@@ -232,6 +260,8 @@ export default function SiteSEO() {
             </div>
           )}
         </div>
+          </>
+        )}
       </div>
     </div>
   );

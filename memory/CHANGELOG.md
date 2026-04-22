@@ -3,6 +3,26 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-22 · SEO/AEO Studio · étape 6 bouclée
+
+**Backend — nouveau module `seo_studio.py`** (4 endpoints puissants) :
+- `GET /api/public/sites/{id}/products/{pid}/jsonld` — retourne JSON-LD combiné Product + Offer + Organization + BreadcrumbList + AggregateRating (si avis) + FAQPage (si narrative.faq). Utilisable par Google rich snippets ET AI engines.
+- `GET /api/sites/{id}/seo/aeo-readiness` — checklist AEO 10-items pondérée (100 pts) : identité marque, llms.txt, sitemap+hreflang, FAQ ≥70%, meta ≥80%, alt-texts ≥50%, blog ≥5, contact local, legal, publié. Verdict excellent/bon/moyen/faible.
+- `POST /api/sites/{id}/seo/bulk-optimize` — background job Claude qui génère pour chaque produit : seo_title (≤60 car), meta_description (≤155 car), 5 keywords long-tail (mix transactionnel+informationnel), alt-texts par image, 3 Q/R pour FAQPage (AEO). Flag `force=true` pour tout régénérer.
+- `GET /api/sites/{id}/seo/keyword-strategy` — classifie les mots-clés Google par marché en transactionnel (acheter, prix, meilleur…) vs informationnel (comment, pourquoi, guide…) + 10 suggestions d'articles blog pour combler le gap informationnel.
+
+**Bouclage étape 5 — storefront public** :
+- `GET /api/public/sites/{id}/navigation` — sert le menu header/footer configuré à l'étape 5
+- `GET /api/public/sites/{id}/collections` — merge collections user (db.collections) + legacy (design.collections) avec flag `source: "user" | "legacy" | "fallback"` + `featured` sort
+
+**Frontend** :
+- `SiteSEO.jsx` : 2 onglets (Audit SEO / Studio AEO + mots-clés), conservant l'audit existant et ajoutant le nouveau panneau.
+- Nouveau `SeoStudioPanel.jsx` : jauge AEO 100pts avec anneau SVG coloré, checklist 10 items (OK/à faire + poids + how_to_fix), card violet "Optimisation IA en masse" (bulk-optimize avec 2 boutons : manquants / tout régénérer), panneau stratégie mots-clés par marché avec buckets Transactionnel/Informationnel (pastilles avec volume + CPC tooltip), suggestions d'articles blog, liens vers sitemap.xml/robots.txt/llms.txt.
+
+**Testing** : lint ✅ · 5 endpoints curl 100% OK (navigation 2/1 items, collection "fauteuils-releveurs" source=user, JSON-LD avec 2 schemas + aggregateRating prêt, AEO score 40/100 moyen avec détail 10 checks, keyword strategy structure OK) · screenshot onglet AEO validé (jauge + checklist complète visible).
+
+
+
 ## 2026-04-22 · Étape 5 · Studio de marque complet
 
 **Backend** (3 nouveaux endpoints dans `/routes/design.py`) :
