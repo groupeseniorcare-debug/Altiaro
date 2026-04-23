@@ -1,0 +1,25 @@
+{
+  "summary": "Iter24 retest after iter23 NavItem fix. ALL TESTS PASS (17/17). Mega menu persists end-to-end: PUT /api/sites/{id}/navigation with {label, type:'mega', children:[{label, href, image}]} now round-trips correctly through GET /api/public/sites/{id}/navigation and GET /api/public/sites/{id}/design. Storefront renders mega menu on both desktop (hover reveals mega-panel with mega-card-0/1) and mobile (390x844 drawer expands mobile-nav-mega-* to show mobile-mega-card-0/1). exclude_none=True verified: plain-link items (Accueil, À propos, Contact) have NO null type/children/image/target fields in stored/returned JSON.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration23_legal_mega_mobile.py",
+    "/app/test_reports/pytest/iter24.xml"
+  ],
+  "action_items": [
+    "None blocking. Optional cleanup: the regression test_patch_section_hero still overwrites hero with 'Hero iter23'/'Regression' copy on this site — main agent may want to regenerate real hero copy via POST /sites/{id}/design/regenerate/hero before handing off to the Concepteur demo."
+  ],
+  "critical_code_review_comments": [
+    "Fix is clean: NavChildItem + NavItem with Optional[str] type/target, Optional[list[NavChildItem]] children, Optional[str] image; update_navigation serializes via .dict(exclude_none=True). Verified no ghost null fields on plain links.",
+    "routes/design.py is now 1278 lines — still large but fix is minimal and focused.",
+    "Consider adding Pydantic validator for type ∈ {'mega', None} to prevent typos from frontend, but not blocking."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "100% (desktop hover + mobile drawer both render mega panels with children)"},
+  "test_credentials": "Concepteur: concepteur@conceptfactory.fr / Concepteur2026! — Site: 65964cb0-7a1a-4c11-9644-1ad8f2371d48",
+  "seed_data_creation": "Restored a user-facing mega menu on site 65964cb0: header=[Accueil, Nos fauteuils (mega with 2 Picsum children: 'Relax & confort'→/collections/confort, 'Mobilité douce'→/collections/mobilite), À propos, Contact]; footer=[CGV, Mentions légales]. design.hero still carries test copy {title:'Hero iter23', subtitle:'Regression'} from pytest — main agent may restore.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "iter23 NavItem fix fully validated. Mega menu end-to-end (Studio PUT → Mongo → public nav GET → StorefrontLayout desktop hover + mobile drawer) works with all data-testids as specified (nav-mega-<label>, mega-panel-*, mega-card-0/1, mobile-nav-mega-<label>, mobile-mega-card-0/1). 17/17 iter23 pytest pass. No regression on auth, patch hero, seed-legal, public design endpoints.",
+  "rca of the issue": "Iter23 bug (NavItem stripping type/children/image/target) is CONFIRMED FIXED. Applied mitigation matches exactly what iter23 RCA recommended: NavChildItem model added, NavItem extended with optional fields, update_navigation uses .dict(exclude_none=True) so plain links don't store ghost nulls. Retest shows: (1) PUT mega → GET public nav returns full type+children+image structure, (2) Storefront renders correctly on desktop + mobile, (3) plain links return {label, href, external} only — no null fields polluting Mongo."
+}

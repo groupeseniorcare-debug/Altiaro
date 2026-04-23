@@ -1114,10 +1114,24 @@ async def brand_patch(site_id: str, data: BrandPatchInput, user: dict = Depends(
 # =====================================================================
 # Navigation — header + footer menu items
 # =====================================================================
+class NavChildItem(BaseModel):
+    """Sub-item of a mega menu: a visual card with image + label + href."""
+    label: str = ""
+    href: str = ""
+    image: Optional[str] = None
+    external: bool = False
+
+
 class NavItem(BaseModel):
+    """Top-level navigation item. `type='mega'` turns it into a mega menu
+    with visual children; any other value (or None) is a plain text link."""
     label: str
     href: str
     external: bool = False
+    type: Optional[str] = None  # 'mega' | None (plain link)
+    children: Optional[list[NavChildItem]] = None
+    image: Optional[str] = None  # optional icon/thumb on the link itself
+    target: Optional[str] = None  # '_blank' for external
 
 
 class NavigationInput(BaseModel):
@@ -1149,8 +1163,8 @@ async def get_navigation(site_id: str, user: dict = Depends(get_current_user)):
 async def update_navigation(site_id: str, data: NavigationInput, user: dict = Depends(get_current_user)):
     await _check_site_access(site_id, user)
     clean = {
-        "header": [i.dict() for i in data.header][:12],
-        "footer": [i.dict() for i in data.footer][:12],
+        "header": [i.dict(exclude_none=True) for i in data.header][:12],
+        "footer": [i.dict(exclude_none=True) for i in data.footer][:12],
     }
     await db.sites.update_one(
         {"id": site_id},
