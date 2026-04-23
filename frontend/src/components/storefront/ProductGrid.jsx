@@ -14,24 +14,29 @@ const DEMO_PRODUCTS = [
 ];
 
 export function ProductGrid({ siteId, products, loading, design, lang }) {
-  const { fontHeading } = designAccents(design);
+  const { primary, accent, divider, textMuted, textFaint, fontHeading } = designAccents(design);
   const hasReal = products && products.length > 0;
   const displayed = hasReal ? products : DEMO_PRODUCTS;
 
   return (
-    <section id="products" className="max-w-7xl mx-auto px-6 md:px-10 py-20 md:py-24" data-testid="products-section">
-      <div className="flex items-baseline justify-between mb-12">
+    <section id="products" className="max-w-7xl mx-auto px-6 md:px-10 py-24 md:py-36 bg-white" data-testid="products-section">
+      <div className="flex items-end justify-between flex-wrap gap-6 mb-14 md:mb-20">
         <div>
-          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-3">Best-sellers</div>
+          <div className="flex items-center gap-3 mb-5">
+            <span className="h-px w-10" style={{ background: primary }} />
+            <span className="text-[11px] uppercase tracking-[0.4em]" style={{ color: primary }}>
+              L'édition
+            </span>
+          </div>
           <h2
-            className="text-4xl md:text-5xl"
-            style={{ fontFamily: `"${fontHeading}", serif`, color: "#1C1917" }}
+            className="text-[40px] md:text-[56px] lg:text-[64px] leading-[1.02] tracking-[-0.02em]"
+            style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
           >
-            {t(lang, "our_collection")}
+            {t(lang, "our_collection")}.
           </h2>
         </div>
-        <div className="text-sm text-[#78716C] hidden md:block">
-          {hasReal ? `${products.length} ${products.length > 1 ? "produits" : "produit"}` : "Aperçu du template"}
+        <div className="text-[12px] uppercase tracking-[0.3em]" style={{ color: textMuted }}>
+          {hasReal ? `${products.length} ${products.length > 1 ? "références" : "référence"}` : "Aperçu du template"}
         </div>
       </div>
 
@@ -75,8 +80,11 @@ export function ProductGrid({ siteId, products, loading, design, lang }) {
                     data-testid={`product-card-${p.id}`}
                     className="group block"
                   >
-                    {/* Premium card — soft neutral frame, tight aspect, gentle lift on hover */}
-                    <div className="relative rounded-[20px] bg-neutral-100 overflow-hidden ring-1 ring-neutral-200/60 transition-all duration-500 group-hover:ring-neutral-900/10 group-hover:shadow-[0_20px_60px_-20px_rgba(0,0,0,0.18)] group-hover:-translate-y-1">
+                    {/* Premium card — gray frame, tight aspect, gentle lift on hover */}
+                    <div
+                      className="relative overflow-hidden transition-all duration-500 group-hover:shadow-[0_20px_60px_-20px_rgba(0,0,0,0.18)] group-hover:-translate-y-1"
+                      style={{ background: accent, borderRadius: "2px" }}
+                    >
                       <div className="aspect-square relative">
                         {p.images?.[0] ? (
                           <img
@@ -92,18 +100,20 @@ export function ProductGrid({ siteId, products, loading, design, lang }) {
                         )}
                         {/* Badges — minimal, one at most each corner */}
                         {p.featured && (
-                          <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm text-neutral-900 text-[10px] uppercase tracking-[0.2em] font-semibold px-2.5 py-1.5 rounded-full flex items-center gap-1 shadow-sm">
+                          <div className="absolute top-4 left-4 bg-white text-neutral-900 text-[10px] uppercase tracking-[0.2em] font-semibold px-2.5 py-1.5 flex items-center gap-1" style={{ borderRadius: "2px" }}>
                             <Star size={10} weight="fill" style={{ color: "#F5B800" }} /> {t(lang, "featured")}
                           </div>
                         )}
                         {p.compare_at_price && p.compare_at_price > p.price && (
-                          <div className="absolute top-4 right-4 bg-neutral-900 text-white text-[11px] font-semibold px-2.5 py-1 rounded-full tracking-tight">
+                          <div className="absolute top-4 right-4 text-white text-[11px] font-semibold px-2.5 py-1 tracking-tight"
+                               style={{ background: primary, borderRadius: "2px" }}>
                             −{Math.round((1 - p.price / p.compare_at_price) * 100)}%
                           </div>
                         )}
-                        {/* Reveal-on-hover quick action — invisible until hover/focus */}
+                        {/* Reveal-on-hover quick action */}
                         <div className="absolute inset-x-4 bottom-4 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
-                          <div className="w-full h-11 bg-white text-neutral-900 text-[13px] font-semibold rounded-full flex items-center justify-center gap-2 shadow-lg">
+                          <div className="w-full h-11 bg-white text-[13px] font-semibold flex items-center justify-center gap-2 shadow-lg"
+                               style={{ color: primary, borderRadius: "2px" }}>
                             Voir le produit
                             <span className="transition-transform group-hover:translate-x-0.5">→</span>
                           </div>
@@ -112,22 +122,24 @@ export function ProductGrid({ siteId, products, loading, design, lang }) {
                     </div>
 
                     {/* Meta line under the card */}
-                    <div className="mt-4 px-1">
-                      <div
-                        className="text-[15px] md:text-[17px] font-semibold leading-snug tracking-tight text-neutral-900 line-clamp-2"
-                        style={{ fontFamily: `"${fontHeading}", serif` }}
-                      >
-                        {pickLang(p.name, lang) || p.name}
-                      </div>
-                      <div className="flex items-baseline gap-2 mt-2">
-                        <span className="text-[17px] font-semibold tabular-nums text-neutral-900">
-                          {formatPrice(p.price, p.currency, lang)}
-                        </span>
-                        {p.compare_at_price && (
-                          <span className="text-sm line-through tabular-nums text-neutral-400">
-                            {formatPrice(p.compare_at_price, p.currency, lang)}
+                    <div className="mt-5 pt-5 flex items-start justify-between gap-3" style={{ borderTop: `1px solid ${divider}` }}>
+                      <div className="flex-1 min-w-0">
+                        <div
+                          className="text-[15px] md:text-[17px] font-normal leading-snug tracking-tight line-clamp-2"
+                          style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
+                        >
+                          {pickLang(p.name, lang) || p.name}
+                        </div>
+                        <div className="flex items-baseline gap-2 mt-2">
+                          <span className="text-[16px] font-semibold tabular-nums" style={{ color: primary }}>
+                            {formatPrice(p.price, p.currency, lang)}
                           </span>
-                        )}
+                          {p.compare_at_price && (
+                            <span className="text-[13px] line-through tabular-nums" style={{ color: textFaint }}>
+                              {formatPrice(p.compare_at_price, p.currency, lang)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </Link>

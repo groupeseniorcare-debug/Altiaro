@@ -75,8 +75,19 @@ export function formatPrice(price, currency = "EUR", lang = "fr") {
 }
 
 export function designAccents(design) {
+  // MONOCHROME TEMPLATE — force the storefront chrome to black/white/gray regardless
+  // of the brand palette. The brand color is exposed as `brandAccent` for small
+  // brand-specific accents only (rating stars remain gold, we expose one optional
+  // hue for any micro-accent that *needs* to be brand-colored).
   return {
-    primary: design?.brand?.primary_color || "#B84B31",
+    primary: "#0A0A0A",           // main "ink" color (text, buttons)
+    accent: "#F5F5F5",            // light gray surfaces
+    surface: "#FAFAFA",           // softest gray
+    divider: "#E5E5E5",           // hairline dividers
+    textMuted: "#737373",         // secondary text
+    textFaint: "#A3A3A3",         // captions
+    brandAccent: design?.brand?.primary_color || "#0A0A0A",
     fontHeading: design?.brand?.font_heading || "Fraunces",
+    fontBody: design?.brand?.font_body || "Inter",
   };
 }

@@ -1,22 +1,21 @@
 import React, { useState } from "react";
-import { Envelope, ArrowRight, CheckCircle } from "@phosphor-icons/react";
+import { ArrowRight, CheckCircle } from "@phosphor-icons/react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
+import { designAccents } from "./storefrontUtils";
 
 const BACKEND = "";
 
 /**
- * Newsletter signup CTA before footer.
+ * NewsletterCTA — MONOCHROME. Gray card on white canvas, split layout with
+ * a poised heading on the left and the email form on the right.
  */
 export default function NewsletterCTA({ design }) {
   const { siteId } = useParams();
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
-  const primary = design?.brand?.primary_color || "#1C1917";
-  const accent = design?.brand?.accent_color || "#F5F2EB";
-  const fontHeading = design?.brand?.font_heading || "Fraunces";
+  const { primary, accent, divider, textMuted, fontHeading } = designAccents(design);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -32,40 +31,68 @@ export default function NewsletterCTA({ design }) {
   };
 
   return (
-    <section className="py-20 md:py-24 px-6" data-testid="storefront-newsletter" style={{ background: primary }}>
-      <div className="max-w-3xl mx-auto text-center text-white">
-        <Envelope size={36} weight="duotone" className="mx-auto mb-4 opacity-80" />
-        <h2 className="text-3xl md:text-4xl mb-4" style={{ fontFamily: `${fontHeading}, serif` }}>
-          Nos conseils directement dans votre boîte mail
-        </h2>
-        <p className="text-white/80 mb-8 text-[15px] max-w-xl mx-auto">
-          Chaque mois, nos guides pratiques, nos nouveautés et des offres exclusives.
-          Pas de spam, une seule newsletter par mois, promis.
-        </p>
-        {submitted ? (
-          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur rounded-full px-5 py-3 text-sm" data-testid="newsletter-success">
-            <CheckCircle size={16} weight="fill" color="#34D399" />
-            Merci ! Vous recevrez notre prochaine newsletter dans quelques jours.
+    <section className="py-20 md:py-28 px-6 bg-white" data-testid="storefront-newsletter">
+      <div className="max-w-6xl mx-auto">
+        <div
+          className="grid grid-cols-1 lg:grid-cols-2 items-center gap-10 lg:gap-16 p-10 md:p-14"
+          style={{ background: accent, borderRadius: "2px" }}
+        >
+          <div>
+            <div className="flex items-center gap-3 mb-5">
+              <span className="h-px w-10" style={{ background: primary }} />
+              <span className="text-[11px] uppercase tracking-[0.4em]" style={{ color: primary }}>
+                Newsletter
+              </span>
+            </div>
+            <h2
+              className="text-[32px] md:text-[42px] leading-[1.05] tracking-[-0.02em]"
+              style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
+            >
+              Nos conseils dans<br />votre boîte mail.
+            </h2>
+            <p className="mt-5 text-[14px] max-w-md" style={{ color: textMuted }}>
+              Chaque mois, nos guides pratiques, nos nouveautés et des offres exclusives. Une seule newsletter par mois, promis.
+            </p>
           </div>
-        ) : (
-          <form onSubmit={submit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="votre@email.com"
-              data-testid="newsletter-input"
-              className="flex-1 h-12 px-5 rounded-full text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-white/50"
-            />
-            <button type="submit" disabled={submitting} data-testid="newsletter-submit"
-              className="h-12 px-6 rounded-full bg-white text-neutral-900 font-medium flex items-center justify-center gap-2 disabled:opacity-60 transition hover:bg-white/90">
-              {submitting ? "Envoi…" : <>Je m'inscris <ArrowRight size={14} weight="bold" /></>}
-            </button>
-          </form>
-        )}
-        <div className="text-xs text-white/60 mt-4">
-          En vous inscrivant, vous acceptez notre politique de confidentialité. Désinscription en 1 clic.
+          <div>
+            {submitted ? (
+              <div
+                className="flex items-center gap-3 bg-white px-6 py-5"
+                style={{ borderRadius: "2px", color: primary }}
+                data-testid="newsletter-success"
+              >
+                <CheckCircle size={20} weight="fill" style={{ color: "#047857" }} />
+                <span className="text-[14px]">Merci ! Vous recevrez notre prochaine newsletter dans quelques jours.</span>
+              </div>
+            ) : (
+              <form onSubmit={submit} className="flex flex-col gap-3">
+                <div className="flex gap-2 bg-white p-1" style={{ borderRadius: "2px", border: `1px solid ${divider}` }}>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="votre@email.com"
+                    data-testid="newsletter-input"
+                    className="flex-1 h-12 px-4 bg-transparent text-[14px] focus:outline-none"
+                    style={{ color: primary }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    data-testid="newsletter-submit"
+                    className="h-12 px-5 text-white text-[13px] font-medium flex items-center justify-center gap-2 disabled:opacity-60 transition-all hover:gap-3"
+                    style={{ background: primary, borderRadius: "2px" }}
+                  >
+                    {submitting ? "Envoi…" : <>S'inscrire <ArrowRight size={13} weight="bold" /></>}
+                  </button>
+                </div>
+                <div className="text-[11px]" style={{ color: textMuted }}>
+                  En vous inscrivant, vous acceptez notre politique de confidentialité. Désinscription en 1 clic.
+                </div>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     </section>

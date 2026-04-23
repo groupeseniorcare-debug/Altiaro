@@ -1,32 +1,40 @@
 import React from "react";
-import { Newspaper, Star } from "@phosphor-icons/react";
+import { designAccents } from "./storefrontUtils";
 
 /**
- * Press logos / mentions — marques media citant la boutique.
- * design.press_mentions = [{name, logo_url?}]
+ * PressLogos — MONOCHROME horizontal ribbon. White canvas with a thin top
+ * and bottom hairline. Press names are rendered in italic serif, grayscale.
  */
 export default function PressLogos({ mentions, design }) {
-  const list = mentions?.length ? mentions : [
-    { name: "Notre Temps" }, { name: "60 Millions" }, { name: "Le Figaro" },
-    { name: "France Info" }, { name: "Silver Eco" }, { name: "Capital" },
+  const { primary, divider, textMuted, fontHeading } = designAccents(design);
+  const list = (mentions && mentions.length) ? mentions : [
+    { name: "Le Figaro" }, { name: "Les Échos" }, { name: "Maison & Travaux" },
+    { name: "Notre Temps" }, { name: "60 Millions de Consommateurs" }, { name: "Version Femina" },
   ];
-  const primary = design?.brand?.primary_color || "#1C1917";
 
   return (
-    <section className="py-14 px-6 bg-white border-y border-neutral-100" data-testid="storefront-press">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <Newspaper size={16} weight="duotone" className="text-neutral-500" />
-          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500">Ils parlent de nous</div>
+    <section
+      className="bg-white py-16 md:py-20 px-6"
+      data-testid="storefront-press"
+      id="press"
+      style={{ borderTop: `1px solid ${divider}`, borderBottom: `1px solid ${divider}` }}
+    >
+      <div className="max-w-7xl mx-auto">
+        <div
+          className="text-center text-[10px] uppercase tracking-[0.5em] mb-8"
+          style={{ color: textMuted }}
+        >
+          — Ils parlent de nous —
         </div>
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-6 md:gap-10 items-center opacity-60 hover:opacity-100 transition-opacity">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-8 gap-y-8 md:gap-y-6 items-center">
           {list.slice(0, 6).map((m, i) => (
-            <div key={i} className="text-center" data-testid={`press-${i}`}>
-              {m.logo_url ? (
-                <img src={m.logo_url} alt={m.name} className="h-10 mx-auto object-contain grayscale hover:grayscale-0 transition" />
-              ) : (
-                <div className="font-serif italic text-neutral-700 text-base md:text-lg">{m.name}</div>
-              )}
+            <div
+              key={i}
+              className="text-center text-[16px] md:text-[17px] italic opacity-70 hover:opacity-100 transition-opacity"
+              style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
+              data-testid={`press-${i}`}
+            >
+              {typeof m === "string" ? m : m.name}
             </div>
           ))}
         </div>

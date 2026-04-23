@@ -47,10 +47,14 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
 
   const shopRoot = `/shop/${siteId}`;
   const brand = design?.brand || {};
-  const primary = brand.primary_color || "#B84B31";
-  const accent = brand.accent_color || "#F5F2EB";
-  const bg = brand.background_color || "#FDFBF7";
-  const textCol = brand.text_color || "#1C1917";
+  // MONOCHROME TEMPLATE — enforce white canvas + near-black ink regardless of the
+  // brand palette. The brand accent is reserved for small micro-accents only
+  // (underlines, hairlines, one or two icons). Prevents cream/beige leaks.
+  const primary = "#0A0A0A";
+  const accent = "#F5F5F5";
+  const bg = "#FFFFFF";
+  const textCol = "#0A0A0A";
+  const brandAccent = brand.primary_color || "#0A0A0A";
   const fontHeading = brand.font_heading || "Fraunces";
   const fontBody = brand.font_body || "Inter";
   const logoUrl = brand.logo_url ? `${BACKEND_URL}${brand.logo_url}` : null;

@@ -230,14 +230,13 @@ function hasData(key, design, products) {
   }
 }
 
-// Alternating surface colors for section rhythm — pale cream ⇄ white ⇄ grey
-// creates a quiet editorial tempo without ever turning dark.
+// MONOCHROME TEMPLATE — white canvas, black ink, gray cards. All sections sit on
+// pure white. Rhythm is created by the cards themselves (bg-[#F5F5F5]) and by
+// generous vertical spacing, not by cream/beige backgrounds.
 const DARK_SECTIONS = new Set([]);
-const GRAY_SECTIONS = new Set(["benefits", "testimonials", "faq", "newsletter", "final_cta", "manifesto"]);
+const GRAY_SECTIONS = new Set([]); // everything stays on white
 
-function sectionWrapperClass(key, idx) {
-  if (DARK_SECTIONS.has(key)) return "bg-[#1C1917] text-white";
-  if (GRAY_SECTIONS.has(key)) return "bg-[#F5F2EB]";
+function sectionWrapperClass() {
   return "bg-white";
 }
 
