@@ -579,6 +579,10 @@ function LegalEditor({ siteId, design, onReload, onSaved }) {
     ["CGV", "cgv", `/shop/${siteId}/cgv`],
     ["Mentions légales", "mentions_legales", `/shop/${siteId}/mentions`],
     ["Confidentialité", "confidentialite", `/shop/${siteId}/confidentialite`],
+    ["Cookies", "cookies", `/shop/${siteId}/cookies`],
+    ["Livraison & délais", "livraison", `/shop/${siteId}/livraison`],
+    ["Retours & rétractation", "retours", `/shop/${siteId}/retours`],
+    ["Médiation", "mediation", `/shop/${siteId}/mediation`],
   ];
 
   return (

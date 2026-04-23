@@ -542,3 +542,5 @@ function LegalPage({ kind, title }) {
 export const StorefrontCGV = () => <LegalPage kind="cgv" title="CGV — Conditions générales de vente" />;
 export const StorefrontMentions = () => <LegalPage kind="mentions_legales" title="Mentions légales" />;
 export const StorefrontConfidentialite = () => <LegalPage kind="confidentialite" title="Politique de confidentialité" />;
+export const StorefrontCookies = () => <LegalPage kind="cookies" title="Politique de cookies" />;
+export const StorefrontMediation = () => <LegalPage kind="mediation" title="Médiation de la consommation" />;

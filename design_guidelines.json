@@ -1,98 +1,149 @@
 {
-  "theme_and_archetype": {
-    "theme": "Fully Dark Mode (Ultra Premium Digital 2.0)",
-    "archetype": "Archetype 4 (Swiss & High-Contrast - Monochrome Variant)",
-    "rationale": "A pure dark monochrome palette (blacks, zincs, pure white) maximizes data legibility and evokes a 'command center' software-grade feel (like Linear, Vercel, Raycast). It strips away the 'warm retail' feel, replacing it with cold, precise efficiency."
-  },
-  "typography": {
-    "primary_font": "Inter, sans-serif",
-    "mono_font": "JetBrains Mono, monospace",
-    "import_url": "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');",
-    "scale": {
-      "h1": "text-3xl font-semibold tracking-tight text-zinc-100",
-      "h2": "text-2xl font-semibold tracking-tight text-zinc-100",
-      "h3": "text-lg font-medium tracking-tight text-zinc-100",
-      "body": "text-sm text-zinc-400 font-normal",
-      "data_numbers": "font-mono text-zinc-100 tracking-tight",
-      "labels": "text-xs font-medium uppercase tracking-[0.1em] text-zinc-500"
+  "project_name": "Altiaro - SaaS Multi-tenant e-commerce (Silver Economy)",
+  "theme": "Light",
+  "archetype": "Hybrid: 1 (Organic & Earthy) for Storefront / 4 (Swiss & High-Contrast) for Cockpit",
+  "blueprint": {
+    "1_diagnostic": {
+      "storefront": [
+        "Le menu mobile ne respecte pas la 'thumb-zone' et semble négligé.",
+        "Les cibles tactiles (touch targets) sont trop petites pour le public ciblé (silver economy).",
+        "Le spacing est insuffisant, limitant la lisibilité et l'accessibilité visuelle.",
+        "Les pages storefront (homepage, product, contact) manquent de storytelling, donnant un effet catalogue basique plutôt qu'une expérience narrative premium."
+      ],
+      "cockpit": [
+        "L'UX/UI de l'app admin (Étapes 1-9, Studio, Dashboard) manque de la finition 'Linear/Vercel' attendue.",
+        "Le journey de conception est lourd et manque de cohérence visuelle.",
+        "Le 'Live Preview' et les éditeurs (produits, navigation) ne sont pas optimisés pour un workflow côte à côte fluide."
+      ]
+    },
+    "2_design_principles": [
+      "1. Thumb-Driven Accessibility: Tous les CTAs vitaux et la navigation mobile doivent se situer dans le tiers inférieur (thumb zone), avec des touch targets de 44x44px minimum.",
+      "2. Organic Warmth meets Swiss Precision: Chaleur organique B2C (Fraunces, #B84B31, espaces généreux `p-6` à `p-12`) vs Précision suisse B2B (Inter, grilles denses 'Control Room', bordures 1px).",
+      "3. Narrative Commerce: La fiche produit doit être une expérience immersive à scroller (zoom in sur les détails, typographie expressive, larges zones de negative space).",
+      "4. App-like Feel Frictionless: Le Storefront mobile doit réagir comme une PWA native (Bottom sheet cart, sticky CTA, respect du safe-area-inset).",
+      "5. Progressive Disclosure: Dans le Cockpit, utiliser des drawers et command palettes (Cmd+K) pour l'édition afin de maintenir le contexte sans surcharger l'écran.",
+      "6. High Contrast & Clarity: Ratio de contraste toujours ≥ 4.5:1, textes ≥ 16px sur mobile, pas de gris clairs illisibles."
+    ],
+    "3_quick_wins_mobile": [
+      "Appliquer `min-h-[44px] min-w-[44px]` sur tous les boutons, icônes et liens de navigation (data-testid='mobile-nav-link').",
+      "Ajouter `pb-[env(safe-area-inset-bottom)]` sur le Footer et le Cart Drawer.",
+      "Implémenter un 'Sticky Add-to-Cart' sur la fiche produit : `fixed bottom-0 w-full z-50 bg-background/90 backdrop-blur-xl border-t` (data-testid='sticky-atc-button').",
+      "Activer le scroll snap sur les carrousels de collections : conteneur `flex overflow-x-auto snap-x snap-mandatory`, cartes `snap-center w-[85vw]`.",
+      "Augmenter la police de base mobile : `text-base` (16px minimum) ou `text-lg` pour la lisibilité senior.",
+      "Transformer le Cart Drawer de `right` à `bottom` sur mobile pour un effet 'Bottom Sheet' naturel.",
+      "Header dynamique mobile : ajouter `backdrop-blur-xl bg-background/80` au scroll pour libérer l'espace visuel.",
+      "Désactiver le hover sur mobile (éviter le double tap) et privilégier l'état actif : `active:scale-95 transition-transform`.",
+      "Remplacer les select natifs de variantes par des 'Radio Cards' larges et cliquables au pouce.",
+      "Remplacer les spinners par des Skeleton UI (`animate-pulse bg-stone-200 rounded-lg`) pour réduire la perception d'attente.",
+      "Aérer les listes : utiliser `gap-6` ou `gap-8` au lieu de `gap-2`.",
+      "Hamburger menu : Augmenter la zone de clic visuelle (`p-4 -m-4`) (data-testid='mobile-menu-trigger')."
+    ],
+    "4_medium_improvements": [
+      "Mega Menu Inline Mobile : Remplacer le menu standard par un Drawer plein écran avec navigation 'drill-down' (slide horizontal) pour les sous-catégories.",
+      "Product Narrative : Ajouter Framer Motion pour animer l'apparition (`whileInView`) des sections (Bénéfices, Testimonials, FAQ) et créer un effet scroll premium.",
+      "Cockpit Live Preview : Fixer l'iframe du Storefront (`sticky top-4 h-[calc(100vh-2rem)]`) à droite pendant que les panneaux d'édition (Identity/Nav) scrollent à gauche.",
+      "Footer Mobile : Convertir le footer 4 colonnes en un composant Accordion (shadcn/ui) pour économiser l'espace vertical.",
+      "SiteProducts Editor : Convertir l'édition produit du Cockpit en un Drawer latéral (`w-3/4 max-w-2xl`) au lieu d'une page complète, incluant l'intégration IA (Nano Banana).",
+      "AI Suggest UI : Habiller les boutons d'enrichissement IA avec un effet 'Tracing Beam' (bordure animée) pour souligner la fonctionnalité premium (data-testid='ai-enrich-btn')."
+    ],
+    "5_long_term_blueprint": [
+      "Voice-Commerce & Accessibilité ++ : Intégrer la recherche vocale et un mode 'High Contrast / Text+' activable par l'utilisateur.",
+      "Mac-like Shortcuts (Cockpit) : Ajouter un Command Menu (`Cmd+K`) avec `cmdk` pour naviguer instantanément entre le Studio, le SEO et le P&L.",
+      "PWA App-like : Transformer le Storefront en Progressive Web App avec View Transitions API pour une navigation sans rechargement perceptible.",
+      "Dyson/Apple Finish : Intégrer React Three Fiber pour les produits héros (modèles 3D simples) et des micro-interactions haptiques simulées via animation.",
+      "Bento Grid Analytics : Refondre le Dashboard et le SiteForecast avec un layout Bento 'Control Room' très dense, couplé à des graphiques Recharts fluides."
+    ],
+    "6_mega_menu_spec": {
+      "desktop": {
+        "trigger": "Hover avec `delay-150` sur les catégories principales (data-testid='mega-menu-trigger').",
+        "structure": "Popover `w-full max-w-7xl mx-auto` attaché sous le header transparent.",
+        "layout": "Grid 4 colonnes : 2 colonnes pour sous-liens (`text-sm font-medium gap-3 flex flex-col`), 2 colonnes 'Featured'.",
+        "featured_cards": "Images `aspect-video rounded-xl object-cover` avec overlay `bg-black/20 hover:bg-black/10 transition-colors` et texte blanc en bas à gauche.",
+        "animation": "Framer Motion: `initial={{ opacity: 0, y: -10, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.2, ease: 'easeOut' }}`."
+      },
+      "mobile": {
+        "trigger": "Hamburger menu ouvrant un Drawer via shadcn/ui (data-testid='mobile-menu-drawer').",
+        "structure": "Plein écran (`h-[100dvh] w-full bg-background`).",
+        "navigation": "Mode 'Drill-down' : cliquer sur une catégorie affiche ses sous-liens avec un bouton 'Retour' (chevron-left).",
+        "featured": "Zone scrollable horizontalement en bas du menu `flex overflow-x-auto snap-x snap-mandatory gap-4 pb-8 px-4`.",
+        "touch_targets": "Liens de catégories avec `py-5 text-xl font-heading` et bordure inférieure `border-b border-border/40`."
+      }
     }
   },
-  "colors": {
-    "background": "#000000",
-    "surface": "#09090B",
-    "surface_hover": "#18181B",
-    "border": "#27272A",
-    "border_subtle": "#18181B",
-    "text_primary": "#FAFAFA",
-    "text_secondary": "#A1A1AA",
-    "accent": "#FFFFFF",
-    "accent_foreground": "#000000",
-    "status": {
-      "success_bg": "#052e16",
-      "success_text": "#4ade80",
-      "warning_bg": "#422006",
-      "warning_text": "#facc15",
-      "danger_bg": "#450a0a",
-      "danger_text": "#f87171"
+  "design_system": {
+    "colors": {
+      "storefront": {
+        "primary": "#B84B31",
+        "secondary": "#E9C46A",
+        "background": "#FAF7F2",
+        "surface": "#FFFFFF",
+        "text": "#1C1917",
+        "text_muted": "#57534E",
+        "border": "#E7E5E4"
+      },
+      "cockpit": {
+        "primary": "#1C1917",
+        "accent": "#B84B31",
+        "background": "#F9FAFB",
+        "surface": "#FFFFFF",
+        "border": "#E5E7EB",
+        "text": "#111827",
+        "text_muted": "#6B7280"
+      },
+      "rules": "Le texte interactif doit toujours changer au hover vers une teinte plus claire ou opacité. Utiliser APCA pour valider le contraste ≥ 4.5."
+    },
+    "typography": {
+      "storefront": {
+        "headings": "Fraunces, font-serif, tracking-tight, leading-none",
+        "body": "Inter, font-sans, leading-relaxed",
+        "hierarchy": {
+          "h1": "text-4xl md:text-5xl lg:text-6xl+",
+          "h2": "text-2xl md:text-3xl lg:text-4xl",
+          "body": "text-base md:text-lg"
+        }
+      },
+      "cockpit": {
+        "headings": "Inter, font-sans, font-semibold, tracking-tight",
+        "body": "Inter, font-sans, text-sm",
+        "hierarchy": {
+          "h1": "text-2xl",
+          "h2": "text-xl",
+          "body": "text-sm"
+        }
+      }
+    },
+    "spacing_and_layout": {
+      "storefront_grid": "Mode A: 'Tetris' Grid pour les pages narratives. Asymétrie et espaces négatifs (gap-8 à gap-16).",
+      "cockpit_grid": "Mode B: 'Control Room' Grid pour Dashboard. Densité maximale (gap-4 à gap-6), layout bento strict.",
+      "padding_scale": "p-4, p-6, p-8, p-12, p-16, p-24 (Utiliser p-6/p-8 minimum pour les sections internes B2C)."
+    },
+    "components": {
+      "strategy": "Storefront: HTML/Tailwind pur pour la structure, shadcn pour interactivité. Cockpit: 100% shadcn UI customisé 'Linear-style'.",
+      "buttons_storefront": "Arrondis doux (`rounded-full` ou `rounded-xl`), padding généreux (`px-8 py-4`), pas d'ombres portées dures.",
+      "buttons_cockpit": "Arrondis faibles (`rounded-md`), bordures 1px (`border-border`), ombres subtiles (`shadow-sm`).",
+      "data_testids": "Obligatoire sur tous les éléments interactifs (ex: `data-testid='cockpit-save-btn'`)."
+    },
+    "motion": {
+      "storefront": "Scroll-triggered via Framer Motion. Parallaxe légère. Transitions organiques (`duration: 0.4, ease: [0.16, 1, 0.3, 1]`).",
+      "cockpit": "Instantané ou très court (`duration: 0.15`). Pas d'animations distrayantes. Utiliser layout animations pour le drag-and-drop."
     }
   },
-  "css_variables": [
-    ":root {",
-    "  --background: 0 0% 0%;",
-    "  --foreground: 0 0% 98%;",
-    "  --card: 240 10% 4%;",
-    "  --card-foreground: 0 0% 98%;",
-    "  --popover: 240 10% 4%;",
-    "  --popover-foreground: 0 0% 98%;",
-    "  --primary: 0 0% 98%;",
-    "  --primary-foreground: 240 5.9% 10%;",
-    "  --secondary: 240 4% 16%;",
-    "  --secondary-foreground: 0 0% 98%;",
-    "  --muted: 240 5% 15%;",
-    "  --muted-foreground: 240 5% 65%;",
-    "  --accent: 240 4% 16%;",
-    "  --accent-foreground: 0 0% 98%;",
-    "  --destructive: 0 62% 30%;",
-    "  --destructive-foreground: 0 85% 60%;",
-    "  --border: 240 6% 15%;",
-    "  --input: 240 6% 15%;",
-    "  --ring: 240 5% 65%;",
-    "  --radius: 0.375rem;",
-    "}"
+  "image_urls": [
+    {
+      "category": "storefront_hero",
+      "url": "https://images.pexels.com/photos/8637983/pexels-photo-8637983.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Seniors actifs et souriants, ambiance chaleureuse pour le Hero de la Homepage."
+    },
+    {
+      "category": "storefront_benefits",
+      "url": "https://images.unsplash.com/photo-1764173040044-9835cc696a39?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2MzR8MHwxfHNlYXJjaHwyfHxhY3RpdmUlMjBzZW5pb3IlMjBsaWZlc3R5bGV8ZW58MHx8fHwxNzc2OTQ2NDQ5fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Seniors engagés dans une activité, style de vie positif et sain."
+    }
   ],
-  "component_recipes": {
-    "layout": "Fully dark is the most '2026-premium'. Dark sidebar (bg-black) with main content (bg-zinc-950) creates subtle architectural depth without relying on shadows.",
-    "sidebar": "fixed inset-y-0 left-0 w-[250px] bg-black border-r border-zinc-900 flex flex-col py-6 px-4 gap-2. Links: flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/50 transition-colors",
-    "kpi_card": "flex flex-col gap-1 p-5 rounded-lg border border-zinc-800 bg-zinc-950/50 hover:border-zinc-700 transition-colors. Label: text-xs font-medium text-zinc-500 uppercase tracking-wider. Value: text-3xl font-mono text-zinc-100. Delta: text-xs font-mono text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded w-fit",
-    "data_table_row": "group border-b border-zinc-900 hover:bg-zinc-900/30 transition-colors. Cells: px-4 py-3 text-sm text-zinc-300. First cell font-medium text-zinc-100.",
-    "form_input": "flex h-9 w-full rounded-md border border-zinc-800 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 disabled:cursor-not-allowed disabled:opacity-50",
-    "primary_button": "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-50 bg-white text-black hover:bg-zinc-200 shadow-sm h-9 px-4 py-2",
-    "ghost_button": "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-zinc-900 hover:text-zinc-100 text-zinc-400 h-9 px-4 py-2",
-    "empty_state": "flex flex-col items-center justify-center p-12 text-center rounded-lg border border-dashed border-zinc-800 bg-zinc-950/50. Icon: w-10 h-10 text-zinc-600 mb-4. Title: text-sm font-medium text-zinc-200. Desc: text-sm text-zinc-500 mt-1.",
-    "filter_pill": "inline-flex items-center rounded-full border border-zinc-800 px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 hover:bg-zinc-800 text-zinc-300",
-    "status_badge_success": "inline-flex items-center rounded-full border border-transparent px-2 py-0.5 text-xs font-semibold bg-emerald-500/10 text-emerald-500",
-    "status_badge_danger": "inline-flex items-center rounded-full border border-transparent px-2 py-0.5 text-xs font-semibold bg-red-500/10 text-red-500",
-    "loading_skeleton": "animate-pulse rounded-md bg-zinc-800/50"
-  },
-  "micro_interactions": {
-    "hover": "Subtle background shifts (e.g., bg-transparent to bg-zinc-900/50). Border color brightens (border-zinc-800 to border-zinc-600).",
-    "active": "Scale down slightly (active:scale-[0.98]) on buttons.",
-    "focus": "Sharp, high-contrast focus rings (focus-visible:ring-1 focus-visible:ring-white focus-visible:ring-offset-1 focus-visible:ring-offset-black).",
-    "transitions": "Fast and snappy. Use `transition-all duration-200 ease-in-out` universally."
-  },
-  "specific_patterns": {
-    "multi_market_scan": "Use a CSS Grid (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4`). Initially render 6 `loading_skeleton` cards. As data streams in, flip cards using Framer Motion (`animate={{ rotateY: 360 }}`) to reveal country data. Highly technical, mechanical feel.",
-    "verdict_go_nogo": "Instead of full color blocks, use purely typographic verdicts with a 1px colored accent. 'GO': pure white text, font-mono, with a tiny 4px emerald-500 dot indicator. 'NO-GO': text-zinc-600, strikethrough or heavily muted, with a tiny red-500 dot indicator.",
-    "sidebar_vs_main": "Fully dark layout. Sidebar: `bg-black`. Main content: `bg-[#09090B]` (Zinc 950). The 1-2% lightness difference plus a 1px `border-zinc-900` separator creates perfect elite software depth."
-  },
   "instructions_to_main_agent": [
-    "1. Update `/app/frontend/src/index.css` with the provided @import for Inter/JetBrains Mono and the root CSS variables (map them to Tailwind's dark mode or set as default).",
-    "2. Apply a global dark background: `bg-black text-zinc-100` to the root HTML/body.",
-    "3. Rewrite the Layout component to use the Sidebar and Main Content recipes.",
-    "4. Overhaul the KPI cards on the Dashboard Concepteur using the `kpi_card` recipe. Ensure numbers use JetBrains Mono via `font-mono`.",
-    "5. Re-style all Shadcn UI components (Buttons, Inputs, Cards, Tables) to match the stark monochrome aesthetic (pure white primary buttons, dark borders, purely transparent inputs).",
-    "6. Retain all existing `data-testid` attributes in all files you touch.",
-    "7. Remove all warm beige, orange, and terracotta references from the codebase.",
-    "8. For the 'Lancer un site' wizard, implement the multi-market scan skeleton loading pattern."
+    "Créer/Modifier les composants en respectant strictement l'architecture hybride définie.",
+    "Appliquer les Quick Wins Mobile en priorité, en ajoutant les `data-testid` indiqués.",
+    "Ne pas utiliser de textes gris illisibles, garantir l'accessibilité Silver Economy.",
+    "Le Mega Menu doit suivre exactement les specs de la section 6."
   ]
 }

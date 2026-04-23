@@ -184,17 +184,70 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
 
           {/* CENTER — Nav desktop */}
           <nav className="hidden lg:flex items-center gap-8" data-testid="header-nav">
-            {nav.map((n) => (
-              <Link
-                key={n.label}
-                to={n.href}
-                data-testid={`nav-${n.label.toLowerCase()}`}
-                className="text-[14px] font-medium relative transition hover:opacity-70"
-                style={{ color: textCol }}
-              >
-                {n.label}
-              </Link>
-            ))}
+            {nav.map((n, idx) => {
+              const isMega = n.type === "mega" && Array.isArray(n.children) && n.children.length > 0;
+              if (isMega) {
+                return (
+                  <div key={`${n.label}-${idx}`} className="group relative">
+                    <Link
+                      to={rewriteHref(n.href || "/collections")}
+                      data-testid={`nav-mega-${n.label.toLowerCase()}`}
+                      className="text-[14px] font-medium transition hover:opacity-70 inline-flex items-center gap-1"
+                      style={{ color: textCol }}
+                    >
+                      {n.label}
+                      <CaretRight size={10} className="rotate-90 opacity-60" />
+                    </Link>
+                    {/* Mega panel (desktop) — appears on hover */}
+                    <div
+                      className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-opacity duration-150 absolute left-1/2 -translate-x-1/2 top-full pt-4 z-40 w-[min(90vw,720px)]"
+                      data-testid={`mega-panel-${n.label.toLowerCase()}`}
+                    >
+                      <div className="bg-white rounded-2xl shadow-2xl border p-5 grid grid-cols-2 md:grid-cols-3 gap-3"
+                        style={{ borderColor: "#E7E5E4" }}>
+                        {n.children.map((c, i) => (
+                          <Link
+                            key={i}
+                            to={rewriteHref(c.href)}
+                            data-testid={`mega-card-${i}`}
+                            className="group/card block rounded-xl border bg-[var(--cf-bg)] overflow-hidden hover:shadow-lg transition"
+                            style={{ borderColor: "#E7E5E4" }}
+                          >
+                            <div className="aspect-[4/3] bg-neutral-100 overflow-hidden">
+                              {c.image ? (
+                                <img
+                                  src={c.image}
+                                  alt={c.label}
+                                  className="w-full h-full object-cover transition-transform duration-300 group-hover/card:scale-105"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-neutral-400 text-xs">
+                                  (image)
+                                </div>
+                              )}
+                            </div>
+                            <div className="p-2.5 text-sm font-medium" style={{ color: textCol }}>
+                              {c.label}
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <Link
+                  key={`${n.label}-${idx}`}
+                  to={n.href}
+                  data-testid={`nav-${n.label.toLowerCase()}`}
+                  className="text-[14px] font-medium relative transition hover:opacity-70"
+                  style={{ color: textCol }}
+                >
+                  {n.label}
+                </Link>
+              );
+            })}
           </nav>
 
           {/* RIGHT — Actions */}
@@ -304,19 +357,61 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
               </div>
             </form>
             <nav className="flex-1 overflow-y-auto py-2">
-              {nav.map((n) => (
-                <Link
-                  key={n.label}
-                  to={n.href}
-                  onClick={() => setMobileOpen(false)}
-                  data-testid={`mobile-nav-${n.label.toLowerCase()}`}
-                  className="flex items-center justify-between px-6 py-4 text-base font-medium border-b transition hover:bg-neutral-50"
-                  style={{ color: textCol, borderColor: "#F5F2EB" }}
-                >
-                  {n.label}
-                  <CaretRight size={16} style={{ color: "#A8A29E" }} />
-                </Link>
-              ))}
+              {nav.map((n, idx) => {
+                const isMega = n.type === "mega" && Array.isArray(n.children) && n.children.length > 0;
+                if (isMega) {
+                  return (
+                    <details key={`${n.label}-${idx}`} className="group border-b" style={{ borderColor: "#F5F2EB" }}>
+                      <summary
+                        data-testid={`mobile-nav-mega-${n.label.toLowerCase()}`}
+                        className="flex items-center justify-between px-6 py-4 text-base font-medium cursor-pointer hover:bg-neutral-50 list-none"
+                        style={{ color: textCol }}
+                      >
+                        {n.label}
+                        <CaretRight
+                          size={16}
+                          className="transition-transform group-open:rotate-90"
+                          style={{ color: "#A8A29E" }}
+                        />
+                      </summary>
+                      <div className="grid grid-cols-2 gap-2 p-4 pt-0 bg-neutral-50/60">
+                        {n.children.map((c, i) => (
+                          <Link
+                            key={i}
+                            to={rewriteHref(c.href)}
+                            onClick={() => setMobileOpen(false)}
+                            data-testid={`mobile-mega-card-${i}`}
+                            className="block rounded-xl border bg-white overflow-hidden"
+                            style={{ borderColor: "#E7E5E4" }}
+                          >
+                            <div className="aspect-[4/3] bg-neutral-100 overflow-hidden">
+                              {c.image && (
+                                <img src={c.image} alt={c.label} className="w-full h-full object-cover" />
+                              )}
+                            </div>
+                            <div className="p-2 text-xs font-medium truncate" style={{ color: textCol }}>
+                              {c.label}
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    </details>
+                  );
+                }
+                return (
+                  <Link
+                    key={`${n.label}-${idx}`}
+                    to={n.href}
+                    onClick={() => setMobileOpen(false)}
+                    data-testid={`mobile-nav-${n.label.toLowerCase()}`}
+                    className="flex items-center justify-between px-6 py-4 text-base font-medium border-b transition hover:bg-neutral-50 min-h-[56px]"
+                    style={{ color: textCol, borderColor: "#F5F2EB" }}
+                  >
+                    {n.label}
+                    <CaretRight size={16} style={{ color: "#A8A29E" }} />
+                  </Link>
+                );
+              })}
             </nav>
             <div className="p-5 border-t text-sm flex flex-col gap-2" style={{ borderColor: "#E7E5E4", color: "#57534E" }}>
               <a href={`mailto:${contactEmail}`} className="flex items-center gap-2 hover:opacity-70">

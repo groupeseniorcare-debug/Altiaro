@@ -591,10 +591,18 @@ function NavigationTab({ siteId, onChange }) {
   const [saving, setSaving] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
   const [aiRationale, setAiRationale] = useState("");
+  const [collections, setCollections] = useState([]);
+  const [products, setProducts] = useState([]);
 
   useEffect(() => {
     apiCall(() => api.get(`/sites/${siteId}/navigation`)).then(({ data }) => {
       if (data) setNav(data);
+    });
+    apiCall(() => api.get(`/sites/${siteId}/collections`)).then(({ data }) => {
+      if (Array.isArray(data)) setCollections(data);
+    });
+    apiCall(() => api.get(`/sites/${siteId}/products`)).then(({ data }) => {
+      if (Array.isArray(data)) setProducts(data.filter((p) => p.status !== "deleted"));
     });
   }, [siteId]);
 
@@ -609,11 +617,17 @@ function NavigationTab({ siteId, onChange }) {
     onChange?.();
   };
 
-  const addItem = (where) => {
-    setNav((n) => ({ ...n, [where]: [...n[where], { label: "Nouveau lien", href: "/", external: false }] }));
+  const addItem = (where, template = {}) => {
+    setNav((n) => ({
+      ...n,
+      [where]: [...n[where], { label: "Nouveau lien", href: "/", external: false, ...template }],
+    }));
   };
-  const updateItem = (where, idx, key, value) => {
-    setNav((n) => ({ ...n, [where]: n[where].map((it, i) => i === idx ? { ...it, [key]: value } : it) }));
+  const updateItem = (where, idx, patch) => {
+    setNav((n) => ({
+      ...n,
+      [where]: n[where].map((it, i) => (i === idx ? { ...it, ...patch } : it)),
+    }));
   };
   const removeItem = (where, idx) => {
     setNav((n) => ({ ...n, [where]: n[where].filter((_, i) => i !== idx) }));
@@ -667,52 +681,51 @@ function NavigationTab({ siteId, onChange }) {
       </div>
       {["header", "footer"].map((where) => (
         <div key={where} className="bg-white border border-neutral-200 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div>
-              <div className="text-[11px] uppercase tracking-widest text-neutral-500">Menu {where === "header" ? "principal (header)" : "pied de page"}</div>
-              <div className="text-sm text-neutral-500">{nav[where].length} lien{nav[where].length > 1 ? "s" : ""} · glisse ↑↓ pour réordonner</div>
+              <div className="text-[11px] uppercase tracking-widest text-neutral-500">
+                Menu {where === "header" ? "principal (header)" : "pied de page"}
+              </div>
+              <div className="text-sm text-neutral-500">
+                {nav[where].length} lien{nav[where].length > 1 ? "s" : ""} · glisse ↑↓ pour réordonner
+              </div>
             </div>
-            <button onClick={() => addItem(where)}
-              data-testid={`nav-add-${where}`}
-              className="h-9 px-3 rounded-lg bg-neutral-900 text-white text-xs font-medium flex items-center gap-1.5">
-              <Plus size={12} weight="bold" /> Ajouter
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => addItem(where)}
+                data-testid={`nav-add-${where}`}
+                className="h-9 px-3 rounded-lg bg-neutral-900 text-white text-xs font-medium flex items-center gap-1.5">
+                <Plus size={12} weight="bold" /> Lien simple
+              </button>
+              {where === "header" && (
+                <button
+                  onClick={() => addItem(where, {
+                    label: "Nos produits", href: "/collections", type: "mega", children: [],
+                  })}
+                  data-testid="nav-add-mega"
+                  className="h-9 px-3 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium flex items-center gap-1.5">
+                  <Stack size={12} weight="bold" /> Mega menu
+                </button>
+              )}
+            </div>
           </div>
           <div className="space-y-2">
             {nav[where].length === 0 && (
               <div className="text-sm text-neutral-400 italic py-4">Aucun lien. Clique sur Ajouter.</div>
             )}
             {nav[where].map((item, idx) => (
-              <div key={idx} className="flex items-center gap-2 bg-neutral-50 rounded-lg p-2">
-                <DotsSixVertical size={16} className="text-neutral-400 cursor-grab" />
-                <input type="text" value={item.label}
-                  onChange={(e) => updateItem(where, idx, "label", e.target.value)}
-                  data-testid={`nav-${where}-label-${idx}`}
-                  placeholder="Intitulé"
-                  className="flex-1 h-9 px-3 rounded border border-neutral-200 bg-white text-sm" />
-                <input type="text" value={item.href}
-                  onChange={(e) => updateItem(where, idx, "href", e.target.value)}
-                  data-testid={`nav-${where}-href-${idx}`}
-                  placeholder="/lien"
-                  className="flex-1 h-9 px-3 rounded border border-neutral-200 bg-white text-sm font-mono" />
-                <label className="text-xs text-neutral-500 flex items-center gap-1 whitespace-nowrap">
-                  <input type="checkbox" checked={item.external}
-                    onChange={(e) => updateItem(where, idx, "external", e.target.checked)}
-                    data-testid={`nav-${where}-external-${idx}`} />
-                  Externe
-                </label>
-                <button onClick={() => moveItem(where, idx, -1)}
-                  className="w-7 h-7 rounded hover:bg-neutral-200 text-neutral-600 flex items-center justify-center text-xs"
-                  title="Monter">↑</button>
-                <button onClick={() => moveItem(where, idx, 1)}
-                  className="w-7 h-7 rounded hover:bg-neutral-200 text-neutral-600 flex items-center justify-center text-xs"
-                  title="Descendre">↓</button>
-                <button onClick={() => removeItem(where, idx)}
-                  data-testid={`nav-${where}-delete-${idx}`}
-                  className="w-7 h-7 rounded hover:bg-red-100 text-red-500 flex items-center justify-center">
-                  <Trash size={12} />
-                </button>
-              </div>
+              <NavRow
+                key={idx}
+                item={item}
+                where={where}
+                idx={idx}
+                siteId={siteId}
+                collections={collections}
+                products={products}
+                onUpdate={(patch) => updateItem(where, idx, patch)}
+                onRemove={() => removeItem(where, idx)}
+                onMoveUp={() => moveItem(where, idx, -1)}
+                onMoveDown={() => moveItem(where, idx, 1)}
+              />
             ))}
           </div>
         </div>
@@ -725,6 +738,256 @@ function NavigationTab({ siteId, onChange }) {
           {saving ? <ArrowClockwise size={14} className="animate-spin" /> : <CheckCircle size={14} weight="fill" />}
           {saving ? "Enregistrement…" : "Enregistrer la navigation"}
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------- NavRow : link picker + mega-menu children editor ----------------
+const LINK_TYPES = [
+  { value: "home",        label: "Accueil",              href: "/" },
+  { value: "shop",        label: "Toute la boutique",    href: "/" },
+  { value: "collections", label: "Toutes collections",   href: "/collections" },
+  { value: "collection",  label: "Une collection…",      href: "" },
+  { value: "product",     label: "Un produit…",          href: "" },
+  { value: "blog",        label: "Journal / Blog",       href: "/blog" },
+  { value: "about",       label: "À propos",             href: "/about" },
+  { value: "contact",     label: "Contact",              href: "/contact" },
+  { value: "faq",         label: "FAQ",                  href: "/faq" },
+  { value: "search",      label: "Recherche",            href: "/search" },
+  { value: "cgv",         label: "CGV",                  href: "/cgv" },
+  { value: "mentions",    label: "Mentions légales",     href: "/mentions" },
+  { value: "confidentialite", label: "Confidentialité",  href: "/confidentialite" },
+  { value: "cookies",     label: "Cookies",              href: "/cookies" },
+  { value: "livraison",   label: "Livraison",            href: "/livraison" },
+  { value: "retours",     label: "Retours",              href: "/retours" },
+  { value: "mediation",   label: "Médiation",            href: "/mediation" },
+  { value: "url",         label: "URL personnalisée",    href: "" },
+];
+
+function detectLinkType(href = "", collections = [], products = []) {
+  const h = (href || "").trim();
+  if (/^https?:\/\//.test(h)) return "url";
+  if (h === "/" || h === "") return "home";
+  if (h === "/collections") return "collections";
+  if (h.startsWith("/collections/")) return "collection";
+  if (h.startsWith("/product/")) return "product";
+  const known = ["blog", "about", "contact", "faq", "search", "cgv", "mentions", "confidentialite", "cookies", "livraison", "retours", "mediation"];
+  for (const k of known) if (h === `/${k}`) return k;
+  return "url";
+}
+
+function NavRow({ item, where, idx, siteId, collections, products, onUpdate, onRemove, onMoveUp, onMoveDown }) {
+  const [expanded, setExpanded] = useState(false);
+  const isMega = item.type === "mega";
+  const linkType = detectLinkType(item.href, collections, products);
+
+  const applyLinkType = (type) => {
+    const preset = LINK_TYPES.find((l) => l.value === type);
+    if (!preset) return;
+    if (type === "collection") {
+      const first = collections[0];
+      onUpdate({ href: first ? `/collections/${first.slug}` : "/collections/", external: false });
+    } else if (type === "product") {
+      const first = products[0];
+      onUpdate({ href: first ? `/product/${first.id}` : "/product/", external: false });
+    } else if (type === "url") {
+      onUpdate({ href: "https://", external: true });
+    } else {
+      onUpdate({ href: preset.href, external: false });
+    }
+  };
+
+  return (
+    <div className="bg-neutral-50 rounded-xl border border-neutral-100">
+      <div className="flex items-center gap-2 p-2 flex-wrap md:flex-nowrap">
+        <DotsSixVertical size={16} className="text-neutral-400 hidden md:block" />
+        {isMega && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 font-medium whitespace-nowrap">
+            Mega menu
+          </span>
+        )}
+        <input
+          type="text"
+          value={item.label}
+          onChange={(e) => onUpdate({ label: e.target.value })}
+          data-testid={`nav-${where}-label-${idx}`}
+          placeholder="Intitulé"
+          className="flex-1 min-w-[140px] h-9 px-3 rounded border border-neutral-200 bg-white text-sm"
+        />
+        <select
+          value={linkType}
+          onChange={(e) => applyLinkType(e.target.value)}
+          data-testid={`nav-${where}-type-${idx}`}
+          className="h-9 px-2 rounded border border-neutral-200 bg-white text-xs w-40"
+        >
+          {LINK_TYPES.map((l) => (
+            <option key={l.value} value={l.value}>{l.label}</option>
+          ))}
+        </select>
+        {linkType === "collection" && (
+          <select
+            value={item.href}
+            onChange={(e) => onUpdate({ href: e.target.value })}
+            data-testid={`nav-${where}-collection-${idx}`}
+            className="h-9 px-2 rounded border border-neutral-200 bg-white text-xs min-w-[140px]"
+          >
+            <option value="">— choisir —</option>
+            {collections.map((c) => (
+              <option key={c.id} value={`/collections/${c.slug}`}>{c.name}</option>
+            ))}
+          </select>
+        )}
+        {linkType === "product" && (
+          <select
+            value={item.href}
+            onChange={(e) => onUpdate({ href: e.target.value })}
+            data-testid={`nav-${where}-product-${idx}`}
+            className="h-9 px-2 rounded border border-neutral-200 bg-white text-xs min-w-[160px]"
+          >
+            <option value="">— choisir —</option>
+            {products.slice(0, 100).map((p) => (
+              <option key={p.id} value={`/product/${p.id}`}>
+                {p.name?.fr || p.name?.en || "(sans nom)"}
+              </option>
+            ))}
+          </select>
+        )}
+        {linkType === "url" && (
+          <input
+            type="url"
+            value={item.href}
+            onChange={(e) => onUpdate({ href: e.target.value })}
+            data-testid={`nav-${where}-href-${idx}`}
+            placeholder="https://…"
+            className="h-9 px-3 rounded border border-neutral-200 bg-white text-sm font-mono min-w-[160px]"
+          />
+        )}
+        <div className="flex items-center gap-1 ml-auto">
+          {isMega && (
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              data-testid={`nav-${where}-expand-${idx}`}
+              className="w-7 h-7 rounded hover:bg-neutral-200 text-neutral-600 flex items-center justify-center text-xs"
+              title="Éditer les vignettes"
+            >
+              {expanded ? "▾" : "▸"}
+            </button>
+          )}
+          <button onClick={onMoveUp}
+            className="w-7 h-7 rounded hover:bg-neutral-200 text-neutral-600 flex items-center justify-center text-xs"
+            title="Monter">↑</button>
+          <button onClick={onMoveDown}
+            className="w-7 h-7 rounded hover:bg-neutral-200 text-neutral-600 flex items-center justify-center text-xs"
+            title="Descendre">↓</button>
+          <button onClick={onRemove}
+            data-testid={`nav-${where}-delete-${idx}`}
+            className="w-7 h-7 rounded hover:bg-red-100 text-red-500 flex items-center justify-center">
+            <Trash size={12} />
+          </button>
+        </div>
+      </div>
+      {isMega && expanded && (
+        <MegaMenuEditor
+          item={item}
+          onUpdate={onUpdate}
+          collections={collections}
+          products={products}
+        />
+      )}
+    </div>
+  );
+}
+
+function MegaMenuEditor({ item, onUpdate, collections, products }) {
+  const children = Array.isArray(item.children) ? item.children : [];
+  const addChild = (template) => {
+    onUpdate({ children: [...children, { label: "", href: "", image: "", ...template }] });
+  };
+  const updateChild = (i, patch) => {
+    onUpdate({ children: children.map((c, j) => (j === i ? { ...c, ...patch } : c)) });
+  };
+  const removeChild = (i) => {
+    onUpdate({ children: children.filter((_, j) => j !== i) });
+  };
+  const autoFromCollections = () => {
+    const cards = collections.slice(0, 6).map((c) => ({
+      label: c.name,
+      href: `/collections/${c.slug}`,
+      image: c.cover_image || "",
+    }));
+    onUpdate({ children: cards });
+  };
+  const autoFromProducts = () => {
+    const cards = products
+      .filter((p) => p.images?.length)
+      .slice(0, 6)
+      .map((p) => ({
+        label: p.name?.fr || p.name?.en || "(sans nom)",
+        href: `/product/${p.id}`,
+        image: p.images?.[0] || "",
+      }));
+    onUpdate({ children: cards });
+  };
+
+  return (
+    <div className="border-t border-neutral-200 p-3 bg-white rounded-b-xl">
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <div className="text-[11px] uppercase tracking-widest text-neutral-500">
+          Vignettes ({children.length}/6) · affichées au survol sur desktop, tap sur mobile
+        </div>
+        <div className="flex gap-1">
+          <button onClick={autoFromCollections}
+            data-testid="mega-auto-collections"
+            className="h-7 px-2 rounded border border-violet-200 text-violet-700 hover:bg-violet-50 text-[11px]">
+            ⚡ Auto-collections
+          </button>
+          <button onClick={autoFromProducts}
+            data-testid="mega-auto-products"
+            className="h-7 px-2 rounded border border-violet-200 text-violet-700 hover:bg-violet-50 text-[11px]">
+            ⚡ Auto-produits
+          </button>
+          <button onClick={() => addChild({})}
+            data-testid="mega-add-card"
+            className="h-7 px-2 rounded bg-neutral-900 text-white text-[11px]">
+            + Vignette
+          </button>
+        </div>
+      </div>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        {children.map((c, i) => (
+          <div key={i} className="border border-neutral-200 rounded-lg p-2 bg-neutral-50">
+            <div className="aspect-[4/3] rounded bg-white border border-neutral-200 mb-2 overflow-hidden flex items-center justify-center">
+              {c.image ? (
+                <img src={c.image} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <ImageIcon size={24} weight="duotone" className="text-neutral-400" />
+              )}
+            </div>
+            <input type="text" value={c.label}
+              onChange={(e) => updateChild(i, { label: e.target.value })}
+              placeholder="Libellé"
+              data-testid={`mega-child-label-${i}`}
+              className="w-full h-8 px-2 rounded border border-neutral-200 bg-white text-xs mb-1" />
+            <input type="text" value={c.href}
+              onChange={(e) => updateChild(i, { href: e.target.value })}
+              placeholder="/collections/xxx ou /product/yyy"
+              data-testid={`mega-child-href-${i}`}
+              className="w-full h-8 px-2 rounded border border-neutral-200 bg-white text-xs font-mono mb-1" />
+            <input type="text" value={c.image}
+              onChange={(e) => updateChild(i, { image: e.target.value })}
+              placeholder="URL image"
+              data-testid={`mega-child-image-${i}`}
+              className="w-full h-8 px-2 rounded border border-neutral-200 bg-white text-xs mb-1" />
+            <div className="flex justify-end">
+              <button onClick={() => removeChild(i)}
+                data-testid={`mega-child-delete-${i}`}
+                className="text-[11px] text-red-500 hover:underline flex items-center gap-1">
+                <Trash size={10} /> Retirer
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -148,6 +148,190 @@ Vous pouvez gérer vos préférences à tout moment depuis le bandeau cookies.
 """
 
 
+COOKIES = """# Politique de cookies
+
+## 1. Qu'est-ce qu'un cookie ?
+Un cookie est un petit fichier texte stocké sur votre terminal (ordinateur, tablette,
+smartphone) lors de votre visite sur **{site_name}**. Il permet au site de mémoriser
+certaines informations pour améliorer votre expérience.
+
+## 2. Cookies utilisés sur notre site
+
+### Cookies strictement nécessaires (exemptés de consentement)
+- **Panier** : mémorisation du panier entre les pages
+- **Session** : maintien de la session client connectée
+- **Préférences** : langue, devise, acceptation du bandeau cookies
+
+### Cookies de mesure d'audience (avec consentement)
+- **Google Analytics 4** : statistiques anonymes de visite
+- **Google Tag Manager** : gestion centralisée des tags
+
+### Cookies marketing (avec consentement)
+- **Meta Pixel** (Facebook) : ciblage publicitaire
+- **Google Ads Conversion** : suivi des conversions publicitaires
+
+## 3. Durée de conservation
+Les cookies sont conservés **13 mois maximum** conformément aux recommandations CNIL.
+
+## 4. Gérer mes préférences
+À tout moment, vous pouvez :
+- Modifier vos choix depuis le bandeau « Gérer les cookies » en bas de page
+- Paramétrer votre navigateur pour refuser les cookies
+- Consulter la documentation de votre navigateur
+  ([Chrome](https://support.google.com/chrome/answer/95647),
+  [Firefox](https://support.mozilla.org/fr/kb/activer-desactiver-cookies),
+  [Safari](https://support.apple.com/fr-fr/guide/safari/sfri11471/mac))
+
+## 5. Conséquences du refus
+Refuser les cookies n'empêche pas la navigation mais peut désactiver certaines
+fonctionnalités (panier persistant, personnalisation).
+
+## 6. Réclamation
+Pour toute question, contactez **{email_contact}**. Vous pouvez également déposer une
+réclamation auprès de la **CNIL** (www.cnil.fr).
+"""
+
+
+LIVRAISON = """# Livraison & délais
+
+## Zones de livraison
+Nous livrons dans toute la **France métropolitaine**, ainsi que :
+- **Belgique, Luxembourg, Pays-Bas** : 3-6 jours ouvrés
+- **Suisse** (frontières douanières) : 5-8 jours ouvrés
+- **Royaume-Uni** : 5-10 jours ouvrés (frais de douane à la charge du client)
+- **Allemagne, Autriche** : 3-6 jours ouvrés
+
+## Délais de préparation
+Votre commande est préparée sous **24 à 48 heures ouvrées** après réception du paiement.
+Les produits volumineux (fauteuils, meubles) peuvent nécessiter **3 à 5 jours ouvrés**
+de préparation supplémentaires.
+
+## Délais de livraison (après expédition)
+| Destination | Mode standard | Mode express |
+|---|---|---|
+| France métropolitaine | 2-4 j | 24-48 h |
+| Europe UE | 3-6 j | 2-3 j |
+| Royaume-Uni | 5-10 j | 3-5 j |
+
+## Suivi de commande
+Un email avec le numéro de suivi vous est envoyé dès l'expédition. Vous pouvez suivre
+votre colis en temps réel depuis votre espace client ou via le lien du transporteur.
+
+## Frais de livraison
+- **Offerte dès 50 €** d'achat en France métropolitaine
+- **5,90 €** en dessous de 50 €
+- Livraison express et Europe : tarif calculé au checkout selon poids et destination
+- Produits volumineux : livraison sur rendez-vous avec possibilité d'installation (option)
+
+## Réception du colis
+Nous vous recommandons de **vérifier l'état du colis en présence du livreur**. En cas de
+colis visiblement endommagé, refusez-le ou émettez des **réserves précises et datées** sur
+le bon de livraison, puis contactez-nous sous 48 h.
+
+## Absence à la livraison
+Si vous êtes absent, le transporteur laisse un avis de passage. Vous disposez généralement
+de 10 jours pour retirer le colis en point relais ou bureau de poste.
+
+## Support livraison
+Pour toute question : **{email_contact}**. Réponse sous 24h ouvrées.
+"""
+
+
+RETOURS = """# Retours & rétractation
+
+## Droit de rétractation de 14 jours
+Conformément à l'article **L.221-18 du Code de la consommation**, vous disposez d'un délai
+de **14 jours calendaires** à compter de la réception de votre commande pour exercer votre
+droit de rétractation, **sans avoir à justifier de motif ni pénalité**.
+
+## Comment exercer mon droit de rétractation ?
+1. Informez-nous de votre décision via :
+   - Email à **{email_contact}** (modèle de formulaire ci-dessous)
+   - Le formulaire de contact de votre espace client
+2. Retournez le produit dans son **emballage d'origine**, accompagné de tous ses accessoires
+3. Joignez une copie de la facture ou du bon de retour
+
+## Adresse de retour
+**{raison_sociale}** — Service Retours
+{adresse}
+{cp} {ville}
+
+## Frais de retour
+Les **frais de retour sont à votre charge**, sauf en cas de produit défectueux ou
+non-conforme (voir garanties).
+
+## Remboursement
+Nous procédons au remboursement dans un délai de **14 jours** à compter de la réception du
+produit retourné, par le même moyen de paiement utilisé pour la commande. Aucun frais de
+remboursement ne vous est facturé.
+
+## Exclusions légales
+Conformément à l'article **L.221-28**, le droit de rétractation ne s'applique pas :
+- Aux produits confectionnés sur mesure ou personnalisés
+- Aux produits d'hygiène descellés après livraison
+- Aux produits périssables
+
+## Garantie légale de conformité (2 ans)
+Indépendamment de la rétractation, tous nos produits bénéficient de la **garantie légale
+de conformité** (articles L.217-4 à L.217-14 du Code de la consommation) pendant **2 ans**.
+En cas de défaut, le remplacement ou le remboursement est **gratuit**.
+
+## Formulaire type de rétractation
+> À l'attention de **{raison_sociale}**, {adresse}, {cp} {ville}
+>
+> Je/nous (*) vous notifie/notifions (*) par la présente ma/notre (*) rétractation
+> du contrat portant sur la vente du bien ci-dessous :
+>
+> Commandé le : ........................
+> Reçu le : ........................
+> Numéro de commande : ........................
+> Nom du/des consommateur(s) : ........................
+> Adresse du/des consommateur(s) : ........................
+>
+> Date : ........................    Signature : ........................
+>
+> (*) Rayez la mention inutile
+"""
+
+
+MEDIATION = """# Médiation de la consommation
+
+Conformément à l'article **L.612-1 du Code de la consommation**, tout consommateur a le
+droit de recourir gratuitement à un médiateur de la consommation en vue de la résolution
+amiable d'un litige.
+
+## 1. Avant la médiation
+Avant de saisir le médiateur, le client doit avoir :
+1. Contacté notre service client à **{email_contact}**
+2. Attendu une réponse ou un délai raisonnable de traitement (60 jours maximum)
+3. Conservé les preuves écrites des échanges
+
+## 2. Médiateur de la consommation désigné
+**{raison_sociale}** a désigné le médiateur suivant pour la résolution amiable des litiges :
+
+> **CM2C — Centre de la Médiation de la Consommation de Conciliateurs de Justice**
+> 14 rue Saint-Jean — 75017 Paris
+> Site : **https://cm2c.net**
+> Email : cm2c@cm2c.net
+
+Vous pouvez saisir le médiateur **gratuitement** dans un délai de **1 an** à compter de
+votre première réclamation écrite.
+
+## 3. Plateforme européenne de règlement des litiges (ODR)
+En vertu du règlement UE n° 524/2013, vous avez également la possibilité de recourir à la
+plateforme européenne de règlement des litiges de consommation :
+
+> **https://ec.europa.eu/consumers/odr**
+
+## 4. Recours judiciaires
+Si la médiation n'aboutit pas, vous conservez le droit de saisir les tribunaux compétents
+conformément aux règles du Code de procédure civile.
+
+## 5. Contact
+Pour toute question relative à la médiation : **{email_contact}**.
+"""
+
+
 DEFAULT_LEGAL_VARS = {
     "raison_sociale": "Altiaro SAS",
     "siren": "[À COMPLÉTER]",

@@ -28,7 +28,11 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr, Field
 
 from deps import db, get_current_user, _check_site_access, EMERGENT_LLM_KEY, UPLOAD_DIR
-from legal_templates import CGV, MENTIONS_LEGALES, CONFIDENTIALITE, render_legal
+from legal_templates import (
+    CGV, MENTIONS_LEGALES, CONFIDENTIALITE,
+    COOKIES, LIVRAISON, RETOURS, MEDIATION,
+    render_legal,
+)
 
 logger = logging.getLogger("conceptfactory.design")
 router = APIRouter()
@@ -269,6 +273,10 @@ def _inject_legal(design: dict, site: dict) -> dict:
         "cgv": {"title": "CGV", "body_md": render_legal(CGV, vars_)},
         "mentions_legales": {"title": "Mentions légales", "body_md": render_legal(MENTIONS_LEGALES, vars_)},
         "confidentialite": {"title": "Politique de confidentialité", "body_md": render_legal(CONFIDENTIALITE, vars_)},
+        "cookies": {"title": "Politique de cookies", "body_md": render_legal(COOKIES, vars_)},
+        "livraison": {"title": "Livraison & délais", "body_md": render_legal(LIVRAISON, vars_)},
+        "retours": {"title": "Retours & rétractation", "body_md": render_legal(RETOURS, vars_)},
+        "mediation": {"title": "Médiation de la consommation", "body_md": render_legal(MEDIATION, vars_)},
     }
     return design
 
