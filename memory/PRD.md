@@ -98,6 +98,8 @@ Les 50 étapes du playbook sont regroupées en **8 blocs thématiques ordonnés*
 | 56 | **Refactor Storefront.jsx** (extract StorefrontProduct → −40 % lignes) | ✅ |
 | 57 | **Coach SEO proactif** (rule engine alertes + email Resend hebdo lundi 9h + cloche topbar cockpit) | ✅ |
 | 58 | **Google Search Console OAuth** (multi-tenant, refresh_token, metrics position/clicks/CTR, UI dormante + guide setup) | ✅ (backend + UI) · ⏳ (en attente des clés Google Cloud) |
+| 59 | **Historique E-E-A-T + Badges** (snapshots hebdo, sparkline SVG, 9 badges d'achievement, rule engine) | ✅ |
+| 60 | **Boost AEO/SEO** (sitemap images, llms-full.txt, Organization enrichi, Speakable FAQ, Article schema v2, IndexNow auto-submit) | ✅ |
 
 ## Règles critiques
 - Pas de Shopify — tout custom React/FastAPI.

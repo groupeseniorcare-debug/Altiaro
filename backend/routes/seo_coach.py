@@ -316,10 +316,16 @@ def _render_digest_html(site: dict, alerts: list, pulse: dict) -> str:
 
 async def send_weekly_seo_digests() -> dict:
     """APScheduler entry — itère les sites `seo_coach.email_enabled != False`
-    et envoie un digest Resend si au moins 1 alerte warn/critical."""
+    et envoie un digest Resend si au moins 1 alerte warn/critical.
+    Snapshot le Pulse de chaque site (pour l'historique + sparkline)."""
+    sent, skipped = 0, 0
+    # First — snapshot ALL sites (even the ones with no email), because
+    # the history graph matters for every Concepteur.
+    await _snapshot_all_sites()
+
     if not RESEND_API_KEY:
-        logger.warning("[seo-coach] RESEND_API_KEY missing — skipping weekly digest")
-        return {"sent": 0, "skipped": "no_api_key"}
+        logger.warning("[seo-coach] RESEND_API_KEY missing — skipping email phase")
+        return {"sent": 0, "skipped": "no_api_key", "snapshots": "done"}
 
     sent, skipped = 0, 0
     cursor = db.sites.find({}, {"_id": 0})
@@ -440,3 +446,211 @@ async def _pulse_from_site_doc(site: dict) -> dict:
         "avg_eeat_score": avg_eeat,
         "next_cluster_at": next_cluster,
     }
+
+
+# =====================================================================
+# Historique hebdomadaire E-E-A-T + Badges achievements (dopamine-driven)
+# =====================================================================
+async def _snapshot_all_sites():
+    """Pour chaque site, enregistre une photo weekly du pulse dans
+    `site.design.seo_coach.weekly_snapshots` (max 52 semaines conservées).
+    Attribue les badges débloqués en passant."""
+    now = datetime.now(timezone.utc)
+    week_key = now.strftime("%G-W%V")  # ISO week, e.g. 2026-W17
+    cursor = db.sites.find({}, {"_id": 0})
+    async for site in cursor:
+        try:
+            pulse = await _pulse_from_site_doc(site)
+            coach = ((site.get("design") or {}).get("seo_coach")) or {}
+            snapshots = list(coach.get("weekly_snapshots") or [])
+
+            # Idempotence — update-in-place if same week_key already exists
+            existing_idx = next(
+                (i for i, s in enumerate(snapshots) if s.get("week") == week_key), None
+            )
+            snapshot = {
+                "week": week_key,
+                "ts": now.isoformat(),
+                "avg_eeat_score": pulse["avg_eeat_score"],
+                "articles_total": pulse["articles_total"],
+                "articles_this_month": pulse["articles_this_month"],
+                "coverage_pct": pulse["coverage_pct"],
+                "keywords_covered": pulse["keywords_covered"],
+            }
+            if existing_idx is not None:
+                snapshots[existing_idx] = snapshot
+            else:
+                snapshots.append(snapshot)
+            # Cap to last 52 weeks
+            snapshots = snapshots[-52:]
+
+            # Achievements
+            unlocked = list(coach.get("badges") or [])
+            unlocked_ids = {b["id"] for b in unlocked}
+            newly_unlocked = _check_badges(snapshots, unlocked_ids)
+
+            update = {
+                "design.seo_coach.weekly_snapshots": snapshots,
+                "design.seo_coach.last_snapshot_at": now.isoformat(),
+            }
+            if newly_unlocked:
+                update["design.seo_coach.badges"] = unlocked + newly_unlocked
+
+            await db.sites.update_one({"id": site["id"]}, {"$set": update})
+        except Exception:
+            logger.exception(f"[seo-coach] snapshot failed for site {site.get('id')}")
+
+
+def _check_badges(snapshots: list, already_unlocked: set) -> list:
+    """Rule engine des badges d'achievement. Retourne les nouveaux débloqués.
+    Chaque badge est idempotent (unlocked 1 fois, conservé à vie)."""
+    if not snapshots:
+        return []
+    latest = snapshots[-1]
+    avg = latest.get("avg_eeat_score", 0)
+    arts = latest.get("articles_total", 0)
+    coverage = latest.get("coverage_pct", 0)
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    candidates = [
+        # Cluster d'ouverture
+        ("first-cluster", arts >= 1,
+         "Premier pas", "Premier cluster de contenu publié — Google a commencé à indexer.",
+         "📝"),
+        ("ten-articles", arts >= 10,
+         "Prolifique", "10 articles publiés — vous entrez dans la zone E-E-A-T sérieuse.",
+         "📚"),
+        ("thirty-articles", arts >= 30,
+         "Autorité installée", "30 articles — vous êtes une référence dans votre niche.",
+         "🏛️"),
+
+        # Score E-E-A-T
+        ("eeat-75", avg >= 75,
+         "Score pro", "Premier 75/100 E-E-A-T atteint — niveau expert.",
+         "⭐"),
+        ("eeat-90", avg >= 90,
+         "Score élite", "Premier 90/100 E-E-A-T — top 5 % du web éditorial.",
+         "🏆"),
+
+        # Couverture keywords
+        ("coverage-50", coverage >= 50,
+         "Mi-marathon", "Plus de la moitié de vos keywords sont couverts.",
+         "🎯"),
+        ("coverage-100", coverage >= 100,
+         "Cartographie complète", "100 % des keywords informationnels couverts. Chapeau.",
+         "🗺️"),
+    ]
+
+    # Streak: 4 weeks consecutive >= 75
+    last4 = snapshots[-4:] if len(snapshots) >= 4 else []
+    if len(last4) == 4 and all((s.get("avg_eeat_score") or 0) >= 75 for s in last4):
+        candidates.append((
+            "streak-4w-75", True,
+            "Marathonien", "4 semaines d'affilée au-dessus de 75/100 — la régularité paie.",
+            "🔥",
+        ))
+
+    # 12 weeks consecutive above 75
+    last12 = snapshots[-12:] if len(snapshots) >= 12 else []
+    if len(last12) == 12 and all((s.get("avg_eeat_score") or 0) >= 75 for s in last12):
+        candidates.append((
+            "streak-12w-75", True,
+            "Trimestre d'or", "12 semaines consécutives au-dessus de 75/100.",
+            "🏅",
+        ))
+
+    new_badges = []
+    for bid, ok, title, description, icon in candidates:
+        if ok and bid not in already_unlocked:
+            new_badges.append({
+                "id": bid,
+                "title": title,
+                "description": description,
+                "icon": icon,
+                "unlocked_at": now_iso,
+            })
+    return new_badges
+
+
+@router.get("/sites/{site_id}/seo/history")
+async def seo_history(site_id: str, user=Depends(get_current_user)):
+    """Renvoie l'historique des snapshots hebdomadaires + badges débloqués.
+    Utilisé par le sparkline + la grille d'achievements dans Pulse SEO."""
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(404, "Site introuvable")
+
+    coach = ((site.get("design") or {}).get("seo_coach")) or {}
+    snapshots = list(coach.get("weekly_snapshots") or [])
+    badges = list(coach.get("badges") or [])
+
+    # If no snapshot yet, create one on the fly so the sparkline is not empty
+    if not snapshots:
+        pulse = await _pulse_from_site_doc(site)
+        now = datetime.now(timezone.utc)
+        live = {
+            "week": now.strftime("%G-W%V"),
+            "ts": now.isoformat(),
+            "avg_eeat_score": pulse["avg_eeat_score"],
+            "articles_total": pulse["articles_total"],
+            "coverage_pct": pulse["coverage_pct"],
+        }
+        snapshots = [live]
+
+    # Delta between the latest and previous snapshot for UI "momentum" indicator
+    delta = 0
+    if len(snapshots) >= 2:
+        delta = (snapshots[-1].get("avg_eeat_score") or 0) - (snapshots[-2].get("avg_eeat_score") or 0)
+
+    return {
+        "snapshots": snapshots,
+        "badges": sorted(badges, key=lambda b: b.get("unlocked_at") or "", reverse=True),
+        "current_score": (snapshots[-1] if snapshots else {}).get("avg_eeat_score", 0),
+        "delta_vs_last_week": delta,
+        "weeks_tracked": len(snapshots),
+    }
+
+
+@router.post("/sites/{site_id}/seo/snapshot")
+async def force_snapshot(site_id: str, user=Depends(get_current_user)):
+    """Déclenche manuellement un snapshot pour ce site (test/debug)."""
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(404, "Site introuvable")
+
+    pulse = await _pulse_from_site_doc(site)
+    coach = ((site.get("design") or {}).get("seo_coach")) or {}
+    snapshots = list(coach.get("weekly_snapshots") or [])
+    now = datetime.now(timezone.utc)
+    week_key = now.strftime("%G-W%V")
+    snapshot = {
+        "week": week_key,
+        "ts": now.isoformat(),
+        "avg_eeat_score": pulse["avg_eeat_score"],
+        "articles_total": pulse["articles_total"],
+        "articles_this_month": pulse["articles_this_month"],
+        "coverage_pct": pulse["coverage_pct"],
+        "keywords_covered": pulse["keywords_covered"],
+    }
+    existing_idx = next(
+        (i for i, s in enumerate(snapshots) if s.get("week") == week_key), None
+    )
+    if existing_idx is not None:
+        snapshots[existing_idx] = snapshot
+    else:
+        snapshots.append(snapshot)
+    snapshots = snapshots[-52:]
+
+    already = {b["id"] for b in (coach.get("badges") or [])}
+    new_badges = _check_badges(snapshots, already)
+
+    update = {
+        "design.seo_coach.weekly_snapshots": snapshots,
+        "design.seo_coach.last_snapshot_at": now.isoformat(),
+    }
+    if new_badges:
+        update["design.seo_coach.badges"] = (coach.get("badges") or []) + new_badges
+    await db.sites.update_one({"id": site_id}, {"$set": update})
+
+    return {"ok": True, "snapshot": snapshot, "new_badges": new_badges}
+

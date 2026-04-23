@@ -3,7 +3,51 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
-## 2026-04-23 · Refactor + Coach SEO + GSC OAuth (3-batch)
+## 2026-04-23 · Historique E-E-A-T + Badges + Boost AEO/SEO
+
+### Historique hebdomadaire + Badges achievements (dopamine-driven)
+- **Backend** :
+  - `_snapshot_all_sites()` — appelé chaque lundi 08:00 UTC par APScheduler,
+    persiste `site.design.seo_coach.weekly_snapshots[]` (52 semaines max).
+  - `_check_badges(snapshots, already_unlocked)` — rule engine qui débloque :
+    `first-cluster`, `ten-articles`, `thirty-articles`, `eeat-75`, `eeat-90`,
+    `coverage-50`, `coverage-100`, `streak-4w-75`, `streak-12w-75`.
+  - Endpoints `GET /sites/{id}/seo/history` (snapshots + badges + delta vs last
+    week) et `POST /sites/{id}/seo/snapshot` (déclenchement manuel test/debug).
+- **Frontend** `components/EeatHistoryPanel.jsx` :
+  - Score Fraunces XXL + delta coloré (+/- pt vs semaine précédente).
+  - **Sparkline SVG pur** (zero-dep) avec aire + ligne + dot final + ligne
+    pointillée à 75 (seuil "pro").
+  - Grille de badges monochromes 🏆📝⭐🎯🏛️ avec description narrative.
+  - Intégré au bas du Pulse SEO avant la bande GSC.
+- **Tests pytest** : +7 sur le badge engine → **29 tests verts** total
+  (seo_coach + seo_badges + blog + brand).
+
+### Boost AEO/SEO "premier sur tous les produits"
+- **Sitemap images** — `sitemap.xml` enrichi du namespace `image:` avec les
+  images AI (Nano Banana closeup/studio/lifestyle) priorisées devant les
+  images fournisseurs → +1 canal de trafic Google Image et signal visuel
+  pour Gemini/Perplexity.
+- **llms-full.txt** (standard <llmstxt.org>) — version exhaustive avec About,
+  catalogue complet (nom + prix + description + benefits + FAQ par produit),
+  articles blog complets (body jusqu'à 4000 chars). C'est la pièce maîtresse
+  pour être **cité directement** par ChatGPT/Claude/Perplexity/Gemini. Listé
+  dans robots.txt comme Sitemap.
+- **Organization schema enrichi** — passage en `OnlineStore` (plus spécifique),
+  ajout de `areaServed`, `knowsLanguage`, `contactPoint` avec téléphone/email,
+  `address` si fourni, `sameAs` étendu (TikTok, Pinterest).
+- **Speakable schema** sur FAQPage (homepage) et BlogPosting — activé pour
+  Google Assistant, Siri, Alexa (voice search).
+- **Article schema v2** sur les posts de blog :
+  `wordCount`, `timeRequired` (ISO 8601 `PT7M`), `inLanguage`, `about`,
+  `keywords` (pillar + satellites), `alternativeHeadline`, `dateModified`,
+  `speakable` css selectors `h1, h2`.
+- **IndexNow auto-submit** — hooked sur `POST /sites/{id}/products` (create)
+  et `PATCH /sites/{id}/products/{id}` (update). Chaque modif pousse 3 URLs
+  (homepage, produit, sitemap) vers Bing/Yandex/Naver/Seznam (ChatGPT search
+  utilise Bing, donc ça indexe indirectement dans les réponses AI).
+
+
 
 ### 1. Refactor `Storefront.jsx` (–40 %)
 - Extrait **StorefrontProduct** (~515 lignes) dans `pages/StorefrontProduct.jsx`.

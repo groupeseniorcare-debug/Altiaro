@@ -37,7 +37,8 @@ async def sitemap(site_id: str):
         langs = ["fr"]
 
     products = await db.products.find(
-        {"site_id": site_id, "status": "active"}, {"_id": 0, "id": 1, "name": 1}
+        {"site_id": site_id, "status": "active"},
+        {"_id": 0, "id": 1, "name": 1, "images": 1, "generated_images": 1, "updated_at": 1},
     ).to_list(5000)
 
     design = site.get("design") or {}
@@ -53,6 +54,33 @@ async def sitemap(site_id: str):
         )
         return (f"<url><loc>{base}{path}</loc><lastmod>{now}</lastmod>"
                 f"<changefreq>{changefreq}</changefreq><priority>{prio}</priority>{alts}</url>")
+
+    def product_urlset(p: dict) -> str:
+        """Product URL enriched with <image:image> for Google Image Search + AEO."""
+        path = f"/product/{p['id']}"
+        alts = "".join(
+            f'<xhtml:link rel="alternate" hreflang="{lg}" href="{base}{path}?lang={lg}"/>'
+            for lg in langs
+        )
+        pname_raw = p.get("name")
+        pname = pname_raw if isinstance(pname_raw, str) else (
+            (pname_raw or {}).get("fr") or next(iter((pname_raw or {}).values()), "")
+        )
+        # Prefer AI-generated images first (closeup, studio, lifestyle)
+        ai_urls = [g.get("url") for g in (p.get("generated_images") or []) if isinstance(g, dict) and g.get("url")]
+        supplier_urls = [u for u in (p.get("images") or []) if isinstance(u, str)]
+        images = (ai_urls + supplier_urls)[:8]  # Google image sitemap cap is 1000, keep it clean
+        image_tags = "".join(
+            f"<image:image><image:loc>{_xml_escape(img if img.startswith('http') else origin + img)}</image:loc>"
+            f"<image:title>{_xml_escape(pname)}</image:title></image:image>"
+            for img in images
+        )
+        lastmod = p.get("updated_at")
+        lastmod = (str(lastmod)[:10] if lastmod else now)
+        return (
+            f"<url><loc>{base}{path}</loc><lastmod>{lastmod}</lastmod>"
+            f"<changefreq>weekly</changefreq><priority>0.85</priority>{alts}{image_tags}</url>"
+        )
 
     urls = [
         urlset("", "1.0", "daily"),
@@ -72,7 +100,7 @@ async def sitemap(site_id: str):
         if slug:
             urls.append(urlset(f"/collection/{slug}", "0.85"))
     for p in products:
-        urls.append(urlset(f"/product/{p['id']}", "0.8"))
+        urls.append(product_urlset(p))
     for b in blog_posts:
         slug = b.get("slug") if isinstance(b, dict) else None
         if slug:
@@ -80,7 +108,8 @@ async def sitemap(site_id: str):
 
     xml = ('<?xml version="1.0" encoding="UTF-8"?>\n'
            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
-           'xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
+           'xmlns:xhtml="http://www.w3.org/1999/xhtml" '
+           'xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n'
            + "\n".join(urls) + "\n</urlset>")
     return Response(content=xml, media_type="application/xml")
 
@@ -121,6 +150,7 @@ async def robots(site_id: str):
         "",
         f"Sitemap: {sitemap_url}",
         f"Sitemap: {_origin()}/api/public/sites/{site_id}/llms.txt",
+        f"Sitemap: {_origin()}/api/public/sites/{site_id}/llms-full.txt",
         "",
     ]
     return Response(content="\n".join(lines), media_type="text/plain")
@@ -227,6 +257,128 @@ async def llms_txt(site_id: str):
         f"Sitemap XML : {origin}/api/public/sites/{site_id}/sitemap.xml",
     ])
     return Response(content="\n".join(lines), media_type="text/plain; charset=utf-8")
+
+
+@router.get("/public/sites/{site_id}/llms-full.txt")
+async def llms_full_txt(site_id: str):
+    """llms-full.txt — version exhaustive avec le contenu des articles de blog.
+    Les moteurs IA (Perplexity, ChatGPT, Gemini, Claude) citent directement à
+    partir de ce fichier, c'est la pièce MAÎTRESSE de l'AEO.
+    Standard : https://llmstxt.org/"""
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(404, "Site introuvable")
+
+    origin = _origin()
+    base = f"{origin}/shop/{site_id}"
+    name = site.get("name") or "Boutique"
+    niche = site.get("niche") or "produits senior"
+    design = site.get("design") or {}
+    brand = design.get("brand") or {}
+    tagline = brand.get("tagline")
+    if isinstance(tagline, dict):
+        tagline = tagline.get("fr") or next(iter(tagline.values()), "")
+
+    products = await db.products.find(
+        {"site_id": site_id, "status": "active"},
+        {"_id": 0},
+    ).limit(100).to_list(100)
+    blog_posts = list(design.get("blog_posts") or [])
+    # Priorise pillars first, then satellites (max 40 total)
+    blog_posts.sort(key=lambda p: (p.get("type") != "pillar", -len(p.get("body") or "")))
+    blog_posts = blog_posts[:40]
+
+    lines = [
+        f"# {name} — llms-full.txt",
+        "",
+        f"> {tagline or f'{name}, spécialiste {niche}. Contenu exhaustif pour citation par les moteurs IA.'}",
+        "",
+        f"URL : {base}",
+        f"Niche : {niche}",
+        f"Dernière mise à jour : {datetime.now(timezone.utc).strftime('%Y-%m-%d')}",
+        "",
+        "## À propos",
+        "",
+    ]
+    about = design.get("pages", {}).get("about") or design.get("about") or {}
+    headline = about.get("headline")
+    if isinstance(headline, dict):
+        headline = headline.get("fr") or ""
+    if headline:
+        lines.extend([f"**{headline}**", ""])
+    for par in (about.get("paragraphs") or [])[:3]:
+        if isinstance(par, dict):
+            par = par.get("fr") or ""
+        if par:
+            lines.extend([str(par), ""])
+
+    # --- Produits : nom + description complète ---
+    lines.extend(["", "## Catalogue complet", ""])
+    for p in products:
+        pname = p.get("name") or {}
+        if isinstance(pname, dict):
+            pname = pname.get("fr") or next(iter(pname.values()), "Produit")
+        desc = p.get("description") or p.get("short_description") or ""
+        if isinstance(desc, dict):
+            desc = desc.get("fr") or next(iter(desc.values()), "")
+        price = p.get("price") or 0
+        narrative = p.get("narrative") or {}
+        sub = narrative.get("subheadline") or ""
+        benefits = narrative.get("benefits") or []
+
+        lines.extend([
+            f"### {pname}",
+            f"URL : {base}/product/{p['id']}",
+            f"Prix : {price} €",
+            "",
+            str(sub) if sub else str(desc)[:600],
+            "",
+        ])
+        if benefits:
+            lines.append("Points forts :")
+            for b in benefits[:6]:
+                if isinstance(b, dict):
+                    b = b.get("fr") or next(iter(b.values()), "")
+                if b:
+                    lines.append(f"- {b}")
+            lines.append("")
+
+        # FAQ produit — clé pour AEO (les IA aspirent les Q/A directement)
+        faq = narrative.get("faq") or []
+        if faq:
+            lines.append("FAQ :")
+            for f in faq[:4]:
+                q = f.get("question") or f.get("q")
+                a = f.get("answer") or f.get("a")
+                if q and a:
+                    lines.append(f"- **Q :** {q}")
+                    lines.append(f"  **R :** {a}")
+            lines.append("")
+
+    # --- Blog : articles complets ---
+    lines.extend(["", "## Articles publiés", ""])
+    for post in blog_posts:
+        title = post.get("title") or ""
+        slug = post.get("slug") or ""
+        body = (post.get("body") or "").strip()
+        # Cap body per article for safety (AI tokens / file size)
+        if len(body) > 4000:
+            body = body[:4000] + "\n\n[…]"
+        lines.extend([
+            f"### {title}",
+            f"URL : {base}/blog/{slug}",
+            f"Type : {post.get('type') or 'article'}",
+            "",
+            body,
+            "",
+            "---",
+            "",
+        ])
+
+    return Response(
+        content="\n".join(lines),
+        media_type="text/plain; charset=utf-8",
+    )
 
 
 def _xml_escape(s: str) -> str:

@@ -1,4 +1,5 @@
 """Products CRUD per site + import from URL."""
+import os
 import uuid
 from datetime import datetime, timezone
 
@@ -8,8 +9,19 @@ from pydantic import BaseModel, HttpUrl
 from deps import db, get_current_user, _check_site_access
 from models_shop import ProductCreateInput, ProductUpdateInput
 from scraper import import_from_url
+from routes.indexnow import fire_and_forget_indexnow
 
 router = APIRouter(prefix="/sites/{site_id}/products")
+
+
+def _product_urls(site_id: str, product_id: str) -> list[str]:
+    """Build canonical URLs (home + product + sitemap) for IndexNow fire."""
+    origin = os.environ.get("PUBLIC_ORIGIN") or "https://senior-france.preview.emergentagent.com"
+    return [
+        f"{origin}/shop/{site_id}",
+        f"{origin}/shop/{site_id}/product/{product_id}",
+        f"{origin}/api/public/sites/{site_id}/sitemap.xml",
+    ]
 
 
 class ImportInput(BaseModel):
@@ -37,6 +49,11 @@ async def create_product(site_id: str, data: ProductCreateInput, user: dict = De
     }
     await db.products.insert_one(dict(doc))
     doc.pop("_id", None)
+    # Auto-submit to IndexNow (Bing, Yandex, Naver, Seznam) — no-op if disabled
+    try:
+        fire_and_forget_indexnow(_product_urls(site_id, doc["id"]))
+    except Exception:
+        pass
     return doc
 
 
@@ -59,6 +76,10 @@ async def update_product(site_id: str, product_id: str, data: ProductUpdateInput
     result = await db.products.update_one({"id": product_id, "site_id": site_id}, {"$set": update})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Produit introuvable")
+    try:
+        fire_and_forget_indexnow(_product_urls(site_id, product_id))
+    except Exception:
+        pass
     return await db.products.find_one({"id": product_id, "site_id": site_id}, {"_id": 0})
 
 

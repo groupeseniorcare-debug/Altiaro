@@ -267,17 +267,40 @@ export function StorefrontBlogPost() {
   const canonical = typeof window !== "undefined" ? `${window.location.origin}/shop/${siteId}/blog/${slug}` : undefined;
   const html = mdLite(body);
 
+  const wordCount = body.split(/\s+/).filter(Boolean).length;
   const articleSchema = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
     headline: title,
+    alternativeHeadline: pickLang(post.excerpt, lang) || undefined,
+    description: pickLang(post.excerpt, lang) || title,
     image: post.image,
     datePublished: post.published_at,
-    dateModified: post.published_at,
-    author: { "@type": "Organization", name: post.author || site?.name },
-    publisher: { "@type": "Organization", name: site?.name, logo: design?.brand?.logo_url ? { "@type": "ImageObject", url: design.brand.logo_url } : undefined },
+    dateModified: post.updated_at || post.published_at,
+    wordCount,
+    timeRequired: post.read_minutes ? `PT${post.read_minutes}M` : undefined,
+    inLanguage: lang === "fr" ? "fr-FR" : lang,
+    author: {
+      "@type": "Organization",
+      name: post.author || site?.name,
+      url: `${window.location.origin}/shop/${siteId}/about`,
+    },
+    publisher: {
+      "@type": "Organization",
+      name: site?.name,
+      logo: design?.brand?.logo_url
+        ? { "@type": "ImageObject", url: design.brand.logo_url }
+        : undefined,
+    },
     mainEntityOfPage: canonical,
     articleSection: category,
+    keywords: [post.pillar_keyword, post.satellite_keyword, ...(post.satellite_keywords || [])]
+      .filter(Boolean).join(", ") || undefined,
+    about: post.pillar_keyword || post.satellite_keyword || category,
+    speakable: {
+      "@type": "SpeakableSpecification",
+      cssSelector: ["h1", "h2", "[data-speakable='true']"],
+    },
   };
   const breadcrumb = {
     "@context": "https://schema.org",

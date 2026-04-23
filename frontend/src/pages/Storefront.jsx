@@ -82,17 +82,42 @@ export function StorefrontHome() {
   const orgSchema = site
     ? {
         "@context": "https://schema.org",
-        "@type": "Organization",
+        "@type": "OnlineStore",   // More specific than Organization — AEO signal
         name: site.name,
         url: canonical,
         logo: design?.brand?.logo_url,
+        image: design?.brand?.logo_url,
         description: seoDesc,
+        areaServed: (site.selected_countries && site.selected_countries.length
+          ? site.selected_countries
+          : ["FR"]
+        ).map((c) => ({ "@type": "Country", name: c })),
+        knowsLanguage: ["fr-FR", "en"],
         sameAs: [
           design?.social?.facebook,
           design?.social?.instagram,
           design?.social?.youtube,
           design?.social?.linkedin,
+          design?.social?.tiktok,
+          design?.social?.pinterest,
         ].filter(Boolean),
+        contactPoint: design?.contact?.support_phone
+          ? [{
+              "@type": "ContactPoint",
+              contactType: "customer service",
+              telephone: design.contact.support_phone,
+              email: design?.contact?.support_email,
+              areaServed: "FR",
+              availableLanguage: ["French"],
+            }]
+          : undefined,
+        address: design?.contact?.address
+          ? {
+              "@type": "PostalAddress",
+              streetAddress: design.contact.address,
+              addressCountry: "FR",
+            }
+          : undefined,
       }
     : null;
   const websiteSchema = site
@@ -131,6 +156,10 @@ export function StorefrontHome() {
   const faqSchema = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
+    speakable: {
+      "@type": "SpeakableSpecification",
+      cssSelector: ["[data-speakable='true']"],
+    },
     mainEntity: faqArray.slice(0, 8).map((it) => {
       const q = typeof it.question === "string" ? it.question : (it.q?.[lang] || it.q?.fr || "");
       const a = typeof it.answer === "string" ? it.answer : (it.a?.[lang] || it.a?.fr || "");
