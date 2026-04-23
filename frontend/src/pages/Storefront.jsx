@@ -60,6 +60,7 @@ import DeliveryEstimate from "../components/storefront/DeliveryEstimate";
 import ProductBundle from "../components/storefront/ProductBundle";
 import PaymentOptions from "../components/storefront/PaymentOptions";
 import MobileStickyBuy from "../components/storefront/MobileStickyBuy";
+import Manifesto from "../components/storefront/Manifesto";
 import {
   PeopleAlsoAsk,
   BestForNotFor,
@@ -185,21 +186,22 @@ export function StorefrontHome() {
 // - Section with no real data is silently skipped.
 // ---------------------------------------------------------------------
 const DEFAULT_HOMEPAGE_ORDER = [
-  { key: "press_logos", visible: false },
-  { key: "benefits", visible: true },
-  { key: "collections", visible: true },
-  { key: "products", visible: true },
-  { key: "featured_product", visible: false },
+  { key: "press_logos",        visible: true },
+  { key: "manifesto",          visible: true },
+  { key: "products",           visible: true },
+  { key: "collections",        visible: true },
   { key: "lifestyle_editorial", visible: false },
-  { key: "values", visible: false },
-  { key: "buying_guide", visible: false },
-  { key: "testimonials", visible: true },
-  { key: "founder_story", visible: false },
-  { key: "instagram", visible: false },
-  { key: "blog_teaser", visible: false },
-  { key: "faq", visible: true },
-  { key: "newsletter", visible: true },
-  { key: "final_cta", visible: true },
+  { key: "founder_story",      visible: true },
+  { key: "benefits",           visible: true },
+  { key: "testimonials",       visible: true },
+  { key: "featured_product",   visible: false },
+  { key: "values",             visible: false },
+  { key: "buying_guide",       visible: false },
+  { key: "instagram",          visible: false },
+  { key: "blog_teaser",        visible: false },
+  { key: "faq",                visible: true },
+  { key: "newsletter",         visible: true },
+  { key: "final_cta",          visible: true },
 ];
 
 function hasData(key, design, products) {
@@ -215,6 +217,7 @@ function hasData(key, design, products) {
     case "press_logos":
     case "collections":
     case "founder_story":
+    case "manifesto":
       return true;
     // These require real data — no fallback makes sense
     case "featured_product": return !!(products?.some((p) => p.featured));
@@ -227,9 +230,10 @@ function hasData(key, design, products) {
   }
 }
 
-// Alternating surface colors for section rhythm.
-const DARK_SECTIONS = new Set(["press_logos"]);
-const GRAY_SECTIONS = new Set(["benefits", "testimonials", "faq", "values", "newsletter", "final_cta"]);
+// Alternating surface colors for section rhythm — pale cream ⇄ white ⇄ grey
+// creates a quiet editorial tempo without ever turning dark.
+const DARK_SECTIONS = new Set([]);
+const GRAY_SECTIONS = new Set(["benefits", "testimonials", "faq", "newsletter", "final_cta", "manifesto"]);
 
 function sectionWrapperClass(key, idx) {
   if (DARK_SECTIONS.has(key)) return "bg-[#1C1917] text-white";
@@ -249,6 +253,8 @@ function renderHomepageSections({ design, site, siteId, products, loading, lang 
       switch (s.key) {
         case "press_logos":
           return <PressLogos mentions={design?.press_mentions} design={design} />;
+        case "manifesto":
+          return <Manifesto design={design} lang={lang} />;
         case "benefits":
           return <Benefits design={design} lang={lang} />;
         case "collections":

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
-  ArrowLeft, PaintBrush, CheckCircle, Storefront as StoreIcon, Rocket,
+  ArrowLeft, PaintBrush, CheckCircle, Storefront as StoreIcon, Rocket, Sparkle, ArrowClockwise,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 import BrandingContent from "../components/BrandingContent";
@@ -23,6 +23,9 @@ export default function SiteDesign() {
   const [tab, setTab] = useState("identity");
   const [previewKey, setPreviewKey] = useState(Date.now());
   const [previewOpen, setPreviewOpen] = useState(true);
+  // Enrich-homepage one-shot
+  const [enriching, setEnriching] = useState(false);
+  const [enrichToast, setEnrichToast] = useState("");
   // Wizard / launch state
   const [mode, setMode] = useState("auto"); // "wizard" | "advanced" | "auto"
   const [launchJobId, setLaunchJobId] = useState(null);
@@ -57,6 +60,25 @@ export default function SiteDesign() {
     setPublishing(false);
     if (error) { window.alert(error); return; }
     setDesign((d) => ({ ...(d || {}), published: data?.published ?? !d?.published }));
+  };
+
+  const enrichHomepage = async () => {
+    setEnriching(true);
+    setEnrichToast("");
+    const { data, error } = await apiCall(() =>
+      api.post(`/sites/${siteId}/design/ai-enrich-homepage`, {})
+    );
+    setEnriching(false);
+    if (error) {
+      setEnrichToast(`Échec : ${error}`);
+      return;
+    }
+    const { enriched = {} } = data || {};
+    setEnrichToast(
+      `✓ Homepage enrichie — ${enriched.press_mentions_count || 0} médias · portrait fondateur · manifeste · ${enriched.values_count || 0} valeurs`
+    );
+    await reload();
+    setTimeout(() => setEnrichToast(""), 6000);
   };
 
   if (loading) return <div className="min-h-screen bg-[#FAF7F2] p-10 text-neutral-500">Chargement…</div>;
@@ -123,7 +145,17 @@ export default function SiteDesign() {
               Identité visuelle, navigation, collections et contenu — tout pour une boutique cohérente de bout en bout.
             </p>
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center flex-wrap">
+            <button
+              onClick={enrichHomepage}
+              disabled={enriching}
+              data-testid="ai-enrich-homepage"
+              title="Remplace les fallbacks (presse, fondateur, manifeste…) par de vraies données IA"
+              className="h-11 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:brightness-110 text-white text-sm font-medium flex items-center gap-2 shadow-md disabled:opacity-60"
+            >
+              {enriching ? <ArrowClockwise size={14} className="animate-spin" /> : <Sparkle size={14} weight="fill" />}
+              {enriching ? "Enrichissement IA…" : "✨ Enrichir la homepage"}
+            </button>
             <button
               onClick={() => setMode("wizard")}
               data-testid="switch-to-wizard"
@@ -156,6 +188,16 @@ export default function SiteDesign() {
             </a>
           </div>
         </div>
+
+        {enrichToast && (
+          <div
+            data-testid="enrich-toast"
+            className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 flex items-start gap-2"
+          >
+            <Sparkle size={14} weight="fill" className="mt-0.5 shrink-0 text-emerald-600" />
+            <div>{enrichToast}</div>
+          </div>
+        )}
 
         {/* Tabs nav */}
         <div className="bg-white rounded-2xl border border-neutral-200 p-1.5 mb-6 flex gap-1 overflow-x-auto">

@@ -1027,6 +1027,125 @@ async def wizard_suggestions(site_id: str, user: dict = Depends(get_current_user
 
 
 # =====================================================================
+# AI Homepage Enrichment — generate press_mentions, founder_story, manifesto,
+# editorial, values in ONE call. The Concepteur presses one button and the
+# homepage goes from "pretty with defaults" to "fully personalized".
+# =====================================================================
+@router.post("/sites/{site_id}/design/ai-enrich-homepage")
+async def ai_enrich_homepage(site_id: str, user: dict = Depends(get_current_user)):
+    """One-shot AI enrichment of the storefront's contextual sections."""
+    await _check_site_access(site_id, user)
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(404, "Site introuvable")
+
+    brand = (site.get("design") or {}).get("brand") or {}
+    brand_name = _sanitize_brand_text(brand.get("logo_text") or brand.get("name") or "", max_len=40) or site.get("name", "")
+    tagline = _sanitize_brand_text(brand.get("tagline") or "", max_len=120)
+    voice = (brand.get("voice") or "chaleureux et rassurant, premium")[:200]
+    niche = site.get("niche") or site.get("niche_keyword") or "produits Silver Economy"
+
+    products = await db.products.find(
+        {"site_id": site_id, "status": {"$ne": "deleted"}},
+        {"_id": 0, "name": 1, "category": 1},
+    ).limit(8).to_list(8)
+    product_names = [
+        (p.get("name") or {}).get("fr") if isinstance(p.get("name"), dict) else str(p.get("name") or "")
+        for p in products if p.get("name")
+    ][:5]
+
+    system = (
+        "Tu es directeur éditorial Silver Economy (60+ et aidants) pour une boutique premium française. "
+        "Tu rédiges du contenu marketing élégant, digne, sans clichés gériatriques — ton chaleureux mais pas condescendant. "
+        "Réponds EXCLUSIVEMENT en français, en JSON strict, sans markdown, sans préambule."
+    )
+    prompt = (
+        f"Marque : « {brand_name} »\n"
+        f"Tagline : « {tagline} »\n"
+        f"Voix : {voice}\n"
+        f"Niche : {niche}\n"
+        f"Produits phares ({len(product_names)}) : {json.dumps(product_names, ensure_ascii=False)}\n\n"
+        "Produis UN SEUL JSON avec ces 5 blocs :\n\n"
+        "1) `press_mentions` : tableau de 6 médias français crédibles. Format : [{\"name\":\"...\"}].\n\n"
+        "2) `founder_story` : portrait fictif cohérent. Format : "
+        "{\"name\":\"Prénom Nom français élégant\", \"role\":\"Fondateur ou Fondatrice\", "
+        "\"quote\":\"citation poignante 40-70 mots — mentionne un grand-parent ou un déclic\", "
+        "\"signature\":\"Prénom L.\"}.\n\n"
+        "3) `manifesto` : {\"eyebrow\":\"Manifeste\", "
+        "\"headline\":\"statement 12-22 mots qui capture la conviction\", "
+        "\"kicker\":\"paragraphe 50-90 mots humain, refus des clichés\"}.\n\n"
+        "4) `editorial` : citation magazine. Format : "
+        "{\"title\":\"4-8 mots\", \"body\":\"250-400 car. usage concret en contexte lifestyle\"}.\n\n"
+        "5) `values` : 4 piliers. Format : "
+        "[{\"title\":\"1-3 mots\", \"description\":\"1 phrase 15-25 mots\"}, ...].\n\n"
+        "Renvoie UNIQUEMENT ce JSON valide."
+    )
+    session = f"enrich-{site_id}-{uuid.uuid4().hex[:6]}"
+    try:
+        data = await _claude_json(system, prompt, session, timeout=90)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("[ai-enrich-homepage] failed")
+        raise HTTPException(status_code=502, detail=f"IA indisponible : {str(e)[:140]}")
+
+    press = [{"name": _sanitize_brand_text(str(p.get("name") or ""), max_len=40)}
+             for p in (data.get("press_mentions") or [])[:6] if p.get("name")]
+    fs = data.get("founder_story") or {}
+    fs_name = _sanitize_brand_text(str(fs.get("name") or ""), max_len=40) or "Camille Lefèvre"
+    founder_story = {
+        "name": fs_name,
+        "role": _sanitize_brand_text(str(fs.get("role") or ""), max_len=40) or "Fondatrice",
+        "quote": _sanitize_brand_text(str(fs.get("quote") or ""), max_len=500)
+                 or "Cette maison est née d'une évidence familiale. Chaque produit est choisi avec la même attention qu'on réserverait à un proche.",
+        "signature": _sanitize_brand_text(str(fs.get("signature") or ""), max_len=40)
+                     or (fs_name.split(" ")[0] if fs_name else "Camille L."),
+    }
+    mf = data.get("manifesto") or {}
+    manifesto = {
+        "eyebrow": _sanitize_brand_text(str(mf.get("eyebrow") or ""), max_len=40) or "Manifeste",
+        "headline": _sanitize_brand_text(str(mf.get("headline") or ""), max_len=240)
+                    or "Bien vieillir chez soi n'est pas un luxe. C'est un droit.",
+        "kicker": _sanitize_brand_text(str(mf.get("kicker") or ""), max_len=500)
+                  or "Nous refusons la médiocrité. Nous refusons le paternalisme. Nous croyons qu'une belle vieillesse mérite de beaux objets.",
+    }
+    ed = data.get("editorial") or {}
+    editorial = {
+        "title": _sanitize_brand_text(str(ed.get("title") or ""), max_len=80),
+        "body": _sanitize_brand_text(str(ed.get("body") or ""), max_len=500),
+    }
+    values = []
+    for v in (data.get("values") or [])[:4]:
+        title = _sanitize_brand_text(str(v.get("title") or ""), max_len=40)
+        desc = _sanitize_brand_text(str(v.get("description") or ""), max_len=180)
+        if title:
+            values.append({"title": title, "description": desc})
+
+    now = datetime.now(timezone.utc).isoformat()
+    await db.sites.update_one(
+        {"id": site_id},
+        {"$set": {
+            "design.press_mentions": press,
+            "design.founder_story": founder_story,
+            "design.manifesto": manifesto,
+            "design.editorial": editorial,
+            "design.values": values,
+            "design.updated_at": now,
+        }},
+    )
+    return {
+        "ok": True,
+        "enriched": {
+            "press_mentions_count": len(press),
+            "founder_story": True,
+            "manifesto": True,
+            "editorial": bool(editorial.get("title")),
+            "values_count": len(values),
+        },
+    }
+
+
+# =====================================================================
 # AI Navigation Optimizer — build a conversion-optimized nav
 # =====================================================================
 @router.post("/sites/{site_id}/navigation/ai-optimize")

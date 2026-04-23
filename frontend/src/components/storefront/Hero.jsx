@@ -1,28 +1,32 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowRight, ShieldCheck, Star, Truck, Phone } from "@phosphor-icons/react";
+import { motion, useScroll, useTransform } from "framer-motion";
+import { ArrowRight, ShieldCheck, Star, Truck } from "@phosphor-icons/react";
 import { designText } from "./storefrontUtils";
 import { t } from "../../lib/i18n";
 import { sanitizeBrandText } from "../../lib/brandText";
 
 /**
- * Hero premium avec image — split layout desktop, empilé en mobile.
- *  - Eyebrow (tagline / catégorie)
- *  - H1 avec titre principal
- *  - Sous-titre
- *  - 2 CTAs (primary → collection principale, secondary → histoire)
- *  - Trust row (avis, livraison, service, garantie)
- *  - Image hero à droite (fallback Unsplash silver-eco)
+ * Hero — ultra-premium editorial hero, inspired by Aesop / Loro Piana.
  *
- * Alimenté par :
- *  - design.hero.title / subtitle / cta_label / cta_secondary_label / image / eyebrow
- *  - design.hero.rating = { score, count }
+ * Features:
+ *  • Near-full viewport height with generous vertical breathing room
+ *  • Oversized serif title (up to 96px on desktop) with tight tracking
+ *  • Soft parallax on the visual column as the page scrolls
+ *  • Minimal eyebrow line (thin hairline + small caps label)
+ *  • Editorial ratings / trust line in a single refined row
+ *  • Subtle animated scroll indicator (vertical line + dot)
+ *  • Graceful placeholder when the hero image is not yet set
  */
 export function Hero({ site, design, lang, products }) {
   const { siteId } = useParams();
-  // Prefer clean brand identity; avoid surfacing raw site.name (often "Test ...")
-  // and sanitize any legacy markdown/preambles that may live in design.hero.title.
   const brand = design?.brand || {};
+  const primary = brand.primary_color || brand.palette?.primary || "#1C1917";
+  const accent = brand.accent_color || brand.palette?.accent || "#F5F2EB";
+  const textColor = brand.text_color || brand.palette?.text || "#1C1917";
+  const bg = brand.background_color || brand.palette?.background || "#FDFBF7";
+  const fontHeading = brand.font_heading || "Fraunces";
+
   const brandLabel = sanitizeBrandText(brand.logo_text || brand.name || "", 40);
   const heroTitleRaw = designText(design, "hero.title", lang) || brandLabel || site?.name || t(lang, "shop_title");
   const heroTitle = sanitizeBrandText(heroTitleRaw, 60);
@@ -30,120 +34,144 @@ export function Hero({ site, design, lang, products }) {
     || "Des produits sélectionnés avec soin pour préserver votre autonomie, votre confort et votre sérénité au quotidien.";
   const heroCta = designText(design, "hero.cta_label", lang) || "Découvrir la collection";
   const heroCta2 = designText(design, "hero.cta_secondary_label", lang) || "Notre histoire";
-  const eyebrowRaw = designText(design, "hero.eyebrow", lang)
-    || brand.tagline
-    || site?.niche
-    || "La maison bienveillante";
+  const eyebrowRaw = designText(design, "hero.eyebrow", lang) || brand.tagline || "La maison bienveillante";
   const eyebrow = sanitizeBrandText(eyebrowRaw, 60);
-  const trustLine = designText(design, "hero.trust_line", lang) || "Conseillers humains · Lun–Ven 9h–18h";
-  // Hero image: 1) explicit design.hero.image, 2) first featured / first product image (so the
-  // hero actually matches the shop), 3) a neutral cream panel (no misleading stock photo).
+  const rating = design?.hero?.rating || { score: 4.8, count: 2143 };
+
+  // First available product image becomes the hero visual if no explicit asset is set.
   const firstProductImg = (() => {
     if (!Array.isArray(products) || products.length === 0) return null;
     const featured = products.find((p) => p.featured && p.images?.[0]);
     return (featured || products.find((p) => p.images?.[0]))?.images?.[0] || null;
   })();
-  const heroImage = designText(design, "hero.image", lang)
-    || design?.hero?.image
-    || firstProductImg
-    || null;
+  const heroImage = designText(design, "hero.image", lang) || design?.hero?.image || firstProductImg || null;
 
-  const rating = design?.hero?.rating || { score: 4.8, count: 2143 };
+  // Subtle parallax on scroll for the image column
+  const ref = useRef(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+  const imgY = useTransform(scrollYProgress, [0, 1], [0, -80]);
+  const copyY = useTransform(scrollYProgress, [0, 1], [0, -30]);
 
-  const primary = design?.brand?.primary_color || "#B84B31";
-  const accent = design?.brand?.accent_color || "#F5F2EB";
-  const fontHeading = design?.brand?.font_heading || "Fraunces";
-  const bg = design?.brand?.background_color || "#FDFBF7";
-  const textColor = design?.brand?.text_color || "#1C1917";
+  // Hide the scroll indicator once the user has scrolled ~200px
+  const [hintVisible, setHintVisible] = useState(true);
+  useEffect(() => {
+    const onScroll = () => setHintVisible(window.scrollY < 200);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
     <section
+      ref={ref}
       className="relative overflow-hidden"
       style={{ background: bg, color: textColor }}
       data-testid="storefront-hero"
     >
-      <div className="max-w-7xl mx-auto px-6 md:px-10 pt-14 md:pt-20 pb-12 md:pb-24 grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] gap-10 lg:gap-16 items-center">
+      <div className="max-w-[1440px] mx-auto px-6 md:px-10 pt-16 md:pt-24 pb-24 md:pb-36 grid grid-cols-1 lg:grid-cols-[1.05fr_1fr] gap-10 lg:gap-20 items-center min-h-[calc(100vh-140px)]">
         {/* ---------- LEFT : Copy ---------- */}
-        <div className="max-w-xl lg:max-w-none order-2 lg:order-1">
-          <div
-            className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.25em] mb-5 font-medium px-3 py-1.5 rounded-full"
-            style={{ background: `${primary}14`, color: primary }}
+        <motion.div style={{ y: copyY }} className="max-w-2xl order-2 lg:order-1">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            className="inline-flex items-center gap-3 mb-8"
             data-testid="hero-eyebrow"
           >
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: primary }} />
-            {eyebrow}
-          </div>
+            <span className="h-px w-8" style={{ background: primary }} />
+            <span className="text-[10px] uppercase tracking-[0.4em] font-medium" style={{ color: textColor }}>
+              {eyebrow}
+            </span>
+          </motion.div>
 
-          <h1
-            className="text-[42px] md:text-[56px] lg:text-[68px] font-semibold leading-[1.04] tracking-[-0.02em]"
-            style={{ fontFamily: `"${fontHeading}", Georgia, serif` }}
+          <motion.h1
+            initial={{ opacity: 0, y: 28 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
+            className="text-[52px] sm:text-[68px] md:text-[84px] lg:text-[96px] leading-[0.95] tracking-[-0.03em] font-normal"
+            style={{ fontFamily: `"${fontHeading}", Georgia, serif`, color: textColor }}
             data-testid="hero-title"
           >
             {heroTitle}
-          </h1>
+          </motion.h1>
 
-          <p
-            className="text-lg md:text-xl mt-6 leading-relaxed max-w-xl"
-            style={{ color: `${textColor}cc` }}
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.9, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="text-[17px] md:text-[19px] mt-8 leading-relaxed max-w-xl"
+            style={{ color: `${textColor}b3` }}
             data-testid="hero-subtitle"
           >
             {heroSub}
-          </p>
+          </motion.p>
 
-          <div className="mt-8 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.9, delay: 0.5 }}
+            className="mt-10 flex flex-col sm:flex-row items-start sm:items-center gap-3"
+          >
             <Link
-              to={`/shop/${siteId}#collections`}
+              to={`/shop/${siteId}#products`}
               data-testid="hero-cta-primary"
-              className="inline-flex items-center gap-2 h-14 px-8 rounded-full text-white font-medium transition-all hover:opacity-90 active:scale-[0.98] text-[15px] shadow-sm"
-              style={{ background: primary }}
+              className="group inline-flex items-center gap-2.5 h-14 px-8 rounded-full text-white font-medium transition-all hover:gap-3.5 text-[14px] tracking-wide bg-neutral-900 hover:bg-neutral-800"
             >
               {heroCta}
-              <ArrowRight size={16} weight="bold" />
+              <ArrowRight size={15} weight="bold" className="transition-transform group-hover:translate-x-0.5" />
             </Link>
             <Link
               to={`/shop/${siteId}#story`}
               data-testid="hero-cta-secondary"
-              className="inline-flex items-center gap-2 h-14 px-7 rounded-full border font-medium transition text-[15px] hover:bg-neutral-50"
-              style={{ borderColor: "#E7E5E4", color: textColor }}
+              className="relative inline-flex items-center gap-2 text-[14px] font-medium tracking-wide h-14 px-2 after:absolute after:left-2 after:right-2 after:bottom-3 after:h-px after:bg-current after:opacity-40 hover:after:opacity-100 after:transition-opacity"
+              style={{ color: textColor }}
             >
               {heroCta2}
             </Link>
-          </div>
+          </motion.div>
 
-          {/* Trust strip */}
-          <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
+          {/* Trust strip — ultra-minimal single line with dot separators */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1, delay: 0.8 }}
+            className="mt-14 flex flex-wrap items-center gap-x-5 gap-y-3 text-[13px]"
+            style={{ color: `${textColor}a0` }}
+          >
             {rating?.score && (
               <div className="flex items-center gap-2" data-testid="hero-rating">
-                <div className="flex" style={{ color: "#F59E0B" }}>
+                <div className="flex" style={{ color: "#F5B800" }}>
                   {[...Array(5)].map((_, i) => (
-                    <Star key={i} size={16} weight="fill" />
+                    <Star key={i} size={13} weight="fill" />
                   ))}
                 </div>
-                <div className="text-sm">
-                  <span className="font-semibold">{rating.score}/5</span>
-                  <span className="text-neutral-500"> · {rating.count?.toLocaleString("fr-FR")} avis</span>
-                </div>
+                <span className="font-medium" style={{ color: textColor }}>
+                  {rating.score}/5
+                </span>
+                <span>· {rating.count?.toLocaleString?.("fr-FR") || rating.count} avis</span>
               </div>
             )}
-            <div className="flex items-center gap-2 text-sm" style={{ color: `${textColor}b3` }}>
-              <Truck size={16} weight="bold" style={{ color: primary }} />
-              Livraison offerte
-            </div>
-            <div className="flex items-center gap-2 text-sm" style={{ color: `${textColor}b3` }}>
-              <ShieldCheck size={16} weight="bold" style={{ color: primary }} />
-              Garantie 2 ans
-            </div>
-            <div className="flex items-center gap-2 text-sm" style={{ color: `${textColor}b3` }}>
-              <Phone size={16} weight="bold" style={{ color: primary }} />
-              {trustLine}
-            </div>
-          </div>
-        </div>
+            <span className="opacity-30">·</span>
+            <span className="flex items-center gap-1.5">
+              <Truck size={13} weight="bold" /> Livraison offerte
+            </span>
+            <span className="opacity-30">·</span>
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck size={13} weight="bold" /> Garantie 2 ans
+            </span>
+          </motion.div>
+        </motion.div>
 
         {/* ---------- RIGHT : Visual ---------- */}
-        <div className="relative order-1 lg:order-2" data-testid="hero-image">
-          <div
-            className="relative aspect-[4/5] md:aspect-[5/6] rounded-[32px] overflow-hidden"
+        <motion.div
+          style={{ y: imgY }}
+          className="relative order-1 lg:order-2"
+          data-testid="hero-image"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+            className="relative aspect-[4/5] md:aspect-[5/6] rounded-[4px] overflow-hidden"
             style={{ background: accent }}
           >
             {heroImage ? (
@@ -155,54 +183,69 @@ export function Hero({ site, design, lang, products }) {
                 fetchPriority="high"
               />
             ) : (
-              // Graceful empty state — no misleading stock photo. Shows brand monogram on
-              // a soft gradient that picks up the brand palette.
               <div
                 className="w-full h-full flex items-center justify-center"
                 style={{
-                  background: `linear-gradient(135deg, ${accent} 0%, ${primary}22 60%, ${accent} 100%)`,
+                  background: `linear-gradient(135deg, ${accent} 0%, ${primary}15 60%, ${accent} 100%)`,
                 }}
                 data-testid="hero-image-placeholder"
               >
                 <div
-                  className="text-[140px] md:text-[200px] font-semibold opacity-[0.08] select-none leading-none"
+                  className="text-[160px] md:text-[220px] font-normal opacity-[0.06] select-none leading-none"
                   style={{ fontFamily: `"${fontHeading}", serif`, color: textColor }}
                 >
                   {(heroTitle || "A").charAt(0).toUpperCase()}
                 </div>
               </div>
             )}
-            {/* Floating trust card */}
-            <div
-              className="absolute bottom-5 left-5 right-5 md:bottom-8 md:left-8 md:right-auto md:max-w-[280px] bg-white/95 backdrop-blur rounded-2xl p-4 shadow-xl"
+
+            {/* Editorial caption card — bottom-left, glassmorphic */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.9, delay: 0.9 }}
+              className="absolute left-6 bottom-6 md:left-8 md:bottom-8 bg-white/92 backdrop-blur-md rounded-[2px] px-4 py-3 max-w-[260px] shadow-[0_20px_60px_-30px_rgba(0,0,0,0.25)]"
               data-testid="hero-floating-card"
             >
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
-                  style={{ background: `${primary}15`, color: primary }}
-                >
-                  <ShieldCheck size={22} weight="duotone" />
-                </div>
-                <div>
-                  <div className="text-sm font-semibold text-neutral-900 leading-tight">
-                    Satisfait ou remboursé
-                  </div>
-                  <div className="text-xs text-neutral-500 mt-0.5">
-                    14 jours · retour gratuit
-                  </div>
-                </div>
+              <div className="text-[9px] uppercase tracking-[0.32em] text-neutral-500 mb-1">
+                Satisfait ou remboursé
               </div>
-            </div>
-          </div>
+              <div className="text-[13px] text-neutral-900 leading-snug">
+                14 jours pour changer d'avis — <span className="text-neutral-500">retour gratuit</span>
+              </div>
+            </motion.div>
+          </motion.div>
 
-          {/* Decorative accent */}
+          {/* vertical brand name — editorial Vogue-style caption on the right edge */}
           <div
-            className="absolute -top-8 -right-8 w-28 h-28 rounded-full opacity-40 blur-2xl -z-10 hidden md:block"
+            className="hidden lg:block absolute -right-12 top-8 text-[10px] uppercase tracking-[0.4em] origin-top-left rotate-90 whitespace-nowrap text-neutral-500"
+            aria-hidden="true"
+          >
+            {brandLabel || "Collection"} — Édition {new Date().getFullYear()}
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Scroll indicator — a thin animated vertical line with a dot travelling down */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: hintVisible ? 1 : 0, y: hintVisible ? 0 : 10 }}
+        transition={{ duration: 0.6 }}
+        className="hidden md:flex absolute bottom-8 left-1/2 -translate-x-1/2 flex-col items-center gap-3 pointer-events-none"
+        aria-hidden="true"
+      >
+        <span className="text-[10px] uppercase tracking-[0.4em] text-neutral-500">
+          Scroll
+        </span>
+        <div className="relative w-px h-14 overflow-hidden" style={{ background: "#E7E5E4" }}>
+          <motion.div
+            className="absolute left-0 right-0 top-0 h-4"
             style={{ background: primary }}
+            animate={{ y: ["-16px", "56px"] }}
+            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
           />
         </div>
-      </div>
+      </motion.div>
     </section>
   );
 }
