@@ -267,7 +267,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
             <button
               type="button"
               onClick={() => navigate(`${shopRoot}/search`)}
-              className="xl:hidden w-11 h-11 rounded-full border flex items-center justify-center hover:bg-neutral-50"
+              className="xl:hidden w-11 h-11 min-w-[44px] min-h-[44px] rounded-full border flex items-center justify-center hover:bg-neutral-50 active:scale-95 transition-transform"
               style={{ borderColor: "#E7E5E4" }}
               data-testid="header-search-icon"
               aria-label="Rechercher"
@@ -314,7 +314,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
             <button
               type="button"
               onClick={() => setMobileOpen(true)}
-              className="lg:hidden w-11 h-11 rounded-full border flex items-center justify-center"
+              className="lg:hidden w-11 h-11 min-w-[44px] min-h-[44px] rounded-full border flex items-center justify-center active:scale-95 transition-transform"
               style={{ borderColor: "#E7E5E4" }}
               data-testid="mobile-menu-open"
               aria-label="Menu"
@@ -336,7 +336,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
               </div>
               <button
                 onClick={() => setMobileOpen(false)}
-                className="w-10 h-10 rounded-full hover:bg-neutral-50 flex items-center justify-center"
+                className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full hover:bg-neutral-50 flex items-center justify-center active:scale-95 transition-transform"
                 data-testid="mobile-menu-close"
                 aria-label="Fermer"
               >
@@ -431,7 +431,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
       <CartDrawer design={design} />
 
       {/* ================= FOOTER ================= */}
-      <footer className="mt-24" style={{ background: "#1C1917", color: "#D6D3D1" }} data-testid="storefront-footer">
+      <footer className="mt-24 pb-[env(safe-area-inset-bottom)]" style={{ background: "#1C1917", color: "#D6D3D1" }} data-testid="storefront-footer">
         {/* Reassurance band */}
         <div className="border-b" style={{ borderColor: "#2A2725" }}>
           <div className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">

@@ -1,0 +1,59 @@
+{
+  "summary": "Iteration 23 testing: items 1, 2, 6, 7 PASS. Items 3, 4 frontend PASS (testids present). Item 5 (mega menu storefront rendering) BLOCKED by backend schema bug: NavItem Pydantic model in /app/backend/routes/design.py strips 'type', 'children', 'image', 'target' fields on PUT /api/sites/{id}/navigation. Mega menu data never persists — only label/href/external survive. Confirmed: after PUT with mega payload, GET /api/public/sites/{id}/navigation returns [{label:'TEST Mega', href:'#', external:false}] with no type/children. Storefront then flattens the mega item to a plain link (verified visually in mobile drawer: 'TEST Mega' appears as a regular row, not a mega panel with cards).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "PUT /api/sites/{site_id}/navigation",
+        "issue": "NavItem Pydantic model (routes/design.py:1117-1120) only accepts label/href/external. When frontend sends a mega menu item with type='mega', children=[{label, href, image}, ...], all extra fields are silently dropped by Pydantic. Result: mega menu is never persisted and storefront cannot render the mega panel. Blocks brief item 5 end-to-end.",
+        "priority": "CRITICAL"
+      },
+      {
+        "endpoint": "GET /api/public/sites/{site_id}/navigation (public_shop.py:82-99)",
+        "issue": "Even if NavItem were fixed, the public endpoint simply returns nav.get('header') which reflects whatever is persisted. Needs no change once persistence is fixed — but the default fallback items also only expose label/href/external (no 'type' key). When header is empty, storefront gets defaults with no type, so the rendering condition `type === 'mega'` never triggers.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Studio Navigation → Storefront mega menu",
+        "issue": "Frontend NavigationTab + MegaMenuEditor works perfectly (all testids present, 18 LINK_TYPES, mega children editable). But when user saves, backend drops the mega structure, so StorefrontLayout.jsx desktop+mobile code path for type='mega' is unreachable. No data-testid='nav-mega-*' or 'mobile-nav-mega-*' rendered in shop because header items never carry type='mega' after round-trip.",
+        "affected_selectors": ["nav-mega-*", "mobile-nav-mega-*", "mega-panel-*"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration23_legal_mega_mobile.py",
+    "/app/test_reports/pytest/iter23.xml"
+  ],
+  "action_items": [
+    "CRITICAL: In /app/backend/routes/design.py, extend NavItem model to accept optional `type: Optional[str] = None`, `children: Optional[list[dict]] = None`, `image: Optional[str] = None`, `target: Optional[str] = None`. Update update_navigation() to serialize via .dict(exclude_none=True) so mega structure persists. Consider creating a separate NavChildItem model for type safety on children (label, href, image).",
+    "After fix: re-run test_public_nav_returns_mega and test_public_design_reflects_mega in /app/backend/tests/test_iteration23_legal_mega_mobile.py; both currently fail. Then verify storefront renders data-testid='nav-mega-test-mega' (desktop) and 'mobile-nav-mega-test-mega' (mobile drawer) after PUT with a mega payload.",
+    "Optional: update default header items in public_shop.py public_navigation() and design.py get_navigation() to include `type` key matching the label (e.g., {label:'Accueil', href:'/', type:'home'}) — so brand-new sites get the new schema out of the box."
+  ],
+  "critical_code_review_comments": [
+    "routes/design.py now 1264 lines (was 1256 in iter22) — continues to grow; should be split.",
+    "NavItem model at line 1117 is the root cause of the iter23 mega menu regression. The Pydantic model is too narrow and silently drops client data. Either add the missing fields explicitly or use `model_config = ConfigDict(extra='allow')` so unknown fields pass through — though the strict approach is safer for long-term type safety.",
+    "In update_navigation (design.py:1149) the items are serialized via `[i.dict() for i in data.header]` — after fix, use `i.dict(exclude_none=True)` to avoid polluting stored docs with null children/image on plain links.",
+    "SiteDesign.jsx NavRow + MegaMenuEditor are well-testid-ed but file is now ~1354 lines; MegaMenuEditor (lines ~900-1000) could be moved to a sibling file.",
+    "Livraison and Retours storefront routes have rich custom components (not LegalPage) — good UX differentiation; verified /shop/{id}/livraison and /shop/{id}/retours return 200.",
+    "StorefrontLayout.jsx: touch targets 44×44 and active:scale-95 confirmed on mobile-menu-open and mobile-menu-close (verified via bounding_box in Playwright). pb-[env(safe-area-inset-bottom)] present in footer."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration23_legal_mega_mobile.py (new)"
+  ],
+  "success_rate": {
+    "backend": "88% (15/17 pass) — 2 failures both traced to same root cause (NavItem schema strips mega fields)",
+    "frontend": "95% — all Studio testids present (subtab-legal source-verified, nav-header-type-0 with 18 options confirmed, nav-add-mega + mega-auto-collections/products/add-card + mega-child-label/href/image-0 all present, touch targets 44x44 confirmed). Only the storefront mega panel rendering is blocked, but that's downstream of the backend bug."
+  },
+  "test_credentials": "Concepteur: concepteur@conceptfactory.fr / Concepteur2026! — Site: 65964cb0-7a1a-4c11-9644-1ad8f2371d48",
+  "seed_data_creation": "test_put_nav_with_mega_persists wrote design.navigation.header = [Accueil (home), TEST Mega (mega with 2 children)] and footer = [CGV (cgv)] on site 65964cb0. NOTE: due to the NavItem bug, only {label, href, external} are stored — mega children were silently lost. Main agent should fix the NavItem model and re-PUT a proper nav payload. test_patch_section_hero wrote design.hero = {title:'Hero iter23', subtitle:'Regression', cta_primary:'Découvrir'} — may want to restore real copy via regenerate_section.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "test_iteration23_legal_mega_mobile.py is the iter23 regression suite. Expected state BEFORE fix: 2 failures in TestNavigationMegaMenu (test_public_nav_returns_mega, test_public_design_reflects_mega). AFTER fix: all 17 tests should pass AND a Playwright test should find data-testid='nav-mega-test-mega' in the shop. Frontend is correct; only backend NavItem needs widening. Brief items 1 (7 legal pages), 2 (storefront legal routes), 6 (mobile quick-wins 44x44 + safe-area), 7 (regression) all PASS. Brief items 3 (18 link-type picker), 4 (mega editor testids) frontend OK — end-user will see the editor work, but Save won't roundtrip mega data until backend fix lands.",
+  "rca of the issue": "ROOT CAUSE: /app/backend/routes/design.py lines 1117-1120 defines `class NavItem(BaseModel): label: str; href: str; external: bool = False` — no fields for type/children/image/target. When frontend sends `{label:'TEST Mega', type:'mega', href:'#', children:[...]}`, Pydantic silently drops type+children (default strict mode discards unknown fields). The `[i.dict() for i in data.header]` on line 1152 then stores only {label, href, external}. On GET public nav, the mega structure is absent. StorefrontLayout.jsx renders based on `n.type === 'mega'` (which is now undefined) → falls through to a plain link. REPRODUCTION: (1) PUT /api/sites/{id}/navigation with {header:[{label:'X', type:'mega', children:[{...}]}]} → 200 OK (2) GET /api/public/sites/{id}/navigation → returns [{label:'X', href:'...', external:false}] (no type, no children). MITIGATION: extend NavItem with optional `type: Optional[str] = None` and `children: Optional[list[dict]] = None` and `image: Optional[str] = None`; serialize with exclude_none=True. Then all downstream consumers (StorefrontLayout, public_shop.public_navigation) will transparently receive the mega structure — no other code changes needed."
+}

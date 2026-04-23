@@ -95,7 +95,7 @@ export default function CartDrawer({ design }) {
         data-testid="cart-drawer-overlay"
       />
       <aside
-        className="fixed top-0 right-0 bottom-0 w-full sm:w-[460px] bg-white z-[999] shadow-2xl flex flex-col animate-slide-in-right"
+        className="fixed top-0 right-0 bottom-0 w-full sm:w-[460px] bg-white z-[999] shadow-2xl flex flex-col animate-slide-in-right pb-[env(safe-area-inset-bottom)]"
         data-testid="cart-drawer"
       >
         <div className="flex items-center justify-between p-5 border-b border-neutral-200 shrink-0">
@@ -111,7 +111,7 @@ export default function CartDrawer({ design }) {
           <button
             onClick={() => setOpen(false)}
             data-testid="cart-drawer-close"
-            className="w-9 h-9 rounded-full hover:bg-neutral-100 flex items-center justify-center transition"
+            className="w-9 h-9 min-w-[44px] min-h-[44px] rounded-full hover:bg-neutral-100 flex items-center justify-center transition active:scale-95"
             aria-label="Fermer"
           >
             <X size={18} />
