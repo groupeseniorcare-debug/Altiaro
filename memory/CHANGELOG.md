@@ -3,7 +3,41 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
-## 2026-04-23 · Page Produit éditoriale + Blog IA (Étape 7)
+## 2026-04-23 · Cluster mensuel SEO — 1 pilier + 4 satellites auto
+
+### Backend
+- **NEW** `POST /api/sites/{id}/blog-posts/cluster-monthly` — déclenche un cluster
+  (pilier + 4 satellites par défaut) en arrière-plan, exclut automatiquement les
+  keywords déjà consommés par les articles existants via `_used_keywords_from_posts()`.
+- **NEW** `POST /api/sites/{id}/blog-posts/cluster-settings` — toggle
+  `design.blog_cluster.auto_enabled` pour programmer le run mensuel.
+  (POST et non PATCH pour éviter la collision avec `PATCH /{slug}`.)
+- **NEW** `GET /api/sites/{id}/blog-posts/cluster-status` — retourne `auto_enabled`,
+  `next_scheduled_at` (prochain 1er du mois 06:00 UTC), derniers 5 jobs cluster.
+- **NEW** `run_monthly_clusters_for_all_sites()` — entry-point APScheduler qui
+  itère tous les sites avec `auto_enabled=True` et lance un job par site.
+- **NEW** scheduler cron `day=1, hour=6` dans `server.py` → `monthly_blog_cluster`.
+- `_pick_informational_keywords()` accepte `exclude_used: set[str]` pour éviter
+  les doublons entre cycles.
+- **Résilience LLM** : `_call_claude_json()` retry sur 502/503 (1 tentative +
+  backoff 3 s) pour absorber les BadGateway transients du proxy LiteLLM.
+- **Prompts optimisés pour le budget** : pillar 1400-1800 mots (vs 2200-2800),
+  satellite 700-1000 mots (vs 900-1300) — économie ~30 % tokens/cluster.
+
+### Frontend
+- `SiteBlogPosts.jsx` : nouvelle **carte "Cluster de contenu mensuel"** ultra-premium
+  monochrome (2 col : gauche CTA + description E-E-A-T / droite `#F5F5F5` avec
+  programme, dates formatées FR, historique des runs récents).
+- Bouton noir sharp-corner **"Générer mon cluster mensuel"** (déclenchement manuel).
+- Toggle pill "Auto-publier chaque mois" (active le scheduler).
+- Chargement du statut au mount + polling après lancement.
+
+### Blocage résiduel
+- Budget Emergent LLM (28.03 / 28.00) : les prompts réduits permettent d'espérer
+  ~2-3 clusters supplémentaires avant épuisement. Le code est robuste : en cas
+  d'échec le job est marqué `failed` avec message clair dans l'UI.
+
+
 
 ### Page Produit — refonte images
 - **NEW** `components/storefront/ProductEditorialMosaic.jsx` : mosaïque magazine asymétrique

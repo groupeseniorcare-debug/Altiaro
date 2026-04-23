@@ -125,33 +125,45 @@ async def delete_blog_post(site_id: str, slug: str, user=Depends(get_current_use
 async def _call_claude_json(system: str, user: str, timeout: int = 120):
     if not EMERGENT_LLM_KEY:
         return None
-    try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = (
-            LlmChat(
-                api_key=EMERGENT_LLM_KEY,
-                session_id=f"blog-{uuid.uuid4().hex[:8]}",
-                system_message=system,
-            )
-            .with_model("anthropic", "claude-sonnet-4-5-20250929")
-        )
-        raw = await asyncio.wait_for(chat.send_message(UserMessage(text=user)), timeout=timeout)
-        text = raw if isinstance(raw, str) else str(raw)
-        return json.loads(_strip_json_fence(text))
-    except Exception as e:
-        msg = str(e)
-        if "Budget has been exceeded" in msg or ("budget" in msg.lower() and "exceeded" in msg.lower()):
-            try:
-                await db.platform_health.update_one(
-                    {"key": "llm"},
-                    {"$set": {"key": "llm", "status": "budget_exhausted",
-                              "last_error_at": datetime.now(timezone.utc).isoformat()}},
-                    upsert=True,
+    # Two attempts with a short backoff — BadGateway (502) from the LiteLLM
+    # proxy is transient and a single retry usually succeeds.
+    last_err = None
+    for attempt in range(2):
+        try:
+            from emergentintegrations.llm.chat import LlmChat, UserMessage
+            chat = (
+                LlmChat(
+                    api_key=EMERGENT_LLM_KEY,
+                    session_id=f"blog-{uuid.uuid4().hex[:8]}",
+                    system_message=system,
                 )
-            except Exception:
-                pass
-        logger.exception("Blog Claude call failed")
-        return None
+                .with_model("anthropic", "claude-sonnet-4-5-20250929")
+            )
+            raw = await asyncio.wait_for(chat.send_message(UserMessage(text=user)), timeout=timeout)
+            text = raw if isinstance(raw, str) else str(raw)
+            return json.loads(_strip_json_fence(text))
+        except Exception as e:
+            last_err = e
+            msg = str(e)
+            if "Budget has been exceeded" in msg or ("budget" in msg.lower() and "exceeded" in msg.lower()):
+                try:
+                    await db.platform_health.update_one(
+                        {"key": "llm"},
+                        {"$set": {"key": "llm", "status": "budget_exhausted",
+                                  "last_error_at": datetime.now(timezone.utc).isoformat()}},
+                        upsert=True,
+                    )
+                except Exception:
+                    pass
+                break  # Budget = no point retrying
+            # Transient upstream 502/503 → retry once
+            if attempt == 0 and ("502" in msg or "503" in msg or "Bad Gateway" in msg or "Internal" in msg):
+                logger.warning(f"[blog-claude] transient {msg[:100]} — retrying in 3s")
+                await asyncio.sleep(3)
+                continue
+            break
+    logger.exception(f"Blog Claude call failed after retries: {last_err}")
+    return None
 
 
 @router.post("/sites/{site_id}/blog-posts/ai-draft")
@@ -243,19 +255,22 @@ _INFO_RE = re.compile(r"\b(comment|pourquoi|guide|choisir|quand|quoi|est-ce|diff
 _TRANSAC_RE = re.compile(r"\b(acheter|achat|prix|commander|meilleur|pas cher|promo|avis|test)\b", re.I)
 
 
-def _pick_informational_keywords(site: dict, country: str, limit: int = 8) -> list:
+def _pick_informational_keywords(site: dict, country: str, limit: int = 8, exclude_used: set | None = None) -> list:
     """Return up to `limit` informational keywords (highest volume first).
-    Falls back to neutral+niche if no informational keyword is available."""
+    Falls back to neutral+niche if no informational keyword is available.
+    If `exclude_used` is provided, keywords already consumed by prior blog
+    posts are skipped (used by the monthly cluster generator)."""
     niche_an = (site.get("design") or {}).get("niche_analysis") or {}
     results = niche_an.get("results") or []
     market = next((r for r in results if r.get("country") == country), None)
     kws = (market or {}).get("keywords") or []
+    used = {(k or "").lower().strip() for k in (exclude_used or set())}
 
     infos, neutrals = [], []
     for k in kws:
         kw = (k.get("keyword") if isinstance(k, dict) else str(k)) or ""
         vol = (k.get("volume_monthly") if isinstance(k, dict) else 0) or 0
-        if not kw:
+        if not kw or kw.lower().strip() in used:
             continue
         if _INFO_RE.search(kw):
             infos.append({"keyword": kw, "volume": vol})
@@ -278,6 +293,21 @@ def _pick_informational_keywords(site: dict, country: str, limit: int = 8) -> li
     return out
 
 
+def _used_keywords_from_posts(posts: list) -> set:
+    """Extract all keywords already consumed by existing blog posts so the
+    monthly cluster generator doesn't duplicate topics."""
+    used = set()
+    for p in posts or []:
+        for f in ("pillar_keyword", "satellite_keyword"):
+            v = p.get(f)
+            if v:
+                used.add(str(v).lower().strip())
+        for v in (p.get("satellite_keywords") or []):
+            if v:
+                used.add(str(v).lower().strip())
+    return used
+
+
 def _pillar_prompt(site_name: str, niche: str, pillar_kw: str, satellite_kws: list) -> tuple[str, str]:
     system = (
         "Tu es un rédacteur SEO senior (top 1%) pour le marché français des seniors. "
@@ -288,16 +318,15 @@ def _pillar_prompt(site_name: str, niche: str, pillar_kw: str, satellite_kws: li
     user = f"""ARTICLE PILIER pour le blog de {site_name} (niche : {niche}).
 
 MOT-CLÉ CIBLE : {pillar_kw}
-LONGUEUR : 2200-2800 mots (article de référence, très approfondi)
+LONGUEUR : 1400-1800 mots (article de référence approfondi mais concis)
 ARTICLES SATELLITES qui pointeront vers ce pilier :
 {sat_list}
 
 RÈGLES :
 - Ton expert et rassurant, aucun jargon médical lourd.
-- E-E-A-T maximum : données chiffrées, normes (LPPR, CE), mention d'ergothérapeutes.
-- Structure markdown riche : H2, H3, listes à puces, **gras** sur faits clés, au moins 1 tableau comparatif sous forme de liste.
-- Section "À retenir" en fin d'article + mini-FAQ de 4 questions.
-- Dans le corps, inclus 3 à 5 "ancres internes" du style [voir notre guide : SUJET] sur des sujets proches. Liste ces ancres dans `internal_anchors`.
+- E-E-A-T : données chiffrées, normes (LPPR, CE), mention d'ergothérapeutes.
+- Structure markdown : H2, H3, listes à puces, **gras** sur faits clés, 1 tableau comparatif sous forme de liste.
+- Section "À retenir" en fin d'article + mini-FAQ de 3 questions.
 - Meta title 55-60 chars + meta description 140-158 chars.
 
 Retourne EXACTEMENT ce JSON :
@@ -308,9 +337,8 @@ Retourne EXACTEMENT ce JSON :
   "meta_description": "Meta description 140-158 chars",
   "category": "Guide d'achat|Maintien à domicile|Sommeil|Bien-être|Santé",
   "excerpt": "Résumé 2 phrases (max 180 chars)",
-  "read_minutes": 9,
-  "body": "Article markdown complet — 2200 à 2800 mots",
-  "internal_anchors": ["ancre 1", "ancre 2", "ancre 3"]
+  "read_minutes": 7,
+  "body": "Article markdown 1400-1800 mots"
 }}"""
     return system, user
 
@@ -323,15 +351,15 @@ def _satellite_prompt(site_name: str, niche: str, sat_kw: str, pillar_title: str
     user = f"""ARTICLE SATELLITE pour le blog de {site_name} (niche : {niche}).
 
 MOT-CLÉ CIBLE : {sat_kw}
-LONGUEUR : 900-1300 mots
+LONGUEUR : 700-1000 mots
 PILIER À CITER : « {pillar_title} » (slug `{pillar_slug}`)
 
 RÈGLES :
 - Ton expert-accessible, zéro jargon.
 - Structure markdown : H2 + H3, listes, **gras** sur faits clés.
-- Tu dois OBLIGATOIREMENT inclure 1 phrase qui renvoie au pilier, sous cette forme exacte :
+- Inclus 1 phrase exacte qui renvoie au pilier :
   *➜ Pour aller plus loin, découvrez notre guide complet : [{pillar_title}](/blog/{pillar_slug})*
-- Mini-FAQ de 3 questions en fin d'article.
+- Mini-FAQ de 2 questions en fin d'article.
 - Meta title 55-60 chars + meta description 140-158 chars.
 
 Retourne EXACTEMENT ce JSON :
@@ -342,8 +370,8 @@ Retourne EXACTEMENT ce JSON :
   "meta_description": "Meta description 140-158 chars",
   "category": "Guide d'achat|Maintien à domicile|Sommeil|Bien-être|Santé",
   "excerpt": "Résumé 2 phrases (max 180 chars)",
-  "read_minutes": 5,
-  "body": "Article markdown 900-1300 mots incluant la phrase de renvoi au pilier"
+  "read_minutes": 4,
+  "body": "Article markdown 700-1000 mots incluant la phrase de renvoi au pilier"
 }}"""
     return system, user
 
@@ -525,3 +553,213 @@ async def auto_plan_status(site_id: str, job_id: str, user=Depends(get_current_u
     if not job:
         raise HTTPException(404, "Job introuvable")
     return job
+
+
+# =====================================================================
+# Cluster mensuel — 1 pilier + 4 satellites, déclenché manuellement
+# et/ou programmé chaque 1er du mois via APScheduler.
+# =====================================================================
+class ClusterMonthlyInput(BaseModel):
+    country: Optional[str] = "FR"
+    satellites: int = 4  # 3-5
+
+
+class ClusterSettingsInput(BaseModel):
+    auto_enabled: bool
+    country: Optional[str] = "FR"
+    satellites: Optional[int] = 4
+
+
+async def _launch_cluster_job(
+    site: dict,
+    country: str,
+    satellites_count: int,
+    triggered_by: str,
+) -> dict:
+    """Common helper pour cluster-monthly (manuel ou schedulé).
+    Retourne {job_id, pillar_kw, satellite_kws, ...} ou lève une erreur métier."""
+    site_id = site["id"]
+    posts = ((site.get("design") or {}).get("blog_posts")) or []
+    used = _used_keywords_from_posts(posts)
+    pool = _pick_informational_keywords(site, country, limit=12, exclude_used=used)
+
+    if not pool:
+        # Fallback synthetic based on niche if keyword pool exhausted
+        niche = site.get("niche") or "produits seniors"
+        synthetic = [
+            f"comment choisir {niche}", f"avantages {niche}",
+            f"guide entretien {niche}", f"prix moyen {niche} 2026",
+            f"meilleurs {niche} pour seniors",
+        ]
+        pool = [{"keyword": k, "volume": 0} for k in synthetic if k.lower() not in used]
+
+    if not pool:
+        raise ValueError("Plus de mots-clés disponibles : tous ont été consommés par les articles existants. Relance l'étape 8 (SEO) pour régénérer.")
+
+    max_sat = max(3, min(5, int(satellites_count or 4)))
+    pillar_kw = pool[0]["keyword"]
+    satellite_kws = [k["keyword"] for k in pool[1:max_sat + 1]]
+    if len(satellite_kws) < max_sat:
+        niche = site.get("niche") or "produits seniors"
+        extras = [
+            f"astuces {niche}",
+            f"questions fréquentes sur {niche}",
+            f"checklist {niche}",
+        ]
+        for e in extras:
+            if len(satellite_kws) >= max_sat:
+                break
+            if e.lower().strip() not in used and e not in satellite_kws:
+                satellite_kws.append(e)
+
+    job_id = str(uuid.uuid4())
+    await db.blog_jobs.insert_one({
+        "id": job_id,
+        "site_id": site_id,
+        "kind": "cluster_monthly",
+        "triggered_by": triggered_by,  # "manual" | "schedule"
+        "status": "pending",
+        "pillar_keyword": pillar_kw,
+        "satellite_keywords": satellite_kws,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    # Kick off generation asynchronously (don't await the long LLM work)
+    asyncio.create_task(_run_auto_plan_job(
+        site_id=site_id,
+        job_id=job_id,
+        site_name=site.get("name") or "",
+        niche=site.get("niche") or "",
+        pillar_kw=pillar_kw,
+        satellite_kws=satellite_kws,
+    ))
+
+    return {
+        "job_id": job_id,
+        "pillar_keyword": pillar_kw,
+        "satellite_keywords": satellite_kws,
+        "expected_count": 1 + len(satellite_kws),
+    }
+
+
+@router.post("/sites/{site_id}/blog-posts/cluster-monthly")
+async def cluster_monthly(
+    site_id: str,
+    body: ClusterMonthlyInput,
+    user=Depends(get_current_user),
+):
+    """Déclenchement manuel d'un cluster mensuel (1 pilier + N satellites).
+    Évite les keywords déjà utilisés par les articles existants."""
+    site = await _ensure_site(site_id)
+    if not site:
+        raise HTTPException(404, "Site introuvable")
+    try:
+        result = await _launch_cluster_job(
+            site=site,
+            country=body.country or "FR",
+            satellites_count=body.satellites or 4,
+            triggered_by="manual",
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    # Persist last_manual run on site for UI feedback
+    await db.sites.update_one(
+        {"id": site_id},
+        {"$set": {
+            "design.blog_cluster.last_manual_run_at": datetime.now(timezone.utc).isoformat(),
+            "design.blog_cluster.last_manual_job_id": result["job_id"],
+        }},
+    )
+
+    return {
+        "status": "started",
+        "message": f"Cluster mensuel lancé ({result['expected_count']} articles) — la liste se met à jour dans 1-2 min.",
+        **result,
+    }
+
+
+@router.post("/sites/{site_id}/blog-posts/cluster-settings")
+async def cluster_settings(
+    site_id: str,
+    body: ClusterSettingsInput,
+    user=Depends(get_current_user),
+):
+    """Active/désactive la génération automatique mensuelle du cluster SEO."""
+    site = await _ensure_site(site_id)
+    if not site:
+        raise HTTPException(404, "Site introuvable")
+
+    update = {
+        "design.blog_cluster.auto_enabled": bool(body.auto_enabled),
+        "design.blog_cluster.country": body.country or "FR",
+        "design.blog_cluster.satellites": max(3, min(5, int(body.satellites or 4))),
+        "design.blog_cluster.updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.sites.update_one({"id": site_id}, {"$set": update})
+    return {"ok": True, **{k.split(".")[-1]: v for k, v in update.items()}}
+
+
+@router.get("/sites/{site_id}/blog-posts/cluster-status")
+async def cluster_status(site_id: str, user=Depends(get_current_user)):
+    """Infos UI : dernier run, prochaine date prévue, settings actuels."""
+    site = await _ensure_site(site_id)
+    if not site:
+        raise HTTPException(404, "Site introuvable")
+
+    bc = ((site.get("design") or {}).get("blog_cluster")) or {}
+    now = datetime.now(timezone.utc)
+    # Next 1st of next month at 06:00 UTC
+    if now.month == 12:
+        next_run = now.replace(year=now.year + 1, month=1, day=1, hour=6, minute=0, second=0, microsecond=0)
+    else:
+        next_run = now.replace(month=now.month + 1, day=1, hour=6, minute=0, second=0, microsecond=0)
+
+    # Latest 5 cluster jobs
+    recent = await db.blog_jobs.find(
+        {"site_id": site_id, "kind": "cluster_monthly"}, {"_id": 0}
+    ).sort("created_at", -1).limit(5).to_list(5)
+
+    return {
+        "auto_enabled": bool(bc.get("auto_enabled")),
+        "country": bc.get("country") or "FR",
+        "satellites": bc.get("satellites") or 4,
+        "last_manual_run_at": bc.get("last_manual_run_at"),
+        "last_scheduled_run_at": bc.get("last_scheduled_run_at"),
+        "next_scheduled_at": next_run.isoformat() if bc.get("auto_enabled") else None,
+        "recent_jobs": recent,
+    }
+
+
+async def run_monthly_clusters_for_all_sites() -> dict:
+    """APScheduler entry-point — 1er de chaque mois à 06:00 UTC.
+    Itère tous les sites avec `design.blog_cluster.auto_enabled == True`
+    et déclenche un cluster en background pour chacun."""
+    try:
+        cursor = db.sites.find(
+            {"design.blog_cluster.auto_enabled": True},
+            {"_id": 0, "id": 1, "name": 1, "niche": 1, "design.blog_cluster": 1, "design.blog_posts": 1, "design.niche_analysis": 1},
+        )
+        launched, skipped = 0, 0
+        async for site in cursor:
+            bc = ((site.get("design") or {}).get("blog_cluster")) or {}
+            try:
+                await _launch_cluster_job(
+                    site=site,
+                    country=bc.get("country") or "FR",
+                    satellites_count=bc.get("satellites") or 4,
+                    triggered_by="schedule",
+                )
+                await db.sites.update_one(
+                    {"id": site["id"]},
+                    {"$set": {"design.blog_cluster.last_scheduled_run_at": datetime.now(timezone.utc).isoformat()}},
+                )
+                launched += 1
+            except Exception:
+                logger.exception(f"[cluster-monthly] site {site.get('id')} skipped")
+                skipped += 1
+        logger.info(f"[cluster-monthly] launched={launched} skipped={skipped}")
+        return {"launched": launched, "skipped": skipped}
+    except Exception:
+        logger.exception("[cluster-monthly] scheduler run failed")
+        return {"launched": 0, "skipped": 0, "error": True}

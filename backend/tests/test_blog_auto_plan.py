@@ -1,5 +1,5 @@
 """Tests for blog auto-plan keyword picker logic (no LLM needed)."""
-from routes.blog_posts import _pick_informational_keywords, _slugify
+from routes.blog_posts import _pick_informational_keywords, _slugify, _used_keywords_from_posts
 
 
 def _make_site(keywords, country="FR"):
@@ -22,11 +22,9 @@ def test_picker_ranks_informational_by_volume():
     ])
     result = _pick_informational_keywords(site, "FR", limit=5)
     kws = [r["keyword"] for r in result]
-    # Informational first (ranked by volume desc), transactionals dropped,
-    # neutrals allowed after.
     assert kws[0] == "comment choisir un fauteuil releveur"
     assert "acheter fauteuil releveur" not in kws
-    assert "fauteuil releveur pas cher" not in kws  # transactional (pas cher)
+    assert "fauteuil releveur pas cher" not in kws
     assert "pourquoi utiliser un fauteuil releveur" in kws
 
 
@@ -53,6 +51,33 @@ def test_picker_handles_missing_market():
     assert _pick_informational_keywords(site, "FR") == []
 
 
+def test_picker_excludes_used_keywords():
+    site = _make_site([
+        {"keyword": "comment choisir X", "volume_monthly": 1000},
+        {"keyword": "pourquoi Y", "volume_monthly": 800},
+        {"keyword": "guide complet Z", "volume_monthly": 500},
+    ])
+    used = {"comment choisir x"}  # lower-cased
+    result = _pick_informational_keywords(site, "FR", limit=5, exclude_used=used)
+    kws = [r["keyword"] for r in result]
+    assert "comment choisir X" not in kws
+    assert "pourquoi Y" in kws
+
+
+def test_used_keywords_extraction():
+    posts = [
+        {"type": "pillar", "pillar_keyword": "Guide Fauteuil", "satellite_keywords": ["Astuces X", "Entretien Y"]},
+        {"type": "satellite", "satellite_keyword": "Avantages Z"},
+        {"title": "Manual post, no AI keyword"},
+    ]
+    used = _used_keywords_from_posts(posts)
+    assert "guide fauteuil" in used
+    assert "astuces x" in used
+    assert "entretien y" in used
+    assert "avantages z" in used
+    assert len(used) == 4
+
+
 def test_slugify_basic():
     assert _slugify("Comment Choisir un Fauteuil Releveur !") == "comment-choisir-un-fauteuil-releveur"
-    assert _slugify("") .startswith("article-")
+    assert _slugify("").startswith("article-")

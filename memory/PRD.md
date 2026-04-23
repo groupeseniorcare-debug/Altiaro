@@ -92,6 +92,7 @@ Les 50 étapes du playbook sont regroupées en **8 blocs thématiques ordonnés*
 | 50 | Admin Virements UI (P3) — page `/admin/payouts` déjà existante, 520 lignes, couvre preview + run-payouts + mark-paid + history | ✅ (n'était pas à recoder) |
 | 51 | **Storefront monochrome éditorial** (homepage + page produit, Manifesto + BrandProcess + FounderStory + PressLogos + EditorialMosaic + Reviews) | ✅ |
 | 52 | **Blog IA — pilier + satellites automatiques** (`/api/sites/{id}/blog-posts/auto-plan` background task + cross-linking + IndexNow) | ✅ |
+| 53 | **Cluster SEO mensuel** (1 pilier + 4 satellites, exclusion keywords utilisés, APScheduler 1er du mois, toggle auto + déclenchement manuel, UI monochrome éditoriale) | ✅ |
 
 ## Règles critiques
 - Pas de Shopify — tout custom React/FastAPI.

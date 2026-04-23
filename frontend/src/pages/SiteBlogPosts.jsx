@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   Plus, PencilSimple, Trash, Sparkle, ArrowLeft, X, Eye,
-  FloppyDisk, Warning, CheckCircle, Clock,
+  FloppyDisk, Warning, CheckCircle, Clock, CalendarBlank, Stack,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 
@@ -69,6 +69,17 @@ export default function SiteBlogPosts() {
   const [autoPlanLoading, setAutoPlanLoading] = useState(false);
   const [autoPlanJob, setAutoPlanJob] = useState(null);
 
+  // Monthly cluster state
+  const [clusterStatus, setClusterStatus] = useState(null);
+  const [clusterBusy, setClusterBusy] = useState(false);
+
+  const loadClusterStatus = async () => {
+    const { data } = await apiCall(() => api.get(`/sites/${siteId}/blog-posts/cluster-status`));
+    if (data) setClusterStatus(data);
+  };
+
+  useEffect(() => { loadClusterStatus(); }, [siteId]);
+
   const pollAutoPlan = async (jobId) => {
     // Poll every 8s up to 4 minutes
     const startAt = Date.now();
@@ -123,6 +134,63 @@ export default function SiteBlogPosts() {
     setAutoPlanJob({ ...data, status: "pending" });
     showToast("ok", data.message || "Génération lancée en arrière-plan.");
     pollAutoPlan(data.job_id);
+  };
+
+  const generateMonthlyCluster = async () => {
+    const msg =
+      `Générer le cluster de contenu de ce mois (1 pilier + 4 satellites) ?\n\n` +
+      `• Les keywords déjà utilisés par vos articles sont automatiquement exclus\n` +
+      `• Durée : 90 à 150 secondes (en arrière-plan)\n` +
+      `• Boost direct des signaux E-E-A-T de Google & Perplexity`;
+    if (!window.confirm(msg)) return;
+    setClusterBusy(true);
+    const { data, error, rawDetail } = await apiCall(() =>
+      api.post(`/sites/${siteId}/blog-posts/cluster-monthly`, {
+        country: "FR",
+        satellites: 4,
+      })
+    );
+    if (error) {
+      setClusterBusy(false);
+      return showToast("error", rawDetail?.detail || error);
+    }
+    setAutoPlanJob({ ...data, status: "pending" });
+    setAutoPlanLoading(true);
+    showToast("ok", data.message || "Cluster mensuel lancé.");
+    pollAutoPlan(data.job_id);
+    // Refresh cluster status
+    setTimeout(loadClusterStatus, 1500);
+    setClusterBusy(false);
+  };
+
+  const toggleAutoCluster = async () => {
+    const nextState = !clusterStatus?.auto_enabled;
+    const { data, error } = await apiCall(() =>
+      api.post(`/sites/${siteId}/blog-posts/cluster-settings`, {
+        auto_enabled: nextState,
+        country: clusterStatus?.country || "FR",
+        satellites: clusterStatus?.satellites || 4,
+      })
+    );
+    if (error) return showToast("error", error);
+    showToast(
+      "ok",
+      nextState
+        ? "Publication automatique activée (1 cluster / mois)"
+        : "Publication automatique désactivée",
+    );
+    loadClusterStatus();
+  };
+
+  const fmtDate = (iso) => {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleDateString("fr-FR", {
+        day: "numeric", month: "long", year: "numeric",
+      });
+    } catch (_e) {
+      return iso;
+    }
   };
 
   return (
@@ -198,6 +266,142 @@ export default function SiteBlogPosts() {
             <Clock size={18} weight="regular" className="text-neutral-400" />
           </div>
         )}
+
+        {/* CLUSTER MENSUEL — carte premium monochrome éditoriale */}
+        <div
+          data-testid="monthly-cluster-card"
+          className="mb-8 bg-white rounded-2xl overflow-hidden"
+          style={{ border: "1px solid #E5E5E5" }}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr]">
+            {/* Left : content + CTA */}
+            <div className="p-7 md:p-9" style={{ borderRight: "1px solid #E5E5E5" }}>
+              <div className="flex items-center gap-3 mb-4">
+                <span className="h-px w-8" style={{ background: "#0A0A0A" }} />
+                <span className="text-[10px] uppercase tracking-[0.35em] font-medium text-neutral-900">
+                  Cluster de contenu mensuel
+                </span>
+              </div>
+              <h2
+                className="text-[26px] md:text-[32px] leading-[1.1] tracking-[-0.015em] text-neutral-900 mb-4"
+                style={{ fontFamily: "'Fraunces', Georgia, serif" }}
+              >
+                5 articles premium, publiés chaque mois sans effort.
+              </h2>
+              <p className="text-[14px] leading-[1.7] text-neutral-600 mb-6 max-w-xl">
+                Un pilier de référence + 4 satellites finement liés entre eux. Les keywords
+                déjà utilisés sont automatiquement exclus, pour cibler à chaque cycle les
+                intentions de recherche <span className="font-semibold text-neutral-900">E-E-A-T</span> non encore couvertes.
+                Effet cumulatif : <span className="font-semibold text-neutral-900">×3 sur le volume SEO en 90 jours</span>.
+              </p>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  onClick={generateMonthlyCluster}
+                  disabled={clusterBusy || autoPlanLoading}
+                  data-testid="cluster-monthly-btn"
+                  className="h-11 px-5 bg-neutral-900 hover:bg-black text-white text-[13px] font-semibold tracking-wide flex items-center gap-2 transition disabled:opacity-60"
+                  style={{ borderRadius: "2px" }}
+                >
+                  <Stack size={16} weight="fill" />
+                  {clusterBusy ? "Lancement…" : "Générer mon cluster mensuel"}
+                </button>
+
+                <label
+                  className="flex items-center gap-2.5 h-11 px-4 cursor-pointer select-none text-[13px]"
+                  style={{ border: "1px solid #E5E5E5", borderRadius: "2px" }}
+                  data-testid="auto-cluster-toggle"
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!clusterStatus?.auto_enabled}
+                    onChange={toggleAutoCluster}
+                    className="sr-only"
+                  />
+                  <span
+                    className="w-9 h-5 rounded-full relative transition"
+                    style={{ background: clusterStatus?.auto_enabled ? "#0A0A0A" : "#D4D4D4" }}
+                  >
+                    <span
+                      className="absolute top-[2px] w-4 h-4 rounded-full bg-white transition-all"
+                      style={{ left: clusterStatus?.auto_enabled ? "18px" : "2px" }}
+                    />
+                  </span>
+                  <span className="font-medium text-neutral-900">Auto-publier chaque mois</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Right : status / schedule */}
+            <div className="p-7 md:p-9 bg-[#F5F5F5]">
+              <div className="text-[10px] uppercase tracking-[0.35em] text-neutral-500 mb-4">
+                Programme
+              </div>
+              <div className="space-y-4 text-[13px]">
+                <div className="flex items-start gap-3">
+                  <CalendarBlank size={16} weight="regular" className="text-neutral-900 mt-[2px] shrink-0" />
+                  <div>
+                    <div className="text-neutral-500">Prochain cluster automatique</div>
+                    <div className="font-semibold text-neutral-900 mt-0.5">
+                      {clusterStatus?.auto_enabled && clusterStatus?.next_scheduled_at
+                        ? fmtDate(clusterStatus.next_scheduled_at)
+                        : <span className="text-neutral-400 font-normal">Désactivé</span>}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Clock size={16} weight="regular" className="text-neutral-900 mt-[2px] shrink-0" />
+                  <div>
+                    <div className="text-neutral-500">Dernier cluster lancé</div>
+                    <div className="font-semibold text-neutral-900 mt-0.5">
+                      {clusterStatus?.last_scheduled_run_at || clusterStatus?.last_manual_run_at
+                        ? fmtDate(clusterStatus?.last_scheduled_run_at || clusterStatus?.last_manual_run_at)
+                        : <span className="text-neutral-400 font-normal">Aucun encore</span>}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Stack size={16} weight="regular" className="text-neutral-900 mt-[2px] shrink-0" />
+                  <div>
+                    <div className="text-neutral-500">Historique</div>
+                    <div className="font-semibold text-neutral-900 mt-0.5">
+                      {clusterStatus?.recent_jobs?.length || 0} cluster(s) sur ce site
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {clusterStatus?.recent_jobs?.length > 0 && (
+                <div className="mt-5 pt-5" style={{ borderTop: "1px solid #E5E5E5" }}>
+                  <div className="text-[10px] uppercase tracking-[0.35em] text-neutral-500 mb-3">
+                    Runs récents
+                  </div>
+                  <ul className="space-y-2">
+                    {clusterStatus.recent_jobs.slice(0, 3).map((j) => (
+                      <li key={j.id} className="flex items-start justify-between gap-3 text-[12px]">
+                        <span className="text-neutral-700 line-clamp-1 flex-1">
+                          {j.pillar_title || j.pillar_keyword || "Cluster"}
+                        </span>
+                        <span
+                          className={`shrink-0 text-[10px] uppercase tracking-wider px-2 py-0.5 ${
+                            j.status === "done"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : j.status === "failed"
+                              ? "bg-rose-100 text-rose-800"
+                              : "bg-neutral-200 text-neutral-700"
+                          }`}
+                          style={{ borderRadius: "2px" }}
+                        >
+                          {j.status}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
 
         {loading ? (
           <div className="text-center py-16 text-neutral-500">Chargement…</div>

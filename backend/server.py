@@ -383,6 +383,22 @@ async def startup():
             id="dns_auto_config", replace_existing=True, misfire_grace_time=300,
         )
 
+        # 1st of every month at 06:00 UTC — Blog cluster mensuel (1 pilier + 4 satellites)
+        async def _scheduled_monthly_blog_cluster():
+            logger.info("[scheduler] monthly blog cluster run start")
+            try:
+                from routes.blog_posts import run_monthly_clusters_for_all_sites
+                result = await run_monthly_clusters_for_all_sites()
+                logger.info(f"[scheduler] monthly blog cluster : {result}")
+            except Exception:
+                logger.exception("[scheduler] monthly blog cluster failed")
+
+        scheduler.add_job(
+            _scheduled_monthly_blog_cluster,
+            CronTrigger(day=1, hour=6, minute=0),
+            id="monthly_blog_cluster", replace_existing=True, misfire_grace_time=7200,
+        )
+
         scheduler.start()
         app.state.scheduler = scheduler
         logger.info("APScheduler started : weekly_debits + bimonthly_payouts + opportunity_scan + dns_auto_config (5min)")
