@@ -3,6 +3,15 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-02 · Studio de marque v2 + Nano Banana — fork priorité 0
+
+- 🐛 **Fix nav storefront** : `StorefrontLayout.jsx` utilisait un `navItems()` **hardcoded** ligne 84 et ignorait `design.navigation.header` configuré par le Concepteur. Remplacé par lecture de `design.navigation.header` + `.footer` avec fallback. Header et footer du storefront suivent désormais ce qui est enregistré dans l'onglet Navigation de l'Étape 5.
+- 📄 **Onglet Pages & contenu → 7 sous-onglets éditables** : Hero · À propos · Bénéfices · FAQ · Témoignages · Contact · Pages légales. Chaque sous-onglet est un formulaire complet avec champs inline (textareas, inputs, gestion i18n FR) + bouton ✨ `regen-{section}` (Claude régénère juste cette section) + bouton `save-{section}`. Nouveau endpoint backend `PATCH /api/sites/{id}/design/section/{section}` qui remplace proprement la section.
+- 👁️ **Mini-iframe live preview** : sur desktop `xl:` une colonne droite 420px affiche l'aperçu de `/shop/{siteId}?preview=1&v={ts}` avec un header de fenêtre MacOS (3 boutons rouge/ambre/vert). Refresh auto à chaque sauvegarde/regen (bump `previewKey` = `Date.now()`). Boutons `preview-refresh`, `preview-external`, `preview-close`. Bouton flottant `open-preview` quand fermé.
+- 🖼️ **Nano Banana — images produits IA** : nouveau module `routes/product_images.py` avec 4 endpoints (`POST /products/{id}/generate-image`, `POST /sites/{id}/products/bulk-generate-images`, `GET /products/{id}/generated-images`, `DELETE` idem). 4 styles : lifestyle, studio, closeup, in_use. Prompt construit dynamiquement depuis `brand.palette` + voice + nom produit. Les images sont stockées sous `/api/uploads/products_ai/p_{pid}_{hex}.png`. Un bouton ✨ `ai-img-generate` + select `ai-img-style` dans `ProductEditor` permet au Concepteur de générer depuis n'importe quelle fiche produit importée. Génération testée : ~21 s, PNG 670 KB.
+- **Testing** — iteration 22 : 8/8 backend + 15/15 frontend testids, fix nav validé (storefront rend bien les libellés custom après PUT), aucune régression. Rapport : `/app/test_reports/iteration_22.json`.
+
+
 ## 2026-02 · Studio de marque — finition Priorité 0 (fork)
 
 - **Fix P0** : `BrandingContent.jsx` avait un `Unterminated string constant` ligne 206 (bloc dupliqué collé par erreur pendant la session précédente). Bloc supprimé → build restauré.
