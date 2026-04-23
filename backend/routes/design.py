@@ -957,6 +957,78 @@ async def ai_field(site_id: str, body: AiFieldInput, user: dict = Depends(get_cu
 # =====================================================================
 # AI Navigation Optimizer — build a conversion-optimized nav
 # =====================================================================
+@router.post("/sites/{site_id}/design/wizard-suggestions")
+async def wizard_suggestions(site_id: str, user: dict = Depends(get_current_user)):
+    """One-shot AI brainstorm for the BrandWizard Step 1 pre-fill: 3 brand names,
+    1 tagline, 1 mission, 1 voice — all sanitized, computed from the site's niche
+    + imported products so suggestions actually fit the shop.
+    Returns 402 if the Universal Key budget is exhausted so the UI can show a clear
+    'recharge your key' banner instead of a generic error."""
+    await _check_site_access(site_id, user)
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(404, "Site introuvable")
+
+    # Gather product context for contextually relevant names (fauteuils releveurs
+    # → "Soléa / Alvenar" ; loupes → "Lueur / Éclaira"…).
+    niche = site.get("niche") or site.get("niche_keyword") or "produits Silver Economy"
+    products = await db.products.find(
+        {"site_id": site_id, "status": "active"},
+        {"_id": 0, "name": 1, "category": 1, "price": 1},
+    ).limit(8).to_list(8)
+    product_ctx = [
+        {
+            "name": (p.get("name") or {}).get("fr") if isinstance(p.get("name"), dict) else str(p.get("name") or ""),
+            "category": p.get("category"),
+            "price": p.get("price"),
+        }
+        for p in products if p.get("name")
+    ]
+
+    system = (
+        "Tu es directeur artistique Silver Economy (60+ et aidants) pour des boutiques e-commerce premium. "
+        "Tu proposes des identités de marque chaleureuses, dignes, sans clichés gériatriques. "
+        "Réponds TOUJOURS en français, en JSON strict, sans markdown, sans préambule."
+    )
+    prompt = (
+        f"Niche de la boutique : {niche}\n"
+        f"Nom technique actuel du site (à ignorer si générique type 'Test XX') : {site.get('name')}\n"
+        f"Produits importés ({len(product_ctx)}) : {json.dumps(product_ctx, ensure_ascii=False)[:800]}\n\n"
+        "Propose TROIS noms de marque distincts + UNE tagline + UNE mission + UNE voix de marque, "
+        "le tout cohérent avec la niche ci-dessus et adapté à un public 60+ aisé (Silver Economy).\n\n"
+        "Contraintes strictes :\n"
+        "- `names` : 3 noms distincts, 1-3 mots, max 24 caractères chacun. Noms imaginés, pas descriptifs "
+        "(évite 'Confort Plus', 'Senior Shop', 'Fauteuils Premium'). Inspiration : maisons françaises "
+        "(Hermès, Le Creuset, Diptyque), noms propres, lieux, mots latins doux.\n"
+        "- `tagline` : ≤ 80 caractères, émotion + bénéfice clé.\n"
+        "- `mission` : 1-2 phrases, ≤ 220 caractères. Pourquoi la marque existe.\n"
+        "- `voice` : ≤ 140 caractères. Ex. 'Chaleureux, expert, tutoiement, jamais condescendant'.\n\n"
+        'Renvoie UNIQUEMENT ce JSON :\n'
+        '{"names":["...","...","..."],"tagline":"...","mission":"...","voice":"..."}'
+    )
+    session = f"wizard-suggest-{site_id}-{uuid.uuid4().hex[:6]}"
+    try:
+        data = await _claude_json(system, prompt, session, timeout=60)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("[wizard-suggestions] failed")
+        raise HTTPException(status_code=502, detail=f"IA indisponible : {str(e)[:140]}")
+
+    # Sanitize every field defensively (Claude sometimes still sneaks markdown into JSON strings).
+    names = [_sanitize_brand_text(str(n), max_len=24) for n in (data.get("names") or [])[:3] if n]
+    names = [n for n in names if n]
+    return {
+        "names": names or ["Aurélia", "Clarelle", "Soléa"],
+        "tagline": _sanitize_brand_text(str(data.get("tagline") or ""), max_len=80),
+        "mission": _sanitize_brand_text(str(data.get("mission") or ""), max_len=280),
+        "voice": _sanitize_brand_text(str(data.get("voice") or ""), max_len=160) or "chaleureux et rassurant, premium",
+    }
+
+
+# =====================================================================
+# AI Navigation Optimizer — build a conversion-optimized nav
+# =====================================================================
 @router.post("/sites/{site_id}/navigation/ai-optimize")
 async def ai_optimize_nav(site_id: str, user: dict = Depends(get_current_user)):
     """Uses Claude to build a sales-optimized navigation based on catalog."""

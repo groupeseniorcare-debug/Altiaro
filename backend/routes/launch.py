@@ -97,6 +97,17 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
         from routes import product_narrative as pn_routes
         from routes import product_images as pimg_routes
 
+        # Pre-flight: if the LLM key is known to be out of budget, abort IMMEDIATELY
+        # instead of wasting 10+ minutes on each content step timing out.
+        health = await db.platform_health.find_one({"key": "llm"}, {"_id": 0})
+        if health and health.get("status") == "budget_exhausted":
+            await _update_job(job_id, {
+                "status": "failed",
+                "error": "Budget Emergent LLM Key épuisé. Recharge la clé (Profile → Universal Key → Add Balance) puis relance le wizard.",
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            })
+            return
+
         site = await db.sites.find_one({"id": site_id}, {"_id": 0})
         if not site:
             raise Exception("Site introuvable")
@@ -204,6 +215,12 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
         ]
         fake_user = {"id": user_id, "role": "concepteur"}
         budget_exhausted = False
+
+        async def _check_budget_health() -> bool:
+            """Re-read platform_health; if _claude_json just flagged budget_exhausted, stop."""
+            h = await db.platform_health.find_one({"key": "llm"}, {"_id": 0})
+            return bool(h and h.get("status") == "budget_exhausted")
+
         for section_key, label, pct in content_steps:
             await _advance(job_id, f"content-{section_key}", label, pct)
             if budget_exhausted:
@@ -225,10 +242,16 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                 )
             except asyncio.TimeoutError:
                 logger.warning(f"[launch] {section_key} timed out")
+                # After a timeout, re-check health — _claude_json may have hit
+                # budget_exhausted inside the cancelled call and persisted the flag.
+                if await _check_budget_health():
+                    budget_exhausted = True
+                    await _update_job(job_id, {"warning": "Budget Emergent LLM Key épuisé — génération interrompue."})
             except Exception as e:
                 msg = str(e)
+                status_code = getattr(e, "status_code", None)
                 logger.warning(f"[launch] {section_key} failed: {msg[:120]}")
-                if "402" in msg or "budget" in msg.lower() or "exhaust" in msg.lower():
+                if status_code == 402 or "402" in msg or ("budget" in msg.lower() and "exceed" in msg.lower()) or await _check_budget_health():
                     budget_exhausted = True
                     await _update_job(job_id, {"warning": "Budget Emergent LLM Key épuisé — sections restantes ignorées."})
 

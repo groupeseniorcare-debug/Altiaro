@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   Sparkle, ArrowRight, ArrowLeft, CheckCircle, Rocket, Palette,
-  TextT, Target, Package, ArrowClockwise, Warning, XCircle,
+  TextT, Target, Package, ArrowClockwise, Warning, XCircle, MagicWand,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 
@@ -42,12 +42,43 @@ export default function BrandWizard({ site, onLaunched, onExit }) {
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState("");
   const [productsCount, setProductsCount] = useState(0);
+  // AI pre-fill suggestions (Step 1) + budget status banner
+  const [suggesting, setSuggesting] = useState(false);
+  const [nameSuggestions, setNameSuggestions] = useState([]);
+  const [suggestError, setSuggestError] = useState("");
+  const [llmStatus, setLlmStatus] = useState("ok"); // "ok" | "budget_exhausted" | "checking"
 
   useEffect(() => {
     apiCall(() => api.get(`/sites/${siteId}/products`)).then(({ data }) => {
       if (Array.isArray(data)) setProductsCount(data.filter((p) => p.status !== "deleted").length);
     });
+    // Surface LLM budget status so the Concepteur doesn't spend time filling the
+    // wizard only to hit a budget error at launch.
+    apiCall(() => api.get(`/platform/llm-status`)).then(({ data }) => {
+      if (data?.status) setLlmStatus(data.status);
+    });
   }, [siteId]);
+
+  const fetchSuggestions = async () => {
+    setSuggestError("");
+    setSuggesting(true);
+    const { data, error: err, rawDetail } = await apiCall(() =>
+      api.post(`/sites/${siteId}/design/wizard-suggestions`, {})
+    );
+    setSuggesting(false);
+    if (err) {
+      const detail = rawDetail?.detail || err;
+      setSuggestError(detail);
+      if (/budget/i.test(detail) || /402/.test(detail)) setLlmStatus("budget_exhausted");
+      return;
+    }
+    setNameSuggestions(data?.names || []);
+    // Auto-fill empty fields so the user sees an instant result.
+    if (!brandName.trim() && data?.names?.[0]) setBrandName(data.names[0]);
+    if (!tagline.trim() && data?.tagline) setTagline(data.tagline);
+    if (!mission.trim() && data?.mission) setMission(data.mission);
+    if (data?.voice) setVoice(data.voice);
+  };
 
   const launch = async () => {
     setError("");
@@ -110,8 +141,75 @@ export default function BrandWizard({ site, onLaunched, onExit }) {
       </div>
 
       <div className="bg-white border border-neutral-200 rounded-2xl p-8 min-h-[420px]">
+        {llmStatus === "budget_exhausted" && (
+          <div
+            className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 flex items-start gap-3"
+            data-testid="wizard-budget-banner"
+          >
+            <Warning size={20} weight="fill" className="text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 text-sm text-amber-900">
+              <div className="font-semibold mb-0.5">Budget Universal Key épuisé</div>
+              <div className="text-xs text-amber-800 leading-relaxed">
+                Les suggestions IA et la génération complète ne peuvent pas s'exécuter tant que la clé n'est pas rechargée.
+                Ouvre <strong>Profile → Universal Key → Add Balance</strong> (ou active l'auto top-up), puis reviens ici.
+              </div>
+            </div>
+          </div>
+        )}
+
         {step === 0 && (
           <Step title="Identité de marque" subtitle="2 min. Ces infos seront utilisées partout — logo, copy, SEO.">
+            <div className="rounded-xl bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-200 p-4">
+              <div className="flex items-start gap-3 flex-wrap">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shrink-0">
+                  <MagicWand size={18} weight="fill" className="text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-violet-900">Pas d'inspiration ? Laisse Claude proposer</div>
+                  <div className="text-[11px] text-violet-800/80 mt-0.5 leading-snug">
+                    Il analyse ta niche + tes produits importés et te donne 3 noms + tagline + mission + voix en 10 secondes.
+                  </div>
+                </div>
+                <button
+                  onClick={fetchSuggestions}
+                  disabled={suggesting || llmStatus === "budget_exhausted"}
+                  data-testid="wizard-suggest-ai"
+                  className="h-10 px-4 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 hover:brightness-110 text-white text-sm font-medium flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {suggesting ? <ArrowClockwise size={14} className="animate-spin" /> : <Sparkle size={14} weight="fill" />}
+                  {suggesting ? "Claude réfléchit…" : "✨ Suggestions IA"}
+                </button>
+              </div>
+              {suggestError && (
+                <div className="mt-3 text-xs text-red-700 bg-white/60 border border-red-200 rounded-lg p-2 flex items-center gap-2">
+                  <XCircle size={12} weight="fill" /> {suggestError}
+                </div>
+              )}
+              {nameSuggestions.length > 0 && (
+                <div className="mt-3" data-testid="wizard-name-suggestions">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-violet-700 mb-2">
+                    Noms proposés — clique pour remplir
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {nameSuggestions.map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => setBrandName(n)}
+                        data-testid={`wizard-name-chip-${n}`}
+                        className={`h-8 px-3 rounded-full border text-sm font-medium transition ${
+                          brandName === n
+                            ? "bg-neutral-900 text-white border-neutral-900"
+                            : "bg-white text-neutral-800 border-neutral-300 hover:border-neutral-900"
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <Field label="Nom de la marque *">
               <input type="text" value={brandName} onChange={(e) => setBrandName(e.target.value)}
                 data-testid="wizard-brand-name"
@@ -271,11 +369,12 @@ export default function BrandWizard({ site, onLaunched, onExit }) {
             Suivant <ArrowRight size={14} />
           </button>
         ) : (
-          <button onClick={launch} disabled={launching}
+          <button onClick={launch} disabled={launching || llmStatus === "budget_exhausted"}
             data-testid="wizard-launch"
-            className="h-12 px-7 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:brightness-110 text-base font-semibold flex items-center gap-2.5 shadow-xl disabled:opacity-60">
+            title={llmStatus === "budget_exhausted" ? "Recharge la Universal Key pour lancer" : ""}
+            className="h-12 px-7 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:brightness-110 text-base font-semibold flex items-center gap-2.5 shadow-xl disabled:opacity-60 disabled:cursor-not-allowed">
             {launching ? <ArrowClockwise size={16} className="animate-spin" /> : <Rocket size={16} weight="fill" />}
-            {launching ? "Démarrage…" : "⚡ Lancer la création complète"}
+            {launching ? "Démarrage…" : llmStatus === "budget_exhausted" ? "Budget IA épuisé" : "⚡ Lancer la création complète"}
           </button>
         )}
       </div>
