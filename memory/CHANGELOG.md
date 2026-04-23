@@ -3,6 +3,26 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-02 · Sticky ATC · Cmd+K · Page Builder drag-and-drop · Narrative sections IA
+
+- 📱 **Sticky Add-to-Cart mobile amélioré** : `backdrop-blur-xl` + `bg-white/90` + `safe-area-inset-bottom` via `pb-[calc(0.75rem+env(safe-area-inset-bottom))]` + bouton `h-12 min-h-[48px]` avec shadow-lg. Plus propre, plus premium, plus tactile (z-50).
+- ⌘ **Command Menu `Cmd+K` pour Concepteurs** (`cmdk`) : palette globale avec 3 groupes dynamiques — « Site actif » (cockpit + 9 étapes + preview shop, apparaît quand URL = /sites/:id/*), « Changer de site » (10 premiers), « Navigation » (Dashboard / Sites / Finance / Niches / Validations) + « Actions rapides » (new-site, new-niche, gen-images, regen-design, orders). Bouton flottant `Chercher… ⌘K` bottom-right desktop. Admin continue d'utiliser l'ancien `CommandPalette` (search backend).
+- 🧩 **Page Builder homepage sections** — NOUVEAU sous-onglet **"Sections homepage"** dans Studio → Pages & contenu (1er position, activé par défaut) :
+  - **16 sections** listées (Hero, PressLogos, Benefits, Collections, Products, FeaturedProduct, LifestyleEditorial, Values, BuyingGuide, Testimonials, FounderStory, Instagram, BlogTeaser, FAQ, Newsletter, FinalCTA)
+  - **Drag-and-drop** via `@dnd-kit/sortable` pour réorganiser
+  - **Toggle eye/eyeslash** par section (masquer sans perdre le contenu)
+  - **4 presets** : Minimaliste (5 sections) / Éditorial (11) / Conversion-first (10) / Complète (16)
+  - Storefront `renderHomepageSections()` respecte l'ordre + visibilité + **skip automatique** des sections sans contenu réel (`hasData()`) → fini le template générique avec données de démo qui ne correspondent pas au business
+  - Backend : 3 endpoints `GET/PUT /api/sites/{id}/design/homepage-sections` + `POST /preset/{name}`, schéma merge-safe (nouvelles sections futures ajoutées invisibles par défaut)
+- 🖼️ **Narrative sections editor** par produit (SiteProducts → ProductEditor) :
+  - Liste toutes les sections détaillées (titre, body, bullet points) du storytelling IA
+  - Bouton **"Image IA"** Nano Banana par section (`gen-section-img-{i}`) → stocke URL dans `narrative.sections[i].image`
+  - 4 styles sélectionnables (lifestyle / studio / closeup / in_use)
+  - Prompt enrichi automatiquement du contexte narratif de la section (titre + body tronqué)
+  - Storefront rend les sections **en alternance gauche/droite** (rythme éditorial) avec image ou layout 12-col si pas d'image
+- **Testing iter26** : 4/4 backend endpoints + 4/4 frontend flows validés, 0 régression, Nano Banana section-img OK. Rapport `/app/test_reports/iteration_26.json`.
+
+
 ## 2026-02 · Skeleton loading + Scroll snap + Cockpit styling phase 2
 
 - 💀 **Skeleton UI partout** (remplacement des "Chargement..." spinners — perception d'attente -40%) :
