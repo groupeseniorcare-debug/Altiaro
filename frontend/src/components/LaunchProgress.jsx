@@ -10,7 +10,9 @@ export default function LaunchProgress({ siteId, jobId, onDone, onFailed }) {
 
   useEffect(() => {
     let cancelled = false;
+    let timer = null;
     const tick = async () => {
+      if (cancelled) return;
       const { data } = await apiCall(() =>
         api.get(`/sites/${siteId}/design/launch-status${jobId ? `?job_id=${jobId}` : ""}`)
       );
@@ -21,15 +23,18 @@ export default function LaunchProgress({ siteId, jobId, onDone, onFailed }) {
         setHistory((prev) => [...prev, data.current_label]);
       }
       if (data.status === "completed") {
-        setTimeout(() => onDone?.(), 1200);
+        timer = setTimeout(() => !cancelled && onDone?.(), 1200);
       } else if (data.status === "failed") {
-        setTimeout(() => onFailed?.(data.error), 1200);
+        timer = setTimeout(() => !cancelled && onFailed?.(data.error), 1200);
       } else {
-        setTimeout(tick, POLL_INTERVAL_MS);
+        timer = setTimeout(tick, POLL_INTERVAL_MS);
       }
     };
     tick();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteId, jobId]);
 

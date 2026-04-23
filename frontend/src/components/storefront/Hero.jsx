@@ -138,7 +138,7 @@ export function Hero({ site, design, lang }) {
               alt={heroTitle}
               className="w-full h-full object-cover"
               loading="eager"
-              fetchpriority="high"
+              fetchPriority="high"
             />
             {/* Floating trust card */}
             <div

@@ -268,6 +268,14 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
         # 7) Legal pages ---------------------------------------------------
         await _advance(job_id, "legal", "Pages légales", 62)
         site2 = await db.sites.find_one({"id": site_id}, {"_id": 0})
+        if not site2:
+            # Site was deleted while the job was running → abort cleanly.
+            await _update_job(job_id, {
+                "status": "failed",
+                "error": "Le site a été supprimé pendant la génération.",
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            })
+            return
         design2 = site2.get("design") or {}
         design2 = design_routes._inject_legal(design2, site2)
         await db.sites.update_one(
@@ -417,7 +425,7 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
 # ------------------------------------------------------------------
 # Endpoints
 # ------------------------------------------------------------------
-@router.post("/sites/{site_id}/design/launch")
+@router.post("/sites/{site_id}/design/launch", status_code=201)
 async def launch_site(
     site_id: str,
     wizard: WizardInput,

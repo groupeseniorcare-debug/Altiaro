@@ -3,6 +3,38 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-02 · Étape 5 · Wizard magique « Lancer la création » + orchestrateur full-site IA
+
+> **Changement majeur de l'UX** : l'Étape 5 devient un wizard 5 étapes → 1 bouton magique qui régénère palette + logo + homepage + fiches produits + images IA en une seule action.
+
+- 🎛️ **BrandWizard.jsx (NEW)** — 5 étapes avec stepper visuel :
+  1. Identité (nom de marque, tagline, mission, voix)
+  2. Ambiance (Éditorial / Minimaliste / Chaleureux / Moderne) → propose palette pré-composée
+  3. Typographie (4 paires premium : Fraunces×Inter, Playfair×DM Sans, Cormorant×Manrope, Libre Caslon×Poppins)
+  4. Portée (remplir seulement le vide / tout écraser)
+  5. Récap + bouton **⚡ Lancer la création complète**
+- 🚀 **Orchestrateur backend `/api/backend/routes/launch.py` (NEW)** avec 9 étapes pilotées :
+  1. Brand identity & palette (écriture directe)
+  2. Logo horizontal premium via Nano Banana (prompt Hermès/Aesop/Loro Piana, ratio 16:5)
+  3. Template homepage fixe appliqué (Hero → Logos partenaires → Best-sellers → Collections → À propos → Avis → Gestion commande → FAQ → Newsletter → CTA)
+  4. Régénération de 6 sections de contenu (Hero / Benefits / Testimonials / FAQ / About / Contact) via Claude
+  5. Navigation IA (mega menu depuis collections réelles)
+  6. Suggestions de collections IA + auto-création (max 3)
+  7. Seed des 7 pages légales
+  8. **Pour chaque produit importé** :
+     - Narrative Claude (si manquant ou overwrite=true)
+     - 3 images IA (lifestyle + studio + closeup) → complète les images fournisseur existantes
+     - 2 images narrative-sections (in_use + closeup) embarquées dans la fiche produit
+  9. Validation Étape 5 → débloque Étape 6 SEO/AEO
+- 📊 **LaunchProgress.jsx (NEW)** — écran plein écran z-[100] gradient violet→indigo, polling 2.5 s, barre animée, journal live des étapes, gestion completed/failed avec redirection automatique.
+- 🛡️ **Fail-soft robuste** : chaque appel IA wrappé en `asyncio.wait_for(timeout=90-150s)` + flag `budget_exhausted` qui skip le reste du job au lieu de crasher. Warning ajouté dans le doc job.
+- 🛡️ **Zombie jobs reaper** : `@app.on_event('startup')` dans server.py marque automatiquement les jobs "running" dead (worker killed) comme failed → la guard concurrent (409) ne bloque plus les relances.
+- 🛡️ **Guard concurrent launches** : POST un 2e launch pendant qu'un est running renvoie 409 « Une génération est déjà en cours ».
+- 🔗 **Coexistence wizard / éditeur avancé** : bouton **"Relancer le wizard"** (rocket violet) en haut de l'éditeur avancé pour revenir au wizard quand on veut.
+- ⚙️ Bugfixes minor de la review testing : POST launch → 201, guard `if not site2: return` quand site supprimé mid-job, React warning `fetchpriority`→`fetchPriority`, LaunchProgress cancel timeout au unmount.
+- **Testing iter27** : 18/18 frontend testids, 4/4 backend endpoints (launch 201, status 200, concurrent 409, reaper OK), budget fail-soft vérifié en logs, zombie reaper confirmé. Rapport `/app/test_reports/iteration_27.json`.
+
+
 ## 2026-02 · Sticky ATC · Cmd+K · Page Builder drag-and-drop · Narrative sections IA
 
 - 📱 **Sticky Add-to-Cart mobile amélioré** : `backdrop-blur-xl` + `bg-white/90` + `safe-area-inset-bottom` via `pb-[calc(0.75rem+env(safe-area-inset-bottom))]` + bouton `h-12 min-h-[48px]` avec shadow-lg. Plus propre, plus premium, plus tactile (z-50).
