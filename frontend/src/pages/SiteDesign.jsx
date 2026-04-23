@@ -4,10 +4,12 @@ import {
   ArrowLeft, PaintBrush, Sparkle, ArrowClockwise, CheckCircle, Image as ImageIcon,
   Palette, ChatCenteredText, Storefront as StoreIcon, UploadSimple,
   List, Rows, Stack, TextT, Plus, Trash, PencilSimple, ArrowRight,
-  DotsSixVertical, Link as LinkIcon, Heart,
+  DotsSixVertical, Link as LinkIcon, Heart, Rocket, Gear,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 import BrandingContent from "../components/BrandingContent";
+import BrandWizard from "../components/BrandWizard";
+import LaunchProgress from "../components/LaunchProgress";
 
 const TABS = [
   { key: "identity", label: "Identité", Icon: PaintBrush },
@@ -36,22 +38,36 @@ const PALETTE_PRESETS = [
 export default function SiteDesign() {
   const { id: siteId } = useParams();
   const [design, setDesign] = useState(null);
+  const [site, setSite] = useState(null);
   const [siteName, setSiteName] = useState("");
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [tab, setTab] = useState("identity");
   const [previewKey, setPreviewKey] = useState(Date.now());
   const [previewOpen, setPreviewOpen] = useState(true);
+  // Wizard / launch state
+  const [mode, setMode] = useState("auto"); // "wizard" | "advanced" | "auto"
+  const [launchJobId, setLaunchJobId] = useState(null);
 
   const reload = async () => {
     const { data } = await apiCall(() => api.get(`/sites/${siteId}/design`));
     if (data) {
       setDesign(data.design || null);
       setSiteName(data.site_name || "");
+      setSite(data.site || { id: siteId, name: data.site_name, design: data.design });
     }
     setLoading(false);
     setPreviewKey(Date.now());
   };
+
+  // Check if an orchestration job is already running on mount
+  useEffect(() => {
+    apiCall(() => api.get(`/sites/${siteId}/design/launch-status`)).then(({ data }) => {
+      if (data?.status === "running") {
+        setLaunchJobId(data.id);
+      }
+    });
+  }, [siteId]);
 
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, [siteId]);
 
@@ -69,6 +85,46 @@ export default function SiteDesign() {
 
   const brand = design?.brand || {};
   const hasDesign = !!(brand.name || brand.tagline || brand.baseline || brand.logo_url || brand.primary_color);
+
+  // Orchestration progress screen takes over everything
+  if (launchJobId) {
+    return (
+      <LaunchProgress
+        siteId={siteId}
+        jobId={launchJobId}
+        onDone={() => { setLaunchJobId(null); setMode("advanced"); reload(); }}
+        onFailed={() => { setLaunchJobId(null); setMode("advanced"); reload(); }}
+      />
+    );
+  }
+
+  // Wizard is the default view when the design has barely been touched AND the user hasn't
+  // explicitly switched to advanced. Once a design exists, we default to advanced.
+  const shouldShowWizard = mode === "wizard" || (mode === "auto" && !hasDesign);
+
+  if (shouldShowWizard) {
+    return (
+      <div className="min-h-screen bg-[#FAF7F2] py-10">
+        <div className="max-w-[1600px] mx-auto px-6 md:px-10">
+          <Link to={`/sites/${siteId}`} className="inline-flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900 mb-6">
+            <ArrowLeft size={14} /> Retour au cockpit
+          </Link>
+          <div className="text-center mb-8">
+            <div className="text-[11px] uppercase tracking-[0.3em] text-violet-600 mb-2 font-medium">Étape 5 · Studio de marque</div>
+            <h1 className="text-3xl md:text-4xl font-semibold text-neutral-900">Génère ta boutique sur-mesure en 2 minutes</h1>
+            <p className="text-sm text-neutral-500 mt-2 max-w-xl mx-auto">
+              Réponds à quelques questions. L'IA prend ensuite en charge logo, palette, homepage, fiches produits, narrative + images premium.
+            </p>
+          </div>
+          <BrandWizard
+            site={site || { id: siteId, name: siteName, design }}
+            onLaunched={(jobId) => setLaunchJobId(jobId)}
+            onExit={() => setMode("advanced")}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FAF7F2]">
@@ -90,6 +146,14 @@ export default function SiteDesign() {
             </p>
           </div>
           <div className="flex gap-2 items-center">
+            <button
+              onClick={() => setMode("wizard")}
+              data-testid="switch-to-wizard"
+              title="Relancer le wizard pour régénérer tout le site"
+              className="h-11 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:brightness-110 text-white text-sm font-medium flex items-center gap-2 shadow-md"
+            >
+              <Rocket size={14} weight="fill" /> Relancer le wizard
+            </button>
             {hasDesign && (
               <button
                 onClick={togglePublish}

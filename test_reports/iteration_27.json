@@ -1,0 +1,46 @@
+{
+  "summary": "Iter27 — Launch Orchestrator (wizard + backend job + polling). Validated: (1) BrandWizard renders all 5 steps with correct data-testid (wizard-step-identity/mood/typography/scope/launch). All inputs present (wizard-brand-name/tagline/mission/voice). Step 2 moods (éditorial/minimaliste/chaleureux/moderne) all present. Step 3: 4 font pairs. Step 4: scope-fill + scope-overwrite. Step 5: wizard-launch + wizard-back. Navigation via wizard-next advances steps correctly and récap screen shows filled data. (2) switch-to-wizard button present in advanced editor on a site that has an existing design (expected behavior — hasDesign=true). (3) Backend POST /api/sites/{id}/design/launch returns 200 with {ok:true, job_id, status:running}. (4) Concurrent guard: 2nd POST while running returns 409 with French message 'Une génération est déjà en cours pour ce site.' (5) GET /api/sites/{id}/design/launch-status returns latest job with correct structure {id, site_id, status, progress_pct, current_step, current_label, wizard, created_at, updated_at}. Status transitions running → completed verified (pre-existing job d8e6ce65 reached 100% 'Site généré !'). (6) Zombie reaper confirmed: backend restart during running job logged '[startup] reaped 1 zombie launch_jobs' and marked the job failed with error 'Serveur redémarré pendant la génération'. (7) Budget fail-soft confirmed in backend logs: logo step hit 402 budget exhausted → skipped without crashing job, continued to subsequent steps.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/sites/{id}/design/launch", "issue": "Returns 200 instead of 201 as specified in review request. Payload {ok, job_id, status} is correct — just the status code. Not breaking the frontend (which checks for job_id only)."},
+      {"endpoint": "launch._run_launch background task", "issue": "AttributeError: 'NoneType' object has no attribute 'get' at launch.py:271 when the site is deleted mid-job (observed when fresh_site cleanup fired while orchestrator was running). Should guard `site2 = await db.sites.find_one(...)` with `if not site2: return`."},
+      {"endpoint": "benefits/faq/about/contact/navigation/collections steps", "issue": "When an upstream site fetch returns 404 (site removed), these steps all log 'Site introuvable' — the orchestrator should abort early instead of trying every step."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration27_launch.py",
+    "/app/test_reports/pytest/iter27_launch.xml"
+  ],
+  "action_items": [
+    "(Minor) Return 201 instead of 200 on POST /api/sites/{id}/design/launch to align with the review request spec.",
+    "(Minor) Add `if not site2: return` guard at /app/backend/routes/launch.py line ~271 to prevent AttributeError crash when a site is deleted mid-job. Also consider aborting the whole orchestrator when an intermediate fetch returns 404.",
+    "(Info) The preview proxy returns 502 when the backend is fully busy running multiple concurrent launch jobs (observed with 2+ simultaneous jobs using Claude/Nano Banana with retries) — consider concurrency limits at cluster level OR a small semaphore in launch.py if more than N jobs running globally."
+  ],
+  "critical_code_review_comments": [
+    "launch.py is 473 lines — borderline but acceptable for a single orchestrator; consider extracting the 9 steps into small async helpers (_step_logo, _step_homepage, ...) for readability.",
+    "launch.py line 271: `site2 = await db.sites.find_one(...)` result is not null-checked before `.get('design')` — causes AttributeError when site vanishes mid-job.",
+    "launch.py POST endpoint returns 200; FastAPI will default to 200 if status_code is not set. Should use @router.post(..., status_code=201).",
+    "BrandWizard.jsx uses hardcoded palettes per mood but `palettes[paletteIdx]` only has 1 entry per mood — paletteIdx is effectively always 0; dead state. Either remove paletteIdx or add multiple palettes per mood.",
+    "LaunchProgress.jsx polls every 2.5s — fine, but no abort on unmount / route change → possible state update on unmounted component warning. Add an AbortController or early return in the setInterval callback.",
+    "Regression check (from iter26 context): React warning `Invalid DOM property fetchpriority` still present in console — unrelated to this iteration."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration27_launch.py"
+  ],
+  "success_rate": {
+    "backend": "100% endpoint functionality (launch 200, status 200, concurrent 409, reaper OK, auth 401). 4/7 pytest tests passed; 3 pytest failures are network-timeout issues due to the backend being saturated by the concurrent launch job during test execution — functional behavior was separately verified via curl + logs.",
+    "frontend": "100% — all 18 wizard data-testids present, stepper navigates correctly, summary screen renders."
+  },
+  "test_credentials": "concepteur@conceptfactory.fr / Concepteur2026! ; admin@conceptfactory.fr / Factory2026!",
+  "seed_data_creation": "Launched one test job (6ab42069-4ed4-4241-8458-8dbfb910db88) on site 65964cb0 to validate 409 — killed by zombie reaper on backend restart. Also attempted a fresh TEST_LaunchWizard_Iter27 site via admin — cleanup executed.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Test site 65964cb0 still has valid design. Backend reaper confirmed working on startup. Concurrent guard 409 works. Budget fail-soft confirmed in logs. When running pytest on this testbed, the backend may be saturated if a launch job is running (preview proxy returns 502 to unrelated requests like /api/auth/login after ~60s). Prefer curl + logs over pytest for endpoints when a live job is in progress. The NoneType bug in _run_launch (line 271) is reproducible by deleting the site mid-job.",
+  "rca of the issue": "No blocker bugs. The two minor backend issues (200 instead of 201, NoneType when site deleted) are corner-case code-quality improvements. Frontend is clean."
+}

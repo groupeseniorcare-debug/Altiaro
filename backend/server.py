@@ -67,6 +67,7 @@ from routes import aliexpress as aliexpress_routes
 from routes import validation as validation_routes
 from routes import cockpit_tools as cockpit_tools_routes
 from routes import product_images as product_images_routes
+from routes import launch as launch_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -125,6 +126,28 @@ api.include_router(aliexpress_routes.router)
 api.include_router(validation_routes.router)
 api.include_router(cockpit_tools_routes.router)
 api.include_router(product_images_routes.router)
+api.include_router(launch_routes.router)
+
+
+@app.on_event("startup")
+async def _reap_stale_launch_jobs():
+    """Mark zombie launch_jobs (running when server was killed) as failed.
+    Otherwise a concurrent-launch guard would block new runs forever."""
+    try:
+        from deps import db
+        from datetime import datetime, timezone
+        res = await db.launch_jobs.update_many(
+            {"status": "running"},
+            {"$set": {
+                "status": "failed",
+                "error": "Serveur redémarré pendant la génération",
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }},
+        )
+        if res.modified_count:
+            logger.info(f"[startup] reaped {res.modified_count} zombie launch_jobs")
+    except Exception as e:
+        logger.warning(f"[startup] launch_jobs reaper failed: {e}")
 
 
 @app.on_event("startup")
