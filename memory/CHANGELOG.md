@@ -3,6 +3,17 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-02 · Pages légales × 7 + Mega menu + Mobile polish + UX/UI audit
+
+- 📄 **Pages légales enrichies** de 3 → 7 : ajout de `COOKIES` (RGPD), `LIVRAISON` (tableau zones + délais), `RETOURS` (rétractation 14 j + formulaire type), `MEDIATION` (CM2C + ODR UE). Routes storefront `/shop/{id}/cookies`, `/mediation` ajoutées; `/livraison` et `/retours` conservent leurs composants custom riches.
+- 🔗 **Sélecteur de lien intelligent** : l'onglet Navigation du Studio a maintenant un select avec 18 types de cible (Accueil, Toutes collections, Une collection…, Un produit…, Blog, À propos, Contact, FAQ, Search, CGV, Mentions, Confidentialité, Cookies, Livraison, Retours, Médiation, URL custom). Pour `collection`/`product`, un second select liste dynamiquement les vrais items du site. Plus besoin de taper un href à la main.
+- 🖼️ **Mega menu** : nouveau bouton `Mega menu` dans l'onglet Navigation → crée un item avec éditeur de vignettes intégré (images + libellés + liens). Boutons `⚡ Auto-collections` et `⚡ Auto-produits` préremplissent depuis le catalogue. Storefront rend le panel au **hover desktop** et en accordéon `<details>` sur **mobile** avec grille 2 colonnes de cartes-images. CaretRight indicateur.
+- 📱 **Polish mobile** : touch targets 44×44 min sur hamburger / panier / search / preview toggle; drawer mobile items `min-h-[56px]`; `pb-[env(safe-area-inset-bottom)]` sur footer et cart drawer; `active:scale-95 transition-transform` pour feedback tactile. Application des quick-wins du design audit.
+- 🎨 **UX/UI audit complet** : `design_agent_full_stack` a généré `/app/design_guidelines.json` (blueprint app + storefront, palette, typo, patterns mobile, spec mega menu détaillée). Référence pour les prochaines itérations (phase 2 : cockpit styling, phase 3 : skeleton loading + scroll snap).
+- 🐛 **Fix critique NavItem Pydantic** (iter23 → iter24) : le modèle n'acceptait que `label/href/external` et stripait silencieusement `type`/`children`/`image`. Étendu avec champs optionnels + `exclude_none=True`. Mega menu persiste end-to-end (PUT → GET public → storefront render).
+- **Testing** — iter23 + iter24 : 17/17 tests backend + 100% frontend testids, mega menu validé sur desktop (hover panel) ET mobile (drawer expand). Rapports : `/app/test_reports/iteration_23.json`, `iteration_24.json`.
+
+
 ## 2026-02 · Studio de marque v2 + Nano Banana — fork priorité 0
 
 - 🐛 **Fix nav storefront** : `StorefrontLayout.jsx` utilisait un `navItems()` **hardcoded** ligne 84 et ignorait `design.navigation.header` configuré par le Concepteur. Remplacé par lecture de `design.navigation.header` + `.footer` avec fallback. Header et footer du storefront suivent désormais ce qui est enregistré dans l'onglet Navigation de l'Étape 5.
