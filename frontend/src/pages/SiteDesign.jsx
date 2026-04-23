@@ -160,6 +160,8 @@ function IdentityTab({ siteId, design, onReload, hasDesign }) {
   const [logoPrompt, setLogoPrompt] = useState("");
   const [saving, setSaving] = useState(false);
   const [skipEmpty, setSkipEmpty] = useState(false);
+  const [aiField, setAiField] = useState(null); // key of the field currently being AI-generated
+  const [aiTweak, setAiTweak] = useState({});   // { name: "...", tagline: "...", ... }
   const effectiveHasDesign = hasDesign || skipEmpty;
   const [form, setForm] = useState({
     name: brand.name || "",
@@ -214,6 +216,39 @@ function IdentityTab({ siteId, design, onReload, hasDesign }) {
 
   const applyFontPair = (pair) => {
     setForm((f) => ({ ...f, font_heading: pair.heading, font_body: pair.body }));
+  };
+
+  const aiGenerate = async (field) => {
+    setAiField(field);
+    const { data, error } = await apiCall(() =>
+      api.post(`/sites/${siteId}/design/ai-field`, { field, tweak: aiTweak[field] || "" })
+    );
+    setAiField(null);
+    if (error) { window.alert(error); return; }
+    // For text fields, update the local form immediately
+    if (field === "name") update("name", data.value);
+    else if (field === "tagline") update("tagline", data.value);
+    else if (field === "voice") update("voice", data.value);
+    else if (field === "story") update("story", data.value);
+    else if (field === "palette") {
+      const v = data.value || {};
+      setForm((f) => ({
+        ...f,
+        primary_color: v.primary || f.primary_color,
+        secondary_color: v.secondary || f.secondary_color,
+        accent_color: v.accent || f.accent_color,
+        background_color: v.background || f.background_color,
+        text_color: v.text || f.text_color,
+      }));
+    } else if (field === "font_pair") {
+      const v = data.value || {};
+      setForm((f) => ({
+        ...f,
+        font_heading: v.heading || f.font_heading,
+        font_body: v.body || f.font_body,
+      }));
+    }
+    await onReload();
   };
 
   const generateAll = async () => {
@@ -312,30 +347,30 @@ function IdentityTab({ siteId, design, onReload, hasDesign }) {
           <div className="text-[11px] uppercase tracking-widest text-neutral-500 flex items-center gap-1">
             <Heart size={11} weight="fill" /> Identité de marque
           </div>
-          <Field label="Nom de marque">
+          <AiField label="Nom de marque" field="name" aiField={aiField} tweak={aiTweak.name} setTweak={(v) => setAiTweak({ ...aiTweak, name: v })} onGenerate={() => aiGenerate("name")}>
             <input type="text" value={form.name} onChange={(e) => update("name", e.target.value)}
               data-testid="brand-name" maxLength={40}
               className="w-full h-10 px-3 rounded-lg border border-neutral-200 bg-white text-lg font-semibold focus:outline-none focus:border-neutral-900"
               style={{ fontFamily: "'Fraunces', serif" }} />
-          </Field>
-          <Field label="Tagline / baseline (≤ 80 car.)">
+          </AiField>
+          <AiField label="Tagline / baseline (≤ 80 car.)" field="tagline" aiField={aiField} tweak={aiTweak.tagline} setTweak={(v) => setAiTweak({ ...aiTweak, tagline: v })} onGenerate={() => aiGenerate("tagline")}>
             <input type="text" value={form.tagline} onChange={(e) => update("tagline", e.target.value)}
               data-testid="brand-tagline" maxLength={80}
               placeholder="Le confort au quotidien, simplement."
               className="w-full h-10 px-3 rounded-lg border border-neutral-200 bg-white text-sm italic focus:outline-none focus:border-neutral-900" />
-          </Field>
-          <Field label="Ton de voix">
+          </AiField>
+          <AiField label="Ton de voix" field="voice" aiField={aiField} tweak={aiTweak.voice} setTweak={(v) => setAiTweak({ ...aiTweak, voice: v })} onGenerate={() => aiGenerate("voice")}>
             <input type="text" value={form.voice} onChange={(e) => update("voice", e.target.value)}
               data-testid="brand-voice" maxLength={200}
               placeholder="Chaleureux, rassurant, expert, tutoiement"
               className="w-full h-10 px-3 rounded-lg border border-neutral-200 bg-white text-sm focus:outline-none focus:border-neutral-900" />
-          </Field>
-          <Field label="Histoire / storytelling">
+          </AiField>
+          <AiField label="Histoire / storytelling" field="story" aiField={aiField} tweak={aiTweak.story} setTweak={(v) => setAiTweak({ ...aiTweak, story: v })} onGenerate={() => aiGenerate("story")}>
             <textarea value={form.story} onChange={(e) => update("story", e.target.value)}
               data-testid="brand-story" rows={4} maxLength={500}
               placeholder="Fondée en 2024 pour offrir aux seniors des solutions pratiques à prix juste…"
               className="w-full p-3 rounded-lg border border-neutral-200 bg-white text-sm focus:outline-none focus:border-neutral-900 resize-y" />
-          </Field>
+          </AiField>
         </div>
 
         {/* Logo */}
@@ -372,11 +407,22 @@ function IdentityTab({ siteId, design, onReload, hasDesign }) {
 
       {/* Palette */}
       <div className="bg-white border border-neutral-200 rounded-2xl p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div className="text-[11px] uppercase tracking-widest text-neutral-500 flex items-center gap-1">
             <Palette size={11} /> Palette de couleurs
           </div>
-          <div className="text-[11px] text-neutral-400">Utilisée partout sur le storefront</div>
+          <div className="flex items-center gap-2">
+            <div className="text-[11px] text-neutral-400">Utilisée partout sur le storefront</div>
+            <button
+              onClick={() => aiGenerate("palette")}
+              disabled={aiField === "palette"}
+              data-testid="ai-palette"
+              className="h-8 px-3 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium flex items-center gap-1.5 disabled:opacity-60"
+            >
+              {aiField === "palette" ? <ArrowClockwise size={12} className="animate-spin" /> : <Sparkle size={12} weight="fill" />}
+              Palette IA
+            </button>
+          </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
           <ColorPicker label="Primary" value={form.primary_color} onChange={(v) => update("primary_color", v)} />
@@ -406,8 +452,19 @@ function IdentityTab({ siteId, design, onReload, hasDesign }) {
 
       {/* Typography */}
       <div className="bg-white border border-neutral-200 rounded-2xl p-5">
-        <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-3 flex items-center gap-1">
-          <TextT size={11} /> Typographie
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div className="text-[11px] uppercase tracking-widest text-neutral-500 flex items-center gap-1">
+            <TextT size={11} /> Typographie
+          </div>
+          <button
+            onClick={() => aiGenerate("font_pair")}
+            disabled={aiField === "font_pair"}
+            data-testid="ai-fonts"
+            className="h-8 px-3 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium flex items-center gap-1.5 disabled:opacity-60"
+          >
+            {aiField === "font_pair" ? <ArrowClockwise size={12} className="animate-spin" /> : <Sparkle size={12} weight="fill" />}
+            Proposer des typos IA
+          </button>
         </div>
         <div className="grid md:grid-cols-2 gap-3 mb-4">
           <Field label="Heading">
@@ -455,12 +512,24 @@ function IdentityTab({ siteId, design, onReload, hasDesign }) {
 function NavigationTab({ siteId }) {
   const [nav, setNav] = useState({ header: [], footer: [] });
   const [saving, setSaving] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
+  const [aiRationale, setAiRationale] = useState("");
 
   useEffect(() => {
     apiCall(() => api.get(`/sites/${siteId}/navigation`)).then(({ data }) => {
       if (data) setNav(data);
     });
   }, [siteId]);
+
+  const aiOptimize = async () => {
+    if (!window.confirm("Laisser l'IA reconstruire ta navigation (header + footer) à partir de ton catalogue ? Tes liens actuels seront remplacés.")) return;
+    setOptimizing(true);
+    const { data, error } = await apiCall(() => api.post(`/sites/${siteId}/navigation/ai-optimize`, {}));
+    setOptimizing(false);
+    if (error) { window.alert(error); return; }
+    if (data?.navigation) setNav(data.navigation);
+    setAiRationale(data?.rationale || "");
+  };
 
   const addItem = (where) => {
     setNav((n) => ({ ...n, [where]: [...n[where], { label: "Nouveau lien", href: "/", external: false }] }));
@@ -490,6 +559,33 @@ function NavigationTab({ siteId }) {
 
   return (
     <div className="space-y-5" data-testid="navigation-tab">
+      <div className="bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-200 rounded-2xl p-5">
+        <div className="flex items-start gap-3 flex-wrap">
+          <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center shrink-0">
+            <Sparkle size={18} weight="fill" className="text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-violet-900">Navigation optimisée par l'IA</div>
+            <div className="text-xs text-violet-800/80 mt-0.5">
+              Claude analyse ton catalogue, tes collections, tes upsells et ta niche pour bâtir une nav orientée conversion (max 5 items header, hiérarchie claire, libellés vendeurs).
+            </div>
+            {aiRationale && (
+              <div className="mt-2 text-[11px] text-violet-800 bg-white/60 rounded-lg p-2 italic">
+                <strong>Rationale IA :</strong> {aiRationale}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={aiOptimize}
+            disabled={optimizing}
+            data-testid="ai-nav-optimize"
+            className="h-10 px-4 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium flex items-center gap-2 disabled:opacity-60"
+          >
+            {optimizing ? <ArrowClockwise size={14} className="animate-spin" /> : <Sparkle size={14} weight="fill" />}
+            {optimizing ? "Optimisation…" : "Optimiser avec l'IA"}
+          </button>
+        </div>
+      </div>
       {["header", "footer"].map((where) => (
         <div key={where} className="bg-white border border-neutral-200 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
@@ -563,6 +659,8 @@ function CollectionsTab({ siteId }) {
   const [products, setProducts] = useState([]);
   const [editing, setEditing] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState(null);
 
   const reload = async () => {
     const [cRes, pRes] = await Promise.all([
@@ -573,6 +671,28 @@ function CollectionsTab({ siteId }) {
     setProducts(Array.isArray(pRes.data) ? pRes.data.filter((p) => p.role !== "upsell") : []);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, [siteId]);
+
+  const aiSuggest = async () => {
+    setSuggesting(true);
+    const { data, error } = await apiCall(() => api.post(`/sites/${siteId}/collections/ai-suggest`, {}));
+    setSuggesting(false);
+    if (error) { window.alert(error); return; }
+    setSuggestions(data?.suggestions || []);
+  };
+
+  const createFromSuggestion = async (s) => {
+    const { error } = await apiCall(() =>
+      api.post(`/sites/${siteId}/collections`, {
+        name: s.name,
+        description: s.description,
+        product_ids: s.product_ids,
+        featured: !!s.featured,
+      })
+    );
+    if (error) { window.alert(error); return; }
+    setSuggestions((prev) => (prev || []).filter((x) => x.name !== s.name));
+    await reload();
+  };
 
   const newCollection = () => setEditing({
     name: "Nouvelle collection", slug: "", description: "", cover_image: "",
@@ -607,6 +727,56 @@ function CollectionsTab({ siteId }) {
 
   return (
     <div className="space-y-5" data-testid="collections-tab">
+      {/* AI suggestion bar */}
+      <div className="bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-200 rounded-2xl p-5">
+        <div className="flex items-start gap-3 flex-wrap">
+          <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center shrink-0">
+            <Sparkle size={18} weight="fill" className="text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-violet-900">Laisser l'IA proposer des collections</div>
+            <div className="text-xs text-violet-800/80 mt-0.5">
+              Claude regroupe tes produits par usage/gamme et propose 3-5 collections clés en main.
+              Tu choisis celles que tu gardes.
+            </div>
+          </div>
+          <button
+            onClick={aiSuggest}
+            disabled={suggesting}
+            data-testid="ai-collections-suggest"
+            className="h-10 px-4 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium flex items-center gap-2 disabled:opacity-60"
+          >
+            {suggesting ? <ArrowClockwise size={14} className="animate-spin" /> : <Sparkle size={14} weight="fill" />}
+            {suggesting ? "Analyse IA…" : "Proposer des collections IA"}
+          </button>
+        </div>
+        {suggestions && suggestions.length > 0 && (
+          <div className="mt-4 grid md:grid-cols-2 gap-3" data-testid="ai-suggestions-list">
+            {suggestions.map((s) => (
+              <div key={s.name} className="bg-white rounded-xl border border-violet-200 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="font-semibold text-sm">{s.name} {s.featured && <span className="ml-1 text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full">vedette</span>}</div>
+                    <div className="text-[11px] text-neutral-500 mt-0.5">{s.description}</div>
+                    <div className="text-[11px] text-violet-700 mt-1">{s.product_ids?.length || 0} produit(s) assigné(s)</div>
+                  </div>
+                  <button
+                    onClick={() => createFromSuggestion(s)}
+                    data-testid={`create-suggestion-${s.name}`}
+                    className="h-8 px-3 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium flex items-center gap-1"
+                  >
+                    <Plus size={11} weight="bold" /> Créer
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {suggestions && suggestions.length === 0 && (
+          <div className="mt-3 text-xs text-violet-700 italic">Toutes les suggestions ont été créées ou aucune proposée. Importe plus de produits pour de meilleures suggestions.</div>
+        )}
+      </div>
+
       <div className="bg-white border border-neutral-200 rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -773,6 +943,46 @@ function CollectionEditor({ col, products, onClose, onSave, onChange, busy }) {
 // ==========================================================================
 // Helpers
 // ==========================================================================
+function AiField({ label, field, aiField, tweak, setTweak, onGenerate, children }) {
+  const busy = aiField === field;
+  const [showTweak, setShowTweak] = useState(false);
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-[11px] uppercase tracking-widest text-neutral-500">{label}</div>
+        <div className="flex items-center gap-1">
+          {showTweak && (
+            <input
+              type="text"
+              value={tweak || ""}
+              onChange={(e) => setTweak(e.target.value)}
+              placeholder="Brief IA (optionnel)"
+              className="h-7 px-2 rounded border border-violet-200 bg-white text-[11px] w-48"
+              data-testid={`ai-tweak-${field}`}
+            />
+          )}
+          <button
+            onClick={() => setShowTweak((v) => !v)}
+            className="h-7 w-7 rounded-lg hover:bg-neutral-100 text-neutral-500 flex items-center justify-center text-xs"
+            title="Ajouter un brief"
+            data-testid={`ai-tweak-toggle-${field}`}
+          >+</button>
+          <button
+            onClick={onGenerate}
+            disabled={busy}
+            data-testid={`ai-${field}`}
+            className="h-7 px-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-medium flex items-center gap-1 disabled:opacity-60"
+          >
+            {busy ? <ArrowClockwise size={10} className="animate-spin" /> : <Sparkle size={10} weight="fill" />}
+            IA
+          </button>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function Field({ label, children }) {
   return (
     <div>

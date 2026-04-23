@@ -12,7 +12,6 @@ const REGEN_SECTIONS = [
   { key: "faq", label: "FAQ", Icon: ChatCenteredText },
   { key: "testimonials", label: "Témoignages", Icon: ChatCenteredText },
   { key: "contact", label: "Contact", Icon: ChatCenteredText },
-  { key: "seo", label: "SEO (title, description)", Icon: Sparkle },
 ];
 
 /**
@@ -24,20 +23,34 @@ export default function BrandingContent({ siteId, design, onReload }) {
   const [regenerating, setRegenerating] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [tweak, setTweak] = useState("");
+  const [seedingLegal, setSeedingLegal] = useState(false);
 
   const hero = design?.hero || {};
   const about = design?.about || {};
   const contact = design?.contact || {};
   const faq = design?.faq || [];
   const benefits = design?.benefits || [];
+  const legalPages = design?.legal_pages || {};
 
   const regenSection = async (section) => {
     setRegenerating(section);
-    const { error } = await apiCall(() =>
+    const { data, error, rawDetail } = await apiCall(() =>
       api.post(`/sites/${siteId}/design/regenerate/${section}`, { tweak: "" })
     );
     setRegenerating(null);
-    if (error) { window.alert(`Régénération échouée : ${error}`); return; }
+    if (error) {
+      const detail = rawDetail?.detail || error;
+      window.alert(`Régénération échouée : ${detail}`);
+      return;
+    }
+    await onReload();
+  };
+
+  const seedLegal = async () => {
+    setSeedingLegal(true);
+    const { error } = await apiCall(() => api.post(`/sites/${siteId}/design/seed-legal`, {}));
+    setSeedingLegal(false);
+    if (error) { window.alert(error); return; }
     await onReload();
   };
 
@@ -160,6 +173,37 @@ export default function BrandingContent({ siteId, design, onReload }) {
 
       {/* Brief + regen all */}
       <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-6">
+        <div className="text-[11px] uppercase tracking-widest text-amber-700 mb-2 font-semibold">Régénérer tout le contenu avec un brief</div>
+        <textarea
+          value={tweak}
+          onChange={(e) => setTweak(e.target.value)}
+          placeholder="Ex. « ton plus chaleureux, mets l'accent sur l'installation offerte et la garantie 5 ans »"
+          className="w-full min-h-[80px] p-3 rounded-lg border border-amber-300 bg-white text-sm resize-y"
+          data-testid="design-brief"
+        />
+        <button
+          onClick={regenAll}
+          disabled={generating}
+          data-testid="design-regen-all"
+          className="mt-3 h-10 px-4 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium flex items-center gap-2 disabled:opacity-60"
+        >
+          {generating ? <ArrowClockwise size={14} className="animate-spin" /> : <Sparkle size={14} weight="fill" />}
+          {generating ? "Régénération (60-90s)…" : "Régénérer avec ce brief"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, children, testid }) {
+  return (
+    <div className="bg-white border border-neutral-200 rounded-2xl p-5" data-testid={testid}>
+      <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-3">{title}</div>
+      {children}
+    </div>
+  );
+}
+-6">
         <div className="text-[11px] uppercase tracking-widest text-amber-700 mb-2 font-semibold">Régénérer tout le contenu avec un brief</div>
         <textarea
           value={tweak}

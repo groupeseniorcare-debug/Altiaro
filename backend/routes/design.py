@@ -774,6 +774,232 @@ async def palette_apply(site_id: str, data: PaletteApplyInput,
     return {"ok": True}
 
 
+# =====================================================================
+# AI Field Generator — generate a single brand field with Claude
+# =====================================================================
+FIELD_PROMPTS = {
+    "name": "Propose un nom de marque court (1-3 mots), mémorable, qui sonne Silver Economy premium. Évite les clichés 'senior'.",
+    "tagline": "Propose une baseline ≤ 80 caractères qui capture l'essence de la marque. Emotion + bénéfice clé.",
+    "voice": "Décris le ton de voix idéal (chaleureux/rassurant/expert/premium/etc.) en 1 phrase ≤ 150 car.",
+    "story": "Rédige une histoire de marque en 2-3 paragraphes (≤ 400 car.) qui inspire confiance et crée un lien émotionnel.",
+    "font_pair": "Propose une paire de Google Fonts (heading + body) adaptée au ton. Format JSON : {\"heading\": \"...\", \"body\": \"...\", \"rationale\": \"pourquoi ce choix\"}",
+    "palette": "Propose une palette 5 couleurs (primary, secondary, accent, background, text) en hex, cohérente avec la niche & l'audience senior. Format JSON : {\"primary\":\"#...\",\"secondary\":\"#...\",\"accent\":\"#...\",\"background\":\"#...\",\"text\":\"#...\",\"rationale\":\"...\"}",
+}
+
+
+class AiFieldInput(BaseModel):
+    field: str  # "name" | "tagline" | "voice" | "story" | "font_pair" | "palette"
+    tweak: Optional[str] = ""  # user hint e.g. "plus luxe minimal"
+
+
+@router.post("/sites/{site_id}/design/ai-field")
+async def ai_field(site_id: str, body: AiFieldInput, user: dict = Depends(get_current_user)):
+    """Generate a single brand field (name, tagline, voice, story, palette, font_pair) via Claude."""
+    await _check_site_access(site_id, user)
+    if body.field not in FIELD_PROMPTS:
+        raise HTTPException(400, f"Champ invalide. Possible : {', '.join(FIELD_PROMPTS)}")
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(404, "Site introuvable")
+
+    brand = (site.get("design") or {}).get("brand") or {}
+    niche = site.get("niche") or "produits Silver Economy"
+    current_name = brand.get("name") or site.get("name") or ""
+    current_voice = brand.get("voice") or "chaleureux, rassurant, expert"
+
+    directive = FIELD_PROMPTS[body.field]
+    hint = body.tweak or ""
+    want_json = body.field in {"palette", "font_pair"}
+
+    system = (
+        "Tu es un directeur artistique spécialisé Silver Economy (65+). Tu produis des éléments de marque "
+        "premium, chaleureux et accessibles. Réponds TOUJOURS en français, sans préambule, sans guillemets superflus."
+    )
+    prompt = (
+        f"Niche : {niche}\n"
+        f"Marque actuelle : {current_name or '(aucun nom encore)'}\n"
+        f"Ton de voix actuel : {current_voice}\n"
+        f"Demande de l'utilisateur : {hint or '(aucune — propose ta meilleure idée)'}\n\n"
+        f"Tâche : {directive}\n\n"
+        + ("Réponds UNIQUEMENT avec le JSON demandé, sans commentaire." if want_json else "Réponds avec uniquement le texte final, rien d'autre.")
+    )
+    session = f"ai-field-{body.field}-{site_id}-{uuid.uuid4().hex[:6]}"
+    try:
+        if want_json:
+            data = await _claude_json(system, prompt, session, timeout=60)
+            # persist depending on field
+            patch = {}
+            if body.field == "palette":
+                for k in ("primary", "secondary", "accent", "background", "text"):
+                    v = data.get(k)
+                    if isinstance(v, str) and v.startswith("#"):
+                        patch[f"design.brand.{k}_color"] = v
+                        patch[f"design.brand.palette.{k}"] = v
+            elif body.field == "font_pair":
+                if data.get("heading"):
+                    patch["design.brand.font_heading"] = str(data["heading"])[:60]
+                if data.get("body"):
+                    patch["design.brand.font_body"] = str(data["body"])[:60]
+            if patch:
+                patch["design.updated_at"] = datetime.now(timezone.utc).isoformat()
+                await db.sites.update_one({"id": site_id}, {"$set": patch})
+            return {"ok": True, "field": body.field, "value": data, "rationale": data.get("rationale")}
+        else:
+            from emergentintegrations.llm.chat import LlmChat, UserMessage  # type: ignore
+            chat = LlmChat(
+                api_key=os.environ.get("EMERGENT_LLM_KEY", ""),
+                session_id=session,
+                system_message=system,
+            ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+            raw = await chat.send_message(UserMessage(text=prompt))
+            txt = str(raw).strip().strip('"').strip("'").strip()
+            # Persist
+            field_key = body.field
+            db_field = {"name": "name", "tagline": "tagline", "voice": "voice", "story": "story"}[field_key]
+            await db.sites.update_one(
+                {"id": site_id},
+                {"$set": {
+                    f"design.brand.{db_field}": txt,
+                    "design.updated_at": datetime.now(timezone.utc).isoformat(),
+                }},
+            )
+            return {"ok": True, "field": body.field, "value": txt}
+    except Exception as e:
+        logger.exception("[ai-field] %s failed", body.field)
+        raise HTTPException(status_code=502, detail=f"IA indisponible : {str(e)[:120]}")
+
+
+# =====================================================================
+# AI Navigation Optimizer — build a conversion-optimized nav
+# =====================================================================
+@router.post("/sites/{site_id}/navigation/ai-optimize")
+async def ai_optimize_nav(site_id: str, user: dict = Depends(get_current_user)):
+    """Uses Claude to build a sales-optimized navigation based on catalog."""
+    await _check_site_access(site_id, user)
+    products = await db.products.find(
+        {"site_id": site_id, "status": "active"},
+        {"_id": 0, "name": 1, "role": 1, "category": 1, "price": 1},
+    ).to_list(300)
+    collections = await db.collections.find(
+        {"site_id": site_id},
+        {"_id": 0, "name": 1, "slug": 1, "featured": 1},
+    ).to_list(50)
+    main_products = [p for p in products if p.get("role") != "upsell"]
+    upsells = [p for p in products if p.get("role") == "upsell"]
+
+    catalog_summary = {
+        "main_count": len(main_products),
+        "upsells_count": len(upsells),
+        "collections": [{"name": c["name"], "slug": c["slug"], "featured": c.get("featured")} for c in collections],
+        "sample_products": [
+            {"name": (p.get("name", {}) or {}).get("fr", "") if isinstance(p.get("name"), dict) else str(p.get("name") or ""), "price": p.get("price")}
+            for p in main_products[:10]
+        ],
+    }
+    system = (
+        "Tu es un expert CRO e-commerce Silver Economy. Tu construis une navigation HEADER "
+        "et FOOTER optimisée pour la conversion : max 5 items header, hiérarchie claire, libellés "
+        "courts et orientés valeur (ex: 'Fauteuils' > 'Nos produits'). Footer : liens utilitaires "
+        "+ legal. Toujours pointer vers /collections/{slug} ou /shop si collection inexistante."
+    )
+    prompt = (
+        "Catalogue :\n" + json.dumps(catalog_summary, ensure_ascii=False, indent=2) +
+        "\n\nPropose UN JSON strict :\n"
+        '{"header":[{"label":"...","href":"/...","external":false}, ...],'
+        '"footer":[{"label":"...","href":"/...","external":false}, ...],'
+        '"rationale":"explication courte"}'
+    )
+    session = f"ai-nav-{site_id}-{uuid.uuid4().hex[:6]}"
+    try:
+        data = await _claude_json(system, prompt, session, timeout=60)
+        clean = {
+            "header": [h for h in (data.get("header") or [])[:5] if h.get("label") and h.get("href")],
+            "footer": [h for h in (data.get("footer") or [])[:8] if h.get("label") and h.get("href")],
+        }
+        # sanitize: ensure external is bool
+        for bucket in ("header", "footer"):
+            for it in clean[bucket]:
+                it["external"] = bool(it.get("external"))
+        await db.sites.update_one(
+            {"id": site_id},
+            {"$set": {"design.navigation": clean, "design.updated_at": datetime.now(timezone.utc).isoformat()}},
+        )
+        return {"ok": True, "navigation": clean, "rationale": data.get("rationale")}
+    except Exception as e:
+        logger.exception("[ai-nav] failed")
+        raise HTTPException(502, f"IA indisponible : {str(e)[:120]}")
+
+
+# =====================================================================
+# AI Collections Suggester — propose collections based on catalog
+# =====================================================================
+@router.post("/sites/{site_id}/collections/ai-suggest")
+async def ai_suggest_collections(site_id: str, user: dict = Depends(get_current_user)):
+    """Proposes 3-5 collections from the active catalog. Does NOT create them —
+    the user can pick and create via the existing POST endpoint."""
+    await _check_site_access(site_id, user)
+    products = await db.products.find(
+        {"site_id": site_id, "status": "active", "role": {"$ne": "upsell"}},
+        {"_id": 0, "id": 1, "name": 1, "category": 1, "price": 1},
+    ).to_list(200)
+    if not products:
+        return {"suggestions": [], "message": "Importe au moins 2 produits principaux à l'étape 2."}
+
+    catalog = [
+        {
+            "id": p["id"],
+            "name": (p.get("name", {}) or {}).get("fr", "") if isinstance(p.get("name"), dict) else str(p.get("name") or ""),
+            "price": p.get("price"),
+        }
+        for p in products[:50]
+    ]
+    system = (
+        "Tu es un merchandiser Silver Economy. Tu regroupes les produits par usage/gamme en "
+        "collections vendeuses : 3 à 5 collections max, nom court et évocateur (2-4 mots), "
+        "description ≤ 120 car. Assigne chaque produit à UNE seule collection."
+    )
+    prompt = (
+        "Catalogue :\n" + json.dumps(catalog, ensure_ascii=False, indent=2) +
+        "\n\nPropose UN JSON strict :\n"
+        '{"collections":[{"name":"...","description":"...","product_ids":["..."],"featured":true},...]}'
+    )
+    session = f"ai-col-{site_id}-{uuid.uuid4().hex[:6]}"
+    try:
+        data = await _claude_json(system, prompt, session, timeout=60)
+        cleaned = []
+        valid_ids = {p["id"] for p in products}
+        for c in data.get("collections") or []:
+            if not c.get("name"):
+                continue
+            cleaned.append({
+                "name": str(c["name"])[:80],
+                "description": str(c.get("description") or "")[:200],
+                "product_ids": [pid for pid in (c.get("product_ids") or []) if pid in valid_ids],
+                "featured": bool(c.get("featured")),
+            })
+        return {"suggestions": cleaned[:5]}
+    except Exception as e:
+        logger.exception("[ai-collections-suggest] failed")
+        raise HTTPException(502, f"IA indisponible : {str(e)[:120]}")
+
+
+# =====================================================================
+# Backwards-compat: seed legal pages if empty
+# =====================================================================
+@router.post("/sites/{site_id}/design/seed-legal")
+async def seed_legal_pages(site_id: str, user: dict = Depends(get_current_user)):
+    """Force regeneration of legal pages (CGV, mentions, confidentialité) from templates."""
+    await _check_site_access(site_id, user)
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(404, "Site introuvable")
+    design = site.get("design") or {}
+    design = _inject_legal(design, site)
+    design["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.sites.update_one({"id": site_id}, {"$set": {"design": design}})
+    return {"ok": True, "pages": list(design["legal_pages"].keys())}
+
+
 @router.get("/sites/{site_id}/design/studio-state")
 async def studio_state(site_id: str, user: dict = Depends(get_current_user)):
     await _check_site_access(site_id, user)
