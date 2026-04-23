@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   ArrowClockwise, Sparkle, CheckCircle, Info, ArrowLeft, ArrowRight,
   ClipboardText, ChatCenteredText, Star, UserCircle, Phone, Scales, Rocket,
-  Plus, Trash,
+  Plus, Trash, Stack,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
+import HomepageSectionsEditor from "./HomepageSectionsEditor";
 
 /**
  * Branding content editor with per-page sub-tabs.
@@ -14,6 +15,7 @@ import { api, apiCall } from "../lib/api";
  */
 
 const SUB_TABS = [
+  { key: "sections",     label: "Sections homepage", Icon: Stack },
   { key: "hero",         label: "Hero",          Icon: Rocket },
   { key: "about",        label: "À propos",      Icon: UserCircle },
   { key: "benefits",     label: "Bénéfices",     Icon: CheckCircle },
@@ -39,7 +41,7 @@ const setLang = (original, newFr) => {
 };
 
 export default function BrandingContent({ siteId, design, onReload, onChange }) {
-  const [sub, setSub] = useState("hero");
+  const [sub, setSub] = useState("sections");
 
   // Notify parent on every section save so the live preview iframe can refresh.
   const bump = () => onChange?.();
@@ -62,6 +64,9 @@ export default function BrandingContent({ siteId, design, onReload, onChange }) 
         ))}
       </div>
 
+      {sub === "sections" && (
+        <HomepageSectionsEditor siteId={siteId} onChange={bump} />
+      )}
       {sub === "hero" && (
         <HeroEditor siteId={siteId} design={design} onReload={onReload} onSaved={bump} />
       )}

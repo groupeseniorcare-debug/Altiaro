@@ -28,43 +28,73 @@ export function NarrativeSections({ sections, design }) {
 
   return (
     <div className="space-y-16 md:space-y-24 mb-20" data-testid="product-narrative">
-      {items.map((s, i) => (
-        <section
-          key={i}
-          data-testid={`product-section-${i}`}
-          className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12 items-start"
-        >
-          <div className="md:col-span-5">
-            <div
-              className="text-[11px] uppercase tracking-[0.25em] mb-3 font-medium"
-              style={{ color: primary }}
-            >
-              {String(i + 1).padStart(2, "0")} · Section
-            </div>
-            <h2
-              className="text-2xl md:text-3xl font-semibold leading-tight"
-              style={{ fontFamily: `"${fontHeading}", serif` }}
-            >
-              {s.title}
-            </h2>
-          </div>
-          <div className="md:col-span-7">
-            <p className="text-[16px] md:text-[17px] leading-relaxed text-[#44403C]">
-              {s.body}
-            </p>
-            {s.bullet_points?.length > 0 && (
-              <ul className="mt-6 space-y-3">
-                {s.bullet_points.map((bp, j) => (
-                  <li key={j} className="flex items-start gap-3 text-[15px] text-[#57534E]">
-                    <CheckCircle size={18} weight="fill" className="shrink-0 mt-0.5" style={{ color: primary }} />
-                    <span>{bp}</span>
-                  </li>
-                ))}
-              </ul>
+      {items.map((s, i) => {
+        const hasImage = !!s.image;
+        const imageLeft = i % 2 === 0; // alternate sides for rhythm
+        return (
+          <section
+            key={i}
+            data-testid={`product-section-${i}`}
+            className={`grid grid-cols-1 gap-8 md:gap-12 items-center ${
+              hasImage ? "md:grid-cols-2" : "md:grid-cols-12"
+            }`}
+          >
+            {hasImage && imageLeft && (
+              <div className="md:order-1">
+                <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-[#F5F2EB]">
+                  <img src={s.image} alt={s.title || `Section ${i + 1}`} loading="lazy"
+                    className="w-full h-full object-cover" />
+                </div>
+              </div>
             )}
-          </div>
-        </section>
-      ))}
+            <div className={hasImage ? "md:order-2" : "md:col-span-5"}>
+              <div
+                className="text-[11px] uppercase tracking-[0.25em] mb-3 font-medium"
+                style={{ color: primary }}
+              >
+                {String(i + 1).padStart(2, "0")} · Section
+              </div>
+              <h2
+                className="text-2xl md:text-3xl font-semibold leading-tight"
+                style={{ fontFamily: `"${fontHeading}", serif` }}
+              >
+                {s.title}
+              </h2>
+              {!hasImage ? null : (
+                <p className="mt-4 text-[16px] md:text-[17px] leading-relaxed text-[#44403C]">
+                  {s.body}
+                </p>
+              )}
+              {!hasImage && s.bullet_points?.length > 0 && null}
+            </div>
+            {!hasImage && (
+              <div className="md:col-span-7">
+                <p className="text-[16px] md:text-[17px] leading-relaxed text-[#44403C]">
+                  {s.body}
+                </p>
+                {s.bullet_points?.length > 0 && (
+                  <ul className="mt-6 space-y-3">
+                    {s.bullet_points.map((bp, j) => (
+                      <li key={j} className="flex items-start gap-3 text-[15px] text-[#57534E]">
+                        <CheckCircle size={18} weight="fill" className="shrink-0 mt-0.5" style={{ color: primary }} />
+                        <span>{bp}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            {hasImage && !imageLeft && (
+              <div className="md:order-1">
+                <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-[#F5F2EB]">
+                  <img src={s.image} alt={s.title || `Section ${i + 1}`} loading="lazy"
+                    className="w-full h-full object-cover" />
+                </div>
+              </div>
+            )}
+          </section>
+        );
+      })}
     </div>
   );
 }

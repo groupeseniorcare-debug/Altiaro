@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import CommandPalette from "./CommandPalette";
+import CommandMenu from "./CommandMenu";
 import CopilotFab from "./CopilotFab";  // Unused — Copilot désactivé
 import { List, X } from "@phosphor-icons/react";
 import { AltiaroLogo } from "./AltiaroLogo";
@@ -147,6 +148,7 @@ export default function Layout({ children }) {
 
       <main className="flex-1 md:ml-[240px] min-h-screen pt-14 md:pt-0 bg-neutral-50">{children}</main>
       {user?.role === "admin" && <CommandPalette />}
+      {user?.role && user.role !== "admin" && <CommandMenu />}
     </div>
   );
 }

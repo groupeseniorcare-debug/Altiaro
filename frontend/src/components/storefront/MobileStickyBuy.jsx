@@ -25,7 +25,7 @@ export default function MobileStickyBuy({ product, onAdd, qty, added, design, la
 
   return (
     <div
-      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t shadow-2xl px-4 py-3 flex items-center gap-3 animate-in slide-in-from-bottom"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t shadow-2xl px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex items-center gap-3 animate-in slide-in-from-bottom"
       style={{ borderColor: "#E7E5E4" }}
       data-testid="mobile-sticky-buy"
     >
@@ -56,7 +56,7 @@ export default function MobileStickyBuy({ product, onAdd, qty, added, design, la
         type="button"
         onClick={onAdd}
         data-testid="sticky-buy-cta"
-        className="h-11 px-4 rounded-full text-white font-medium text-sm transition active:scale-[0.97] shrink-0"
+        className="h-12 min-h-[48px] px-5 rounded-full text-white font-semibold text-sm transition active:scale-[0.97] shrink-0 shadow-lg"
         style={{ background: added ? "#047857" : primary }}
       >
         {added ? (

@@ -960,6 +960,11 @@ function ProductEditor({ siteId, initial, onClose, onSaved, onEnrichNarrative, e
             </div>
           )}
 
+          {/* Narrative sections editor — detailed per-product storytelling */}
+          {!isNew && (
+            <NarrativeSectionsEditor productId={initial.id} narrative={initial.narrative} />
+          )}
+
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-200">
             <button
               type="button"
@@ -1227,3 +1232,133 @@ function Info({ label, value, mono }) {
     </div>
   );
 }
+
+// =====================================================================
+// NarrativeSectionsEditor — per-product detailed sections with IA images
+// =====================================================================
+function NarrativeSectionsEditor({ productId, narrative }) {
+  const sections = Array.isArray(narrative?.sections) ? narrative.sections : [];
+  const [open, setOpen] = useState(sections.length > 0);
+  const [busyIdx, setBusyIdx] = useState(null);
+  const [style, setStyle] = useState("lifestyle");
+  const [localSections, setLocalSections] = useState(sections);
+
+  React.useEffect(() => {
+    setLocalSections(Array.isArray(narrative?.sections) ? narrative.sections : []);
+  }, [narrative]);
+
+  const genImage = async (idx) => {
+    setBusyIdx(idx);
+    const { data, error: err, rawDetail } = await apiCall(() =>
+      api.post(`/products/${productId}/generate-section-image`, {
+        section_index: idx, style, tweak: "",
+      })
+    );
+    setBusyIdx(null);
+    if (err) { window.alert(rawDetail?.detail || err); return; }
+    setLocalSections((prev) => prev.map((s, i) => (i === idx ? { ...s, image: data.url } : s)));
+  };
+
+  if (!localSections.length) {
+    return (
+      <div className="bg-violet-50/60 border border-violet-200 rounded-xl p-4 text-sm text-violet-900 flex items-start gap-2">
+        <SparkleIcon size={16} weight="duotone" className="flex-shrink-0 mt-0.5" />
+        <span>
+          Pas de sections détaillées pour ce produit. Clique sur <strong>Générer IA</strong> ci-dessus
+          pour créer automatiquement les textes narratifs (titre, histoire, usage, bénéfices, FAQ).
+          Chaque section pourra ensuite recevoir une image IA dédiée.
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border border-neutral-200 rounded-xl overflow-hidden" data-testid="narrative-sections-editor">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-5 py-3 bg-neutral-50 hover:bg-neutral-100 transition text-left"
+      >
+        <div>
+          <div className="text-sm font-semibold text-neutral-900">
+            Sections détaillées de la fiche produit ({localSections.length})
+          </div>
+          <div className="text-xs text-neutral-500 mt-0.5">
+            Ces blocs s'affichent sous la fiche produit. Génère une image IA par section.
+          </div>
+        </div>
+        <span className="text-lg text-neutral-400">{open ? "−" : "+"}</span>
+      </button>
+      {open && (
+        <div className="p-5 space-y-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="text-xs text-neutral-500">Style d'image par défaut :</label>
+            <select value={style} onChange={(e) => setStyle(e.target.value)}
+              data-testid="narrative-img-style"
+              className="h-8 px-2 rounded border border-neutral-200 bg-white text-xs">
+              <option value="lifestyle">Lifestyle</option>
+              <option value="studio">Studio</option>
+              <option value="closeup">Gros plan</option>
+              <option value="in_use">En usage</option>
+            </select>
+          </div>
+          {localSections.map((s, i) => (
+            <div key={i} className="border border-neutral-200 rounded-lg p-4 bg-white"
+              data-testid={`narrative-section-${i}`}>
+              <div className="flex items-start gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] uppercase tracking-widest text-neutral-400 mb-1">
+                    Section {String(i + 1).padStart(2, "0")}
+                  </div>
+                  <div className="text-sm font-semibold text-neutral-900 mb-2">
+                    {s.title || "(sans titre)"}
+                  </div>
+                  <div className="text-xs text-neutral-600 leading-relaxed line-clamp-4">
+                    {s.body || "(pas de contenu)"}
+                  </div>
+                  {s.bullet_points?.length > 0 && (
+                    <ul className="mt-2 space-y-1">
+                      {s.bullet_points.slice(0, 3).map((bp, j) => (
+                        <li key={j} className="text-[11px] text-neutral-500 flex gap-1.5">
+                          <span className="text-emerald-600">✓</span>{bp}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="w-28 shrink-0">
+                  {s.image ? (
+                    <div className="relative aspect-[4/3] rounded-lg overflow-hidden bg-neutral-100 border border-neutral-200">
+                      <img src={s.image} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="aspect-[4/3] rounded-lg border border-dashed border-neutral-300 bg-neutral-50 flex items-center justify-center text-[10px] text-neutral-400">
+                      Pas d'image
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => genImage(i)}
+                    disabled={busyIdx === i}
+                    data-testid={`gen-section-img-${i}`}
+                    className="mt-2 w-full h-8 px-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-semibold flex items-center justify-center gap-1 disabled:opacity-60"
+                  >
+                    {busyIdx === i ? (
+                      <>Nano Banana…</>
+                    ) : (
+                      <>
+                        <SparkleIcon size={10} weight="fill" />
+                        {s.image ? "Re-générer" : "Image IA"}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+

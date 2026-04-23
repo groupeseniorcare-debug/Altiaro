@@ -1275,3 +1275,120 @@ async def delete_collection(site_id: str, collection_id: str, user: dict = Depen
     await _check_site_access(site_id, user)
     await db.collections.delete_one({"id": collection_id, "site_id": site_id})
     return {"ok": True}
+
+
+# =====================================================================
+# Homepage Sections — Page Builder
+# =====================================================================
+DEFAULT_HOMEPAGE_SECTIONS = [
+    {"key": "hero",              "label": "Hero",                  "visible": True},
+    {"key": "press_logos",       "label": "Logos presse",          "visible": False},
+    {"key": "benefits",          "label": "Bénéfices clés",        "visible": True},
+    {"key": "collections",       "label": "Collections",           "visible": True},
+    {"key": "products",          "label": "Grille produits",       "visible": True},
+    {"key": "featured_product",  "label": "Produit vedette",       "visible": False},
+    {"key": "lifestyle_editorial", "label": "Éditorial lifestyle", "visible": False},
+    {"key": "values",            "label": "Nos valeurs",           "visible": False},
+    {"key": "buying_guide",      "label": "Guide d'achat",         "visible": False},
+    {"key": "testimonials",      "label": "Témoignages",           "visible": True},
+    {"key": "founder_story",     "label": "Histoire du fondateur", "visible": False},
+    {"key": "instagram",         "label": "Feed Instagram",        "visible": False},
+    {"key": "blog_teaser",       "label": "Derniers articles",     "visible": False},
+    {"key": "faq",               "label": "FAQ",                   "visible": True},
+    {"key": "newsletter",        "label": "Newsletter CTA",        "visible": True},
+    {"key": "final_cta",         "label": "CTA final",             "visible": True},
+]
+
+HOMEPAGE_PRESETS = {
+    "minimal": ["hero", "benefits", "products", "faq", "final_cta"],
+    "editorial": ["hero", "lifestyle_editorial", "founder_story", "benefits",
+                  "collections", "products", "values", "testimonials", "faq", "newsletter", "final_cta"],
+    "conversion": ["hero", "press_logos", "benefits", "products", "testimonials",
+                   "featured_product", "buying_guide", "faq", "newsletter", "final_cta"],
+    "full": [s["key"] for s in DEFAULT_HOMEPAGE_SECTIONS],
+}
+
+
+@router.get("/sites/{site_id}/design/homepage-sections")
+async def get_homepage_sections(site_id: str, user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "design.homepage_sections": 1})
+    stored = ((site or {}).get("design") or {}).get("homepage_sections")
+    if not stored:
+        return {"sections": DEFAULT_HOMEPAGE_SECTIONS, "presets": HOMEPAGE_PRESETS}
+    # Merge with defaults — add any new key as invisible (lets us ship new sections without breaking existing sites)
+    by_key = {s["key"]: s for s in stored}
+    merged = []
+    for default in DEFAULT_HOMEPAGE_SECTIONS:
+        existing = by_key.get(default["key"])
+        if existing:
+            merged.append({"key": default["key"], "label": default["label"],
+                           "visible": bool(existing.get("visible", default["visible"]))})
+        else:
+            merged.append({**default, "visible": False})
+    # Preserve user ordering when available
+    ordered_keys = [s["key"] for s in stored if s.get("key") in {d["key"] for d in DEFAULT_HOMEPAGE_SECTIONS}]
+    if ordered_keys:
+        by_key2 = {s["key"]: s for s in merged}
+        merged = [by_key2[k] for k in ordered_keys if k in by_key2]
+        # Append any default not yet in user's list (newly-shipped sections)
+        for d in DEFAULT_HOMEPAGE_SECTIONS:
+            if d["key"] not in ordered_keys:
+                merged.append({**d, "visible": False})
+    return {"sections": merged, "presets": HOMEPAGE_PRESETS}
+
+
+class HomepageSectionItem(BaseModel):
+    key: str
+    visible: bool = True
+
+
+class HomepageSectionsInput(BaseModel):
+    sections: list[HomepageSectionItem]
+
+
+@router.put("/sites/{site_id}/design/homepage-sections")
+async def put_homepage_sections(
+    site_id: str,
+    data: HomepageSectionsInput,
+    user: dict = Depends(get_current_user),
+):
+    await _check_site_access(site_id, user)
+    valid_keys = {s["key"] for s in DEFAULT_HOMEPAGE_SECTIONS}
+    clean = [
+        {"key": s.key, "visible": bool(s.visible)}
+        for s in data.sections
+        if s.key in valid_keys
+    ]
+    await db.sites.update_one(
+        {"id": site_id},
+        {"$set": {
+            "design.homepage_sections": clean,
+            "design.updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    return {"ok": True, "count": len(clean)}
+
+
+@router.post("/sites/{site_id}/design/homepage-sections/preset/{preset}")
+async def apply_homepage_preset(
+    site_id: str,
+    preset: str,
+    user: dict = Depends(get_current_user),
+):
+    await _check_site_access(site_id, user)
+    if preset not in HOMEPAGE_PRESETS:
+        raise HTTPException(400, f"Preset inconnu. Choix : {', '.join(HOMEPAGE_PRESETS.keys())}")
+    enabled = set(HOMEPAGE_PRESETS[preset])
+    sections = [
+        {"key": d["key"], "visible": d["key"] in enabled}
+        for d in DEFAULT_HOMEPAGE_SECTIONS
+    ]
+    await db.sites.update_one(
+        {"id": site_id},
+        {"$set": {
+            "design.homepage_sections": sections,
+            "design.updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    return {"ok": True, "preset": preset, "visible_count": len(enabled), "sections": sections}

@@ -237,6 +237,55 @@ async def list_generated_images(product_id: str, user: dict = Depends(get_curren
     return {"images": product.get("generated_images") or []}
 
 
+class GenSectionImgInput(BaseModel):
+    section_index: int
+    style: str = "lifestyle"
+    tweak: Optional[str] = ""
+
+
+@router.post("/products/{product_id}/generate-section-image")
+async def generate_narrative_section_image(
+    product_id: str,
+    data: GenSectionImgInput,
+    user: dict = Depends(get_current_user),
+):
+    """Generate a Nano Banana image for a specific narrative section and
+    store the URL directly on narrative.sections[i].image."""
+    product = await db.products.find_one({"id": product_id}, {"_id": 0})
+    if not product:
+        raise HTTPException(404, "Produit introuvable")
+    site_id = product.get("site_id")
+    await _check_site_access(site_id, user)
+    sections = ((product.get("narrative") or {}).get("sections")) or []
+    if data.section_index < 0 or data.section_index >= len(sections):
+        raise HTTPException(400, f"Section invalide (0-{len(sections)-1})")
+    section = sections[data.section_index]
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "design.brand": 1})
+    brand = ((site or {}).get("design") or {}).get("brand") or {}
+
+    # Use section title + body as art-direction context
+    context_prompt = _build_prompt(product, brand, data.style, data.tweak or "")
+    extra = (
+        f"\nContexte narratif de la section : « {section.get('title', '')} » — "
+        f"{section.get('body', '')[:400]}.\n"
+        "L'image doit illustrer cette section de manière sensorielle et concrète "
+        "(matières, gestes, lumière), sans texte ni logo visible."
+    )
+    url = await _generate_one(context_prompt + extra, site_id, f"{product_id}-sec{data.section_index}")
+    if not url:
+        raise HTTPException(502, "L'IA n'a pas renvoyé d'image.")
+
+    # Update section[i].image in place
+    await db.products.update_one(
+        {"id": product_id},
+        {"$set": {
+            f"narrative.sections.{data.section_index}.image": url,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    return {"ok": True, "url": url, "section_index": data.section_index}
+
+
 @router.delete("/products/{product_id}/generated-images")
 async def clear_generated_images(product_id: str, user: dict = Depends(get_current_user)):
     product = await db.products.find_one({"id": product_id}, {"_id": 0, "site_id": 1})

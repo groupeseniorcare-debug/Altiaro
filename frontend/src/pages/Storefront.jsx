@@ -171,29 +171,105 @@ export function StorefrontHome() {
         schema={[orgSchema, websiteSchema, itemListSchema, faqSchema].filter(Boolean)}
       />
       <Hero site={site} design={design} lang={lang} />
-      <div id="press"><PressLogos mentions={design?.press_mentions} design={design} /></div>
-      <Benefits design={design} lang={lang} />
-      <div id="collections"><CollectionsShowcase collections={design?.collections} lang={lang} design={design} /></div>
-      <div id="products"><ProductGrid
-        siteId={siteId}
-        products={products}
-        loading={loading}
-        design={design}
-        lang={lang}
-      /></div>
-      <FeaturedProduct products={products} design={design} lang={lang} />
-      <LifestyleEditorial editorial={design?.editorial} lang={lang} design={design} />
-      <ValuesSection values={design?.values} lang={lang} design={design} />
-      <BuyingGuide guide={design?.buying_guide} design={design} />
-      <Testimonials design={design} lang={lang} />
-      <div id="story"><FounderStory story={design?.founder_story} lang={lang} design={design} /></div>
-      <InstagramGrid instagram={design?.instagram} design={design} />
-      <BlogTeaser posts={design?.blog_posts} lang={lang} design={design} />
-      <div id="faq"><FAQSection design={design} lang={lang} /></div>
-      <NewsletterCTA design={design} />
-      <FinalCTA design={design} lang={lang} />
+      {renderHomepageSections({
+        design, site, siteId, products, loading, lang,
+      })}
     </StorefrontLayout>
   );
+}
+
+// ---------------------------------------------------------------------
+// Homepage sections renderer — respects design.homepage_sections config.
+// - Missing config → default order.
+// - Section with no real data is silently skipped.
+// ---------------------------------------------------------------------
+const DEFAULT_HOMEPAGE_ORDER = [
+  { key: "press_logos", visible: false },
+  { key: "benefits", visible: true },
+  { key: "collections", visible: true },
+  { key: "products", visible: true },
+  { key: "featured_product", visible: false },
+  { key: "lifestyle_editorial", visible: false },
+  { key: "values", visible: false },
+  { key: "buying_guide", visible: false },
+  { key: "testimonials", visible: true },
+  { key: "founder_story", visible: false },
+  { key: "instagram", visible: false },
+  { key: "blog_teaser", visible: false },
+  { key: "faq", visible: true },
+  { key: "newsletter", visible: true },
+  { key: "final_cta", visible: true },
+];
+
+function hasData(key, design, products) {
+  switch (key) {
+    case "press_logos": return !!(design?.press_mentions?.length);
+    case "benefits": return !!(design?.benefits?.length);
+    case "collections": return !!(design?.collections?.length);
+    case "products": return true; // Always show (even with 0 products it has copy)
+    case "featured_product": return !!(products?.some((p) => p.featured));
+    case "lifestyle_editorial": return !!(design?.editorial?.title || design?.editorial?.image);
+    case "values": return !!(design?.values?.length);
+    case "buying_guide": return !!(design?.buying_guide?.items?.length);
+    case "testimonials": return !!(design?.testimonials?.length);
+    case "founder_story": return !!(design?.founder_story?.title || design?.founder_story?.bio);
+    case "instagram": return !!(design?.instagram?.posts?.length || design?.instagram?.handle);
+    case "blog_teaser": return !!(design?.blog_posts?.length);
+    case "faq": return !!(design?.faq?.length || design?.faq?.items?.length);
+    case "newsletter": return true;
+    case "final_cta": return true;
+    default: return false;
+  }
+}
+
+function renderHomepageSections({ design, site, siteId, products, loading, lang }) {
+  const cfg = Array.isArray(design?.homepage_sections) && design.homepage_sections.length
+    ? design.homepage_sections
+    : DEFAULT_HOMEPAGE_ORDER;
+  // Hero is always rendered on top
+  const list = cfg.filter((s) => s.key !== "hero");
+  return list.map((s) => {
+    if (!s.visible) return null;
+    if (!hasData(s.key, design, products)) return null;
+    switch (s.key) {
+      case "press_logos":
+        return <div key={s.key} id="press"><PressLogos mentions={design?.press_mentions} design={design} /></div>;
+      case "benefits":
+        return <Benefits key={s.key} design={design} lang={lang} />;
+      case "collections":
+        return <div key={s.key} id="collections"><CollectionsShowcase collections={design?.collections} lang={lang} design={design} /></div>;
+      case "products":
+        return (
+          <div key={s.key} id="products">
+            <ProductGrid siteId={siteId} products={products} loading={loading} design={design} lang={lang} />
+          </div>
+        );
+      case "featured_product":
+        return <FeaturedProduct key={s.key} products={products} design={design} lang={lang} />;
+      case "lifestyle_editorial":
+        return <LifestyleEditorial key={s.key} editorial={design?.editorial} lang={lang} design={design} />;
+      case "values":
+        return <ValuesSection key={s.key} values={design?.values} lang={lang} design={design} />;
+      case "buying_guide":
+        return <BuyingGuide key={s.key} guide={design?.buying_guide} design={design} />;
+      case "testimonials":
+        return <Testimonials key={s.key} design={design} lang={lang} />;
+      case "founder_story":
+        return <div key={s.key} id="story"><FounderStory story={design?.founder_story} lang={lang} design={design} /></div>;
+      case "instagram":
+        return <InstagramGrid key={s.key} instagram={design?.instagram} design={design} />;
+      case "blog_teaser":
+        return <BlogTeaser key={s.key} posts={design?.blog_posts} lang={lang} design={design} />;
+      case "faq":
+        return <div key={s.key} id="faq"><FAQSection design={design} lang={lang} /></div>;
+      case "newsletter":
+        return <NewsletterCTA key={s.key} design={design} />;
+      case "final_cta":
+        return <FinalCTA key={s.key} design={design} lang={lang} />;
+      default:
+        return null;
+    }
+  });
 }
 
 /* =========================================================
