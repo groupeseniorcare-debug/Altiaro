@@ -4,6 +4,7 @@ import {
   Sparkle, CalendarBlank, ChartLineUp, ArrowRight, TrendUp,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
+import GSCConnectCard from "./GSCConnectCard";
 
 /**
  * Widget "Pulse SEO" monochrome éditorial — affiche la performance éditoriale
@@ -168,19 +169,8 @@ export default function PulseSEOWidget({ siteId }) {
         )}
       </div>
 
-      {/* Google position footer (placeholder until Search Console branché) */}
-      {avg_google_position === null && (
-        <div
-          className="px-6 md:px-7 py-3 flex items-center gap-2.5 bg-[#F5F5F5]"
-          style={{ borderTop: "1px solid #E5E5E5" }}
-        >
-          <CalendarBlank size={14} weight="regular" className="text-neutral-500 shrink-0" />
-          <div className="text-[11.5px] text-neutral-600">
-            Position Google moyenne : branchez Google Search Console pour voir le suivi
-            de ranking en direct.
-          </div>
-        </div>
-      )}
+      {/* Google Search Console — connect / metrics band */}
+      <GSCConnectCard siteId={siteId} />
     </div>
   );
 }

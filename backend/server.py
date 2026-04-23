@@ -68,6 +68,8 @@ from routes import validation as validation_routes
 from routes import cockpit_tools as cockpit_tools_routes
 from routes import product_images as product_images_routes
 from routes import launch as launch_routes
+from routes import seo_coach as seo_coach_routes
+from routes import gsc as gsc_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -127,6 +129,8 @@ api.include_router(validation_routes.router)
 api.include_router(cockpit_tools_routes.router)
 api.include_router(product_images_routes.router)
 api.include_router(launch_routes.router)
+api.include_router(seo_coach_routes.router)
+api.include_router(gsc_routes.router)
 
 
 @app.on_event("startup")
@@ -397,6 +401,22 @@ async def startup():
             _scheduled_monthly_blog_cluster,
             CronTrigger(day=1, hour=6, minute=0),
             id="monthly_blog_cluster", replace_existing=True, misfire_grace_time=7200,
+        )
+
+        # Every Monday at 08:00 UTC (09h CET) — Coach SEO weekly digest email
+        async def _scheduled_weekly_seo_coach():
+            logger.info("[scheduler] weekly SEO coach digest run start")
+            try:
+                from routes.seo_coach import send_weekly_seo_digests
+                result = await send_weekly_seo_digests()
+                logger.info(f"[scheduler] weekly SEO coach : {result}")
+            except Exception:
+                logger.exception("[scheduler] weekly SEO coach failed")
+
+        scheduler.add_job(
+            _scheduled_weekly_seo_coach,
+            CronTrigger(day_of_week="mon", hour=8, minute=0),
+            id="weekly_seo_coach", replace_existing=True, misfire_grace_time=3600,
         )
 
         scheduler.start()

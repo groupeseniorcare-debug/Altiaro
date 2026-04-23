@@ -3,7 +3,51 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
-## 2026-04-23 · Étape 6 + Widget Pulse SEO (dashboard)
+## 2026-04-23 · Refactor + Coach SEO + GSC OAuth (3-batch)
+
+### 1. Refactor `Storefront.jsx` (–40 %)
+- Extrait **StorefrontProduct** (~515 lignes) dans `pages/StorefrontProduct.jsx`.
+- `Storefront.jsx` garde StorefrontHome/Cart/Checkout/Confirmation + re-exporte Product.
+- **1279 → 764 lignes** (dans le fichier principal), imports nettoyés.
+
+### 2. Coach SEO proactif (alertes + email Resend)
+- **Backend** `routes/seo_coach.py` :
+  - `GET /api/sites/{id}/seo/alerts` — rule engine retourne des alertes
+    catégorisées (critical / warn / info) sur score E-E-A-T, couverture keywords,
+    cadence mensuelle, proximité du prochain cluster.
+  - `GET .../alerts/unread` — compteur pour le badge cloche, mémorise les
+    alertes lues via `site.design.seo_coach.read_alert_ids`.
+  - `POST .../alerts/mark-read` — marque lues.
+- **APScheduler** cron **lundi 08:00 UTC** (9h CET) → `send_weekly_seo_digests()` :
+  Iterate tous les sites `seo_coach.email_enabled != False`, envoie un digest
+  HTML Resend si ≥ 1 alerte warn/critical. Support `created_by` comme
+  fallback de l'owner_id et gère les users `_id` ObjectId legacy.
+- **Frontend** `components/SEOCoachBell.jsx` — cloche monochrome dans le
+  topbar cockpit avec badge count rouge/noir selon severity, dropdown 400px
+  premium (Fraunces, CTA noirs, footer "DIGEST EMAIL · CHAQUE LUNDI 09H"),
+  mark-read au clic d'ouverture, polling 60 s.
+- **Tests pytest** : 7 tests sur le rule engine (+ 7 existants blog) → **14/14**.
+
+### 3. Google Search Console OAuth
+- **Backend** `routes/gsc.py` (multi-tenant) :
+  - `GET /api/sites/{id}/gsc/connect` — retourne l'URL OAuth avec state CSRF.
+  - `GET /api/gsc/oauth/callback` — exchange code → refresh_token, stocké dans
+    `site.design.gsc.*`, détecte automatiquement la property_url via
+    `searchconsole.googleapis.com/webmasters/v3/sites`.
+  - `GET .../gsc/status` — {configured, connected, property_url, last_synced_at}.
+  - `GET .../gsc/metrics?days=28` — queries, avg_position, clicks, impressions,
+    CTR via searchAnalytics API. Refresh token exchange à chaque call.
+  - `POST .../gsc/disconnect` — unset `design.gsc`.
+- **Frontend** `components/GSCConnectCard.jsx` — bande intégrée au bas du
+  PulseSEOWidget, 3 états : non-configuré (message admin) / non-connecté
+  (bouton "Connecter GSC") / connecté (4 Fraunces KPIs + lien déconnecter).
+- **Setup guide** `docs/GSC_SETUP.md` — 6 étapes pour créer projet Google
+  Cloud, activer l'API, configurer OAuth consent, créer credentials,
+  copier dans `.env`. En attente que l'admin fournisse
+  `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI`.
+- **Packages** : `google-auth-oauthlib`, `google-api-python-client` (pip freeze).
+
+
 
 ### Étape 6 — Rédaction IA des pages statiques
 - **NEW backend** `POST /api/sites/{id}/design/generate-pages` + `GET .../generate-pages/{job_id}` :

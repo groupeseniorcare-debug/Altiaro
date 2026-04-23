@@ -8,6 +8,7 @@ import BlockOutputModal from "../components/BlockOutputModal";
 import SiteQAPanel from "../components/SiteQAPanel";
 import CockpitJourney from "../components/CockpitJourney";
 import PulseSEOWidget from "../components/PulseSEOWidget";
+import SEOCoachBell from "../components/SEOCoachBell";
 import {
   ArrowLeft,
   Lock,
@@ -324,10 +325,13 @@ export default function SiteDetail() {
               </div>
             </div>
 
-            <div className="text-right">
-              <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-1">Statut</div>
-              <div className="text-sm text-neutral-600 mt-1 max-w-[180px]">
-                Le parcours ci-dessous pilote désormais l'avancement du site.
+            <div className="text-right flex flex-col items-end gap-3">
+              <SEOCoachBell siteId={id} />
+              <div>
+                <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-1">Statut</div>
+                <div className="text-sm text-neutral-600 mt-1 max-w-[180px]">
+                  Le parcours ci-dessous pilote désormais l'avancement du site.
+                </div>
               </div>
             </div>
           </div>
