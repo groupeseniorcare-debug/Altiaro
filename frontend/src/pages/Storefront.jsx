@@ -15,6 +15,7 @@ import {
 import {
   ArrowRight,
   CheckCircle,
+  Check,
   Trash,
   ShoppingBagOpen,
   ShieldCheck,
@@ -497,112 +498,184 @@ export function StorefrontProduct() {
           } : null,
         ].filter(Boolean)}
       />
-      <div className="max-w-7xl mx-auto px-6 md:px-10 py-6 md:py-10">
-        {/* Breadcrumb */}
-        <nav className="text-[12px] text-neutral-500 mb-6" data-testid="product-breadcrumb">
-          <Link to={`/shop/${siteId}`} className="hover:underline">Accueil</Link>
-          <span className="mx-2">/</span>
-          <Link to={`/shop/${siteId}/collections`} className="hover:underline">Collections</Link>
+      <div className="bg-white" data-testid="product-page-root">
+        {/* Thin top trust ribbon */}
+        <div
+          className="bg-white"
+          style={{ borderBottom: "1px solid #E5E5E5" }}
+        >
+          <div className="max-w-7xl mx-auto px-6 md:px-10 py-3 flex items-center justify-between text-[11px] uppercase tracking-[0.3em]" style={{ color: "#737373" }}>
+            <div className="flex items-center gap-4 flex-wrap">
+              <span className="flex items-center gap-1.5"><Truck size={12} weight="bold" /> Livraison offerte</span>
+              <span className="opacity-40 hidden md:inline">·</span>
+              <span className="hidden md:flex items-center gap-1.5"><ShieldCheck size={12} weight="bold" /> Garantie 2 ans</span>
+              <span className="opacity-40 hidden md:inline">·</span>
+              <span className="hidden md:flex items-center gap-1.5"><CheckCircle size={12} weight="bold" /> Retour 14 j</span>
+            </div>
+            <div className="hidden md:block">Réf. {p.sku || p.id?.slice(0, 8).toUpperCase()}</div>
+          </div>
+        </div>
+
+      <div className="max-w-7xl mx-auto px-6 md:px-10 pt-8 md:pt-12 pb-12">
+        {/* Breadcrumb — editorial */}
+        <nav
+          className="text-[11px] uppercase tracking-[0.25em] mb-10"
+          style={{ color: "#737373" }}
+          data-testid="product-breadcrumb"
+        >
+          <Link to={`/shop/${siteId}`} className="hover:opacity-60 transition">Accueil</Link>
+          <span className="mx-2 opacity-50">/</span>
+          <Link to={`/shop/${siteId}/collections`} className="hover:opacity-60 transition">Collections</Link>
           {p.category && (
             <>
-              <span className="mx-2">/</span>
-              <Link to={`/shop/${siteId}/collection/${p.category}`} className="hover:underline capitalize">
+              <span className="mx-2 opacity-50">/</span>
+              <Link to={`/shop/${siteId}/collection/${p.category}`} className="hover:opacity-60 transition capitalize">
                 {p.category}
               </Link>
             </>
           )}
-          <span className="mx-2">/</span>
-          <span className="text-neutral-900">{pickLang(p.name, lang)}</span>
+          <span className="mx-2 opacity-50">/</span>
+          <span style={{ color: "#0A0A0A" }}>{pickLang(p.name, lang)}</span>
         </nav>
 
         {/* HERO PRODUCT */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-20 mb-16 md:mb-24 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-[1.1fr_1fr] gap-8 lg:gap-16 mb-24 md:mb-32 items-start">
           {/* Gallery */}
           <ProductGallery images={p.images || []} name={pickLang(p.name, lang)} design={design} />
 
-          {/* Buy panel */}
-          <div className="md:pt-4">
-            <div
-              className="text-[11px] uppercase tracking-[0.25em] mb-3 font-medium"
-              style={{ color: primary }}
-            >
-              {site?.name}
+          {/* Buy panel — monochrome editorial */}
+          <div className="md:pt-2 md:sticky md:top-28">
+            {/* Eyebrow · chapter-style */}
+            <div className="flex items-center gap-3 mb-5">
+              <span className="h-px w-8" style={{ background: "#0A0A0A" }} />
+              <span className="text-[10px] uppercase tracking-[0.4em] font-medium" style={{ color: "#0A0A0A" }}>
+                {site?.name}{p.category ? ` · ${p.category}` : ""}
+              </span>
             </div>
+
             <h1
-              className="text-3xl md:text-5xl font-semibold text-[#1C1917] leading-[1.05] tracking-tight"
-              style={{ fontFamily: `"${fontHeading}", Georgia, serif` }}
+              className="text-[36px] md:text-[48px] lg:text-[56px] leading-[1.02] tracking-[-0.02em] font-normal"
+              style={{ fontFamily: `"${fontHeading}", Georgia, serif`, color: "#0A0A0A" }}
               data-testid="product-name"
             >
               {p.narrative?.headline || pickLang(p.name, lang)}
             </h1>
             {p.narrative?.subheadline && (
-              <p className="text-lg mt-4 leading-relaxed text-[#57534E]">
+              <p className="text-[15px] md:text-[17px] mt-5 leading-[1.65]" style={{ color: "#525252" }}>
                 {p.narrative.subheadline}
               </p>
             )}
 
             {/* Rating + stock */}
-            <div className="flex items-center gap-4 mt-5 text-sm">
+            <div className="flex items-center gap-4 mt-6 text-[13px]" style={{ color: "#525252" }}>
               <div className="flex items-center gap-1.5">
-                <div className="flex" style={{ color: "#F59E0B" }}>
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} size={14} weight="fill" />
-                  ))}
+                <div className="flex" style={{ color: "#F5B800" }}>
+                  {[...Array(5)].map((_, i) => (<Star key={i} size={14} weight="fill" />))}
                 </div>
-                <span className="font-semibold">{(p.rating?.score ?? 4.8).toFixed(1)}</span>
-                <span className="text-neutral-500">({p.rating?.count ?? 127} avis)</span>
+                <span className="font-semibold" style={{ color: "#0A0A0A" }}>{(p.rating?.score ?? 4.8).toFixed(1)}</span>
+                <span>· {p.rating?.count ?? 127} avis</span>
               </div>
-              <div className="w-px h-4 bg-neutral-200" />
-              <div className="flex items-center gap-1.5 text-emerald-700">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                {p.stock === null || (p.stock ?? 1) > 0 ? "En stock" : "Rupture"}
+              <span className="w-px h-4" style={{ background: "#E5E5E5" }} />
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#10B981" }} />
+                <span style={{ color: "#0A0A0A" }}>{p.stock === null || (p.stock ?? 1) > 0 ? "En stock" : "Rupture"}</span>
               </div>
             </div>
 
-            {/* Price */}
-            <div className="flex items-baseline gap-3 mt-8" data-testid="product-price">
-              <span className="text-3xl md:text-4xl font-semibold" style={{ color: primary }}>
+            {/* Price block — oversized */}
+            <div
+              className="mt-8 pt-8 pb-6 flex items-baseline gap-3 flex-wrap"
+              style={{ borderTop: "1px solid #E5E5E5" }}
+              data-testid="product-price"
+            >
+              <span className="text-[40px] md:text-[48px] font-semibold tabular-nums leading-none" style={{ color: "#0A0A0A" }}>
                 {formatPrice(p.price, p.currency, lang)}
               </span>
               {p.compare_at_price && p.compare_at_price > p.price && (
                 <>
-                  <span className="text-xl text-[#A8A29E] line-through">
+                  <span className="text-[18px] line-through tabular-nums" style={{ color: "#A3A3A3" }}>
                     {formatPrice(p.compare_at_price, p.currency, lang)}
                   </span>
                   <span
-                    className="text-white text-xs font-semibold px-2.5 py-1 rounded-full"
-                    style={{ background: primary }}
+                    className="text-white text-[11px] font-semibold px-2.5 py-1 tracking-tight"
+                    style={{ background: "#0A0A0A", borderRadius: "2px" }}
                   >
-                    -{Math.round((1 - p.price / p.compare_at_price) * 100)}%
+                    −{Math.round((1 - p.price / p.compare_at_price) * 100)}%
                   </span>
                 </>
               )}
             </div>
-            <div className="text-xs text-neutral-500 mt-1">TVA incluse · livraison offerte dès 50 €</div>
+            <div className="text-[11px] uppercase tracking-[0.25em]" style={{ color: "#737373" }}>
+              TVA incluse · Livraison offerte
+            </div>
 
-            {/* Stock urgency (subtle, only if < 10) */}
+            {/* Highlights — 4 bullets in a gray card */}
+            {(() => {
+              const highlights = (p.narrative?.benefits || p.highlights || [])
+                .map((h) => (typeof h === "string" ? h : pickLang(h, lang) || h?.fr))
+                .filter(Boolean).slice(0, 4);
+              const list = highlights.length ? highlights : [
+                "Livraison offerte sous 72h",
+                "Garantie 2 ans incluse",
+                "Retour gratuit 14 jours",
+                "Conseiller humain 7j/7",
+              ];
+              return (
+                <ul
+                  className="mt-8 p-5 space-y-2.5"
+                  style={{ background: "#F5F5F5", borderRadius: "2px" }}
+                  data-testid="product-highlights"
+                >
+                  {list.map((h, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-[13.5px] leading-snug" style={{ color: "#262626" }}>
+                      <Check size={14} weight="bold" className="mt-[3px] shrink-0" style={{ color: "#0A0A0A" }} />
+                      <span>{h}</span>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+
+            {/* Urgency strip */}
             {typeof p.stock === "number" && p.stock > 0 && p.stock < 10 && (
-              <div className="mt-4 flex items-center gap-2 text-sm" data-testid="stock-urgency">
+              <div
+                className="mt-5 flex items-center gap-2 text-[13px] px-4 py-2.5"
+                style={{ background: "#FEF3C7", color: "#92400E", borderRadius: "2px" }}
+                data-testid="stock-urgency"
+              >
                 <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#F59E0B" }} />
-                <span className="text-amber-700 font-medium">Plus que {p.stock} en stock</span>
+                <span className="font-medium">Stock limité · plus que {p.stock} en réserve</span>
               </div>
             )}
 
-            {/* Quantity + Add */}
-            <div className="mt-6 flex items-center gap-4">
-              <div className="flex items-center border border-[#E7E5E4] rounded-full overflow-hidden bg-white">
+            {/* Quantity + Add to cart */}
+            <div className="mt-6 flex items-center gap-3">
+              <div
+                className="flex items-center overflow-hidden bg-white h-14"
+                style={{ border: "1px solid #E5E5E5", borderRadius: "2px" }}
+              >
                 <button
                   onClick={() => setQty(Math.max(1, qty - 1))}
                   data-testid="qty-minus"
-                  className="w-12 h-12 hover:bg-[#FDFBF7] text-[#1C1917]"
+                  className="w-12 h-14 hover:bg-neutral-50 text-lg"
+                  style={{ color: "#0A0A0A" }}
+                  aria-label="Réduire"
                 >
                   −
                 </button>
-                <div className="w-10 text-center font-medium" data-testid="qty-value">{qty}</div>
+                <div
+                  className="w-10 text-center font-semibold tabular-nums"
+                  style={{ color: "#0A0A0A" }}
+                  data-testid="qty-value"
+                >
+                  {qty}
+                </div>
                 <button
                   onClick={() => setQty(qty + 1)}
                   data-testid="qty-plus"
-                  className="w-12 h-12 hover:bg-[#FDFBF7] text-[#1C1917]"
+                  className="w-12 h-14 hover:bg-neutral-50 text-lg"
+                  style={{ color: "#0A0A0A" }}
+                  aria-label="Augmenter"
                 >
                   +
                 </button>
@@ -611,48 +684,53 @@ export function StorefrontProduct() {
               <button
                 onClick={handleAdd}
                 data-testid="add-to-cart"
-                className="flex-1 h-14 rounded-full font-medium text-[15px] transition-all duration-200 active:scale-[0.98] text-white"
-                style={{ background: added ? "#047857" : primary }}
+                className="flex-1 h-14 font-semibold text-[14px] tracking-wide transition-all active:scale-[0.98] text-white flex items-center justify-center gap-2"
+                style={{ background: added ? "#047857" : "#0A0A0A", borderRadius: "2px" }}
               >
                 {added ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <CheckCircle size={18} weight="fill" /> {t(lang, "added_to_cart")}
-                  </span>
+                  <>
+                    <CheckCircle size={16} weight="fill" /> {t(lang, "added_to_cart")}
+                  </>
                 ) : (
-                  t(lang, "add_to_cart")
+                  <>{t(lang, "add_to_cart")}</>
                 )}
               </button>
             </div>
 
-            {/* Marketing elements — delivery estimate + payment options */}
+            {/* Marketing helpers */}
             <div className="mt-6 space-y-3">
               <DeliveryEstimate design={design} />
               <PaymentOptions price={p.price} currency={p.currency} design={design} />
             </div>
 
-            {/* Trust badges — condensed */}
-            <div className="mt-6 grid grid-cols-2 gap-2 text-[13px]" data-testid="product-trust-badges">
-              <div className="flex items-center gap-2 text-neutral-700">
-                <ShieldCheck size={15} weight="fill" style={{ color: primary }} />
-                Garantie 2 ans
-              </div>
-              <div className="flex items-center gap-2 text-neutral-700">
-                <Truck size={15} weight="fill" style={{ color: primary }} />
-                Livraison offerte
-              </div>
-              <div className="flex items-center gap-2 text-neutral-700">
-                <CheckCircle size={15} weight="fill" style={{ color: primary }} />
-                Retour gratuit 14j
-              </div>
-              <div className="flex items-center gap-2 text-neutral-700">
-                <ShieldCheck size={15} weight="fill" style={{ color: primary }} />
-                Paiement sécurisé
-              </div>
+            {/* Trust grid — 4 mini gray cards */}
+            <div className="mt-8 grid grid-cols-2 gap-2.5" data-testid="product-trust-badges">
+              {[
+                { Icon: Truck, label: "Livraison offerte", sub: "48–72 h" },
+                { Icon: ShieldCheck, label: "Garantie 2 ans", sub: "Pièces & MO" },
+                { Icon: CheckCircle, label: "Retour 14 jours", sub: "Gratuit" },
+                { Icon: Star, label: "4.8 / 5", sub: `${p.rating?.count ?? 127} avis` },
+              ].map((b, i) => (
+                <div
+                  key={i}
+                  className="p-3.5 flex items-start gap-2.5"
+                  style={{ background: "#F5F5F5", borderRadius: "2px" }}
+                >
+                  <b.Icon size={16} weight="thin" className="mt-[2px] shrink-0" style={{ color: "#0A0A0A" }} />
+                  <div className="min-w-0">
+                    <div className="text-[12.5px] font-semibold leading-tight" style={{ color: "#0A0A0A" }}>{b.label}</div>
+                    <div className="text-[11px] mt-0.5" style={{ color: "#737373" }}>{b.sub}</div>
+                  </div>
+                </div>
+              ))}
             </div>
 
-            {/* Fallback description if no narrative */}
+            {/* Fallback description */}
             {!p.narrative && pickLang(p.description, lang) && (
-              <p className="text-[15px] leading-relaxed text-[#57534E] mt-8 whitespace-pre-line">
+              <p
+                className="text-[14.5px] leading-relaxed mt-10 whitespace-pre-line"
+                style={{ color: "#525252" }}
+              >
                 {pickLang(p.description, lang)}
               </p>
             )}
@@ -679,6 +757,7 @@ export function StorefrontProduct() {
         <CrossSellProducts currentProduct={p} lang={lang} design={design} />
         <LastUpdatedBadge date={p.narrative?.enriched_at || p.updated_at} design={design} />
       </div>
+      </div>
 
       <MobileStickyBuy
         product={p}
@@ -690,17 +769,22 @@ export function StorefrontProduct() {
       />
 
       {/* Sticky mobile CTA */}
-      <div className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-[#E7E5E4] p-3 flex items-center gap-3 z-40">
-        <div className="flex-1">
-          <div className="text-xs text-[#78716C]">{pickLang(p.name, lang).slice(0, 25)}…</div>
-          <div className="font-semibold" style={{ color: primary }}>
+      <div
+        className="md:hidden fixed bottom-0 inset-x-0 bg-white p-3 flex items-center gap-3 z-40"
+        style={{ borderTop: "1px solid #E5E5E5" }}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="text-[11px] uppercase tracking-[0.2em] truncate" style={{ color: "#737373" }}>
+            {pickLang(p.name, lang).slice(0, 28)}…
+          </div>
+          <div className="font-semibold tabular-nums" style={{ color: "#0A0A0A" }}>
             {formatPrice(p.price, p.currency, lang)}
           </div>
         </div>
         <button
           onClick={handleAdd}
-          className="h-11 px-5 rounded-full text-white text-sm font-medium"
-          style={{ background: added ? "#047857" : primary }}
+          className="h-11 px-5 text-white text-[13px] font-semibold"
+          style={{ background: added ? "#047857" : "#0A0A0A", borderRadius: "2px" }}
         >
           {added ? "Ajouté ✓" : "Ajouter"}
         </button>

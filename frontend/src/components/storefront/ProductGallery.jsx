@@ -5,7 +5,8 @@ import { ShoppingBagOpen, MagnifyingGlassPlus, X } from "@phosphor-icons/react";
  * Premium product gallery — image principale + vignettes + zoom modal.
  */
 export default function ProductGallery({ images = [], name, design }) {
-  const primary = design?.brand?.primary_color || "#B84B31";
+  const primary = "#0A0A0A";
+  const accent = "#F5F5F5";
   const [idx, setIdx] = useState(0);
   const [zoomOpen, setZoomOpen] = useState(false);
 
@@ -15,7 +16,10 @@ export default function ProductGallery({ images = [], name, design }) {
   return (
     <div className="md:sticky md:top-24" data-testid="product-gallery">
       {/* Main image */}
-      <div className="aspect-square bg-[#F5F2EB] rounded-3xl overflow-hidden relative group mb-4">
+      <div
+        className="aspect-square overflow-hidden relative group mb-3"
+        style={{ background: accent, borderRadius: "2px" }}
+      >
         {activeImg ? (
           <>
             <img
@@ -27,15 +31,16 @@ export default function ProductGallery({ images = [], name, design }) {
             <button
               type="button"
               onClick={() => setZoomOpen(true)}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/90 backdrop-blur flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+              className="absolute top-4 right-4 w-10 h-10 bg-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-sm"
+              style={{ color: primary, borderRadius: "2px" }}
               aria-label="Agrandir"
               data-testid="gallery-zoom"
             >
-              <MagnifyingGlassPlus size={18} weight="regular" />
+              <MagnifyingGlassPlus size={16} weight="regular" />
             </button>
           </>
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-neutral-300">
+          <div className="w-full h-full flex items-center justify-center" style={{ color: "#D4D4D4" }}>
             <ShoppingBagOpen size={80} weight="thin" />
           </div>
         )}
@@ -50,8 +55,12 @@ export default function ProductGallery({ images = [], name, design }) {
               type="button"
               onClick={() => setIdx(i)}
               data-testid={`gallery-thumb-${i}`}
-              className="aspect-square bg-[#F5F2EB] rounded-xl overflow-hidden border-2 transition"
-              style={{ borderColor: i === idx ? primary : "transparent" }}
+              className="aspect-square overflow-hidden transition"
+              style={{
+                background: accent,
+                borderRadius: "2px",
+                border: `1.5px solid ${i === idx ? primary : "transparent"}`,
+              }}
               aria-label={`Vue ${i + 1}`}
             >
               <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
@@ -78,11 +87,14 @@ export default function ProductGallery({ images = [], name, design }) {
           <img
             src={activeImg}
             alt={name}
-            className="max-w-full max-h-full object-contain rounded-xl"
+            className="max-w-full max-h-full object-contain"
+            style={{ borderRadius: "2px" }}
             onClick={(e) => e.stopPropagation()}
           />
         </div>
       )}
+      {/* design prop kept for interface parity */}
+      {false && <span style={{ background: design ? "" : "" }} />}
     </div>
   );
 }

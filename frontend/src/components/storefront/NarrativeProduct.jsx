@@ -1,5 +1,5 @@
 import React from "react";
-import { CheckCircle } from "@phosphor-icons/react";
+import { Check } from "@phosphor-icons/react";
 import { designAccents } from "./storefrontUtils";
 
 export function NarrativeSections({ sections, design }) {
@@ -24,59 +24,59 @@ export function NarrativeSections({ sections, design }) {
     },
   ];
   const items = (Array.isArray(sections) && sections.length > 0) ? sections : fallback;
-  const { primary, fontHeading } = designAccents(design);
+  const { primary, accent, divider, textMuted, fontHeading } = designAccents(design);
 
   return (
-    <div className="space-y-16 md:space-y-24 mb-20" data-testid="product-narrative">
+    <div className="space-y-20 md:space-y-28 mb-24" data-testid="product-narrative">
       {items.map((s, i) => {
         const hasImage = !!s.image;
-        const imageLeft = i % 2 === 0; // alternate sides for rhythm
+        const imageLeft = i % 2 === 0;
         return (
           <section
             key={i}
             data-testid={`product-section-${i}`}
-            className={`grid grid-cols-1 gap-8 md:gap-12 items-center ${
-              hasImage ? "md:grid-cols-2" : "md:grid-cols-12"
-            }`}
+            className={`grid grid-cols-1 gap-10 md:gap-16 items-center ${hasImage ? "md:grid-cols-2" : "md:grid-cols-12"}`}
           >
             {hasImage && imageLeft && (
               <div className="md:order-1">
-                <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-[#F5F2EB]">
+                <div
+                  className="aspect-[4/3] overflow-hidden"
+                  style={{ background: accent, borderRadius: "2px" }}
+                >
                   <img src={s.image} alt={s.title || `Section ${i + 1}`} loading="lazy"
                     className="w-full h-full object-cover" />
                 </div>
               </div>
             )}
             <div className={hasImage ? "md:order-2" : "md:col-span-5"}>
-              <div
-                className="text-[11px] uppercase tracking-[0.25em] mb-3 font-medium"
-                style={{ color: primary }}
-              >
-                {String(i + 1).padStart(2, "0")} · Section
+              <div className="flex items-center gap-3 mb-5">
+                <span className="h-px w-8" style={{ background: primary }} />
+                <span className="text-[10px] uppercase tracking-[0.35em] font-medium" style={{ color: primary }}>
+                  {String(i + 1).padStart(2, "0")} · Chapitre
+                </span>
               </div>
               <h2
-                className="text-2xl md:text-3xl font-semibold leading-tight"
-                style={{ fontFamily: `"${fontHeading}", serif` }}
+                className="text-[30px] md:text-[44px] leading-[1.05] tracking-[-0.015em]"
+                style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
               >
                 {s.title}
               </h2>
-              {!hasImage ? null : (
-                <p className="mt-4 text-[16px] md:text-[17px] leading-relaxed text-[#44403C]">
+              {hasImage && (
+                <p className="mt-6 text-[15px] md:text-[16px] leading-[1.7]" style={{ color: textMuted }}>
                   {s.body}
                 </p>
               )}
-              {!hasImage && s.bullet_points?.length > 0 && null}
             </div>
             {!hasImage && (
               <div className="md:col-span-7">
-                <p className="text-[16px] md:text-[17px] leading-relaxed text-[#44403C]">
+                <p className="text-[16px] md:text-[17px] leading-[1.7]" style={{ color: textMuted }}>
                   {s.body}
                 </p>
                 {s.bullet_points?.length > 0 && (
-                  <ul className="mt-6 space-y-3">
+                  <ul className="mt-8 p-6 space-y-3" style={{ background: accent, borderRadius: "2px" }}>
                     {s.bullet_points.map((bp, j) => (
-                      <li key={j} className="flex items-start gap-3 text-[15px] text-[#57534E]">
-                        <CheckCircle size={18} weight="fill" className="shrink-0 mt-0.5" style={{ color: primary }} />
+                      <li key={j} className="flex items-start gap-3 text-[14px]" style={{ color: "#262626" }}>
+                        <Check size={14} weight="bold" className="shrink-0 mt-[4px]" style={{ color: primary }} />
                         <span>{bp}</span>
                       </li>
                     ))}
@@ -86,7 +86,10 @@ export function NarrativeSections({ sections, design }) {
             )}
             {hasImage && !imageLeft && (
               <div className="md:order-1">
-                <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-[#F5F2EB]">
+                <div
+                  className="aspect-[4/3] overflow-hidden"
+                  style={{ background: accent, borderRadius: "2px" }}
+                >
                   <img src={s.image} alt={s.title || `Section ${i + 1}`} loading="lazy"
                     className="w-full h-full object-cover" />
                 </div>
@@ -95,6 +98,8 @@ export function NarrativeSections({ sections, design }) {
           </section>
         );
       })}
+      {/* divider kept in scope for interface parity */}
+      {false && <span style={{ background: divider }} />}
     </div>
   );
 }
@@ -111,23 +116,26 @@ export function TechSpecs({ specs, design }) {
     { label: "Entretien", value: "Housse déhoussable, lavable à 30°" },
   ];
   const items = (Array.isArray(specs) && specs.length > 0) ? specs : fallback;
-  const { primary, fontHeading } = designAccents(design);
+  const { primary, accent, textMuted, fontHeading } = designAccents(design);
 
   return (
-    <section className="mb-20" data-testid="product-specs">
-      <div className="flex items-end justify-between flex-wrap gap-3 mb-10">
+    <section className="mb-24" data-testid="product-specs">
+      <div className="flex items-end justify-between flex-wrap gap-4 mb-10">
         <div>
-          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-2">
-            Fiche technique
+          <div className="flex items-center gap-3 mb-5">
+            <span className="h-px w-8" style={{ background: primary }} />
+            <span className="text-[10px] uppercase tracking-[0.4em]" style={{ color: primary }}>
+              Fiche technique
+            </span>
           </div>
           <h2
-            className="text-3xl md:text-4xl font-semibold"
-            style={{ fontFamily: `"${fontHeading}", serif`, color: "#1C1917" }}
+            className="text-[30px] md:text-[44px] leading-[1.05] tracking-[-0.015em]"
+            style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
           >
             Caractéristiques précises
           </h2>
         </div>
-        <div className="text-sm text-neutral-500">
+        <div className="text-[11px] uppercase tracking-[0.3em]" style={{ color: textMuted }}>
           {items.length} caractéristique{items.length > 1 ? "s" : ""} vérifiée{items.length > 1 ? "s" : ""}
         </div>
       </div>
@@ -135,15 +143,16 @@ export function TechSpecs({ specs, design }) {
         {items.map((spec, i) => (
           <div
             key={i}
-            className="bg-[#F5F2EB] rounded-2xl p-5 hover:bg-[#EFEBE2] transition-colors duration-300"
+            className="p-6"
+            style={{ background: accent, borderRadius: "2px" }}
             data-testid={`spec-${i}`}
           >
-            <div className="text-[11px] uppercase tracking-[0.15em] text-neutral-500 mb-2 font-medium">
+            <div className="text-[10px] uppercase tracking-[0.28em] mb-3" style={{ color: textMuted }}>
               {spec.label}
             </div>
             <div
-              className="text-[15px] font-medium text-neutral-900 leading-snug"
-              style={{ fontFamily: `"${fontHeading}", serif` }}
+              className="text-[16px] leading-snug"
+              style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
             >
               {spec.value}
             </div>
@@ -163,33 +172,41 @@ export function ProductFAQ({ faq, design }) {
     { question: "Ce produit est-il remboursé par la Sécurité sociale ou la mutuelle ?", answer: "Certains équipements sont pris en charge partiellement au titre de la LPPR. Contactez-nous avec votre numéro de Sécu et votre mutuelle : nous établissons un devis et vous aidons à monter le dossier." },
   ];
   const items = (Array.isArray(faq) && faq.length > 0) ? faq : fallback;
-  const { primary, fontHeading } = designAccents(design);
+  const { primary, accent, divider, textMuted, fontHeading } = designAccents(design);
 
   return (
-    <section className="mb-20" data-testid="product-faq">
+    <section className="mb-24" data-testid="product-faq">
+      <div className="flex items-center gap-3 mb-5">
+        <span className="h-px w-8" style={{ background: primary }} />
+        <span className="text-[10px] uppercase tracking-[0.4em]" style={{ color: primary }}>FAQ produit</span>
+      </div>
       <h2
-        className="text-2xl md:text-3xl font-semibold mb-8"
-        style={{ fontFamily: `"${fontHeading}", serif` }}
+        className="text-[30px] md:text-[44px] leading-[1.05] tracking-[-0.015em] mb-10"
+        style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
       >
-        Questions sur ce produit
+        Tout ce que vous voulez savoir.
       </h2>
-      <div className="space-y-3 max-w-3xl">
+      <div className="max-w-3xl" style={{ borderTop: `1px solid ${divider}` }}>
         {items.map((it, i) => (
           <details
             key={i}
             data-testid={`product-faq-${i}`}
-            className="bg-white rounded-xl border border-[#E7E5E4] p-5 group"
+            className="group py-6"
+            style={{ borderBottom: `1px solid ${divider}` }}
           >
-            <summary className="cursor-pointer font-medium list-none flex items-center justify-between text-[#1C1917]">
-              <span className="pr-4">{it.question}</span>
+            <summary
+              className="cursor-pointer list-none flex items-center justify-between gap-5 text-[17px] md:text-[18px]"
+              style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
+            >
+              <span>{it.question}</span>
               <span
-                className="w-6 h-6 rounded-full flex items-center justify-center text-xs group-open:rotate-45 transition-transform shrink-0"
-                style={{ background: `${primary}14`, color: primary }}
+                className="w-9 h-9 flex items-center justify-center shrink-0 text-lg group-open:rotate-45 transition-transform"
+                style={{ background: accent, color: primary, borderRadius: "2px" }}
               >
                 +
               </span>
             </summary>
-            <p className="text-[15px] mt-4 leading-relaxed text-[#57534E]">{it.answer}</p>
+            <p className="text-[15px] mt-4 leading-relaxed pr-14" style={{ color: textMuted }}>{it.answer}</p>
           </details>
         ))}
       </div>
