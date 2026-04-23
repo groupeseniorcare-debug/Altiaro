@@ -1,0 +1,39 @@
+{
+  "summary": "Iter28 — Storefront UI polish (mobile header 3-col, drawer from left, horizontal logo object-contain, homepage multi-section with motion + alt bg). Validated on production site 65964cb0 via Playwright across 390x844 (mobile) and 1440x900 (desktop).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Homepage desktop — FinalCTA", "issues": ["FinalCTA dark section renders but appears visually thin/empty on this test site (just a title + button on #1C1917 with lots of vertical white space above it). Consider increasing content density (icons/stats/secondary text) so the dark block looks balanced vs. the tall footer below it. See /.screenshots/desktop_scrolled.png."]},
+      {"screen": "CommandPalette", "issues": ["Cmd+K / Ctrl+K keyboard shortcut did NOT open the command palette on /sites route (Playwright keyboard.press Meta+K and Control+K both no-op). `data-testid=cmdk-trigger` element is rendered in bottom-right but the keyboard handler appears not to be wired. Regression vs. previous iterations. Priority: MEDIUM."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration27_launch.py"
+  ],
+  "action_items": [
+    "(Medium) Wire Cmd+K / Ctrl+K global keyboard listener to open the command palette — currently only the bottom-right `cmdk-trigger` is clickable; the hotkey is advertised in the UI (⌘K) but does not open the palette.",
+    "(Low) Polish FinalCTA: the dark block looks sparse. Add stats / sub-CTAs / icons to fill it out so the transition into the footer feels designed.",
+    "(Low) Add data-testid on Testimonials wrapper (e.g. `storefront-testimonials`), FAQ wrapper (`storefront-faq`), and FinalCTA wrapper (`storefront-final-cta`) to make future regression easier — individual items have testids but the section wrapper does not."
+  ],
+  "critical_code_review_comments": [
+    "Storefront.jsx is 1165 lines — should be split into StorefrontHome / StorefrontProduct / StorefrontCollection pages with shared utils. Already partially extracted but the home + product components still live together.",
+    "hasData() returns true for benefits/testimonials/faq/newsletter/final_cta/products regardless of design content — this is the intended permissive fallback but means even an empty site with no design will render 5 generic sections. Consider adding a `design.homepage_fallback_disabled` flag for brands who want hero-only.",
+    "sectionWrapperClass(key, idx) takes idx but never uses it — dead parameter. Either alternate colors by idx as the name suggests, or remove the param."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (UI-focused iteration — backend smoke-tested: /api/public/sites/{id} 200, /api/public/sites/{id}/products 200)",
+    "frontend": "30/30 critical UI checks passed (100%). Additionally verified: product page mobile sticky ATC, /sites/{id}/design editor+switch-to-wizard, mega menu hover. 1 regression on Cmd+K hotkey."
+  },
+  "test_credentials": "concepteur@conceptfactory.fr / Concepteur2026!",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Site 65964cb0 has a full design (logo Maison Clarelle horizontal). Storefront.jsx is 1165 lines and should be split. Cmd+K hotkey regression is a known issue as of this iteration. All storefront iter28 features validated: mobile 3-col grid (hamburger/logo/cart all >=44px, positions verified via bounding boxes), drawer slides from left (left-0 + slide-in-from-left), drawer contains mobile-search → mobile-account → mobile-nav-* in correct order, desktop logo is h-10 max-w-[220px] object-contain with NO rounded/border, 5 sections render with opacity/transform motion wrappers, dark/gray bg alternation confirmed (#1C1917 / #F5F2EB / white), mobile sticky-buy on product page works.",
+  "rca of the issue": "Cmd+K regression: the cmdk-trigger element is present (bottom-right of authenticated layout) but the global document-level keydown handler that maps (e.metaKey||e.ctrlKey) && e.key === 'k' to open the palette is either missing or attached to a non-focused element. Reproduction: login as concepteur, go to /sites, press Meta+K or Ctrl+K — nothing opens. Expected: palette dialog with role=dialog opens."
+}

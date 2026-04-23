@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import axios from "axios";
+import { motion } from "framer-motion";
 import StorefrontLayout from "../components/StorefrontLayout";
 import { t, pickLang, COUNTRY_OPTIONS, countryLabel } from "../lib/i18n";
 import {
@@ -203,23 +204,36 @@ const DEFAULT_HOMEPAGE_ORDER = [
 
 function hasData(key, design, products) {
   switch (key) {
+    // These always render nicely with a premium fallback
+    case "benefits":
+    case "testimonials":
+    case "faq":
+    case "newsletter":
+    case "final_cta":
+    case "products":
+      return true;
+    // These require real data — no fallback
     case "press_logos": return !!(design?.press_mentions?.length);
-    case "benefits": return !!(design?.benefits?.length);
     case "collections": return !!(design?.collections?.length);
-    case "products": return true; // Always show (even with 0 products it has copy)
     case "featured_product": return !!(products?.some((p) => p.featured));
     case "lifestyle_editorial": return !!(design?.editorial?.title || design?.editorial?.image);
     case "values": return !!(design?.values?.length);
     case "buying_guide": return !!(design?.buying_guide?.items?.length);
-    case "testimonials": return !!(design?.testimonials?.length);
     case "founder_story": return !!(design?.founder_story?.title || design?.founder_story?.bio);
     case "instagram": return !!(design?.instagram?.posts?.length || design?.instagram?.handle);
     case "blog_teaser": return !!(design?.blog_posts?.length);
-    case "faq": return !!(design?.faq?.length || design?.faq?.items?.length);
-    case "newsletter": return true;
-    case "final_cta": return true;
     default: return false;
   }
+}
+
+// Alternating surface colors for section rhythm.
+const DARK_SECTIONS = new Set(["press_logos", "final_cta"]);
+const GRAY_SECTIONS = new Set(["benefits", "testimonials", "faq", "values", "newsletter"]);
+
+function sectionWrapperClass(key, idx) {
+  if (DARK_SECTIONS.has(key)) return "bg-[#1C1917] text-white";
+  if (GRAY_SECTIONS.has(key)) return "bg-[#F5F2EB]";
+  return "bg-white";
 }
 
 function renderHomepageSections({ design, site, siteId, products, loading, lang }) {
@@ -228,47 +242,65 @@ function renderHomepageSections({ design, site, siteId, products, loading, lang 
     : DEFAULT_HOMEPAGE_ORDER;
   // Hero is always rendered on top
   const list = cfg.filter((s) => s.key !== "hero");
-  return list.map((s) => {
-    if (!s.visible) return null;
-    if (!hasData(s.key, design, products)) return null;
-    switch (s.key) {
-      case "press_logos":
-        return <div key={s.key} id="press"><PressLogos mentions={design?.press_mentions} design={design} /></div>;
-      case "benefits":
-        return <Benefits key={s.key} design={design} lang={lang} />;
-      case "collections":
-        return <div key={s.key} id="collections"><CollectionsShowcase collections={design?.collections} lang={lang} design={design} /></div>;
-      case "products":
-        return (
-          <div key={s.key} id="products">
-            <ProductGrid siteId={siteId} products={products} loading={loading} design={design} lang={lang} />
-          </div>
-        );
-      case "featured_product":
-        return <FeaturedProduct key={s.key} products={products} design={design} lang={lang} />;
-      case "lifestyle_editorial":
-        return <LifestyleEditorial key={s.key} editorial={design?.editorial} lang={lang} design={design} />;
-      case "values":
-        return <ValuesSection key={s.key} values={design?.values} lang={lang} design={design} />;
-      case "buying_guide":
-        return <BuyingGuide key={s.key} guide={design?.buying_guide} design={design} />;
-      case "testimonials":
-        return <Testimonials key={s.key} design={design} lang={lang} />;
-      case "founder_story":
-        return <div key={s.key} id="story"><FounderStory story={design?.founder_story} lang={lang} design={design} /></div>;
-      case "instagram":
-        return <InstagramGrid key={s.key} instagram={design?.instagram} design={design} />;
-      case "blog_teaser":
-        return <BlogTeaser key={s.key} posts={design?.blog_posts} lang={lang} design={design} />;
-      case "faq":
-        return <div key={s.key} id="faq"><FAQSection design={design} lang={lang} /></div>;
-      case "newsletter":
-        return <NewsletterCTA key={s.key} design={design} />;
-      case "final_cta":
-        return <FinalCTA key={s.key} design={design} lang={lang} />;
-      default:
-        return null;
-    }
+  const visible = list.filter((s) => s.visible && hasData(s.key, design, products));
+  return visible.map((s, idx) => {
+    const inner = (() => {
+      switch (s.key) {
+        case "press_logos":
+          return <PressLogos mentions={design?.press_mentions} design={design} />;
+        case "benefits":
+          return <Benefits design={design} lang={lang} />;
+        case "collections":
+          return <CollectionsShowcase collections={design?.collections} lang={lang} design={design} />;
+        case "products":
+          return <ProductGrid siteId={siteId} products={products} loading={loading} design={design} lang={lang} />;
+        case "featured_product":
+          return <FeaturedProduct products={products} design={design} lang={lang} />;
+        case "lifestyle_editorial":
+          return <LifestyleEditorial editorial={design?.editorial} lang={lang} design={design} />;
+        case "values":
+          return <ValuesSection values={design?.values} lang={lang} design={design} />;
+        case "buying_guide":
+          return <BuyingGuide guide={design?.buying_guide} design={design} />;
+        case "testimonials":
+          return <Testimonials design={design} lang={lang} />;
+        case "founder_story":
+          return <FounderStory story={design?.founder_story} lang={lang} design={design} />;
+        case "instagram":
+          return <InstagramGrid instagram={design?.instagram} design={design} />;
+        case "blog_teaser":
+          return <BlogTeaser posts={design?.blog_posts} lang={lang} design={design} />;
+        case "faq":
+          return <FAQSection design={design} lang={lang} />;
+        case "newsletter":
+          return <NewsletterCTA design={design} />;
+        case "final_cta":
+          return <FinalCTA design={design} lang={lang} />;
+        default:
+          return null;
+      }
+    })();
+    if (!inner) return null;
+    const anchorId = ({
+      press_logos: "press",
+      collections: "collections",
+      products: "products",
+      founder_story: "story",
+      faq: "faq",
+    })[s.key];
+    return (
+      <motion.div
+        key={s.key}
+        id={anchorId}
+        initial={{ opacity: 0, y: 32 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-80px" }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className={sectionWrapperClass(s.key, idx)}
+      >
+        {inner}
+      </motion.div>
+    );
   });
 }
 

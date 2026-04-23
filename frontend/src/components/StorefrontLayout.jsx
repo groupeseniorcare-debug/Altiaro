@@ -156,30 +156,79 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
 
       {/* ================= HEADER ================= */}
       <header className="bg-white/95 backdrop-blur border-b sticky top-0 z-30" style={{ borderColor: "#E7E5E4" }}>
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-6">
-          {/* LEFT — Logo */}
-          <Link to={shopRoot} className="group flex items-center gap-3 shrink-0" data-testid="shop-logo">
-            {logoUrl && (
+        {/* -------- Mobile layout (<lg) : hamburger LEFT · logo CENTER · cart RIGHT -------- */}
+        <div className="lg:hidden max-w-7xl mx-auto px-4 py-3 grid grid-cols-[auto_1fr_auto] items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            data-testid="mobile-menu-open"
+            aria-label="Ouvrir le menu"
+            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full border flex items-center justify-center active:scale-95 transition-transform"
+            style={{ borderColor: "#E7E5E4" }}
+          >
+            <List size={20} style={{ color: textCol }} />
+          </button>
+          <Link to={shopRoot} className="flex items-center justify-center gap-2" data-testid="shop-logo-mobile">
+            {logoUrl ? (
               <img
                 src={logoUrl}
                 alt={logoText}
-                className="w-11 h-11 rounded-lg object-cover border"
-                style={{ borderColor: "#E7E5E4" }}
+                className="h-9 max-w-[160px] object-contain"
+                loading="eager"
               />
-            )}
-            <div>
+            ) : (
               <div
-                className="font-semibold text-xl md:text-2xl leading-tight transition"
+                className="font-semibold text-lg truncate"
+                style={{ fontFamily: `"${fontHeading}", serif`, color: textCol }}
+              >
+                {logoText}
+              </div>
+            )}
+          </Link>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event("cf_cart_open"))}
+            data-testid="cart-button-mobile"
+            aria-label={t(lang, "cart")}
+            className="relative w-11 h-11 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center active:scale-95 transition-transform"
+            style={{ background: accent }}
+          >
+            <ShoppingBag size={20} weight="regular" style={{ color: textCol }} />
+            {cartCount > 0 && (
+              <span
+                className="absolute -top-1 -right-1 min-w-[20px] h-[20px] text-[10px] font-semibold rounded-full flex items-center justify-center px-1 text-white"
+                style={{ background: primary }}
+              >
+                {cartCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* -------- Desktop layout (>=lg) -------- */}
+        <div className="hidden lg:flex max-w-7xl mx-auto px-6 py-4 items-center justify-between gap-6">
+          {/* LEFT — Logo */}
+          <Link to={shopRoot} className="group flex items-center gap-3 shrink-0" data-testid="shop-logo">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={logoText}
+                className="h-10 max-w-[220px] object-contain"
+                loading="eager"
+              />
+            ) : (
+              <div
+                className="font-semibold text-2xl leading-tight transition"
                 style={{ fontFamily: `"${fontHeading}", serif`, color: textCol }}
               >
                 <span className="group-hover:text-[var(--cf-primary)]">{logoText}</span>
+                {tagline && (
+                  <div className="text-[11px] mt-0.5" style={{ color: "#78716C" }}>
+                    {tagline}
+                  </div>
+                )}
               </div>
-              {tagline && (
-                <div className="text-[11px] mt-0.5 hidden md:block" style={{ color: "#78716C" }}>
-                  {tagline}
-                </div>
-              )}
-            </div>
+            )}
           </Link>
 
           {/* CENTER — Nav desktop */}
@@ -310,17 +359,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
               )}
             </button>
 
-            {/* Mobile menu toggle */}
-            <button
-              type="button"
-              onClick={() => setMobileOpen(true)}
-              className="lg:hidden w-11 h-11 min-w-[44px] min-h-[44px] rounded-full border flex items-center justify-center active:scale-95 transition-transform"
-              style={{ borderColor: "#E7E5E4" }}
-              data-testid="mobile-menu-open"
-              aria-label="Menu"
-            >
-              <List size={20} style={{ color: textCol }} />
-            </button>
+            {/* Mobile menu toggle (kept as a safety — hidden because desktop layout is >=lg only) */}
           </div>
         </div>
       </header>
@@ -329,7 +368,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden" data-testid="mobile-menu">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
-          <div className="absolute top-0 right-0 w-[86%] max-w-sm h-full bg-white shadow-2xl flex flex-col">
+          <div className="absolute top-0 left-0 w-[86%] max-w-sm h-full bg-white shadow-2xl flex flex-col animate-in slide-in-from-left">
             <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: "#E7E5E4" }}>
               <div className="font-semibold text-lg" style={{ fontFamily: `"${fontHeading}", serif`, color: textCol }}>
                 {logoText}
@@ -356,6 +395,29 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
                 />
               </div>
             </form>
+            <Link
+              to={customer ? `${shopRoot}/account` : `${shopRoot}/account/login`}
+              onClick={() => setMobileOpen(false)}
+              data-testid="mobile-account"
+              className="mx-5 my-3 flex items-center justify-between p-4 rounded-2xl border transition hover:bg-neutral-50"
+              style={{ borderColor: "#E7E5E4" }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                  style={{ background: accent }}>
+                  <User size={18} weight="regular" style={{ color: textCol }} />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold" style={{ color: textCol }}>
+                    {customer ? (customer.first_name || "Mon compte") : "Se connecter"}
+                  </div>
+                  <div className="text-xs opacity-60" style={{ color: textCol }}>
+                    {customer ? "Mes commandes & préférences" : "Accéder à mon espace"}
+                  </div>
+                </div>
+              </div>
+              <CaretRight size={14} style={{ color: "#A8A29E" }} />
+            </Link>
             <nav className="flex-1 overflow-y-auto py-2">
               {nav.map((n, idx) => {
                 const isMega = n.type === "mega" && Array.isArray(n.children) && n.children.length > 0;
