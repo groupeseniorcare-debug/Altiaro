@@ -620,6 +620,37 @@ function ProductEditor({ siteId, initial, onClose, onSaved, onEnrichNarrative, e
     setForm((f) => ({ ...f, images: [data.url, ...(f.images || [])].filter(Boolean).slice(0, 10) }));
   };
 
+  const genEditorialSet = async () => {
+    if (isNew) { window.alert("Enregistre d'abord le produit."); return; }
+    if (!window.confirm(
+      "Générer 4 images IA éditoriales (closeup × 2, studio, lifestyle) ?\n\n" +
+      "• Durée : environ 60 à 90 s au total\n" +
+      "• Ces images alimentent la mosaïque éditoriale de la fiche produit"
+    )) return;
+    setAiImgBusy(true);
+    setAiImgResult(null);
+    const jobs = [
+      { style: "closeup", tweak: "Détail macro de la texture du tissu, gros plan ultra-détaillé" },
+      { style: "closeup", tweak: "Détail fonctionnel du produit (bouton, commande, mécanisme), gros plan cinématique" },
+      { style: "lifestyle", tweak: "Scène de vie apaisée dans un intérieur épuré, lumière naturelle" },
+      { style: "studio", tweak: "Vue produit 3/4 sur fond crème très clair, éclairage softbox éditorial" },
+    ];
+    let ok = 0, lastErr = null;
+    for (const j of jobs) {
+      const { data, error: err, rawDetail } = await apiCall(() =>
+        api.post(`/products/${initial.id}/generate-image`, { ...j, replace_main: false })
+      );
+      if (err) { lastErr = rawDetail?.detail || err; break; }
+      if (data?.url) ok += 1;
+    }
+    setAiImgBusy(false);
+    if (lastErr) {
+      window.alert(`Série interrompue après ${ok} image(s) : ${lastErr}`);
+    } else {
+      setAiImgResult({ message: `${ok} images éditoriales générées. Recharge la page produit pour les voir.` });
+    }
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -704,6 +735,17 @@ function ProductEditor({ siteId, initial, onClose, onSaved, onEnrichNarrative, e
               >
                 <SparkleIcon size={12} weight="fill" className={aiImgBusy ? "animate-pulse" : ""} />
                 {aiImgBusy ? "Nano Banana…" : "Image IA"}
+              </button>
+              <button
+                type="button"
+                onClick={genEditorialSet}
+                disabled={aiImgBusy}
+                data-testid="ai-img-editorial-set"
+                className="h-8 px-3 rounded-lg bg-neutral-900 text-[12px] font-semibold text-white hover:bg-neutral-800 flex items-center gap-1.5 transition disabled:opacity-50"
+                title="Génère 4 images (2 gros plans + studio + lifestyle) pour la mosaïque éditoriale"
+              >
+                <SparkleIcon size={12} weight="fill" className={aiImgBusy ? "animate-pulse" : ""} />
+                {aiImgBusy ? "Série…" : "Série éditoriale (4 img)"}
               </button>
             </div>
             <button

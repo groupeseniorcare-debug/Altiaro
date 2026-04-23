@@ -8,13 +8,33 @@ import { designAccents } from "./storefrontUtils";
  *
  * Requires `images` (>= 2). Gracefully hides itself otherwise.
  */
-export default function ProductEditorialMosaic({ images = [], productName, design, captions }) {
+export default function ProductEditorialMosaic({ images = [], styledImages = [], productName, design, captions }) {
   const { primary, textMuted, fontHeading } = designAccents(design);
   const accent = "#F5F5F5";
   const pool = (images || []).filter(Boolean);
   if (pool.length < 2) return null;
 
-  const pick = (i) => pool[i % pool.length];
+  // Smart assignment: prefer specific AI styles per tile when available.
+  const byStyle = (name) => {
+    const hit = (styledImages || []).find((g) => g && g.style === name && g.url);
+    return hit ? hit.url : null;
+  };
+  const closeup = byStyle("closeup");
+  const studio = byStyle("studio");
+  const lifestyle = byStyle("lifestyle");
+  const inUse = byStyle("in_use") || lifestyle;
+  const fallback = (i) => pool[i % pool.length];
+  // Tile 1 (big portrait, "Vu de près") = closeup
+  // Tile 2 ("Dans le geste") = second closeup or in_use
+  // Tile 3 ("En situation") = lifestyle or in_use
+  // Tile 4 banner ("Détail") = studio
+  const tile0 = closeup || fallback(0);
+  const tile1 = (styledImages || []).filter((g) => g.style === "closeup")[1]?.url
+    || inUse
+    || fallback(1);
+  const tile2 = lifestyle || inUse || fallback(2);
+  const tile3 = studio || fallback(3);
+  const pick = (i) => [tile0, tile1, tile2, tile3][i] || fallback(i);
 
   const defaultCaptions = [
     { eyebrow: "Vu de près", title: "La matière, sans filtre.", body: "Textile dense, couture régulière, finitions minutieuses — chaque détail est pensé pour durer." },
