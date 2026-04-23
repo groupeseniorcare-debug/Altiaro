@@ -38,6 +38,55 @@ logger = logging.getLogger("conceptfactory.design")
 router = APIRouter()
 
 JSON_FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
+
+
+# ---------------------------------------------------------------------
+# Brand text sanitizer — Claude sometimes ignores "reply with only the final text"
+# and returns preambles, markdown, or full explanations. This strips that noise.
+# ---------------------------------------------------------------------
+_BRAND_PREAMBLES = re.compile(
+    r"^\s*(?:voici|proposition(?:s)?\s+de\s+\w+|suggestion(?:s)?(?:\s+de)?|mon\s+choix|je\s+propose|nom\s+(?:de\s+)?(?:marque|choisi)\s*:?|baseline\s*:?|tagline\s*:?|ton\s+de\s+voix\s*:?|histoire\s*:?|le\s+nom\s+(?:est|serait)?\s*:?)\s*[:\-–—]?\s*",
+    re.IGNORECASE,
+)
+
+
+def _sanitize_brand_text(raw: str, max_len: int = 80) -> str:
+    """Strip markdown, preambles, quotes and pick the first meaningful line.
+
+    Brand fields should be plain text (no headings, no bullet lists, no prose).
+    If Claude responds with a full explanation like "# Proposition de nom\n\n**Soléa**\n\n...",
+    this extracts "Soléa".
+    """
+    if not raw:
+        return ""
+    text = str(raw).strip()
+    # 1) If there's a bold token (** ... **) early on, prefer it — Claude loves bolding the answer.
+    bold = re.search(r"\*\*([^*\n]{1,80})\*\*", text)
+    if bold:
+        text = bold.group(1).strip()
+    else:
+        # 2) Demote markdown headings / blockquotes to their content (keep the text, drop the markers)
+        text = re.sub(r"^\s*#{1,6}\s+", "", text, flags=re.MULTILINE)
+        text = re.sub(r"^\s*>\s*", "", text, flags=re.MULTILINE)
+        text = re.sub(r"```[^`]*```", "", text, flags=re.DOTALL)
+        # 3) Take first non-empty line
+        for line in text.splitlines():
+            line = line.strip()
+            if line:
+                text = line
+                break
+    # 4) Remove markdown formatting chars
+    text = re.sub(r"[*_`#>]+", "", text)
+    # 5) Strip surrounding quotes (straight + curly + FR guillemets)
+    text = text.strip().strip('"').strip("'").strip("«»").strip("“”‘’").strip()
+    # 6) Strip common French preambles
+    text = _BRAND_PREAMBLES.sub("", text).strip()
+    # 7) Drop trailing colon/period noise
+    text = text.rstrip(".:, ").strip()
+    # 8) Enforce max length
+    if len(text) > max_len:
+        text = text[:max_len].rsplit(" ", 1)[0].rstrip(".:, ")
+    return text
 NANO_BANANA_MODEL = "gemini-3.1-flash-image-preview"
 
 
@@ -719,14 +768,19 @@ async def prompt_apply(site_id: str, data: PromptApplyInput,
     now = datetime.now(timezone.utc).isoformat()
     # identity → patch brand_name/tagline + create a brand_story
     if section == "identity":
+        brand_name_clean = _sanitize_brand_text(data.data.get("brand_name") or "", max_len=40)
+        tagline_clean = _sanitize_brand_text(data.data.get("tagline") or "", max_len=80)
+        update = {
+            "design.brand.name": brand_name_clean,
+            "design.brand.tagline": tagline_clean,
+            "design.brand.story": data.data.get("brand_story"),
+            "design.updated_at": now,
+        }
+        if brand_name_clean:
+            update["design.brand.logo_text"] = brand_name_clean
         await db.sites.update_one(
             {"id": site_id},
-            {"$set": {
-                "design.brand.name": data.data.get("brand_name"),
-                "design.brand.tagline": data.data.get("tagline"),
-                "design.brand.story": data.data.get("brand_story"),
-                "design.updated_at": now,
-            }},
+            {"$set": update},
         )
         return {"ok": True, "section": section}
     await db.sites.update_one(
@@ -797,10 +851,10 @@ async def palette_apply(site_id: str, data: PaletteApplyInput,
 # AI Field Generator — generate a single brand field with Claude
 # =====================================================================
 FIELD_PROMPTS = {
-    "name": "Propose un nom de marque court (1-3 mots), mémorable, qui sonne Silver Economy premium. Évite les clichés 'senior'.",
-    "tagline": "Propose une baseline ≤ 80 caractères qui capture l'essence de la marque. Emotion + bénéfice clé.",
-    "voice": "Décris le ton de voix idéal (chaleureux/rassurant/expert/premium/etc.) en 1 phrase ≤ 150 car.",
-    "story": "Rédige une histoire de marque en 2-3 paragraphes (≤ 400 car.) qui inspire confiance et crée un lien émotionnel.",
+    "name": "Propose UN SEUL nom de marque court (1-3 mots, max 28 caractères), mémorable, qui sonne Silver Economy premium. Évite les clichés 'senior'. Réponds EXCLUSIVEMENT avec le nom final, sans guillemets, sans markdown, sans préambule, sans explication.",
+    "tagline": "Propose UNE SEULE baseline ≤ 80 caractères qui capture l'essence de la marque. Emotion + bénéfice clé. Réponds EXCLUSIVEMENT avec la baseline finale, sans guillemets, sans markdown, sans préambule.",
+    "voice": "Décris le ton de voix idéal (chaleureux/rassurant/expert/premium/etc.) en 1 phrase ≤ 150 car. Réponds EXCLUSIVEMENT avec la phrase finale, sans préambule.",
+    "story": "Rédige une histoire de marque en 2-3 paragraphes (≤ 400 car.) qui inspire confiance et crée un lien émotionnel. Réponds directement, sans titre markdown ni préambule.",
     "font_pair": "Propose une paire de Google Fonts (heading + body) adaptée au ton. Format JSON : {\"heading\": \"...\", \"body\": \"...\", \"rationale\": \"pourquoi ce choix\"}",
     "palette": "Propose une palette 5 couleurs (primary, secondary, accent, background, text) en hex, cohérente avec la niche & l'audience senior. Format JSON : {\"primary\":\"#...\",\"secondary\":\"#...\",\"accent\":\"#...\",\"background\":\"#...\",\"text\":\"#...\",\"rationale\":\"...\"}",
 }
@@ -872,15 +926,27 @@ async def ai_field(site_id: str, body: AiFieldInput, user: dict = Depends(get_cu
             ).with_model("anthropic", "claude-sonnet-4-5-20250929")
             raw = await chat.send_message(UserMessage(text=prompt))
             txt = str(raw).strip().strip('"').strip("'").strip()
+            # Sanitize plain-text brand fields (name/tagline/voice/story) — strip markdown,
+            # preambles, quotes. Claude sometimes returns a full explanation with bold tokens
+            # and markdown headings despite the "reply with only the final text" instruction.
+            max_lens = {"name": 40, "tagline": 80, "voice": 150, "story": 500}
+            txt = _sanitize_brand_text(txt, max_len=max_lens.get(body.field, 200))
+            if not txt:
+                raise HTTPException(status_code=502, detail="IA a renvoyé une réponse vide. Réessaye.")
             # Persist
             field_key = body.field
             db_field = {"name": "name", "tagline": "tagline", "voice": "voice", "story": "story"}[field_key]
+            update = {
+                f"design.brand.{db_field}": txt,
+                "design.updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+            # When the brand name is regenerated, mirror it to logo_text so the header/footer
+            # text logo stays in sync (otherwise stale logo_text from older runs leaks into the UI).
+            if field_key == "name":
+                update["design.brand.logo_text"] = txt
             await db.sites.update_one(
                 {"id": site_id},
-                {"$set": {
-                    f"design.brand.{db_field}": txt,
-                    "design.updated_at": datetime.now(timezone.utc).isoformat(),
-                }},
+                {"$set": update},
             )
             return {"ok": True, "field": body.field, "value": txt}
     except Exception as e:
@@ -1101,6 +1167,18 @@ async def brand_patch(site_id: str, data: BrandPatchInput, user: dict = Depends(
             # store both flat (for palette_apply compat) and in palette dict
             patch[f"design.brand.{k}"] = v
             patch[f"design.brand.palette.{k.replace('_color', '')}"] = v
+        elif k == "name":
+            # Sanitize brand name (strip markdown/preambles Claude sometimes leaks through)
+            cleaned = _sanitize_brand_text(str(v), max_len=40)
+            patch["design.brand.name"] = cleaned
+            # Keep logo_text in sync so the header/footer text logo matches.
+            patch["design.brand.logo_text"] = cleaned
+        elif k == "tagline":
+            patch["design.brand.tagline"] = _sanitize_brand_text(str(v), max_len=80)
+        elif k == "voice":
+            patch["design.brand.voice"] = _sanitize_brand_text(str(v), max_len=200)
+        elif k == "story":
+            patch["design.brand.story"] = _sanitize_brand_text(str(v), max_len=600)
         else:
             patch[f"design.brand.{k}"] = v
     if not patch:

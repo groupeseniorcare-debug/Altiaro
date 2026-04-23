@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowRight, ShieldCheck, Star, Truck, Phone } from "@phosphor-icons/react";
 import { designText } from "./storefrontUtils";
 import { t } from "../../lib/i18n";
+import { sanitizeBrandText } from "../../lib/brandText";
 
 /**
  * Hero premium avec image — split layout desktop, empilé en mobile.
@@ -17,23 +18,35 @@ import { t } from "../../lib/i18n";
  *  - design.hero.title / subtitle / cta_label / cta_secondary_label / image / eyebrow
  *  - design.hero.rating = { score, count }
  */
-export function Hero({ site, design, lang }) {
+export function Hero({ site, design, lang, products }) {
   const { siteId } = useParams();
-  const heroTitle = designText(design, "hero.title", lang)
-    || site?.name
-    || t(lang, "shop_title");
+  // Prefer clean brand identity; avoid surfacing raw site.name (often "Test ...")
+  // and sanitize any legacy markdown/preambles that may live in design.hero.title.
+  const brand = design?.brand || {};
+  const brandLabel = sanitizeBrandText(brand.logo_text || brand.name || "", 40);
+  const heroTitleRaw = designText(design, "hero.title", lang) || brandLabel || site?.name || t(lang, "shop_title");
+  const heroTitle = sanitizeBrandText(heroTitleRaw, 60);
   const heroSub = designText(design, "hero.subtitle", lang)
     || "Des produits sélectionnés avec soin pour préserver votre autonomie, votre confort et votre sérénité au quotidien.";
   const heroCta = designText(design, "hero.cta_label", lang) || "Découvrir la collection";
   const heroCta2 = designText(design, "hero.cta_secondary_label", lang) || "Notre histoire";
-  const eyebrow = designText(design, "hero.eyebrow", lang)
-    || design?.brand?.tagline
+  const eyebrowRaw = designText(design, "hero.eyebrow", lang)
+    || brand.tagline
     || site?.niche
     || "La maison bienveillante";
+  const eyebrow = sanitizeBrandText(eyebrowRaw, 60);
   const trustLine = designText(design, "hero.trust_line", lang) || "Conseillers humains · Lun–Ven 9h–18h";
+  // Hero image: 1) explicit design.hero.image, 2) first featured / first product image (so the
+  // hero actually matches the shop), 3) a neutral cream panel (no misleading stock photo).
+  const firstProductImg = (() => {
+    if (!Array.isArray(products) || products.length === 0) return null;
+    const featured = products.find((p) => p.featured && p.images?.[0]);
+    return (featured || products.find((p) => p.images?.[0]))?.images?.[0] || null;
+  })();
   const heroImage = designText(design, "hero.image", lang)
     || design?.hero?.image
-    || "https://images.unsplash.com/photo-1447452001602-7090c7ab2db3?w=1200&auto=format&fit=crop";
+    || firstProductImg
+    || null;
 
   const rating = design?.hero?.rating || { score: 4.8, count: 2143 };
 
@@ -133,13 +146,32 @@ export function Hero({ site, design, lang }) {
             className="relative aspect-[4/5] md:aspect-[5/6] rounded-[32px] overflow-hidden"
             style={{ background: accent }}
           >
-            <img
-              src={heroImage}
-              alt={heroTitle}
-              className="w-full h-full object-cover"
-              loading="eager"
-              fetchPriority="high"
-            />
+            {heroImage ? (
+              <img
+                src={heroImage}
+                alt={heroTitle}
+                className="w-full h-full object-cover"
+                loading="eager"
+                fetchPriority="high"
+              />
+            ) : (
+              // Graceful empty state — no misleading stock photo. Shows brand monogram on
+              // a soft gradient that picks up the brand palette.
+              <div
+                className="w-full h-full flex items-center justify-center"
+                style={{
+                  background: `linear-gradient(135deg, ${accent} 0%, ${primary}22 60%, ${accent} 100%)`,
+                }}
+                data-testid="hero-image-placeholder"
+              >
+                <div
+                  className="text-[140px] md:text-[200px] font-semibold opacity-[0.08] select-none leading-none"
+                  style={{ fontFamily: `"${fontHeading}", serif`, color: textColor }}
+                >
+                  {(heroTitle || "A").charAt(0).toUpperCase()}
+                </div>
+              </div>
+            )}
             {/* Floating trust card */}
             <div
               className="absolute bottom-5 left-5 right-5 md:bottom-8 md:left-8 md:right-auto md:max-w-[280px] bg-white/95 backdrop-blur rounded-2xl p-4 shadow-xl"

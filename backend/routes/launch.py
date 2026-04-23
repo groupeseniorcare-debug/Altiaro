@@ -32,6 +32,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
 from deps import db, get_current_user, _check_site_access
+from routes.design import _sanitize_brand_text
 
 logger = logging.getLogger("conceptfactory.launch")
 router = APIRouter()
@@ -105,6 +106,13 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
 
         # 1) Brand identity & palette -------------------------------------
         await _advance(job_id, "brand", "Identité de marque & palette", 5)
+        # Sanitize brand name coming from the wizard (user may have typed "Test409" or
+        # pasted markdown by mistake).
+        _raw_name = (wizard.get("brand_name") or "").strip()
+        _clean_name = _sanitize_brand_text(_raw_name, max_len=40) if _raw_name else ""
+        _clean_tagline = _sanitize_brand_text((wizard.get("tagline") or "").strip(), max_len=80) if wizard.get("tagline") else ""
+        _clean_mission = _sanitize_brand_text((wizard.get("mission") or "").strip(), max_len=400) if wizard.get("mission") else ""
+
         brand_patch = {
             "primary_color": (wizard.get("palette_choice") or {}).get("primary") or design.get("brand", {}).get("primary_color") or "#B84B31",
             "accent_color":  (wizard.get("palette_choice") or {}).get("accent")  or design.get("brand", {}).get("accent_color")  or "#E9C46A",
@@ -114,12 +122,21 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
             "font_body":     (wizard.get("font_pair") or {}).get("body")    or design.get("brand", {}).get("font_body")    or "Inter",
             "voice": wizard.get("voice") or design.get("brand", {}).get("voice") or "chaleureux et rassurant, premium",
         }
-        if wizard.get("brand_name"):
-            brand_patch["logo_text"] = wizard["brand_name"]
-        if wizard.get("tagline"):
-            brand_patch["tagline"] = wizard["tagline"]
-        if wizard.get("mission"):
-            brand_patch["mission"] = wizard["mission"]
+        # Brand name is the single source of truth — write it to BOTH `name` and `logo_text`
+        # so the header image logo, header text fallback, footer text and © copyright all stay in sync.
+        if _clean_name:
+            brand_patch["name"] = _clean_name
+            brand_patch["logo_text"] = _clean_name
+        if _clean_tagline:
+            brand_patch["tagline"] = _clean_tagline
+        if _clean_mission:
+            brand_patch["mission"] = _clean_mission
+            brand_patch["story"] = _clean_mission
+
+        # When the wizard runs in "overwrite" mode, ditch stale logo images and legacy logo_text
+        # from previous generations — they would otherwise keep showing an older brand identity.
+        if overwrite:
+            brand_patch["logo_url"] = None
 
         await db.sites.update_one(
             {"id": site_id},
@@ -132,9 +149,10 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
         # 2) Logo premium horizontal (Nano Banana) ------------------------
         await _advance(job_id, "logo", "Logo premium horizontal (Nano Banana)", 12)
         try:
+            _logo_name = _clean_name or brand_patch.get("logo_text") or site.get("name") or "Maison"
             logo_prompt = (
                 f"Ultra-premium horizontal wordmark logo for a luxury French brand named "
-                f"« {wizard.get('brand_name') or brand_patch.get('logo_text') or site.get('name')} ». "
+                f"« {_logo_name} ». "
                 "Editorial typography (light serif with subtle ligatures), monochrome on transparent background, "
                 "extremely refined kerning, tagline optional below in small caps. Aspect ratio 16:5 (horizontal, "
                 "wider than tall). Absolutely NO icon, NO symbol, NO flourish — typography only. "

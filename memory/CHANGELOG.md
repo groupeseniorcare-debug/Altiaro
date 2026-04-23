@@ -3,6 +3,30 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-02 · Fix critique storefront — 3 identités de marque incohérentes
+
+Bug remonté par le user : le storefront affichait **3 noms de marque différents** sur la même page (logo image "Maison Clarelle", hero "Test Fauteuils Releveurs", footer "Test409"), avec une image hero hors-sujet et un produit seul perdu dans une grille 4-col vide.
+
+### Root causes identifiées
+1. `/api/sites/:id/design/ai-field` retournait la réponse Claude brute **avec markdown + préambule** (`# Proposition de nom de marque\n\n**Soléa**\n\n...`) et la sauvegardait telle quelle dans `design.brand.name`.
+2. `brand.logo_text = "Test409"` venait d'un ancien run de test où le site s'appelait "Test409" ; jamais régénéré par le wizard car la condition `if wizard.get("brand_name")` écrivait vers `logo_text` **seulement** (pas `brand.name`), créant deux champs désynchronisés.
+3. `Hero.jsx` avait un fallback Unsplash `photo-1447452001602-...` (silhouette yoga) quand `design.hero.image` absent.
+4. `ProductGrid` utilisait une grille `grid-cols-3` fixe → 1 produit = 66% d'espace vide.
+5. Prix des produits en couleur `primary` (bleu) → peu lisible, typo premium exige du noir.
+
+### Fixes livrés
+- **Backend `routes/design.py`** : nouvelle fonction `_sanitize_brand_text()` qui extrait le premier bloc `**bold**`, à défaut demote les markdown headings, strippe les préambules FR ("Voici…", "Proposition de…"), les guillemets (`" ' « » “ ”`) et enforce `max_len`. Appliquée dans `ai_field`, `prompt_apply` (identity), `brand_patch`.
+- **Backend `routes/design.py`** : prompts FIELD_PROMPTS renforcés avec "Réponds EXCLUSIVEMENT avec X, sans markdown, sans préambule".
+- **Backend `routes/launch.py`** : écrit `brand_patch["name"]` + `brand_patch["logo_text"]` simultanément (single source of truth), sanitize les inputs wizard, reset `logo_url=None` quand `overwrite_all=True`.
+- **Frontend `lib/brandText.js` (NEW)** : `sanitizeBrandText()` miroir du backend, appliqué défensivement dans `StorefrontLayout` (logoText, tagline) et `Hero.jsx` (title, eyebrow) pour couvrir les sites déjà corrompus en BDD.
+- **Frontend `Hero.jsx`** : fallback Unsplash yoga **supprimé** → utilise en cascade `design.hero.image` > image du premier produit vedette > placeholder élégant avec initiale monogram sur gradient de la palette. La prop `products` est désormais passée depuis `Storefront.jsx`.
+- **Frontend `ProductGrid.jsx`** : layout adaptatif — 1 produit = colonne unique `max-w-md` centrée, 2 produits = 2-col `max-w-3xl`, 3 = 3-col, 4+ = grid standard. Prix passent de `color: primary` à `text-neutral-900`.
+- **Frontend `Testimonials.jsx`** : étoiles avis passent de `color: primary` (bleu sur le test site) à `#F5B800` doré fixe — convention UX universelle.
+
+### Tests
+- `tests/test_brand_sanitizer.py` : **8 tests pytest** couvrant extraction bold, stripping préambules FR, guillemets, markdown chars, empty input, enforcement max_len. Tous passent.
+- Validation e2e via screenshot : le site affiche maintenant "Soléa" partout (hero title, footer brand, © copyright) au lieu des 3 noms différents, le produit apparaît centré avec son image réelle de fauteuil, les prix sont noirs.
+
 ## 2026-02 · Refactoring `SiteDesign.jsx` → modules `/components/site-design/`
 
 Monolithe de **1417 lignes** découpé en 6 modules pour améliorer la maintenabilité :

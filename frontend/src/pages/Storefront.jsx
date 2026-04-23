@@ -171,7 +171,7 @@ export function StorefrontHome() {
         langs={buildHreflangs(site, "")}
         schema={[orgSchema, websiteSchema, itemListSchema, faqSchema].filter(Boolean)}
       />
-      <Hero site={site} design={design} lang={lang} />
+      <Hero site={site} design={design} lang={lang} products={products} />
       {renderHomepageSections({
         design, site, siteId, products, loading, lang,
       })}

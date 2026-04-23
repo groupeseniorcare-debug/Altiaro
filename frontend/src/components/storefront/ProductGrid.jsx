@@ -51,65 +51,84 @@ export function ProductGrid({ siteId, products, loading, design, lang }) {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-5 md:gap-8" data-testid="products-grid">
-          {displayed.map((p) => (
-            <Link
-              key={p.id}
-              to={hasReal ? `/shop/${siteId}/product/${p.id}` : `/shop/${siteId}`}
-              data-testid={`product-card-${p.id}`}
-              className="group block"
-            >
-              <div className="aspect-square bg-[#F5F2EB] rounded-2xl overflow-hidden relative mb-4">
-                {p.images?.[0] ? (
-                  <img
-                    src={p.images[0]}
-                    alt={pickLang(p.name, lang) || p.name}
-                    loading="lazy"
-                    className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700 ease-out"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[#D6D3D1]">
-                    <ShoppingBagOpen size={56} weight="thin" />
-                  </div>
-                )}
-                {p.featured && (
-                  <div
-                    className="absolute top-4 left-4 text-white text-[10px] uppercase tracking-widest font-semibold px-3 py-1.5 rounded-full backdrop-blur-sm flex items-center gap-1"
-                    style={{ background: `${primary}dd` }}
+        (() => {
+          // Adaptive grid so single/few real products don't sit in a mostly empty 3-col grid.
+          const n = displayed.length;
+          let gridCls = "grid grid-cols-2 lg:grid-cols-3 gap-5 md:gap-8";
+          let wrapCls = "";
+          if (hasReal && n === 1) {
+            gridCls = "grid grid-cols-1 gap-8";
+            wrapCls = "max-w-md mx-auto";
+          } else if (hasReal && n === 2) {
+            gridCls = "grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8";
+            wrapCls = "max-w-3xl mx-auto";
+          } else if (hasReal && n === 3) {
+            gridCls = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8";
+          }
+          return (
+            <div className={wrapCls}>
+              <div className={gridCls} data-testid="products-grid">
+                {displayed.map((p) => (
+                  <Link
+                    key={p.id}
+                    to={hasReal ? `/shop/${siteId}/product/${p.id}` : `/shop/${siteId}`}
+                    data-testid={`product-card-${p.id}`}
+                    className="group block"
                   >
-                    <Star size={10} weight="fill" /> {t(lang, "featured")}
-                  </div>
-                )}
-                {p.compare_at_price && p.compare_at_price > p.price && (
-                  <div
-                    className="absolute top-4 right-4 text-white text-[11px] font-semibold px-2.5 py-1 rounded-full"
-                    style={{ background: "#1C1917" }}
-                  >
-                    -{Math.round((1 - p.price / p.compare_at_price) * 100)}%
-                  </div>
-                )}
+                    <div className="aspect-square bg-[#F5F2EB] rounded-2xl overflow-hidden relative mb-4">
+                      {p.images?.[0] ? (
+                        <img
+                          src={p.images[0]}
+                          alt={pickLang(p.name, lang) || p.name}
+                          loading="lazy"
+                          className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700 ease-out"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[#D6D3D1]">
+                          <ShoppingBagOpen size={56} weight="thin" />
+                        </div>
+                      )}
+                      {p.featured && (
+                        <div
+                          className="absolute top-4 left-4 text-white text-[10px] uppercase tracking-widest font-semibold px-3 py-1.5 rounded-full backdrop-blur-sm flex items-center gap-1"
+                          style={{ background: `${primary}dd` }}
+                        >
+                          <Star size={10} weight="fill" /> {t(lang, "featured")}
+                        </div>
+                      )}
+                      {p.compare_at_price && p.compare_at_price > p.price && (
+                        <div
+                          className="absolute top-4 right-4 text-white text-[11px] font-semibold px-2.5 py-1 rounded-full"
+                          style={{ background: "#1C1917" }}
+                        >
+                          -{Math.round((1 - p.price / p.compare_at_price) * 100)}%
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <div
+                        className="text-[15px] md:text-lg font-semibold leading-tight mb-1 group-hover:opacity-70 transition text-neutral-900"
+                        style={{ fontFamily: `"${fontHeading}", serif` }}
+                      >
+                        {pickLang(p.name, lang) || p.name}
+                      </div>
+                      <div className="flex items-baseline gap-2 mt-2">
+                        <span className="text-lg md:text-xl font-semibold text-neutral-900">
+                          {formatPrice(p.price, p.currency, lang)}
+                        </span>
+                        {p.compare_at_price && (
+                          <span className="text-sm line-through text-[#A8A29E]">
+                            {formatPrice(p.compare_at_price, p.currency, lang)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
               </div>
-              <div>
-                <div
-                  className="text-[15px] md:text-lg font-semibold leading-tight mb-1 group-hover:opacity-70 transition text-neutral-900"
-                  style={{ fontFamily: `"${fontHeading}", serif` }}
-                >
-                  {pickLang(p.name, lang) || p.name}
-                </div>
-                <div className="flex items-baseline gap-2 mt-2">
-                  <span className="text-lg md:text-xl font-semibold" style={{ color: primary }}>
-                    {formatPrice(p.price, p.currency, lang)}
-                  </span>
-                  {p.compare_at_price && (
-                    <span className="text-sm line-through text-[#A8A29E]">
-                      {formatPrice(p.compare_at_price, p.currency, lang)}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+            </div>
+          );
+        })()
       )}
     </section>
   );

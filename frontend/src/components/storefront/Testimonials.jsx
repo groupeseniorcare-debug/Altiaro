@@ -41,7 +41,7 @@ export function Testimonials({ design, lang }) {
                 className="bg-white rounded-2xl p-6 md:p-8 border border-[#E7E5E4]"
                 data-testid={`testimonial-${i}`}
               >
-                <div className="flex gap-0.5 mb-4" style={{ color: primary }}>
+                <div className="flex gap-0.5 mb-4" style={{ color: "#F5B800" }}>
                   {Array.from({ length: rating }).map((_, j) => (
                     <Star key={j} size={16} weight="fill" />
                   ))}

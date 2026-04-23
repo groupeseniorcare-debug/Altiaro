@@ -6,6 +6,7 @@ import { readCart, cartTotals } from "../lib/cart";
 import { getCustomer } from "../lib/customerAuth";
 import CartDrawer from "./CartDrawer";
 import StorefrontTracking from "./storefront/StorefrontTracking";
+import { sanitizeBrandText } from "../lib/brandText";
 import {
   ShoppingBag, Phone, ShieldCheck, Truck, MagnifyingGlass, User,
   List, X, FacebookLogo, InstagramLogo, YoutubeLogo, LinkedinLogo,
@@ -53,11 +54,16 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
   const fontHeading = brand.font_heading || "Fraunces";
   const fontBody = brand.font_body || "Inter";
   const logoUrl = brand.logo_url ? `${BACKEND_URL}${brand.logo_url}` : null;
-  const logoText = brand.logo_text || site?.name || "…";
+  // Sanitize brand name / site name so stale DB entries containing markdown or
+  // Claude preambles ("# Proposition de nom…") don't leak into <h1>s and copyright.
+  // Priority: explicit logo_text > brand.name > site.name > fallback.
+  const rawLogoCandidate = brand.logo_text || brand.name || site?.name || "";
+  const logoText = sanitizeBrandText(rawLogoCandidate, 40) || "Maison";
   const brandTaglineRaw = design?.brand?.tagline;
-  const tagline = typeof brandTaglineRaw === "string"
+  const taglineRaw = typeof brandTaglineRaw === "string"
     ? brandTaglineRaw
     : (brandTaglineRaw?.[lang] || brandTaglineRaw?.fr || site?.niche_data?.tagline);
+  const tagline = taglineRaw ? sanitizeBrandText(taglineRaw, 80) : "";
 
   const footerTagline = design?.footer?.tagline?.[lang] || design?.footer?.tagline?.fr
     || "Des produits pensés pour bien vieillir chez soi, avec dignité.";
