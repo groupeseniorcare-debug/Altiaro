@@ -204,22 +204,23 @@ const DEFAULT_HOMEPAGE_ORDER = [
 
 function hasData(key, design, products) {
   switch (key) {
-    // These always render nicely with a premium fallback
+    // These always render with a premium fallback — so newly-launched sites look
+    // complete from day 1, before the Concepteur has filled in their own data.
     case "benefits":
     case "testimonials":
     case "faq":
     case "newsletter":
     case "final_cta":
     case "products":
+    case "press_logos":
+    case "collections":
+    case "founder_story":
       return true;
-    // These require real data — no fallback
-    case "press_logos": return !!(design?.press_mentions?.length);
-    case "collections": return !!(design?.collections?.length);
+    // These require real data — no fallback makes sense
     case "featured_product": return !!(products?.some((p) => p.featured));
     case "lifestyle_editorial": return !!(design?.editorial?.title || design?.editorial?.image);
     case "values": return !!(design?.values?.length);
     case "buying_guide": return !!(design?.buying_guide?.items?.length);
-    case "founder_story": return !!(design?.founder_story?.title || design?.founder_story?.bio);
     case "instagram": return !!(design?.instagram?.posts?.length || design?.instagram?.handle);
     case "blog_teaser": return !!(design?.blog_posts?.length);
     default: return false;
