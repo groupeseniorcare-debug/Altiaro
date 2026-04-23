@@ -81,7 +81,30 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
     `${fontHeading}:wght@400;500;600;700|${fontBody}:wght@400;500;600`
   );
 
-  const nav = navItems(shopRoot);
+  // Header & footer navigation — source of truth is design.navigation (configured in the Studio).
+  // We fall back to the default template items only if nothing is configured yet.
+  const rewriteHref = (href = "") => {
+    if (!href) return shopRoot;
+    // External links → keep as-is
+    if (/^https?:\/\//.test(href)) return href;
+    // Shop-scoped path ("/a-propos" → "/shop/{id}/a-propos"), already scoped → keep
+    if (href.startsWith(shopRoot)) return href;
+    return `${shopRoot}${href.startsWith("/") ? href : "/" + href}`;
+  };
+  const configuredHeader = design?.navigation?.header;
+  const configuredFooter = design?.navigation?.footer;
+  const nav = (Array.isArray(configuredHeader) && configuredHeader.length
+    ? configuredHeader
+    : navItems(shopRoot)
+  ).map((n) => ({ ...n, href: rewriteHref(n.href) }));
+  const footerLinks = (Array.isArray(configuredFooter) && configuredFooter.length
+    ? configuredFooter
+    : [
+        { label: "CGV", href: `${shopRoot}/cgv` },
+        { label: "Mentions légales", href: `${shopRoot}/mentions` },
+        { label: "Confidentialité", href: `${shopRoot}/confidentialite` },
+      ]
+  ).map((n) => ({ ...n, href: rewriteHref(n.href) }));
   const onSearch = (e) => {
     e.preventDefault();
     if (searchQ.trim().length >= 2) {
@@ -411,12 +434,15 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
             { label: customer ? "Mon compte" : "Se connecter", href: customer ? `${shopRoot}/account` : `${shopRoot}/account/login` },
           ]} />
 
-          <FooterCol title="Légal" items={[
-            { label: "CGV", href: `${shopRoot}/cgv` },
-            { label: "Mentions légales", href: `${shopRoot}/mentions` },
-            { label: "Confidentialité", href: `${shopRoot}/confidentialite` },
-            { label: "Cookies", href: `${shopRoot}/cookies` },
-          ]} />
+          <FooterCol
+            title="Légal"
+            items={footerLinks.length > 0 ? footerLinks : [
+              { label: "CGV", href: `${shopRoot}/cgv` },
+              { label: "Mentions légales", href: `${shopRoot}/mentions` },
+              { label: "Confidentialité", href: `${shopRoot}/confidentialite` },
+              { label: "Cookies", href: `${shopRoot}/cookies` },
+            ]}
+          />
         </div>
 
         {/* Payment methods */}

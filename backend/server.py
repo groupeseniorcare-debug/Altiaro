@@ -66,6 +66,7 @@ from routes import seo_studio as seo_studio_routes
 from routes import aliexpress as aliexpress_routes
 from routes import validation as validation_routes
 from routes import cockpit_tools as cockpit_tools_routes
+from routes import product_images as product_images_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -123,6 +124,7 @@ api.include_router(seo_studio_routes.router)
 api.include_router(aliexpress_routes.router)
 api.include_router(validation_routes.router)
 api.include_router(cockpit_tools_routes.router)
+api.include_router(product_images_routes.router)
 
 
 @app.on_event("startup")

@@ -1011,6 +1011,38 @@ async def seed_legal_pages(site_id: str, user: dict = Depends(get_current_user))
     return {"ok": True, "pages": list(design["legal_pages"].keys())}
 
 
+# =====================================================================
+# Section editor — save manual edits to any content section
+# =====================================================================
+_EDITABLE_SECTIONS = {"hero", "about", "benefits", "faq", "testimonials", "contact", "footer", "seo"}
+
+
+@router.patch("/sites/{site_id}/design/section/{section}")
+async def patch_design_section(
+    site_id: str,
+    section: str,
+    data: dict,
+    user: dict = Depends(get_current_user),
+):
+    """Replace one content section (hero/about/benefits/faq/testimonials/contact/footer/seo).
+    Used by the sub-tab editors in the Studio Content tab."""
+    await _check_site_access(site_id, user)
+    if section not in _EDITABLE_SECTIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Section invalide. Possibles : {', '.join(sorted(_EDITABLE_SECTIONS))}",
+        )
+    payload = data.get("data") if "data" in data and isinstance(data.get("data"), (dict, list)) else data
+    await db.sites.update_one(
+        {"id": site_id},
+        {"$set": {
+            f"design.{section}": payload,
+            "design.updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    return {"ok": True, "section": section}
+
+
 @router.get("/sites/{site_id}/design/studio-state")
 async def studio_state(site_id: str, user: dict = Depends(get_current_user)):
     await _check_site_access(site_id, user)

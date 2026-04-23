@@ -596,9 +596,28 @@ function ProductEditor({ siteId, initial, onClose, onSaved, onEnrichNarrative, e
   const [activeLang, setActiveLang] = useState("fr");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [aiImgBusy, setAiImgBusy] = useState(false);
+  const [aiImgStyle, setAiImgStyle] = useState("lifestyle");
+  const [aiImgResult, setAiImgResult] = useState(null);
 
   const setI18n = (field, lang, value) => {
     setForm((f) => ({ ...f, [field]: { ...f[field], [lang]: value } }));
+  };
+
+  const genAiImage = async () => {
+    if (isNew) { window.alert("Enregistre d'abord le produit."); return; }
+    setAiImgBusy(true);
+    setAiImgResult(null);
+    const { data, error: err, rawDetail } = await apiCall(() =>
+      api.post(`/products/${initial.id}/generate-image`, {
+        style: aiImgStyle, tweak: "", replace_main: false,
+      })
+    );
+    setAiImgBusy(false);
+    if (err) { window.alert(rawDetail?.detail || err); return; }
+    setAiImgResult(data);
+    // Prepend the new image to the local form so it shows up immediately
+    setForm((f) => ({ ...f, images: [data.url, ...(f.images || [])].filter(Boolean).slice(0, 10) }));
   };
 
   const submit = async (e) => {
@@ -663,6 +682,30 @@ function ProductEditor({ siteId, initial, onClose, onSaved, onEnrichNarrative, e
               <SparkleIcon size={12} weight={initial.narrative ? "fill" : "regular"} className={enriching ? "animate-pulse" : ""} />
               {enriching ? "Génération…" : initial.narrative ? "Régénérer IA" : "Générer IA"}
             </button>
+            <div className="flex items-center gap-1">
+              <select
+                value={aiImgStyle}
+                onChange={(e) => setAiImgStyle(e.target.value)}
+                disabled={aiImgBusy}
+                data-testid="ai-img-style"
+                className="h-8 px-2 rounded-lg border border-neutral-200 bg-white text-[12px] font-medium text-neutral-700 focus:outline-none"
+              >
+                <option value="lifestyle">Lifestyle</option>
+                <option value="studio">Studio</option>
+                <option value="closeup">Gros plan</option>
+                <option value="in_use">En usage</option>
+              </select>
+              <button
+                type="button"
+                onClick={genAiImage}
+                disabled={aiImgBusy}
+                data-testid="ai-img-generate"
+                className="h-8 px-3 rounded-lg border border-violet-200 bg-violet-50 text-[12px] font-medium text-violet-700 hover:border-violet-400 flex items-center gap-1.5 transition disabled:opacity-50"
+              >
+                <SparkleIcon size={12} weight="fill" className={aiImgBusy ? "animate-pulse" : ""} />
+                {aiImgBusy ? "Nano Banana…" : "Image IA"}
+              </button>
+            </div>
             <button
               type="button"
               onClick={onResync}

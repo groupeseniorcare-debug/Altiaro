@@ -40,6 +40,8 @@ export default function SiteDesign() {
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [tab, setTab] = useState("identity");
+  const [previewKey, setPreviewKey] = useState(Date.now());
+  const [previewOpen, setPreviewOpen] = useState(true);
 
   const reload = async () => {
     const { data } = await apiCall(() => api.get(`/sites/${siteId}/design`));
@@ -48,6 +50,7 @@ export default function SiteDesign() {
       setSiteName(data.site_name || "");
     }
     setLoading(false);
+    setPreviewKey(Date.now());
   };
 
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, [siteId]);
@@ -130,18 +133,92 @@ export default function SiteDesign() {
           ))}
         </div>
 
-        {/* Tab content */}
-        {tab === "identity" && (
-          <IdentityTab
-            siteId={siteId}
-            design={design}
-            onReload={reload}
-            hasDesign={hasDesign}
-          />
+        {/* Tab content + live preview side-by-side on desktop */}
+        <div className={`grid gap-6 ${previewOpen ? "xl:grid-cols-[minmax(0,1fr)_420px]" : "grid-cols-1"}`}>
+          <div className="min-w-0">
+            {tab === "identity" && (
+              <IdentityTab
+                siteId={siteId}
+                design={design}
+                onReload={reload}
+                hasDesign={hasDesign}
+              />
+            )}
+            {tab === "navigation" && <NavigationTab siteId={siteId} onChange={reload} />}
+            {tab === "collections" && <CollectionsTab siteId={siteId} onChange={reload} />}
+            {tab === "content" && <BrandingContent siteId={siteId} design={design} onReload={reload} onChange={reload} />}
+          </div>
+          {previewOpen && (
+            <LivePreview
+              siteId={siteId}
+              previewKey={previewKey}
+              onClose={() => setPreviewOpen(false)}
+              onRefresh={() => setPreviewKey(Date.now())}
+            />
+          )}
+        </div>
+        {!previewOpen && (
+          <button
+            onClick={() => setPreviewOpen(true)}
+            data-testid="open-preview"
+            className="fixed bottom-6 right-6 z-40 h-12 px-5 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium flex items-center gap-2 shadow-xl"
+          >
+            <StoreIcon size={14} weight="fill" /> Aperçu live
+          </button>
         )}
-        {tab === "navigation" && <NavigationTab siteId={siteId} />}
-        {tab === "collections" && <CollectionsTab siteId={siteId} />}
-        {tab === "content" && <BrandingContent siteId={siteId} design={design} onReload={reload} />}
+      </div>
+    </div>
+  );
+}
+
+// ==========================================================================
+// Live preview — sticky iframe that refreshes on each save/regen
+// ==========================================================================
+function LivePreview({ siteId, previewKey, onClose, onRefresh }) {
+  const src = `/shop/${siteId}?preview=1&v=${previewKey}`;
+  return (
+    <div className="hidden xl:block" data-testid="live-preview">
+      <div className="sticky top-6">
+        <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden shadow-sm">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-100 bg-neutral-50">
+            <div className="flex items-center gap-2 text-xs text-neutral-600">
+              <div className="flex gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+              </div>
+              <span className="font-mono truncate max-w-[180px]">/shop/{siteId.slice(0, 8)}…</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button onClick={onRefresh} title="Rafraîchir"
+                data-testid="preview-refresh"
+                className="w-7 h-7 rounded hover:bg-neutral-200 text-neutral-600 flex items-center justify-center">
+                <ArrowClockwise size={12} />
+              </button>
+              <a href={src} target="_blank" rel="noreferrer" title="Ouvrir en nouvel onglet"
+                data-testid="preview-external"
+                className="w-7 h-7 rounded hover:bg-neutral-200 text-neutral-600 flex items-center justify-center">
+                <StoreIcon size={12} />
+              </a>
+              <button onClick={onClose} title="Fermer l'aperçu"
+                data-testid="preview-close"
+                className="w-7 h-7 rounded hover:bg-neutral-200 text-neutral-600 flex items-center justify-center text-xs">
+                ✕
+              </button>
+            </div>
+          </div>
+          <iframe
+            key={previewKey}
+            src={src}
+            title="Aperçu storefront"
+            data-testid="preview-iframe"
+            className="w-full h-[720px] bg-white"
+            loading="lazy"
+          />
+        </div>
+        <div className="text-[11px] text-neutral-400 mt-2 text-center">
+          L'aperçu se rafraîchit à chaque modification enregistrée.
+        </div>
       </div>
     </div>
   );
@@ -509,7 +586,7 @@ function IdentityTab({ siteId, design, onReload, hasDesign }) {
 // ==========================================================================
 // TAB 2 — NAVIGATION
 // ==========================================================================
-function NavigationTab({ siteId }) {
+function NavigationTab({ siteId, onChange }) {
   const [nav, setNav] = useState({ header: [], footer: [] });
   const [saving, setSaving] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
@@ -529,6 +606,7 @@ function NavigationTab({ siteId }) {
     if (error) { window.alert(error); return; }
     if (data?.navigation) setNav(data.navigation);
     setAiRationale(data?.rationale || "");
+    onChange?.();
   };
 
   const addItem = (where) => {
@@ -555,6 +633,7 @@ function NavigationTab({ siteId }) {
     setSaving(false);
     if (error) { window.alert(error); return; }
     window.alert("Navigation enregistrée");
+    onChange?.();
   };
 
   return (
@@ -654,7 +733,7 @@ function NavigationTab({ siteId }) {
 // ==========================================================================
 // TAB 3 — COLLECTIONS
 // ==========================================================================
-function CollectionsTab({ siteId }) {
+function CollectionsTab({ siteId, onChange }) {
   const [collections, setCollections] = useState([]);
   const [products, setProducts] = useState([]);
   const [editing, setEditing] = useState(null);
@@ -692,6 +771,7 @@ function CollectionsTab({ siteId }) {
     if (error) { window.alert(error); return; }
     setSuggestions((prev) => (prev || []).filter((x) => x.name !== s.name));
     await reload();
+    onChange?.();
   };
 
   const newCollection = () => setEditing({
@@ -716,6 +796,7 @@ function CollectionsTab({ siteId }) {
     if (error) { window.alert(error); return; }
     setEditing(null);
     await reload();
+    onChange?.();
   };
 
   const del = async (id) => {
@@ -723,6 +804,7 @@ function CollectionsTab({ siteId }) {
     const { error } = await apiCall(() => api.delete(`/sites/${siteId}/collections/${id}`));
     if (error) { window.alert(error); return; }
     await reload();
+    onChange?.();
   };
 
   return (

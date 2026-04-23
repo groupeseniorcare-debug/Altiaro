@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 22 full regression PASS. Validated all 6 items from the brief: (1) navigation PUT persists and public GET /api/public/sites/{id}/navigation echoes custom header — storefront /shop/{id} now renders custom labels ('TEST Accueil | TEST Mobilité | TEST Blog') from design.navigation.header instead of hardcoded; (2) Content tab sub-tabbed — all 7 testids present (subtab-hero/about/benefits/faq/testimonials/contact/legal) with dedicated editor per section (hero-title, regen-hero, save-hero ✅ + seed-legal + legal-link-cgv|mentions_legales|confidentialite ✅); (3) Live preview iframe present on /sites/{id}/design with src=/shop/{siteId}?preview=1&v={ts}, refresh & close buttons wired; (4) Nano Banana POST /api/products/{id}/generate-image returned 200 with valid PNG (~670KB) served via /api/uploads/products_ai/, and ProductEditor exposes ai-img-generate + ai-img-style; (5) PATCH /api/sites/{id}/design/section/hero returns 200 and persists, invalid section 'garbage' returns 400 with French error; (6) Regression: /api/auth/me, /api/sites/{id}/design, /api/platform/llm-status still 200. Backend 8/8 pass, frontend 15/15 testids verified.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration22_nav_sections_images.py",
+    "/app/test_reports/pytest/iter22.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/design.py is now ~1256 lines (up from 1213 in iter21) — still over the 700-line guideline. PATCH /design/section handler added here; consider splitting Studio editors into design_sections.py to keep the core publish/generate module lean.",
+    "PATCH /sites/{site_id}/design/section/{section} accepts an untyped `dict` body (no Pydantic model) — any JSON shape is written to `design.{section}` verbatim. Add per-section Pydantic models (HeroInput, AboutInput, etc.) to reject malformed payloads early (e.g., ensure hero always has a `title` string ≤120 chars).",
+    "In StorefrontLayout.jsx, `configuredHeader` is read only once at mount via `design.navigation.header`. If the Studio saves new nav while the shop tab is already open, the storefront won't pick it up until a hard reload. Consider a SWR / polling layer, or at minimum document the v=timestamp cache-bust the Studio's LivePreview already leverages.",
+    "product_images.py uses a filesystem upload dir (UPLOAD_DIR/products_ai) — OK for preview, but for production this breaks horizontal scaling. Move to S3/OVH Object Storage and store only the public URL in `product.image_url`.",
+    "The PATCH section endpoint unwraps `data.get('data')` only if it's a dict/list — subtle: if a client mistakenly sends {\"data\": \"string\"} it silently stores the whole envelope under design.{section}. Either require a wrapper or document the unwrap rule.",
+    "Concepteur with disposable site data was used — PATCH hero now writes 'TEST_hero_title_iter22' to production-like design. Main agent may want to seed-restore hero or run regenerate_section('hero') before handover.",
+    "BrandingContent.jsx still uses window.alert() on save/regen errors (carried over from iter19–21)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration22_nav_sections_images.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (8/8)",
+    "frontend": "100% — preview-iframe + preview-refresh + preview-close present; 7 subtabs render; hero-title/regen-hero/save-hero/seed-legal/legal-link-{cgv,mentions_legales,confidentialite} present; storefront nav echoes custom header; ProductEditor exposes ai-img-generate + ai-img-style"
+  },
+  "test_credentials": "Concepteur: concepteur@conceptfactory.fr / Concepteur2026! — Site: 65964cb0-7a1a-4c11-9644-1ad8f2371d48 — Product: 447e666d-5db0-4e73-9e94-949a30db9cfd",
+  "seed_data_creation": "test_patch_section_hero_valid wrote design.hero = {title:'TEST_hero_title_iter22', subtitle:'TEST subtitle', cta_primary:'Découvrir'} on site 65964cb0. test_navigation_put_persists_and_public_returns_header wrote design.navigation.header = [TEST Accueil, TEST Mobilité, TEST Blog] and footer = [TEST CGV]. test_generate_product_image created a new AI PNG under /app/backend/uploads/products_ai/ for product 447e666d. All persist — main agent may want to restore genuine copy via regenerate_section / PUT /navigation before user demos.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_iteration22_nav_sections_images.py is the iter22 regression suite. It accepts Nano Banana 200 OR 402/502/504 (brief allows flaky Google backend). All 6 items from the brief validated end-to-end via pytest + Playwright. Site 65964cb0 has TEST_ prefixed data in design.hero and design.navigation — do not trust the current hero title/subtitle or header labels as 'real' copy. To revert, POST /api/sites/{site_id}/design/regenerate/hero (or PUT fresh navigation payload). For product image regression, reuse PRODUCT=447e666d-5db0-4e73-9e94-949a30db9cfd — the generated AI image stays on disk. Backend endpoints confirmed working: PATCH /sites/{id}/design/section/{section} (valid/invalid), PUT /sites/{id}/navigation + GET /api/public/sites/{id}/navigation, POST /products/{id}/generate-image with {style:'lifestyle'}. Frontend testids all present in BrandingContent.jsx, SiteDesign.jsx, SiteProducts.jsx, StorefrontLayout.jsx.",
+  "rca of the issue": "N/A — no bugs found. StorefrontLayout.jsx correctly reads design.navigation.header (lines 94-100) with fallback to Accueil/Nos collections/Notre histoire/Contact when empty; verified by PUT custom header → shop renders 'TEST' labels. BrandingContent.jsx rewrite into 7 sub-tabs is functional. PATCH /design/section/{section} endpoint (routes/design.py:1020-1043) validates section name against _EDITABLE_SECTIONS and returns 400 for unknown. LivePreview iframe bumps previewKey={Date.now()} on every onRefresh to cache-bust the storefront. Nano Banana integration at /app/backend/routes/product_images.py:148 returns {url, style} after ~20s."
+}
