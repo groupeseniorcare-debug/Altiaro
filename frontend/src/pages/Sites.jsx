@@ -45,7 +45,28 @@ export default function Sites() {
         </div>
 
         {loading ? (
-          <div className="text-neutral-500">Chargement...</div>
+          <div
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
+            data-testid="sites-list-skeleton"
+            aria-busy="true"
+          >
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-xl border border-neutral-200 p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-10 h-10 rounded-lg bg-stone-200 animate-pulse" />
+                  <div className="w-16 h-5 rounded-full bg-stone-200 animate-pulse" />
+                </div>
+                <div className="h-5 w-40 bg-stone-200 rounded animate-pulse mb-2" />
+                <div className="h-4 w-56 bg-stone-200 rounded animate-pulse mb-5" />
+                <div className="h-2 w-full bg-stone-200 rounded-full animate-pulse mb-3" />
+                <div className="h-3 w-32 bg-stone-200 rounded animate-pulse mb-4" />
+                <div className="pt-3 border-t border-neutral-200 flex justify-between">
+                  <div className="h-3 w-40 bg-stone-200 rounded animate-pulse" />
+                  <div className="h-3 w-4 bg-stone-200 rounded animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : sites.length === 0 ? (
           <div className="bg-white rounded-xl border border-neutral-200 p-12 text-center">
             <div className="w-14 h-14 rounded-full bg-neutral-200 flex items-center justify-center mx-auto mb-5">

@@ -50,8 +50,23 @@ export default function ConcepteurDashboard() {
   if (loading) {
     return (
       <Layout>
-        <div className="p-8 flex items-center gap-2 text-neutral-500 text-sm">
-          <ArrowClockwise size={14} className="animate-spin" /> Chargement du tableau de bord…
+        <div className="p-8 md:p-12 max-w-[1600px] mx-auto w-full" data-testid="concepteur-dashboard-skeleton" aria-busy="true">
+          <div className="mb-10">
+            <div className="h-3 w-24 bg-stone-200 rounded animate-pulse mb-3" />
+            <div className="h-8 w-72 bg-stone-200 rounded animate-pulse" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-xl border border-neutral-200 p-6">
+                <div className="h-3 w-20 bg-stone-200 rounded animate-pulse mb-4" />
+                <div className="h-8 w-28 bg-stone-200 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl border border-neutral-200 p-6 h-[260px] animate-pulse" />
+            <div className="bg-white rounded-xl border border-neutral-200 p-6 h-[260px] animate-pulse" />
+          </div>
         </div>
       </Layout>
     );

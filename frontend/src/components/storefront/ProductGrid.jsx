@@ -36,7 +36,20 @@ export function ProductGrid({ siteId, products, loading, design, lang }) {
       </div>
 
       {loading ? (
-        <div className="py-20 text-center text-[#78716C]">…</div>
+        <div
+          className="grid grid-cols-2 lg:grid-cols-3 gap-5 md:gap-8"
+          data-testid="products-grid-skeleton"
+          aria-busy="true"
+          aria-label="Chargement des produits"
+        >
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="animate-pulse">
+              <div className="aspect-square rounded-2xl bg-stone-200/80 mb-4" />
+              <div className="h-4 bg-stone-200/80 rounded w-4/5 mb-2" />
+              <div className="h-4 bg-stone-200/80 rounded w-1/3" />
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-5 md:gap-8" data-testid="products-grid">
           {displayed.map((p) => (

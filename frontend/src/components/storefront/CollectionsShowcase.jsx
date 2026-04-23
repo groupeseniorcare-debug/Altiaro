@@ -57,7 +57,10 @@ export default function CollectionsShowcase({ collections, lang = "fr", design }
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6">
+        <div
+          className="flex md:grid md:grid-cols-3 gap-5 md:gap-6 -mx-6 md:mx-0 px-6 md:px-0 overflow-x-auto md:overflow-visible snap-x snap-mandatory md:snap-none scroll-smooth pb-2 md:pb-0"
+          data-testid="collections-carousel"
+        >
           {list.slice(0, 3).map((c, i) => {
             const title = pickLang(c.title, lang) || c.title;
             const desc = pickLang(c.description, lang) || c.description;
@@ -69,7 +72,7 @@ export default function CollectionsShowcase({ collections, lang = "fr", design }
                 key={i}
                 to={href}
                 data-testid={`collection-${i}`}
-                className="group relative block rounded-3xl overflow-hidden aspect-[4/5] md:aspect-[3/4]"
+                className="group relative block rounded-3xl overflow-hidden aspect-[4/5] md:aspect-[3/4] snap-center shrink-0 w-[85vw] md:w-auto"
                 style={{ background: accent }}
               >
                 {c.image ? (

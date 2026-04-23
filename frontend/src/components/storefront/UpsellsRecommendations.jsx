@@ -89,7 +89,10 @@ export default function UpsellsRecommendations({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+      <div
+        className="flex sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5 -mx-6 sm:mx-0 px-6 sm:px-0 overflow-x-auto sm:overflow-visible snap-x snap-mandatory sm:snap-none scroll-smooth pb-2 sm:pb-0"
+        data-testid="upsells-carousel"
+      >
         {items.map((p) => {
           const name = pickLang(p.name, lang) || p.name;
           const added = addedIds[p.id];
@@ -97,7 +100,7 @@ export default function UpsellsRecommendations({
             <div
               key={p.id}
               data-testid={`upsell-card-${p.id}`}
-              className="bg-white rounded-2xl overflow-hidden border border-[#E7E5E4] hover:border-neutral-900 transition flex flex-col"
+              className="bg-white rounded-2xl overflow-hidden border border-[#E7E5E4] hover:border-neutral-900 transition flex flex-col snap-center shrink-0 w-[72vw] sm:w-auto"
             >
               <Link
                 to={`/shop/${siteId}/product/${p.id}`}

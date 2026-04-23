@@ -1,0 +1,30 @@
+{
+  "summary": "Iter25 - Validated skeleton loading patterns (storefront + cockpit) and mobile scroll-snap carousels. All 10 target testids found with correct animate-pulse counts. Login admin/concepteur, /platform/llm-status regression OK. Storefront collections & upsells carousels have correct mobile classes (overflow-x-auto snap-x snap-mandatory) that turn into md:grid on desktop.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Dashboard.jsx (>300 lines): AdminDashboard could be extracted into its own file to stay <300 LOC (currently 304).",
+    "ConcepteurDashboard.jsx (333 lines): KpiCard + NextEventCard subcomponents could live in a separate file for reusability.",
+    "ProductGrid.jsx: DEMO_PRODUCTS hardcoded with Unsplash URLs directly in component — consider extracting to a constants/demoData.js file for DRY and easier i18n.",
+    "UpsellsRecommendations.jsx: `JSON.stringify(productIds || [])` in useEffect deps is an anti-pattern (expensive serialization on every render). Prefer useMemo on productIds identity or join('|').",
+    "No loading/error state in UpsellsRecommendations — silently returns null on 4xx/5xx which hides API regressions. Add an error log or telemetry.",
+    "Console warning visible: `Invalid DOM property fetchpriority` — lowercase `fetchpriority` should be `fetchPriority` in JSX (minor React warning, not blocking)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (no backend tests new)", "frontend": "100% (10/10 targets validated)"},
+  "test_credentials": "admin@conceptfactory.fr / Factory2026! · concepteur@conceptfactory.fr / Concepteur2026!",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 4 cockpit skeletons (dashboard-skeleton, concepteur-dashboard-skeleton, sites-list-skeleton, site-seo-skeleton) and storefront skeletons (products-grid-skeleton) verified via Playwright route-throttling (page.route + asyncio.sleep(3)). Carousels (collections-carousel, upsells-carousel) use `flex md:grid overflow-x-auto md:overflow-visible snap-x snap-mandatory md:snap-none` on mobile; cards have `snap-center shrink-0 w-[85vw]` (collections) / `w-[72vw]` (upsells). When testing skeleton, remember Dashboard.jsx routes non-admin users to ConcepteurDashboard so `dashboard-skeleton` ONLY appears for role=admin; make sure to clear cookies+localStorage between role switches. The `fetchpriority` React warning is pre-existing and unrelated to this iteration.",
+  "rca of the issue": "n/a — no bugs found. Minor test-script flakiness (Route.continue_ race) resolved by un-routing fully before next scenario and clearing cookies/localStorage between admin/concepteur session switches."
+}
