@@ -69,7 +69,7 @@ export default function SiteDesign() {
 
   return (
     <div className="min-h-screen bg-[#FAF7F2]">
-      <div className="max-w-6xl mx-auto px-6 md:px-10 py-8">
+      <div className="max-w-[1600px] mx-auto px-6 md:px-10 py-8">
         <Link to={`/sites/${siteId}`} className="inline-flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900 mb-6">
           <ArrowLeft size={14} /> Retour au cockpit
         </Link>

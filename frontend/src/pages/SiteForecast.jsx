@@ -33,7 +33,6 @@ export default function SiteForecast() {
   const [forecast, setForecast] = useState(null);
   const [loading, setLoading] = useState(false);
   const [dailyBudget, setDailyBudget] = useState(30);
-  const [concepteurShare, setConcepteurShare] = useState(15);
   const [activeScenario, setActiveScenario] = useState("realistic");
   const [showFormulas, setShowFormulas] = useState(false);
   const [validating, setValidating] = useState(false);
@@ -55,7 +54,8 @@ export default function SiteForecast() {
       api.post(`/sites/${siteId}/financial-forecast`, {
         site_id: siteId,
         daily_budget_total_eur: Number(dailyBudget),
-        concepteur_share_eur: Number(concepteurShare),
+        // concepteur share is a pure estimation — default to half of the daily budget
+        concepteur_share_eur: Number(dailyBudget) / 2,
       })
     );
     setLoading(false);
@@ -80,7 +80,7 @@ export default function SiteForecast() {
 
   return (
     <div className="min-h-screen bg-[#FAF7F2]">
-      <div className="max-w-6xl mx-auto px-6 md:px-10 py-8">
+      <div className="max-w-[1600px] mx-auto px-6 md:px-10 py-8">
         <Link to={`/sites/${siteId}`} className="inline-flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900 mb-6">
           <ArrowLeft size={14} /> Retour au cockpit
         </Link>
@@ -97,15 +97,30 @@ export default function SiteForecast() {
           </p>
         </div>
 
-        {/* Budget inputs */}
+        {/* Budget input — single field, estimation only */}
         <div className="bg-white border border-neutral-200 rounded-2xl p-5 mb-6 flex flex-wrap items-end gap-4">
-          <BudgetInput label="Budget Ads / jour / marché" value={dailyBudget} onChange={setDailyBudget} testid="forecast-daily-budget" />
-          <BudgetInput label="Ta part quotidienne (reste = Altiaro)" value={concepteurShare} onChange={setConcepteurShare} testid="forecast-concepteur-share" max={dailyBudget} />
+          <div className="flex-1 min-w-[220px]">
+            <label className="block text-[11px] uppercase tracking-widest text-neutral-500 mb-1">
+              Budget Google Ads quotidien par marché
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={dailyBudget}
+                onChange={(e) => setDailyBudget(e.target.value)}
+                data-testid="forecast-daily-budget"
+                className="h-10 w-28 px-3 rounded-lg border border-neutral-200 text-sm font-mono"
+                min="5" max="500"
+              />
+              <span className="text-sm text-neutral-600">€ / jour</span>
+              <span className="ml-2 text-[11px] text-neutral-400 italic">estimation uniquement · non conservé</span>
+            </div>
+          </div>
           <button
             onClick={run}
             disabled={loading}
             data-testid="forecast-run"
-            className="h-11 px-5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium flex items-center gap-2 disabled:opacity-60 ml-auto"
+            className="h-11 px-5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium flex items-center gap-2 disabled:opacity-60"
           >
             {loading ? <ArrowClockwise size={14} className="animate-spin" /> : <Sparkle size={14} weight="fill" />}
             {loading ? "Calcul…" : (forecast ? "Recalculer" : "Calculer le prévisionnel")}
@@ -140,7 +155,7 @@ export default function SiteForecast() {
                   <div className={`text-sm ${verdict.text} opacity-90 mt-0.5`}>
                     Scénario réaliste : {fmtNum(forecast.scenarios.realistic.global.conversions)} ventes · CA HT{" "}
                     <strong>{fmtEur(forecast.scenarios.realistic.global.revenue_ht_eur)}</strong> · ROAS <strong>{forecast.scenarios.realistic.global.roas}x</strong>
-                    {" · "}marge pour toi <strong>{fmtEur(forecast.scenarios.realistic.global.net_margin_concepteur_eur)}</strong>
+                    {" · "}marge brute <strong>{fmtEur(forecast.scenarios.realistic.global.gross_margin_eur)}</strong>
                   </div>
                 </div>
               </div>
@@ -176,11 +191,7 @@ export default function SiteForecast() {
                       <Kpi label="ROAS" value={`${s.global.roas}x`} />
                       <Kpi label="Ventes" value={fmtNum(s.global.conversions)} />
                       <Kpi label="Marge brute HT" value={`${fmtEur(s.global.gross_margin_eur)} (${fmtPct(s.global.gross_margin_pct, 0)})`} />
-                      <Kpi
-                        label="Net pour toi"
-                        value={fmtEur(s.global.net_margin_concepteur_eur)}
-                        color={s.global.net_margin_concepteur_eur >= 0 ? "text-emerald-700" : "text-rose-700"}
-                      />
+                      <Kpi label="CPA réel" value={fmtEur(s.global.cpa_real_eur)} />
                     </div>
                     <div className="text-[11px] text-neutral-500 mt-3 leading-relaxed">{s.description}</div>
                   </button>
@@ -295,7 +306,7 @@ export default function SiteForecast() {
                   <div>
                     <div className="text-[11px] uppercase tracking-widest text-neutral-500">Compte de résultat consolidé · 30 jours</div>
                     <h2 className="text-xl font-semibold text-neutral-900" style={{ fontFamily: "'Fraunces', serif" }}>
-                      Cascade TTC → Net pour toi
+                      Cascade TTC → Marge brute
                     </h2>
                   </div>
                 </div>
@@ -305,22 +316,14 @@ export default function SiteForecast() {
                   <PnlRow label="= Chiffre d'affaires HT" value={scen.global.revenue_ht_eur} bold />
                   <PnlRow label="– Coût marchandises (achat fournisseur)" value={-scen.global.cogs_eur} muted description="Payé à CJ Dropshipping / AliExpress" />
                   <PnlRow label="– Frais de livraison" value={-scen.global.shipping_eur} muted description="Coût moyen transporteur · ~6 €/commande" />
-                  <PnlRow label="– Budget publicitaire" value={-scen.global.ad_spend_eur} muted description="Google Ads · couvert 50/50 avec Altiaro" />
+                  <PnlRow label="– Budget publicitaire" value={-scen.global.ad_spend_eur} muted description="Google Ads estimé" />
                   <PnlRow
                     label="= Marge brute"
                     value={scen.global.gross_margin_eur}
                     bold
-                    accent={scen.global.gross_margin_eur >= 0 ? "emerald" : "rose"}
-                    description={`${fmtPct(scen.global.gross_margin_pct, 1)} du CA HT`}
-                  />
-                  <PnlRow label="– Commission Altiaro (50%)" value={-scen.global.commission_altiaro_eur} muted description="Plateforme · couvre hébergement, IA, support" />
-                  <PnlRow
-                    label="= Marge nette pour toi"
-                    value={scen.global.net_margin_concepteur_eur}
-                    bold
                     xl
-                    accent={scen.global.net_margin_concepteur_eur >= 0 ? "emerald" : "rose"}
-                    description="Ce que tu encaisses réellement après tous les coûts"
+                    accent={scen.global.gross_margin_eur >= 0 ? "emerald" : "rose"}
+                    description={`${fmtPct(scen.global.gross_margin_pct, 1)} du CA HT · ce que le projet dégage réellement`}
                   />
                 </div>
               </div>
@@ -345,7 +348,7 @@ export default function SiteForecast() {
                   <div><strong>3. Panier moyen (AOV)</strong> = prix produit principal + (attach rate × prix upsell remisé -20%)</div>
                   <div><strong>4. CA TTC / 30j</strong> = ventes × AOV · puis CA HT = CA TTC ÷ (1 + TVA marché)</div>
                   <div><strong>5. Marge brute</strong> = CA HT − coût marchandises − frais livraison − budget Ads</div>
-                  <div><strong>6. Net pour toi</strong> = Marge brute × 50 % (l'autre 50 % = commission Altiaro qui finance la plateforme)</div>
+                  <div><strong>6. Marge brute</strong> = ce que le projet dégage une fois tous les coûts opérationnels payés. C'est ce chiffre que tu veux maximiser.</div>
                   <div><strong>7. ROAS</strong> = CA TTC ÷ budget Ads · <span className="text-emerald-700">≥ 2,5 x</span> = sain, <span className="text-amber-700">1,8-2,5 x</span> = acceptable, <span className="text-rose-700">{`< 1,8 x`}</span> = risqué</div>
                   <div><strong>8. CPA réel</strong> = budget Ads ÷ ventes · à comparer avec ta marge par commande</div>
                   <div className="pt-2 text-neutral-500 italic">
@@ -499,26 +502,6 @@ export default function SiteForecast() {
 }
 
 // ---------- Small UI components ----------
-function BudgetInput({ label, value, onChange, testid, max }) {
-  return (
-    <div>
-      <label className="block text-[11px] uppercase tracking-widest text-neutral-500 mb-1">{label}</label>
-      <div className="flex items-center gap-2">
-        <input
-          type="number"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          data-testid={testid}
-          className="h-10 w-24 px-3 rounded-lg border border-neutral-200 text-sm font-mono"
-          min="5"
-          max={max || 500}
-        />
-        <span className="text-sm text-neutral-600">€</span>
-      </div>
-    </div>
-  );
-}
-
 function Row({ label, value, highlight, small }) {
   return (
     <div className="flex items-baseline justify-between">
