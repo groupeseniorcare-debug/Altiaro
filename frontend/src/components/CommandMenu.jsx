@@ -21,17 +21,22 @@ export default function CommandMenu() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Cmd+K / Ctrl+K toggle
+  // Cmd+K / Ctrl+K toggle — listens at window level + ignores when typing in an input
   useEffect(() => {
     const down = (e) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
+        e.stopPropagation();
         setOpen((v) => !v);
       }
       if (e.key === "Escape") setOpen(false);
     };
-    document.addEventListener("keydown", down);
-    return () => document.removeEventListener("keydown", down);
+    window.addEventListener("keydown", down, true);
+    document.addEventListener("keydown", down, true);
+    return () => {
+      window.removeEventListener("keydown", down, true);
+      document.removeEventListener("keydown", down, true);
+    };
   }, []);
 
   // Load user's sites lazily the first time the palette opens

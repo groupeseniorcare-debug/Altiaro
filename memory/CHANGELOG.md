@@ -3,6 +3,34 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-02 · Storefront UI polish v2 — mobile-first premium
+
+### Header refait mobile-first
+- **Mobile (<lg)** — grille 3 colonnes : hamburger **GAUCHE** (44×44) · logo **CENTRE** (h-9 max-w-[160px] object-contain, natural aspect) · panier **DROITE** (44×44 avec badge count). Fini le logo-carré-cropé.
+- **Desktop (>=lg)** — logo horizontal propre (h-10 max-w-[220px] object-contain, sans border, sans rounded-lg). Fraunces tagline sous le nom uniquement si pas de logo uploaded.
+
+### Drawer mobile premium (slide depuis la GAUCHE)
+- Barre de recherche full-width arrondie en haut (data-testid `mobile-search`)
+- **Lien compte** avec avatar User icon + label « Se connecter » / « Mon compte » (data-testid `mobile-account`) — NOUVEAU
+- Nav items (mobile-nav-*) avec min-h-[56px] + CaretRight
+- Footer email + téléphone + réassurance
+
+### Homepage — sections premium avec animations
+- `hasData()` **permissif** : benefits / testimonials / faq / newsletter / final_cta / products rendent toujours (fallback premium embarqué dans chaque composant). Seules les sections qui requièrent du contenu strictement user-provided restent gated (press_logos, lifestyle_editorial, founder_story, values, buying_guide, instagram, blog_teaser).
+- **Alternance de fond** : DARK_SECTIONS (`press_logos`, `final_cta`) → `#1C1917` blanc · GRAY_SECTIONS (`benefits`, `testimonials`, `faq`, `values`, `newsletter`) → `#F5F2EB` · autres → white.
+- **framer-motion v12.38** installé · chaque section wrappée dans `motion.div` avec `initial={{ opacity: 0, y: 32 }} whileInView={{ opacity: 1, y: 0 }}` viewport `once: true, margin: -80px` · animation 500ms easeOut.
+
+### Fix régression Cmd+K
+- Event listener installé sur `window` + `document` en **capture phase** (`true`) avec `stopPropagation()` — résout le cas où certains browser system handlers capturent avant React.
+
+### Testing iter28 : 30/30 UI PASS
+- Mobile layout 3-col validé bounding-box
+- Drawer left-0 slide-in-from-left confirmé
+- Logo desktop horizontal sans border confirmé
+- 5 sections motion wrapper + alternance bg confirmées
+- Cmd+K regression corrigée (cmdk-overlay count=1 après Ctrl+K)
+
+
 ## 2026-02 · Étape 5 · Wizard magique « Lancer la création » + orchestrateur full-site IA
 
 > **Changement majeur de l'UX** : l'Étape 5 devient un wizard 5 étapes → 1 bouton magique qui régénère palette + logo + homepage + fiches produits + images IA en une seule action.

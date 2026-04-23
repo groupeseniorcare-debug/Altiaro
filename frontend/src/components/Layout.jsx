@@ -149,6 +149,7 @@ export default function Layout({ children }) {
       <main className="flex-1 md:ml-[240px] min-h-screen pt-14 md:pt-0 bg-neutral-50">{children}</main>
       {user?.role === "admin" && <CommandPalette />}
       {user?.role && user.role !== "admin" && <CommandMenu />}
+      {/* user.role might be 'operator', 'concepteur', 'user', etc. — anything non-admin shows the navigation palette. */}
     </div>
   );
 }
