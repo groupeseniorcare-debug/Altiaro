@@ -41,7 +41,12 @@ export default function CockpitJourney({ site, onRefresh }) {
 
   const clearLlmFlag = async () => {
     setClearingLlm(true);
-    await apiCall(() => api.post(`/platform/llm-status/clear`));
+    // 1) Ask the backend to re-probe the LLM (will auto-clear if the key works).
+    const { data } = await apiCall(() => api.get(`/platform/llm-status?force=1`));
+    // 2) If probe still says exhausted, fall back to manual override.
+    if (data?.status === "budget_exhausted") {
+      await apiCall(() => api.post(`/platform/llm-status/clear`));
+    }
     setClearingLlm(false);
     setLlmStatus("ok");
   };
@@ -204,24 +209,23 @@ export default function CockpitJourney({ site, onRefresh }) {
     <div className="bg-white border border-neutral-200 rounded-2xl p-6" data-testid="cockpit-journey">
       {llmStatus === "budget_exhausted" && (
         <div
-          className="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3"
+          className="mb-5 p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3"
           data-testid="llm-budget-banner"
         >
-          <Warning size={20} weight="fill" className="text-red-600 flex-shrink-0 mt-0.5" />
+          <Warning size={20} weight="fill" className="text-amber-600 flex-shrink-0 mt-0.5" />
           <div className="flex-1 text-sm">
-            <div className="font-semibold text-red-900 mb-0.5">Budget IA épuisé</div>
-            <div className="text-red-700 leading-relaxed">
-              Toutes les actions IA (analyse pricing, design, upsells, enrichissement produits) sont désactivées.
-              Recharge ton Universal Key depuis <strong>Profile → Universal Key → Add Balance</strong> sur la plateforme Emergent, puis clique « J'ai rechargé » ci-contre.
+            <div className="font-semibold text-amber-900 mb-0.5">Clé IA à vérifier</div>
+            <div className="text-amber-800 leading-relaxed">
+              Ta dernière action IA a retourné « budget épuisé ». Le cockpit re-vérifie automatiquement toutes les minutes — si ta clé a été rechargée, la bannière disparaîtra seule à la prochaine action IA. Tu peux aussi la forcer maintenant.
             </div>
           </div>
           <button
             onClick={clearLlmFlag}
             disabled={clearingLlm}
             data-testid="clear-llm-banner"
-            className="h-9 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium disabled:opacity-60 whitespace-nowrap"
+            className="h-9 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium disabled:opacity-60 whitespace-nowrap"
           >
-            {clearingLlm ? "…" : "J'ai rechargé"}
+            {clearingLlm ? "…" : "Re-vérifier maintenant"}
           </button>
         </div>
       )}

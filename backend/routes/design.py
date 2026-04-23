@@ -136,7 +136,18 @@ async def _claude_json(system: str, user: str, session_id: str, timeout: int = 1
             raw = await asyncio.wait_for(chat.send_message(UserMessage(text=user)), timeout=timeout)
             payload = _strip(raw if isinstance(raw, str) else str(raw))
             try:
-                return json.loads(payload)
+                data = json.loads(payload)
+                # Success → auto-clear any stale budget_exhausted flag
+                try:
+                    await db.platform_health.update_one(
+                        {"key": "llm"},
+                        {"$set": {"key": "llm", "status": "ok",
+                                  "last_success_at": datetime.now(timezone.utc).isoformat()}},
+                        upsert=True,
+                    )
+                except Exception:
+                    pass
+                return data
             except json.JSONDecodeError as e:
                 logger.error(f"Design prompt returned invalid JSON (try {attempt+1}): {e}\n{payload[:400]}")
                 last_err = e

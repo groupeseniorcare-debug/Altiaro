@@ -62,7 +62,18 @@ async def _call_claude_json(system: str, user: str, timeout: int = 90) -> tuple[
         raw = await asyncio.wait_for(chat.send_message(UserMessage(text=user)), timeout=timeout)
         text = raw if isinstance(raw, str) else str(raw)
         try:
-            return json.loads(_strip_json_fence(text)), None
+            result = json.loads(_strip_json_fence(text))
+            # Success → auto-clear any stale budget_exhausted flag
+            try:
+                await db.platform_health.update_one(
+                    {"key": "llm"},
+                    {"$set": {"key": "llm", "status": "ok",
+                              "last_success_at": datetime.now(timezone.utc).isoformat()}},
+                    upsert=True,
+                )
+            except Exception:
+                pass
+            return result, None
         except json.JSONDecodeError:
             logger.error(f"Narrative Claude returned invalid JSON: {text[:300]}")
             return None, "invalid_json"

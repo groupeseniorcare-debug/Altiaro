@@ -1,11 +1,47 @@
 """Public routes for Altiaro platform (landing, legal pages).
 No auth required — crawlable by Google, Mollie reviewers, etc."""
 
+import asyncio
+import logging
+from datetime import datetime, timezone, timedelta
+
 from fastapi import APIRouter, HTTPException
 from altiaro_legal import get_legal_page
 from platform_policy import get_platform_policy
 
 router = APIRouter(prefix="/platform", tags=["platform"])
+logger = logging.getLogger("conceptfactory.platform")
+
+# How long a `budget_exhausted` flag is trusted before we re-probe the LLM.
+# Short value = the user gets unblocked fast as soon as they recharge.
+LLM_STALE_AFTER = timedelta(minutes=10)
+# Minimum interval between two auto-probes (avoids hammering Claude).
+LLM_PROBE_COOLDOWN = timedelta(seconds=60)
+
+
+async def _probe_llm_budget() -> bool:
+    """Fast, cheap Claude call (1-2 tokens). Returns True if the LLM answers
+    without a budget error — meaning the Universal Key has credits again."""
+    try:
+        import os
+        key = os.environ.get("EMERGENT_LLM_KEY", "")
+        if not key:
+            return False
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=key,
+            session_id=f"probe-{datetime.now(timezone.utc).timestamp()}",
+            system_message="Reply with the single word OK.",
+        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+        raw = await asyncio.wait_for(chat.send_message(UserMessage(text="ping")), timeout=15)
+        return bool(raw)
+    except Exception as e:
+        msg = str(e)
+        if "Budget has been exceeded" in msg or ("budget" in msg.lower() and "exceeded" in msg.lower()):
+            return False
+        # Transient errors (timeout, 5xx) → don't flip the flag, stay pessimistic.
+        logger.warning(f"[llm-probe] transient error, keeping flag: {msg[:120]}")
+        return False
 
 
 @router.get("/legal/{slug}")
@@ -66,25 +102,53 @@ async def platform_policy_public():
 
 
 @router.get("/llm-status")
-async def llm_status():
+async def llm_status(force: int = 0):
     """Returns the current LLM (Emergent Key) health status.
-    Used by the Cockpit to show a banner when the key has run out of budget.
-    Reads from `platform_health.llm` updated by any LLM route that hits 402.
+    Auto-recovers:
+      - If the flag is older than LLM_STALE_AFTER (10 min), silently clear it.
+      - If the flag is fresh but hasn't been probed in the last minute,
+        fire a 1-token test call. If Claude answers → clear the flag.
+      - Pass `?force=1` to bypass the probe cooldown (used by the banner button).
+    The Cockpit banner is therefore self-healing without user action.
     """
     from deps import db
-    from datetime import datetime, timezone, timedelta
     doc = await db.platform_health.find_one({"key": "llm"}, {"_id": 0}) or {}
     status = doc.get("status") or "ok"
     last_err = doc.get("last_error_at")
-    # Auto-clear stale flag after 2h — manual recheck will re-flip if still broken
-    if status == "budget_exhausted" and last_err:
+    last_probe = doc.get("last_probe_at")
+
+    if status != "budget_exhausted":
+        return {"status": status, "last_error_at": last_err}
+
+    now = datetime.now(timezone.utc)
+
+    def _parse(ts):
         try:
-            ts = datetime.fromisoformat(last_err.replace("Z", "+00:00"))
-            if datetime.now(timezone.utc) - ts > timedelta(hours=2):
-                status = "ok"
-        except (ValueError, TypeError):
-            pass
-    return {"status": status, "last_error_at": last_err}
+            return datetime.fromisoformat((ts or "").replace("Z", "+00:00"))
+        except (ValueError, TypeError, AttributeError):
+            return None
+
+    err_ts = _parse(last_err)
+    probe_ts = _parse(last_probe)
+    probe_stale = (not probe_ts) or (now - probe_ts) > LLM_PROBE_COOLDOWN
+    flag_stale = bool(err_ts) and (now - err_ts) > LLM_STALE_AFTER
+
+    if force or flag_stale or probe_stale:
+        ok = await _probe_llm_budget()
+        await db.platform_health.update_one(
+            {"key": "llm"},
+            {"$set": {
+                "key": "llm",
+                "status": "ok" if ok else "budget_exhausted",
+                "last_probe_at": now.isoformat(),
+                **({"last_error_at": now.isoformat()} if not ok else {}),
+            }},
+            upsert=True,
+        )
+        return {"status": "ok" if ok else "budget_exhausted",
+                "last_error_at": last_err, "auto_cleared": ok}
+
+    return {"status": "budget_exhausted", "last_error_at": last_err}
 
 
 @router.post("/llm-status/clear")
