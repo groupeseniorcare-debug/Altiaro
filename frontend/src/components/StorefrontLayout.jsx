@@ -89,13 +89,66 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
 
   // Header & footer navigation — source of truth is design.navigation (configured in the Studio).
   // We fall back to the default template items only if nothing is configured yet.
+  //
+  // The AI navigation optimizer (and older generations) sometimes produce French-slug
+  // aliases that don't match the live routes ("/a-propos" vs "/about", "/mentions-legales"
+  // vs "/mentions", "/collections/slug" vs "/collection/slug"). We normalise them here so
+  // Concepteurs never ship broken menus.
+  const HREF_ALIASES = {
+    "/a-propos": "/about",
+    "/a_propos": "/about",
+    "/apropos": "/about",
+    "/qui-sommes-nous": "/about",
+    "/qui-nous-sommes": "/about",
+    "/notre-histoire": "/about",
+    "/mentions-legales": "/mentions",
+    "/mentions_legales": "/mentions",
+    "/mentions-legal": "/mentions",
+    "/politique-de-confidentialite": "/confidentialite",
+    "/politique-confidentialite": "/confidentialite",
+    "/privacy": "/confidentialite",
+    "/cookies-policy": "/cookies",
+    "/conditions-generales": "/cgv",
+    "/conditions-generales-de-vente": "/cgv",
+    "/terms": "/cgv",
+    "/delivery": "/livraison",
+    "/shipping": "/livraison",
+    "/returns": "/retours",
+    "/refunds": "/retours",
+    "/questions": "/faq",
+    "/help": "/faq",
+    "/journal": "/blog",
+    "/news": "/blog",
+    "/press": "/blog",
+    "/boutique": "",
+    "/shop": "",
+    "/home": "",
+    "/accueil": "",
+  };
+
   const rewriteHref = (href = "") => {
     if (!href) return shopRoot;
     // External links → keep as-is
     if (/^https?:\/\//.test(href)) return href;
-    // Shop-scoped path ("/a-propos" → "/shop/{id}/a-propos"), already scoped → keep
+    // Mega-menu placeholders → route to the aggregate collections page
+    if (href === "#" || href === "#/") return `${shopRoot}/collections`;
+    // Already shop-scoped → trust it
     if (href.startsWith(shopRoot)) return href;
-    return `${shopRoot}${href.startsWith("/") ? href : "/" + href}`;
+    // Normalise path & query
+    let path = href.startsWith("/") ? href : "/" + href;
+    // Strip trailing slash (except for the root "/")
+    if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+    // Alias lookup (exact match first)
+    if (HREF_ALIASES[path] !== undefined) {
+      return `${shopRoot}${HREF_ALIASES[path]}`;
+    }
+    // /collections/<slug> → the route is /collection/<slug> (singular). Keep the plural
+    // root /collections because StorefrontCollections lists them all.
+    const collMatch = path.match(/^\/collections\/(.+)$/);
+    if (collMatch) {
+      return `${shopRoot}/collection/${collMatch[1]}`;
+    }
+    return `${shopRoot}${path}`;
   };
   const configuredHeader = design?.navigation?.header;
   const configuredFooter = design?.navigation?.footer;
@@ -132,24 +185,24 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
       <StorefrontTracking site={site} />
 
       {/* ================= TRUST BAR ================= */}
-      <div className="text-white text-[12.5px]" style={{ background: textCol }}>
-        <div className="max-w-7xl mx-auto px-6 py-2 flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-5">
-            <span className="flex items-center gap-1.5">
-              <Truck size={14} weight="bold" /> {t(lang, "free_shipping_above")}
+      <div className="text-white text-[12px] tracking-[0.01em]" style={{ background: textCol }}>
+        <div className="max-w-7xl mx-auto px-6 py-2.5 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center divide-x divide-white/15">
+            <span className="flex items-center gap-1.5 pr-5">
+              <Truck size={13} weight="bold" /> {t(lang, "free_shipping_above")}
             </span>
-            <span className="hidden md:flex items-center gap-1.5">
-              <ShieldCheck size={14} weight="bold" /> {t(lang, "secure_checkout")}
+            <span className="hidden md:flex items-center gap-1.5 px-5">
+              <ShieldCheck size={13} weight="bold" /> {t(lang, "secure_checkout")}
             </span>
-            <span className="hidden md:flex items-center gap-1.5">
-              <Phone size={14} weight="bold" /> {t(lang, "support_seniors")}
+            <span className="hidden md:flex items-center gap-1.5 pl-5">
+              <Phone size={13} weight="bold" /> {t(lang, "support_seniors")}
             </span>
           </div>
           <select
             value={lang}
             onChange={(e) => setLang(e.target.value)}
             data-testid="lang-switcher"
-            className="bg-transparent border border-white/25 rounded px-2 py-0.5 text-[12px] hover:bg-white/10 cursor-pointer outline-none"
+            className="bg-transparent border border-white/20 rounded-sm px-2 py-0.5 text-[11px] tracking-wide hover:bg-white/10 cursor-pointer outline-none"
           >
             {LANGUAGES.map((l) => (
               <option key={l.code} value={l.code} style={{ color: textCol }}>
@@ -161,9 +214,9 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
       </div>
 
       {/* ================= HEADER ================= */}
-      <header className="bg-white/95 backdrop-blur border-b sticky top-0 z-30" style={{ borderColor: "#E7E5E4" }}>
+      <header className="bg-white/95 backdrop-blur-md sticky top-0 z-30 border-b" style={{ borderColor: "#EDEAE4" }}>
         {/* -------- Mobile layout (<lg) : hamburger LEFT · logo CENTER · cart RIGHT -------- */}
-        <div className="lg:hidden max-w-7xl mx-auto px-4 py-3 grid grid-cols-[auto_1fr_auto] items-center gap-3">
+        <div className="lg:hidden max-w-7xl mx-auto px-4 py-3.5 grid grid-cols-[auto_1fr_auto] items-center gap-3">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
@@ -180,6 +233,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
                 src={logoUrl}
                 alt={logoText}
                 className="h-9 max-w-[160px] object-contain"
+                style={{ mixBlendMode: "multiply" }}
                 loading="eager"
               />
             ) : (
@@ -196,8 +250,8 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
             onClick={() => window.dispatchEvent(new Event("cf_cart_open"))}
             data-testid="cart-button-mobile"
             aria-label={t(lang, "cart")}
-            className="relative w-11 h-11 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center active:scale-95 transition-transform"
-            style={{ background: accent }}
+            className="relative w-11 h-11 min-w-[44px] min-h-[44px] rounded-full border bg-white hover:bg-neutral-50 flex items-center justify-center active:scale-95 transition-all"
+            style={{ borderColor: "#E7E5E4" }}
           >
             <ShoppingBag size={20} weight="regular" style={{ color: textCol }} />
             {cartCount > 0 && (
@@ -212,14 +266,15 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
         </div>
 
         {/* -------- Desktop layout (>=lg) -------- */}
-        <div className="hidden lg:flex max-w-7xl mx-auto px-6 py-4 items-center justify-between gap-6">
+        <div className="hidden lg:grid max-w-7xl mx-auto px-6 py-5 items-center gap-8 grid-cols-[auto_1fr_auto]">
           {/* LEFT — Logo */}
           <Link to={shopRoot} className="group flex items-center gap-3 shrink-0" data-testid="shop-logo">
             {logoUrl ? (
               <img
                 src={logoUrl}
                 alt={logoText}
-                className="h-10 max-w-[220px] object-contain"
+                className="h-10 max-w-[220px] object-contain transition-transform group-hover:scale-[1.02]"
+                style={{ mixBlendMode: "multiply" }}
                 loading="eager"
               />
             ) : (
@@ -238,7 +293,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
           </Link>
 
           {/* CENTER — Nav desktop */}
-          <nav className="hidden lg:flex items-center gap-8" data-testid="header-nav">
+          <nav className="hidden lg:flex items-center justify-center gap-10" data-testid="header-nav">
             {nav.map((n, idx) => {
               const isMega = n.type === "mega" && Array.isArray(n.children) && n.children.length > 0;
               if (isMega) {
@@ -247,11 +302,11 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
                     <Link
                       to={rewriteHref(n.href || "/collections")}
                       data-testid={`nav-mega-${n.label.toLowerCase()}`}
-                      className="text-[14px] font-medium transition hover:opacity-70 inline-flex items-center gap-1"
+                      className="text-[14px] font-medium tracking-[0.01em] inline-flex items-center gap-1 py-2 relative after:absolute after:left-1/2 after:-translate-x-1/2 after:bottom-0 after:h-[1.5px] after:w-0 after:bg-current after:transition-all after:duration-300 group-hover:after:w-[calc(100%-8px)]"
                       style={{ color: textCol }}
                     >
                       {n.label}
-                      <CaretRight size={10} className="rotate-90 opacity-60" />
+                      <CaretRight size={10} className="rotate-90 opacity-60 transition-transform group-hover:rotate-[270deg]" />
                     </Link>
                     {/* Mega panel (desktop) — appears on hover */}
                     <div
@@ -296,7 +351,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
                   key={`${n.label}-${idx}`}
                   to={n.href}
                   data-testid={`nav-${n.label.toLowerCase()}`}
-                  className="text-[14px] font-medium relative transition hover:opacity-70"
+                  className="text-[14px] font-medium tracking-[0.01em] relative py-2 after:absolute after:left-1/2 after:-translate-x-1/2 after:bottom-0 after:h-[1.5px] after:w-0 after:bg-current after:transition-all after:duration-300 hover:after:w-full"
                   style={{ color: textCol }}
                 >
                   {n.label}
@@ -333,31 +388,27 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
             <Link
               to={customer ? `${shopRoot}/account` : `${shopRoot}/account/login`}
               data-testid="header-account"
-              className="flex items-center gap-2 h-11 px-3 rounded-full border transition hover:bg-neutral-50"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full border bg-white hover:bg-neutral-50 flex items-center justify-center transition active:scale-95"
               style={{ borderColor: "#E7E5E4" }}
               title={customer ? `${customer.first_name} ${customer.last_name}` : "Se connecter"}
+              aria-label={customer ? "Mon compte" : "Se connecter"}
             >
               <User size={18} weight="regular" style={{ color: textCol }} />
-              <span className="text-sm font-medium hidden lg:inline" style={{ color: textCol }}>
-                {customer ? (customer.first_name || "Mon compte") : "Se connecter"}
-              </span>
             </Link>
 
             <button
               type="button"
               onClick={() => window.dispatchEvent(new Event("cf_cart_open"))}
               data-testid="cart-button"
-              className="relative flex items-center gap-2 h-11 px-4 rounded-full border transition"
-              style={{ background: accent, borderColor: "#E7E5E4" }}
+              aria-label={t(lang, "cart")}
+              className="relative w-11 h-11 min-w-[44px] min-h-[44px] rounded-full border bg-white hover:bg-neutral-50 flex items-center justify-center transition active:scale-95"
+              style={{ borderColor: "#E7E5E4" }}
             >
               <ShoppingBag size={20} weight="regular" style={{ color: textCol }} />
-              <span className="text-sm font-medium hidden sm:inline" style={{ color: textCol }}>
-                {t(lang, "cart")}
-              </span>
               {cartCount > 0 && (
                 <span
                   data-testid="cart-count"
-                  className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] rounded-full text-white text-[11px] font-semibold flex items-center justify-center px-1.5"
+                  className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] rounded-full text-white text-[11px] font-semibold flex items-center justify-center px-1.5 border-2 border-white"
                   style={{ background: primary }}
                 >
                   {cartCount}

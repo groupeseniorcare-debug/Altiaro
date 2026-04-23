@@ -245,13 +245,21 @@ export default function CartDrawer({ design }) {
 
         {items.length > 0 && (
           <div className="border-t border-neutral-200 p-5 space-y-3 shrink-0 bg-white">
-            <div className="flex items-center gap-2 text-xs text-emerald-700 font-medium" style={{ background: accent }} >
-              <Truck size={14} weight="duotone" />
-              <span className="py-1.5">Livraison offerte partout</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-emerald-700 font-medium" style={{ background: accent }}>
-              <ShieldCheck size={14} weight="duotone" />
-              <span className="py-1.5">Retour gratuit sous 14 jours · Garantie 2 ans</span>
+            {/* Reassurance strip — neutral panels, emerald accent only on the icon
+                (a premium convention: trust cues are subtle, not in-your-face). */}
+            <div className="rounded-xl bg-neutral-50 border border-neutral-200 divide-y divide-neutral-200 overflow-hidden">
+              <div className="flex items-center gap-2.5 px-3 py-2.5">
+                <div className="w-7 h-7 rounded-full bg-emerald-50 flex items-center justify-center">
+                  <Truck size={14} weight="fill" className="text-emerald-600" />
+                </div>
+                <span className="text-xs text-neutral-800 font-medium">Livraison offerte partout</span>
+              </div>
+              <div className="flex items-center gap-2.5 px-3 py-2.5">
+                <div className="w-7 h-7 rounded-full bg-emerald-50 flex items-center justify-center">
+                  <ShieldCheck size={14} weight="fill" className="text-emerald-600" />
+                </div>
+                <span className="text-xs text-neutral-800 font-medium">Retour gratuit 14 j · Garantie 2 ans</span>
+              </div>
             </div>
             <div className="flex items-center justify-between pt-1">
               <span className="text-sm text-neutral-600">Sous-total</span>

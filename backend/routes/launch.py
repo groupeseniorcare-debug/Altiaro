@@ -164,11 +164,14 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
             logo_prompt = (
                 f"Ultra-premium horizontal wordmark logo for a luxury French brand named "
                 f"« {_logo_name} ». "
-                "Editorial typography (light serif with subtle ligatures), monochrome on transparent background, "
-                "extremely refined kerning, tagline optional below in small caps. Aspect ratio 16:5 (horizontal, "
-                "wider than tall). Absolutely NO icon, NO symbol, NO flourish — typography only. "
-                "Museum-quality, think Hermès / Aesop / Loro Piana. Output ready to go on a white website header. "
-                "High resolution, extremely sharp."
+                "Editorial typography only (elegant light serif with subtle ligatures), "
+                "DEEP BLACK text (#0A0A0A) on a PURE WHITE background (#FFFFFF), no cream, no ivory, no off-white. "
+                "The background must be 100% white so it blends invisibly into a white website header. "
+                "Extremely refined kerning, tagline optional below in small caps. Aspect ratio 16:5 (horizontal, "
+                "wider than tall), with generous white margins on all sides. Absolutely NO icon, NO symbol, "
+                "NO flourish, NO framed box, NO colored background — pure typography only. "
+                "Museum-quality, think Hermès / Aesop / Loro Piana. High resolution, extremely sharp, "
+                "antialiased edges."
             )
             url = await asyncio.wait_for(
                 pimg_routes._generate_one(logo_prompt, site_id, f"logo-{site_id[:8]}"),

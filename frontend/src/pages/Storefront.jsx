@@ -227,8 +227,8 @@ function hasData(key, design, products) {
 }
 
 // Alternating surface colors for section rhythm.
-const DARK_SECTIONS = new Set(["press_logos", "final_cta"]);
-const GRAY_SECTIONS = new Set(["benefits", "testimonials", "faq", "values", "newsletter"]);
+const DARK_SECTIONS = new Set(["press_logos"]);
+const GRAY_SECTIONS = new Set(["benefits", "testimonials", "faq", "values", "newsletter", "final_cta"]);
 
 function sectionWrapperClass(key, idx) {
   if (DARK_SECTIONS.has(key)) return "bg-[#1C1917] text-white";
