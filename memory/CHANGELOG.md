@@ -3,7 +3,39 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
-## 2026-04-23 · Cluster mensuel SEO — 1 pilier + 4 satellites auto
+## 2026-04-23 · Étape 6 + Widget Pulse SEO (dashboard)
+
+### Étape 6 — Rédaction IA des pages statiques
+- **NEW backend** `POST /api/sites/{id}/design/generate-pages` + `GET .../generate-pages/{job_id}` :
+  job background qui génère en 1 appel Claude le copy éditorial des 5 pages
+  (**about, contact, livraison, retours, faq**) persisté dans `site.design.pages.*`.
+  Gère l'erreur 402 budget proprement (status `failed` + message clair).
+- **Frontend** : bouton noir **"Rédiger les pages (IA)"** dans `SiteDesign.jsx` +
+  polling du statut toutes les 8 s (max 4 min).
+- **Storefront** : `StorefrontAbout`, `StorefrontContact`, `StorefrontLivraison`,
+  `StorefrontRetours`, `StorefrontFAQ` lisent maintenant `design.pages.{section}`
+  avec fallback sur l'ancien contenu hardcodé.
+
+### Widget "Pulse SEO" — Dashboard Concepteur
+- **NEW backend** `GET /api/sites/{id}/seo/pulse` : articles ce mois, keywords
+  couverts vs total informationnels, score E-E-A-T par article (heuristique sur
+  longueur, structure H2, listes, FAQ, internal links, méta SEO), prochain
+  cluster mensuel, top 6 articles récents scorés.
+- **NEW frontend** `components/PulseSEOWidget.jsx` :
+  - Carte monochrome éditoriale 4-KPIs (Fraunces numerals, barres de progression
+    noires `#0A0A0A`).
+  - Liste des top articles récents avec badge E-E-A-T coloré par tranche
+    (≥75 noir, ≥55 gris, <55 ambre).
+  - Footer placeholder pour brancher Google Search Console plus tard.
+  - Bouton d'accès direct vers `/sites/:id/blog-posts`.
+- Intégré dans `SiteDetail.jsx` entre le Cockpit et le QA Panel.
+
+### Budget
+Chaque appel Claude coûte ~1-2 € avec un pillar ou 5 pages. Les prompts sont
+calibrés au minimum viable. Budget épuisé = `status:"failed"` clair + UI
+bannerisée. Aucune perte de UX.
+
+## 2026-04-23 (earlier) · Cluster mensuel SEO — 1 pilier + 4 satellites auto
 
 ### Backend
 - **NEW** `POST /api/sites/{id}/blog-posts/cluster-monthly` — déclenche un cluster

@@ -81,6 +81,54 @@ export default function SiteDesign() {
     setTimeout(() => setEnrichToast(""), 6000);
   };
 
+  const [pagesBusy, setPagesBusy] = useState(false);
+  const pollPagesJob = (jobId) => {
+    const startAt = Date.now();
+    const maxMs = 4 * 60 * 1000;
+    const tick = async () => {
+      const { data, error } = await apiCall(() =>
+        api.get(`/sites/${siteId}/design/generate-pages/${jobId}`)
+      );
+      if (error) { setPagesBusy(false); setEnrichToast(`Échec : ${error}`); return; }
+      if (data.status === "done") {
+        setPagesBusy(false);
+        const pages = (data.generated_pages || []).join(", ");
+        setEnrichToast(`✓ Pages générées : ${pages}`);
+        await reload();
+        setTimeout(() => setEnrichToast(""), 6000);
+        return;
+      }
+      if (data.status === "failed") {
+        setPagesBusy(false);
+        setEnrichToast(`Échec : ${data.error || "erreur inconnue"}`);
+        return;
+      }
+      if (Date.now() - startAt < maxMs) {
+        setTimeout(tick, 8000);
+      } else {
+        setPagesBusy(false);
+        setEnrichToast("Timeout — recharge dans 1 min si les pages ne sont pas là.");
+      }
+    };
+    setTimeout(tick, 5000);
+  };
+
+  const generatePages = async () => {
+    if (!window.confirm(
+      "Générer le contenu IA des 5 pages statiques (À propos, Contact, Livraison, Retours, FAQ) ?\n\n" +
+      "• Durée : environ 60-120 s (en arrière-plan)\n" +
+      "• Copy éditorial ton magazine, pensé pour votre niche"
+    )) return;
+    setPagesBusy(true);
+    setEnrichToast("");
+    const { data, error, rawDetail } = await apiCall(() =>
+      api.post(`/sites/${siteId}/design/generate-pages`, {})
+    );
+    if (error) { setPagesBusy(false); setEnrichToast(`Échec : ${rawDetail?.detail || error}`); return; }
+    setEnrichToast(data?.message || "Rédaction IA lancée…");
+    if (data?.job_id) pollPagesJob(data.job_id);
+  };
+
   if (loading) return <div className="min-h-screen bg-[#FAF7F2] p-10 text-neutral-500">Chargement…</div>;
 
   const brand = design?.brand || {};
@@ -191,6 +239,16 @@ export default function SiteDesign() {
             >
               {enriching ? <ArrowClockwise size={14} className="animate-spin" /> : <Sparkle size={14} weight="fill" />}
               {enriching ? "Enrichissement IA…" : "✨ Enrichir la homepage"}
+            </button>
+            <button
+              onClick={generatePages}
+              disabled={pagesBusy}
+              data-testid="ai-generate-pages"
+              title="Rédige le copy IA des 5 pages statiques (À propos, Contact, Livraison, Retours, FAQ)"
+              className="h-11 px-4 rounded-xl bg-neutral-900 hover:bg-black text-white text-sm font-medium flex items-center gap-2 shadow-md disabled:opacity-60"
+            >
+              {pagesBusy ? <ArrowClockwise size={14} className="animate-spin" /> : <Sparkle size={14} weight="fill" />}
+              {pagesBusy ? "Rédaction IA…" : "Rédiger les pages (IA)"}
             </button>
             <button
               onClick={() => setMode("wizard")}

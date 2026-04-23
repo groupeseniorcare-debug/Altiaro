@@ -1697,3 +1697,267 @@ async def apply_homepage_preset(
         }},
     )
     return {"ok": True, "preset": preset, "visible_count": len(enabled), "sections": sections}
+
+
+# =====================================================================
+# ÉTAPE 6 — Rédaction IA des pages statiques (About, FAQ, Contact, Livraison, Retours)
+# =====================================================================
+async def _run_pages_generation_job(site_id: str, job_id: str, site: dict):
+    """Background worker : génère + persiste le copy des 5 pages statiques."""
+    try:
+        await db.pages_jobs.update_one({"id": job_id}, {"$set": {"status": "running"}})
+        name = site.get("name") or "notre maison"
+        niche = site.get("niche") or "produits seniors"
+        brand = ((site.get("design") or {}).get("brand")) or {}
+        voice = brand.get("voice") or "chaleureux, rassurant, premium, pédagogue"
+
+        system = (
+            "Tu es un rédacteur éditorial senior (top 1%) pour le marché français de la Silver Economy. "
+            "Tu écris un copy ultra-premium (ton magazine, jamais corporate), E-E-A-T maximum, "
+            "avec des phrases courtes et concrètes. Tu renvoies UNIQUEMENT du JSON valide."
+        )
+        user_prompt = f"""Rédige le contenu éditorial de 5 pages statiques pour la boutique {name} (niche : {niche}, voix de marque : {voice}).
+
+Le JSON ci-dessous est STRICT — respecte la structure et les longueurs EXACTEMENT.
+
+{{
+  "about": {{
+    "headline": "Phrase éditoriale 60-90 chars, pas de nom de marque, évocatrice",
+    "paragraphs": [
+      "Paragraphe 1 — l'origine, la conviction fondatrice (60-90 mots)",
+      "Paragraphe 2 — notre méthode et nos exigences (60-90 mots)",
+      "Paragraphe 3 — notre engagement humain (50-70 mots)"
+    ],
+    "values": [
+      {{"title": "Valeur 1 (2-3 mots)", "description": "1 phrase concrète (15-20 mots)"}},
+      {{"title": "Valeur 2 (2-3 mots)", "description": "1 phrase concrète (15-20 mots)"}},
+      {{"title": "Valeur 3 (2-3 mots)", "description": "1 phrase concrète (15-20 mots)"}},
+      {{"title": "Valeur 4 (2-3 mots)", "description": "1 phrase concrète (15-20 mots)"}}
+    ]
+  }},
+  "contact": {{
+    "headline": "Phrase d'invitation 50-70 chars",
+    "intro": "1 paragraphe chaleureux 40-60 mots sur la relation humaine avec vos clients"
+  }},
+  "livraison": {{
+    "headline": "Phrase rassurante 50-70 chars",
+    "intro": "1 paragraphe 50-70 mots sur la philosophie de livraison (attention, soin, planning)",
+    "notes": [
+      "Note sur les produits volumineux (50-70 mots)",
+      "Note sur l'emballage écologique et le zéro-plastique (40-60 mots)"
+    ]
+  }},
+  "retours": {{
+    "headline": "Phrase 50-70 chars sur la sérénité d'achat",
+    "intro": "1 paragraphe 50-70 mots sur la politique de retour 14 jours, gratuite, sans justification",
+    "steps": [
+      {{"title": "Étape 1 titre court", "description": "1 phrase concrète 15-25 mots"}},
+      {{"title": "Étape 2 titre court", "description": "1 phrase concrète 15-25 mots"}},
+      {{"title": "Étape 3 titre court", "description": "1 phrase concrète 15-25 mots"}},
+      {{"title": "Étape 4 titre court", "description": "1 phrase concrète 15-25 mots"}}
+    ]
+  }},
+  "faq": {{
+    "headline": "Phrase 50-70 chars d'intro FAQ",
+    "items": [
+      {{"question": "Question fréquente spécifique à la niche ({niche}) 1", "answer": "Réponse 40-60 mots précise et rassurante"}},
+      {{"question": "Question 2 sur la livraison/délais", "answer": "Réponse 40-60 mots"}},
+      {{"question": "Question 3 sur l'installation / mise en service", "answer": "Réponse 40-60 mots"}},
+      {{"question": "Question 4 sur la garantie et le SAV", "answer": "Réponse 40-60 mots"}},
+      {{"question": "Question 5 sur le remboursement mutuelle/Sécu (LPPR)", "answer": "Réponse 40-60 mots"}},
+      {{"question": "Question 6 sur l'entretien du produit", "answer": "Réponse 40-60 mots"}},
+      {{"question": "Question 7 sur les conseils personnalisés par téléphone", "answer": "Réponse 40-60 mots"}},
+      {{"question": "Question 8 sur le paiement sécurisé / plusieurs fois", "answer": "Réponse 40-60 mots"}}
+    ]
+  }}
+}}
+
+CONTRAINTES :
+- Aucune marque concurrente citée. Aucun disclaimer IA.
+- Écris comme un rédacteur de Monocle/Kinfolk : phrases concrètes, images sensorielles, pas d'adjectifs creux.
+- N'emploie jamais le mot "senior" comme étiquette froide — préfère "client", "parent", "proche"."""
+
+        try:
+            data = await _claude_json(system, user_prompt, session_id=f"pages-{site_id}", timeout=220)
+        except HTTPException as e:
+            await db.pages_jobs.update_one({"id": job_id}, {"$set": {
+                "status": "failed", "error": f"{e.status_code}: {e.detail}"[:300],
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+            }})
+            return
+        if not isinstance(data, dict):
+            await db.pages_jobs.update_one({"id": job_id}, {"$set": {
+                "status": "failed", "error": "IA n'a pas renvoyé un JSON valide.",
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+            }})
+            return
+
+        pages = {}
+        for key in ("about", "contact", "livraison", "retours", "faq"):
+            block = data.get(key)
+            if isinstance(block, dict):
+                pages[key] = block
+
+        if not pages:
+            await db.pages_jobs.update_one({"id": job_id}, {"$set": {
+                "status": "failed", "error": "Réponse IA incomplète.",
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+            }})
+            return
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        await db.sites.update_one(
+            {"id": site_id},
+            {"$set": {
+                "design.pages": pages,
+                "design.pages_generated_at": now_iso,
+                "design.updated_at": now_iso,
+            }},
+        )
+        await db.pages_jobs.update_one({"id": job_id}, {"$set": {
+            "status": "done",
+            "generated_pages": list(pages.keys()),
+            "finished_at": now_iso,
+        }})
+    except Exception as e:
+        logger.exception("pages generation job crashed")
+        await db.pages_jobs.update_one({"id": job_id}, {"$set": {
+            "status": "failed", "error": str(e)[:300],
+            "finished_at": datetime.now(timezone.utc).isoformat(),
+        }})
+
+
+@router.post("/sites/{site_id}/design/generate-pages")
+async def generate_static_pages(site_id: str, user: dict = Depends(get_current_user)):
+    """Lance la génération IA des 5 pages statiques en background. Retourne
+    un job_id, le client poll via GET .../generate-pages/{job_id}."""
+    await _check_site_access(site_id, user)
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(404, "Site introuvable")
+
+    job_id = str(uuid.uuid4())
+    await db.pages_jobs.insert_one({
+        "id": job_id,
+        "site_id": site_id,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    asyncio.create_task(_run_pages_generation_job(site_id, job_id, site))
+    return {
+        "status": "started",
+        "job_id": job_id,
+        "message": "Rédaction IA lancée. Recharge la page dans 60 à 120 secondes.",
+    }
+
+
+@router.get("/sites/{site_id}/design/generate-pages/{job_id}")
+async def generate_static_pages_status(site_id: str, job_id: str, user: dict = Depends(get_current_user)):
+    await _check_site_access(site_id, user)
+    job = await db.pages_jobs.find_one({"id": job_id, "site_id": site_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(404, "Job introuvable")
+    return job
+
+
+# =====================================================================
+# Pulse SEO — widget de suivi éditorial et SEO
+# =====================================================================
+def _compute_eeat_score(post: dict) -> int:
+    """Score E-E-A-T heuristique 0-100 basé sur des signaux concrets du contenu."""
+    body = post.get("body") or ""
+    word_count = len(body.split())
+    score = 0
+    if word_count >= 1500:
+        score += 25
+    elif word_count >= 900:
+        score += 18
+    elif word_count >= 500:
+        score += 10
+    if body.count("\n## ") >= 3:
+        score += 15
+    elif body.count("\n## ") >= 1:
+        score += 8
+    if "FAQ" in body or "?\n" in body or "### Question" in body:
+        score += 15
+    if body.count("\n- ") >= 5:
+        score += 10
+    if body.count("**") >= 6:
+        score += 10
+    if "/blog/" in body or ("[" in body and "](/" in body):
+        score += 15
+    if post.get("meta_title") and post.get("meta_description"):
+        score += 10
+    return min(score, 100)
+
+
+@router.get("/sites/{site_id}/seo/pulse")
+async def seo_pulse(site_id: str, user: dict = Depends(get_current_user)):
+    """Widget dashboard : articles publiés, keywords couverts, E-E-A-T moyen."""
+    await _check_site_access(site_id, user)
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(404, "Site introuvable")
+
+    design = site.get("design") or {}
+    posts = design.get("blog_posts") or []
+
+    now = datetime.now(timezone.utc)
+    month_key = now.strftime("%Y-%m")
+    posts_this_month = [p for p in posts if (p.get("published_at") or "").startswith(month_key)]
+
+    covered_kws = set()
+    for p in posts:
+        for f in ("pillar_keyword", "satellite_keyword"):
+            if p.get(f):
+                covered_kws.add(str(p[f]).lower().strip())
+        for v in p.get("satellite_keywords") or []:
+            covered_kws.add(str(v).lower().strip())
+
+    niche_an = design.get("niche_analysis") or {}
+    total_informational = 0
+    info_re = re.compile(r"\b(comment|pourquoi|guide|choisir|quand|quoi|est-ce|différence|types|bienfaits|avantages|inconvénients)\b", re.I)
+    for result in niche_an.get("results") or []:
+        for k in result.get("keywords") or []:
+            kw = (k.get("keyword") if isinstance(k, dict) else str(k)) or ""
+            if info_re.search(kw):
+                total_informational += 1
+
+    coverage_pct = 0
+    if total_informational > 0:
+        coverage_pct = round(min(100, (len(covered_kws) / total_informational) * 100))
+
+    recent = sorted(posts, key=lambda p: p.get("published_at") or "", reverse=True)[:6]
+    recent_scored = [{
+        "slug": p.get("slug"),
+        "title": p.get("title"),
+        "type": p.get("type") or "article",
+        "published_at": p.get("published_at"),
+        "read_minutes": p.get("read_minutes"),
+        "eeat_score": _compute_eeat_score(p),
+        "word_count": len((p.get("body") or "").split()),
+    } for p in recent]
+    avg_eeat = round(sum(r["eeat_score"] for r in recent_scored) / len(recent_scored)) if recent_scored else 0
+
+    bc = design.get("blog_cluster") or {}
+    next_cluster = None
+    if bc.get("auto_enabled"):
+        if now.month == 12:
+            nc = now.replace(year=now.year + 1, month=1, day=1, hour=6, minute=0, second=0, microsecond=0)
+        else:
+            nc = now.replace(month=now.month + 1, day=1, hour=6, minute=0, second=0, microsecond=0)
+        next_cluster = nc.isoformat()
+
+    return {
+        "articles_this_month": len(posts_this_month),
+        "articles_total": len(posts),
+        "keywords_covered": len(covered_kws),
+        "keywords_total_informational": total_informational,
+        "coverage_pct": coverage_pct,
+        "recent_articles": recent_scored,
+        "avg_eeat_score": avg_eeat,
+        "next_cluster_at": next_cluster,
+        "avg_google_position": None,
+        "google_source": "non_connecte",
+    }
+

@@ -93,6 +93,8 @@ Les 50 étapes du playbook sont regroupées en **8 blocs thématiques ordonnés*
 | 51 | **Storefront monochrome éditorial** (homepage + page produit, Manifesto + BrandProcess + FounderStory + PressLogos + EditorialMosaic + Reviews) | ✅ |
 | 52 | **Blog IA — pilier + satellites automatiques** (`/api/sites/{id}/blog-posts/auto-plan` background task + cross-linking + IndexNow) | ✅ |
 | 53 | **Cluster SEO mensuel** (1 pilier + 4 satellites, exclusion keywords utilisés, APScheduler 1er du mois, toggle auto + déclenchement manuel, UI monochrome éditoriale) | ✅ |
+| 54 | **Étape 6 — Rédaction IA des pages** (About, Contact, Livraison, Retours, FAQ en 1 run Claude, endpoint background, bouton Studio, storefront lit design.pages.*) | ✅ |
+| 55 | **Widget Pulse SEO** (articles/mois, couverture keywords, score E-E-A-T par article, prochain cluster, intégré au cockpit SiteDetail) | ✅ |
 
 ## Règles critiques
 - Pas de Shopify — tout custom React/FastAPI.

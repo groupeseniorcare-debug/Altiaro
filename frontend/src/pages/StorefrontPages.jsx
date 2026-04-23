@@ -89,17 +89,24 @@ export function StorefrontAbout() {
   const { site, design, lang, setLang } = useSiteDesign();
   const fontHeading = design?.brand?.font_heading || "Fraunces";
   const primary = design?.brand?.primary_color || "#B84B31";
+  const aiPage = design?.pages?.about || {};
 
-  const headline = pickText(design?.about?.headline, lang) || `L'histoire de ${site?.name || "notre boutique"}`;
+  const headline = aiPage.headline
+    || pickText(design?.about?.headline, lang)
+    || `L'histoire de ${site?.name || "notre boutique"}`;
+  const aiParagraphs = Array.isArray(aiPage.paragraphs) ? aiPage.paragraphs.filter(Boolean) : [];
   const paragraphs = (design?.about?.paragraphs || []).map((p) => pickText(p, lang)).filter(Boolean);
   const fallbackParagraphs = [
     `Tout a commencé avec une question simple : « Pourquoi est-il si compliqué de trouver des produits de qualité, adaptés aux seniors, sans se perdre dans le jargon médical ou dans des catalogues impersonnels ? »`,
     `${site?.name || "Notre boutique"} est née de cette évidence. Nous sélectionnons chaque produit comme si c'était pour un membre de notre propre famille. Nos partenaires fabricants sont audités, nos ergothérapeutes valident les produits avant l'entrée en catalogue, et notre équipe de conseillers est joignable par téléphone — par de vrais humains, pas des robots.`,
     `Nous croyons qu'on peut vieillir dignement, sereinement, en gardant son autonomie. Et que cela doit être accessible à tous, simplement.`,
   ];
-  const displayParagraphs = paragraphs.length > 0 ? paragraphs : fallbackParagraphs;
+  const displayParagraphs = aiParagraphs.length ? aiParagraphs : (paragraphs.length > 0 ? paragraphs : fallbackParagraphs);
 
-  const pillars = [
+  const aiValues = Array.isArray(aiPage.values) ? aiPage.values.filter((v) => v && v.title) : [];
+  const pillars = aiValues.length ? aiValues.map((v) => ({
+    icon: Heart, title: v.title, desc: v.description || "",
+  })) : [
     { icon: Heart, title: "Bienveillance", desc: "Chaque produit est pensé pour préserver dignité, confort et autonomie." },
     { icon: ShieldCheck, title: "Exigence", desc: "Audits fournisseurs, tests ergothérapeutes, garantie 2 ans sur tout." },
     { icon: HandHeart, title: "Accompagnement", desc: "Un conseiller humain Lun–Ven 9h–18h, installation possible à domicile." },
@@ -170,6 +177,7 @@ export function StorefrontContact() {
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
   const contact = design?.contact || {};
+  const aiPage = design?.pages?.contact || {};
   const contactEmail = contact.support_email || contact.email || "bonjour@boutique.fr";
   const contactPhone = contact.support_phone || contact.phone || "01 23 45 67 89";
   const contactHours = pickText(contact.support_hours, lang) || contact.hours || "Lun–Ven · 9h–18h";
@@ -193,8 +201,8 @@ export function StorefrontContact() {
       <SEOHead title={`Contact · ${site?.name || ""}`} description="Contactez notre équipe par email, téléphone ou via le formulaire." />
       <PageHero
         eyebrow="Contact"
-        title="On vous écoute."
-        subtitle="Une question, un conseil produit, un devis, un problème avec votre commande ? Nous vous répondons en moyenne sous 2h ouvrées."
+        title={aiPage.headline || "On vous écoute."}
+        subtitle={aiPage.intro || "Une question, un conseil produit, un devis, un problème avec votre commande ? Nous vous répondons en moyenne sous 2h ouvrées."}
         design={design}
       />
 
@@ -325,6 +333,7 @@ export function StorefrontLivraison() {
   const { site, design, lang, setLang } = useSiteDesign();
   const fontHeading = design?.brand?.font_heading || "Fraunces";
   const primary = design?.brand?.primary_color || "#B84B31";
+  const aiPage = design?.pages?.livraison || {};
 
   const zones = [
     { country: "France métropolitaine", delay: "48–72h", cost: "Offerte dès 50 €", carriers: "Colissimo, Chronopost, transporteur dédié" },
@@ -339,8 +348,8 @@ export function StorefrontLivraison() {
       <SEOHead title={`Livraison & délais · ${site?.name || ""}`} description="Délais, coûts, suivi, installation à domicile : tout savoir sur la livraison." />
       <PageHero
         eyebrow="Livraison"
-        title="Livraison offerte dès 50 € d'achat."
-        subtitle="Expédition sous 24h ouvrées. Réception en 48 à 72h en France. Suivi par SMS et email."
+        title={aiPage.headline || "Livraison offerte dès 50 € d'achat."}
+        subtitle={aiPage.intro || "Expédition sous 24h ouvrées. Réception en 48 à 72h en France. Suivi par SMS et email."}
         design={design}
       />
 
@@ -388,22 +397,30 @@ export function StorefrontLivraison() {
         </div>
 
         <div className="mt-12 space-y-4 text-[16px] text-neutral-700 leading-relaxed">
-          <h3 className="text-xl font-semibold text-neutral-900 mt-4" style={{ fontFamily: `"${fontHeading}", serif` }}>
-            Pour les produits volumineux
-          </h3>
-          <p>
-            Certains produits (fauteuils releveurs, lits médicaux, matelas XL) sont livrés par un transporteur dédié avec prise de rendez-vous. Vous êtes contacté 48h avant la livraison pour choisir un créneau horaire qui vous convient.
-          </p>
-          <p>
-            Sur demande, un technicien peut aussi assurer l'installation, la mise en marche et une prise en main. Les frais sont communiqués lors de la commande.
-          </p>
+          {Array.isArray(aiPage.notes) && aiPage.notes.length > 0 ? (
+            aiPage.notes.map((n, i) => (
+              <p key={i}>{n}</p>
+            ))
+          ) : (
+            <>
+              <h3 className="text-xl font-semibold text-neutral-900 mt-4" style={{ fontFamily: `"${fontHeading}", serif` }}>
+                Pour les produits volumineux
+              </h3>
+              <p>
+                Certains produits (fauteuils releveurs, lits médicaux, matelas XL) sont livrés par un transporteur dédié avec prise de rendez-vous. Vous êtes contacté 48h avant la livraison pour choisir un créneau horaire qui vous convient.
+              </p>
+              <p>
+                Sur demande, un technicien peut aussi assurer l'installation, la mise en marche et une prise en main. Les frais sont communiqués lors de la commande.
+              </p>
 
-          <h3 className="text-xl font-semibold text-neutral-900 mt-8" style={{ fontFamily: `"${fontHeading}", serif` }}>
-            Emballage & écologie
-          </h3>
-          <p>
-            Nous utilisons des emballages recyclés et certifiés FSC. Nous minimisons les plastiques à usage unique : calage carton, ruban kraft, pas de polystyrène.
-          </p>
+              <h3 className="text-xl font-semibold text-neutral-900 mt-8" style={{ fontFamily: `"${fontHeading}", serif` }}>
+                Emballage & écologie
+              </h3>
+              <p>
+                Nous utilisons des emballages recyclés et certifiés FSC. Nous minimisons les plastiques à usage unique : calage carton, ruban kraft, pas de polystyrène.
+              </p>
+            </>
+          )}
         </div>
       </section>
     </StorefrontLayout>
@@ -417,21 +434,25 @@ export function StorefrontRetours() {
   const { site, design, lang, setLang } = useSiteDesign();
   const fontHeading = design?.brand?.font_heading || "Fraunces";
   const primary = design?.brand?.primary_color || "#B84B31";
+  const aiPage = design?.pages?.retours || {};
 
-  const steps = [
-    { n: 1, title: "Contactez-nous", desc: "Par email ou téléphone. Pas de formulaire compliqué à remplir, on s'occupe de tout." },
-    { n: 2, title: "Étiquette prépayée", desc: "Nous vous envoyons une étiquette de retour sous 24h. Imprimez-la ou demandez-nous une version papier." },
-    { n: 3, title: "Déposez votre colis", desc: "En bureau de poste ou en relais colis. Le transport est à notre charge." },
-    { n: 4, title: "Remboursement rapide", desc: "Sous 5 jours ouvrés après réception du colis, sur le moyen de paiement d'origine." },
-  ];
+  const aiSteps = Array.isArray(aiPage.steps) ? aiPage.steps.filter((s) => s && s.title) : [];
+  const steps = aiSteps.length
+    ? aiSteps.map((s, i) => ({ n: i + 1, title: s.title, desc: s.description || "" }))
+    : [
+        { n: 1, title: "Contactez-nous", desc: "Par email ou téléphone. Pas de formulaire compliqué à remplir, on s'occupe de tout." },
+        { n: 2, title: "Étiquette prépayée", desc: "Nous vous envoyons une étiquette de retour sous 24h. Imprimez-la ou demandez-nous une version papier." },
+        { n: 3, title: "Déposez votre colis", desc: "En bureau de poste ou en relais colis. Le transport est à notre charge." },
+        { n: 4, title: "Remboursement rapide", desc: "Sous 5 jours ouvrés après réception du colis, sur le moyen de paiement d'origine." },
+      ];
 
   return (
     <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
       <SEOHead title={`Retours & remboursements · ${site?.name || ""}`} description="14 jours pour changer d'avis, retour gratuit, remboursement sous 5 jours." />
       <PageHero
         eyebrow="Retours & remboursements"
-        title="14 jours pour changer d'avis."
-        subtitle="Si un produit ne vous convient pas, vous le retournez gratuitement. Nous vous remboursons intégralement dans les 5 jours."
+        title={aiPage.headline || "14 jours pour changer d'avis."}
+        subtitle={aiPage.intro || "Si un produit ne vous convient pas, vous le retournez gratuitement. Nous vous remboursons intégralement dans les 5 jours."}
         design={design}
       />
 
@@ -494,16 +515,26 @@ export function StorefrontRetours() {
 export function StorefrontFAQ() {
   const { site, design, lang, setLang } = useSiteDesign();
   const font = design?.brand?.font_heading || "Fraunces";
-  const faq = design?.faq || [];
+  const aiPage = design?.pages?.faq || {};
+  const aiItems = Array.isArray(aiPage.items) ? aiPage.items.filter((f) => f && f.question) : [];
+  const legacyFaq = design?.faq || [];
+  // Normalize AI items into the existing {q, a} shape
+  const items = aiItems.length
+    ? aiItems.map((f) => ({ q: f.question, a: f.answer || "" }))
+    : legacyFaq;
   return (
     <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
-      <PageHero eyebrow="FAQ" title="Questions fréquentes" design={design} />
+      <PageHero
+        eyebrow="FAQ"
+        title={aiPage.headline || "Questions fréquentes"}
+        design={design}
+      />
       <div className="max-w-3xl mx-auto px-6 py-16" data-testid="page-faq">
-        {faq.length === 0 ? (
+        {items.length === 0 ? (
           <div className="text-[#78716C]">Rendez-vous dans la FAQ sur la page d'accueil pour les réponses les plus consultées.</div>
         ) : (
           <div className="space-y-2">
-            {faq.map((it, i) => (
+            {items.map((it, i) => (
               <details key={i} className="bg-white rounded-xl border p-5 group" style={{ borderColor: "#E7E5E4" }}>
                 <summary className="cursor-pointer font-medium list-none flex items-center justify-between">
                   <span>{pickText(it.q, lang)}</span>

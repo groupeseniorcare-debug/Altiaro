@@ -7,6 +7,7 @@ import StepPanel from "../components/StepPanel";
 import BlockOutputModal from "../components/BlockOutputModal";
 import SiteQAPanel from "../components/SiteQAPanel";
 import CockpitJourney from "../components/CockpitJourney";
+import PulseSEOWidget from "../components/PulseSEOWidget";
 import {
   ArrowLeft,
   Lock,
@@ -334,6 +335,10 @@ export default function SiteDetail() {
 
         <div className="mb-10">
           <CockpitJourney site={site} onRefresh={load} />
+        </div>
+
+        <div className="mb-10">
+          <PulseSEOWidget siteId={id} />
         </div>
 
         <div className="mb-10">
