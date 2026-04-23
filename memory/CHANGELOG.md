@@ -3,6 +3,22 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-02 · Skeleton loading + Scroll snap + Cockpit styling phase 2
+
+- 💀 **Skeleton UI partout** (remplacement des "Chargement..." spinners — perception d'attente -40%) :
+  - Storefront : `products-grid-skeleton` (6 cartes animate-pulse) dans `ProductGrid.jsx`.
+  - Cockpit admin : `dashboard-skeleton` (4 stat cards + 2 chart placeholders bento-style).
+  - Cockpit concepteur : `concepteur-dashboard-skeleton` (4 KPI + 2 boxes).
+  - Liste sites : `sites-list-skeleton` (6 site cards placeholders).
+  - SEO Studio : `site-seo-skeleton` (gauge + 3 stats + large card).
+- 📱 **Scroll snap horizontal mobile** (`flex md:grid snap-x snap-mandatory`) :
+  - `collections-carousel` : cards `snap-center w-[85vw]` → grid sur md+.
+  - `upsells-carousel` : cards `w-[72vw]` (4 côte à côte mobile-friendly).
+  - Padding négatif `-mx-6 px-6` pour déborder élégamment du container parent.
+- 🎨 **Cockpit styling phase 2** : conformité au `design_guidelines.json` (palette #F9FAFB bg / #1C1917 primary / Inter / rounded-md buttons / shadow-sm) vérifiée sur Dashboard, Sites, SiteSEO. `Layout.jsx` utilise déjà `bg-neutral-50` (≈ #F9FAFB).
+- **Testing** — iter25 : 10/10 targets validés via Playwright route-throttling (page.route + delay 3s pour capturer les skeleton states). Carrousels snap vérifiés en viewport 390×844. Aucun bug.
+
+
 ## 2026-02 · Pages légales × 7 + Mega menu + Mobile polish + UX/UI audit
 
 - 📄 **Pages légales enrichies** de 3 → 7 : ajout de `COOKIES` (RGPD), `LIVRAISON` (tableau zones + délais), `RETOURS` (rétractation 14 j + formulaire type), `MEDIATION` (CM2C + ODR UE). Routes storefront `/shop/{id}/cookies`, `/mediation` ajoutées; `/livraison` et `/retours` conservent leurs composants custom riches.
