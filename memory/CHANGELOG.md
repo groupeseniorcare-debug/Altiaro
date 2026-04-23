@@ -3,6 +3,14 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-02 · Studio de marque — finition Priorité 0 (fork)
+
+- **Fix P0** : `BrandingContent.jsx` avait un `Unterminated string constant` ligne 206 (bloc dupliqué collé par erreur pendant la session précédente). Bloc supprimé → build restauré.
+- **Pages légales** — nouveau bouton `[data-testid=seed-legal]` dans l'onglet *Pages & contenu* qui appelle `POST /sites/{id}/design/seed-legal` : affiche un état "non générée" + avertissement amber quand vide, et désactive les liens vers CGV/Mentions/Confidentialité tant qu'ils ne sont pas créés. Le backend rendait déjà les templates mais il n'y avait aucun déclencheur UI.
+- **Prompt fiches produits "ultra premium"** — `product_narrative.py` : system prompt enrichi (niveau Hermès/Dyson/Apple, style éditorial sensoriel : textures, matières, gestes, lumière, rituel) et nouvelle règle dure "chaque `body` de section contient ≥1 image sensorielle concrète" (interdit les slogans creux).
+- **Testing** — iteration 21 : 7/7 backend + 100% frontend, seed-legal OK, ai-field tagline OK (~2 s), aucune régression. Rapport : `/app/test_reports/iteration_21.json`.
+
+
 ## 2026-04-22 · Étape 9 QA enrichi · intégration de toutes les nouveautés
 
 - **`_run_qa_snapshot` étendu** de 13 → 23 contrôles pour refléter tout ce qu'on vient de bâtir :
