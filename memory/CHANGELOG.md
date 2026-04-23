@@ -3,6 +3,45 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-23 · Page Produit éditoriale + Blog IA (Étape 7)
+
+### Page Produit — refonte images
+- **NEW** `components/storefront/ProductEditorialMosaic.jsx` : mosaïque magazine asymétrique
+  (4 tuiles sur 12-col : 1 grand portrait + 2 paysages + 1 bannière 21:9) avec eyebrows
+  chapitre-style, captions narratives. Placée entre ProductBundle et NarrativeSections.
+- `NarrativeProduct.jsx` : sections du narratif reçoivent maintenant la galerie `productImages`
+  en fallback → chaque chapitre a une image même sans génération IA. Bullet points réintroduits
+  sous la body quand image présente (compactés à 3 max).
+- `Storefront.jsx` : priorité `generated_images` (Nano Banana) puis `images[]` CJ pour alimenter
+  mosaïque + narrative. Résultat : la page produit n'a plus de blocs text-only.
+
+### Blog IA Étape 7 — Pilier + Satellites
+- **NEW** `POST /api/sites/{id}/blog-posts/auto-plan` : génère 1 pilier (2200-2800 mots) +
+  N satellites (900-1300 mots) depuis les keywords informationnels de Step 8. Claude Sonnet 4.5
+  via Emergent LLM Key.
+- Architecture background : retourne `{job_id, status:"started"}` en <1s, génération dans
+  `BackgroundTasks`, polling via `GET /api/sites/{id}/blog-posts/auto-plan/{job_id}`. Évite
+  le timeout gateway 60s.
+- Cross-linking automatique : chaque satellite cite le pilier via ancre markdown obligatoire,
+  le pilier liste ses satellites en fin d'article.
+- IndexNow fire-and-forget sur tous les slugs + /blog à la fin du job.
+- `_pick_informational_keywords()` : classification regex (comment/pourquoi/guide/choisir…) +
+  rank par volume, fallback sur keywords neutres, puis sur synthetic keywords si pool trop court.
+- **Frontend `SiteBlogPosts.jsx`** : bouton "Générer tout le blog (IA)" + bannière de progression
+  animée + polling auto toutes les 8s pendant max 4 min + toast de succès à la fin.
+- Gestion budget : `_call_claude_json` catch "Budget has been exceeded" et persiste le flag
+  `platform_health.llm = budget_exhausted`.
+
+### Tests
+- `tests/test_blog_auto_plan.py` : **5 tests pytest** (ranking informationnel, fallback neutres,
+  empty pool, marché manquant, slugify). Tous passent.
+
+### Blocage environnement
+- L'Emergent LLM Key est **épuisée** (current_cost=27.19 / max_budget=27.00). L'endpoint est
+  fonctionnel mais retourne `{status:"failed", error:"IA indisponible ou budget épuisé"}`
+  jusqu'à recharge par l'utilisateur (Profile → Universal Key → Add Balance).
+
+
 ## 2026-02 · Fix critique storefront — 3 identités de marque incohérentes
 
 Bug remonté par le user : le storefront affichait **3 noms de marque différents** sur la même page (logo image "Maison Clarelle", hero "Test Fauteuils Releveurs", footer "Test409"), avec une image hero hors-sujet et un produit seul perdu dans une grille 4-col vide.

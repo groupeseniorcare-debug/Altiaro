@@ -90,6 +90,8 @@ Les 50 étapes du playbook sont regroupées en **8 blocs thématiques ordonnés*
 | 48 | **Scan multi-marché asynchrone (job + polling)** — POST démarre en BG retourne <1s, GET poll les cartes qui apparaissent progressivement (fix timeout 60s ingress K8s) | ✅ |
 | 49 | **Cron auto-config DNS post-OVH** — APScheduler toutes les 5 min scanne les domaines `purchased`, tente la config DNS, envoie email "🌍 domain is live", abandonne après 30 min si zone OVH pas créée (status `dns_auto_failed`) | ✅ |
 | 50 | Admin Virements UI (P3) — page `/admin/payouts` déjà existante, 520 lignes, couvre preview + run-payouts + mark-paid + history | ✅ (n'était pas à recoder) |
+| 51 | **Storefront monochrome éditorial** (homepage + page produit, Manifesto + BrandProcess + FounderStory + PressLogos + EditorialMosaic + Reviews) | ✅ |
+| 52 | **Blog IA — pilier + satellites automatiques** (`/api/sites/{id}/blog-posts/auto-plan` background task + cross-linking + IndexNow) | ✅ |
 
 ## Règles critiques
 - Pas de Shopify — tout custom React/FastAPI.

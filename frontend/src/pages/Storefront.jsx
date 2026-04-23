@@ -63,6 +63,7 @@ import PaymentOptions from "../components/storefront/PaymentOptions";
 import MobileStickyBuy from "../components/storefront/MobileStickyBuy";
 import Manifesto from "../components/storefront/Manifesto";
 import BrandProcess from "../components/storefront/BrandProcess";
+import ProductEditorialMosaic from "../components/storefront/ProductEditorialMosaic";
 import {
   PeopleAlsoAsk,
   BestForNotFor,
@@ -739,7 +740,17 @@ export function StorefrontProduct() {
 
         <ProductBundle currentProduct={p} lang={lang} design={design} />
 
-        <NarrativeSections sections={p.narrative?.sections} design={design} />
+        <ProductEditorialMosaic
+          images={[...(p.generated_images || []).map(g => g.url).filter(Boolean), ...(p.images || [])]}
+          productName={pickLang(p.name, lang)}
+          design={design}
+        />
+
+        <NarrativeSections
+          sections={p.narrative?.sections}
+          design={design}
+          productImages={[...(p.generated_images || []).map(g => g.url).filter(Boolean), ...(p.images || [])]}
+        />
         <TechSpecs specs={p.narrative?.tech_specs} design={design} />
         <BestForNotFor best_for={p.narrative?.seo?.best_for} not_for={p.narrative?.seo?.not_for} design={design} />
         <UsageSteps steps={p.narrative?.seo?.usage_steps} productName={pickLang(p.name, lang)} design={design} />

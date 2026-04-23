@@ -66,6 +66,65 @@ export default function SiteBlogPosts() {
     load();
   };
 
+  const [autoPlanLoading, setAutoPlanLoading] = useState(false);
+  const [autoPlanJob, setAutoPlanJob] = useState(null);
+
+  const pollAutoPlan = async (jobId) => {
+    // Poll every 8s up to 4 minutes
+    const startAt = Date.now();
+    const maxMs = 4 * 60 * 1000;
+    const tick = async () => {
+      const { data, error } = await apiCall(() => api.get(`/sites/${siteId}/blog-posts/auto-plan/${jobId}`));
+      if (error) return;
+      setAutoPlanJob(data);
+      if (data.status === "done") {
+        setAutoPlanLoading(false);
+        setAutoPlanJob(null);
+        showToast("ok", `Blog complet généré : « ${data.pillar_title} » + ${data.satellites_count} satellite(s).`);
+        load();
+        return;
+      }
+      if (data.status === "failed") {
+        setAutoPlanLoading(false);
+        setAutoPlanJob(null);
+        showToast("error", `Génération échouée : ${data.error || "erreur inconnue"}`);
+        return;
+      }
+      if (Date.now() - startAt < maxMs) {
+        setTimeout(tick, 8000);
+      } else {
+        setAutoPlanLoading(false);
+        setAutoPlanJob(null);
+        showToast("error", "Timeout — recharge dans 1 min, les articles apparaîtront s'ils sont prêts.");
+        load();
+      }
+    };
+    setTimeout(tick, 5000);
+  };
+
+  const autoPlan = async (maxSatellites = 3) => {
+    const msg =
+      `Générer automatiquement 1 article pilier + ${maxSatellites} satellites depuis vos mots-clés SEO (Étape 8) ?\n\n` +
+      `• Durée : environ 60 à 120 secondes (l'IA génère en arrière-plan)\n` +
+      `• Les articles sont liés entre eux (internal linking)\n` +
+      `• Ils sont publiés immédiatement sur /blog`;
+    if (!window.confirm(msg)) return;
+    setAutoPlanLoading(true);
+    const { data, error, rawDetail } = await apiCall(() =>
+      api.post(`/sites/${siteId}/blog-posts/auto-plan`, {
+        country: "FR",
+        max_satellites: maxSatellites,
+      })
+    );
+    if (error) {
+      setAutoPlanLoading(false);
+      return showToast("error", rawDetail?.detail || error);
+    }
+    setAutoPlanJob({ ...data, status: "pending" });
+    showToast("ok", data.message || "Génération lancée en arrière-plan.");
+    pollAutoPlan(data.job_id);
+  };
+
   return (
     <div className="min-h-screen bg-[#FAF7F2]">
       <div className="max-w-[1600px] mx-auto px-6 md:px-10 py-8">
@@ -83,14 +142,24 @@ export default function SiteBlogPosts() {
               Les articles alimentent la page `/blog` de votre boutique et participent au SEO.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <a href={`/shop/${siteId}/blog`} target="_blank" rel="noreferrer"
                className="h-11 px-4 rounded-xl bg-white border border-neutral-200 hover:border-[#B84B31] text-neutral-900 text-sm font-medium flex items-center gap-2 transition" data-testid="preview-blog">
               <Eye size={16} /> Voir le blog
             </a>
+            <button
+              onClick={() => autoPlan(3)}
+              disabled={autoPlanLoading}
+              data-testid="auto-plan-btn"
+              className="h-11 px-4 rounded-xl bg-gradient-to-br from-[#1C1917] to-[#44403C] hover:from-[#0A0A0A] text-white text-sm font-medium flex items-center gap-2 transition disabled:opacity-60"
+              title="Génère 1 pilier + 3 satellites depuis vos mots-clés SEO"
+            >
+              <Sparkle size={16} weight="fill" />
+              {autoPlanLoading ? "Génération en cours…" : "Générer tout le blog (IA)"}
+            </button>
             <button onClick={() => setAiOpen(true)} data-testid="ai-draft-btn"
                     className="h-11 px-4 rounded-xl bg-white border border-neutral-200 hover:border-[#B84B31] text-neutral-900 text-sm font-medium flex items-center gap-2 transition">
-              <Sparkle size={16} weight="duotone" /> Rédiger avec l'IA
+              <Sparkle size={16} weight="duotone" /> Rédiger 1 article
             </button>
             <button onClick={() => setEditing({ _isNew: true, title: "", category: "Guide d'achat", read_minutes: 4, body: "" })} data-testid="new-post-btn"
                     className="h-11 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium flex items-center gap-2 transition">
@@ -106,6 +175,27 @@ export default function SiteBlogPosts() {
                }`}>
             {toast.type === "ok" ? <CheckCircle size={16} weight="fill" /> : <Warning size={16} weight="fill" />}
             {toast.msg}
+          </div>
+        )}
+
+        {autoPlanLoading && (
+          <div
+            data-testid="auto-plan-progress"
+            className="mb-5 px-4 py-3 rounded-xl border border-neutral-900/20 bg-white flex items-center gap-3 text-sm"
+          >
+            <Sparkle size={18} weight="fill" className="text-neutral-900 animate-pulse" />
+            <div className="flex-1">
+              <div className="font-semibold text-neutral-900">
+                L'IA rédige votre blog complet…
+              </div>
+              <div className="text-xs text-neutral-500 mt-0.5">
+                {autoPlanJob?.pillar_keyword
+                  ? `Pilier : « ${autoPlanJob.pillar_keyword} » · ${autoPlanJob?.expected_count || "plusieurs"} article(s) en préparation`
+                  : "Analyse des mots-clés SEO…"}
+                {autoPlanJob?.status && autoPlanJob.status !== "pending" && ` · statut : ${autoPlanJob.status}`}
+              </div>
+            </div>
+            <Clock size={18} weight="regular" className="text-neutral-400" />
           </div>
         )}
 

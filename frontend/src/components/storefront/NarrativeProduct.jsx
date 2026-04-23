@@ -2,7 +2,7 @@ import React from "react";
 import { Check } from "@phosphor-icons/react";
 import { designAccents } from "./storefrontUtils";
 
-export function NarrativeSections({ sections, design }) {
+export function NarrativeSections({ sections, design, productImages = [] }) {
   const fallback = [
     {
       title: "Pensé pour un usage quotidien",
@@ -23,7 +23,13 @@ export function NarrativeSections({ sections, design }) {
       ],
     },
   ];
-  const items = (Array.isArray(sections) && sections.length > 0) ? sections : fallback;
+  const base = (Array.isArray(sections) && sections.length > 0) ? sections : fallback;
+  // Auto-fill section images with product gallery shots when AI images are missing.
+  const pool = (productImages || []).filter(Boolean);
+  const items = base.map((s, i) => ({
+    ...s,
+    image: s.image || (pool.length ? pool[(i + 1) % pool.length] : null),
+  }));
   const { primary, accent, divider, textMuted, fontHeading } = designAccents(design);
 
   return (
@@ -62,9 +68,21 @@ export function NarrativeSections({ sections, design }) {
                 {s.title}
               </h2>
               {hasImage && (
-                <p className="mt-6 text-[15px] md:text-[16px] leading-[1.7]" style={{ color: textMuted }}>
-                  {s.body}
-                </p>
+                <>
+                  <p className="mt-6 text-[15px] md:text-[16px] leading-[1.7]" style={{ color: textMuted }}>
+                    {s.body}
+                  </p>
+                  {s.bullet_points?.length > 0 && (
+                    <ul className="mt-6 space-y-2.5">
+                      {s.bullet_points.slice(0, 3).map((bp, j) => (
+                        <li key={j} className="flex items-start gap-3 text-[14px]" style={{ color: "#262626" }}>
+                          <Check size={14} weight="bold" className="shrink-0 mt-[4px]" style={{ color: primary }} />
+                          <span>{bp}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
               )}
             </div>
             {!hasImage && (
