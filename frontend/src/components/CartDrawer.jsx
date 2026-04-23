@@ -244,21 +244,26 @@ export default function CartDrawer({ design }) {
         </div>
 
         {items.length > 0 && (
-          <div className="border-t border-neutral-200 p-5 space-y-3 shrink-0 bg-white">
-            {/* Reassurance strip — neutral panels, emerald accent only on the icon
-                (a premium convention: trust cues are subtle, not in-your-face). */}
-            <div className="rounded-xl bg-neutral-50 border border-neutral-200 divide-y divide-neutral-200 overflow-hidden">
-              <div className="flex items-center gap-2.5 px-3 py-2.5">
-                <div className="w-7 h-7 rounded-full bg-emerald-50 flex items-center justify-center">
-                  <Truck size={14} weight="fill" className="text-emerald-600" />
+          <div className="border-t border-neutral-200 p-5 space-y-4 shrink-0 bg-white">
+            {/* Reassurance cards — premium grey panels, not chips. Two equal cards */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="rounded-xl bg-neutral-100 p-3">
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.15em] text-neutral-500 font-semibold mb-1.5">
+                  <Truck size={11} weight="bold" /> Livraison
                 </div>
-                <span className="text-xs text-neutral-800 font-medium">Livraison offerte partout</span>
+                <div className="text-[13px] font-semibold text-neutral-900 leading-tight">
+                  Offerte partout
+                </div>
+                <div className="text-[11px] text-neutral-500 mt-0.5">48h–72h ouvrées</div>
               </div>
-              <div className="flex items-center gap-2.5 px-3 py-2.5">
-                <div className="w-7 h-7 rounded-full bg-emerald-50 flex items-center justify-center">
-                  <ShieldCheck size={14} weight="fill" className="text-emerald-600" />
+              <div className="rounded-xl bg-neutral-100 p-3">
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.15em] text-neutral-500 font-semibold mb-1.5">
+                  <ShieldCheck size={11} weight="bold" /> Garantie
                 </div>
-                <span className="text-xs text-neutral-800 font-medium">Retour gratuit 14 j · Garantie 2 ans</span>
+                <div className="text-[13px] font-semibold text-neutral-900 leading-tight">
+                  2 ans incluse
+                </div>
+                <div className="text-[11px] text-neutral-500 mt-0.5">Retour 14 j gratuit</div>
               </div>
             </div>
             <div className="flex items-center justify-between pt-1">

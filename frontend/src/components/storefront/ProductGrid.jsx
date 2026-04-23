@@ -14,7 +14,7 @@ const DEMO_PRODUCTS = [
 ];
 
 export function ProductGrid({ siteId, products, loading, design, lang }) {
-  const { primary, fontHeading } = designAccents(design);
+  const { fontHeading } = designAccents(design);
   const hasReal = products && products.length > 0;
   const displayed = hasReal ? products : DEMO_PRODUCTS;
 
@@ -75,49 +75,56 @@ export function ProductGrid({ siteId, products, loading, design, lang }) {
                     data-testid={`product-card-${p.id}`}
                     className="group block"
                   >
-                    <div className="aspect-square bg-[#F5F2EB] rounded-2xl overflow-hidden relative mb-4">
-                      {p.images?.[0] ? (
-                        <img
-                          src={p.images[0]}
-                          alt={pickLang(p.name, lang) || p.name}
-                          loading="lazy"
-                          className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700 ease-out"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-[#D6D3D1]">
-                          <ShoppingBagOpen size={56} weight="thin" />
+                    {/* Premium card — soft neutral frame, tight aspect, gentle lift on hover */}
+                    <div className="relative rounded-[20px] bg-neutral-100 overflow-hidden ring-1 ring-neutral-200/60 transition-all duration-500 group-hover:ring-neutral-900/10 group-hover:shadow-[0_20px_60px_-20px_rgba(0,0,0,0.18)] group-hover:-translate-y-1">
+                      <div className="aspect-square relative">
+                        {p.images?.[0] ? (
+                          <img
+                            src={p.images[0]}
+                            alt={pickLang(p.name, lang) || p.name}
+                            loading="lazy"
+                            className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-neutral-300">
+                            <ShoppingBagOpen size={64} weight="thin" />
+                          </div>
+                        )}
+                        {/* Badges — minimal, one at most each corner */}
+                        {p.featured && (
+                          <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm text-neutral-900 text-[10px] uppercase tracking-[0.2em] font-semibold px-2.5 py-1.5 rounded-full flex items-center gap-1 shadow-sm">
+                            <Star size={10} weight="fill" style={{ color: "#F5B800" }} /> {t(lang, "featured")}
+                          </div>
+                        )}
+                        {p.compare_at_price && p.compare_at_price > p.price && (
+                          <div className="absolute top-4 right-4 bg-neutral-900 text-white text-[11px] font-semibold px-2.5 py-1 rounded-full tracking-tight">
+                            −{Math.round((1 - p.price / p.compare_at_price) * 100)}%
+                          </div>
+                        )}
+                        {/* Reveal-on-hover quick action — invisible until hover/focus */}
+                        <div className="absolute inset-x-4 bottom-4 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
+                          <div className="w-full h-11 bg-white text-neutral-900 text-[13px] font-semibold rounded-full flex items-center justify-center gap-2 shadow-lg">
+                            Voir le produit
+                            <span className="transition-transform group-hover:translate-x-0.5">→</span>
+                          </div>
                         </div>
-                      )}
-                      {p.featured && (
-                        <div
-                          className="absolute top-4 left-4 text-white text-[10px] uppercase tracking-widest font-semibold px-3 py-1.5 rounded-full backdrop-blur-sm flex items-center gap-1"
-                          style={{ background: `${primary}dd` }}
-                        >
-                          <Star size={10} weight="fill" /> {t(lang, "featured")}
-                        </div>
-                      )}
-                      {p.compare_at_price && p.compare_at_price > p.price && (
-                        <div
-                          className="absolute top-4 right-4 text-white text-[11px] font-semibold px-2.5 py-1 rounded-full"
-                          style={{ background: "#1C1917" }}
-                        >
-                          -{Math.round((1 - p.price / p.compare_at_price) * 100)}%
-                        </div>
-                      )}
+                      </div>
                     </div>
-                    <div>
+
+                    {/* Meta line under the card */}
+                    <div className="mt-4 px-1">
                       <div
-                        className="text-[15px] md:text-lg font-semibold leading-tight mb-1 group-hover:opacity-70 transition text-neutral-900"
+                        className="text-[15px] md:text-[17px] font-semibold leading-snug tracking-tight text-neutral-900 line-clamp-2"
                         style={{ fontFamily: `"${fontHeading}", serif` }}
                       >
                         {pickLang(p.name, lang) || p.name}
                       </div>
                       <div className="flex items-baseline gap-2 mt-2">
-                        <span className="text-lg md:text-xl font-semibold text-neutral-900">
+                        <span className="text-[17px] font-semibold tabular-nums text-neutral-900">
                           {formatPrice(p.price, p.currency, lang)}
                         </span>
                         {p.compare_at_price && (
-                          <span className="text-sm line-through text-[#A8A29E]">
+                          <span className="text-sm line-through tabular-nums text-neutral-400">
                             {formatPrice(p.compare_at_price, p.currency, lang)}
                           </span>
                         )}

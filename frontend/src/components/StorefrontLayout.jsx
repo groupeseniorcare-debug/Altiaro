@@ -233,7 +233,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
                 src={logoUrl}
                 alt={logoText}
                 className="h-9 max-w-[160px] object-contain"
-                style={{ mixBlendMode: "multiply" }}
+                style={{ mixBlendMode: "multiply", filter: "contrast(1.25) brightness(1.08)" }}
                 loading="eager"
               />
             ) : (
@@ -274,7 +274,7 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
                 src={logoUrl}
                 alt={logoText}
                 className="h-10 max-w-[220px] object-contain transition-transform group-hover:scale-[1.02]"
-                style={{ mixBlendMode: "multiply" }}
+                style={{ mixBlendMode: "multiply", filter: "contrast(1.25) brightness(1.08)" }}
                 loading="eager"
               />
             ) : (
