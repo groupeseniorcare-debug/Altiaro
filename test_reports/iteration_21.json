@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 21 — Studio de marque (Étape 5) full regression PASS. All 7 backend tests pass (GET /design, GET /navigation, POST /design/seed-legal, POST /design/ai-field, POST /navigation/ai-optimize, POST /collections/ai-suggest + invalid field guard). Frontend build compiles cleanly, login works, /sites/{id}/design renders 4 tabs; all AI testids (ai-name/tagline/voice/story/palette/fonts, ai-nav-optimize, ai-collections-suggest) and regen-{hero,about,benefits,faq,testimonials,contact} buttons present. New seed-legal button clicks correctly and returns 200. ai-tagline click triggers POST /design/ai-field (returned 200 in ~2s during standalone curl test — 'Se relever en douceur, rester soi avec élégance'). No regression on GET /sites/{id}/design (returns {design, site_id, site_name}). BrandingContent.jsx unterminated-string syntax bug from previous fork is confirmed fixed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration21_studio.py",
+    "/app/test_reports/pytest/iter21.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/design.py has duplicate _slugify definitions at lines 208 and 1126 — the second overrides the first. Both produce equivalent output but this is a DRY violation; remove the first or unify.",
+    "routes/design.py is ~1213 lines — well over the 700-line guideline. Split into design_core.py (generate/regenerate/publish), design_studio.py (prompt runner, palette, ai-field), navigation.py and collections.py to improve maintainability.",
+    "POST /sites/{id}/design/publish still uses `publish: bool = True` as a Query param (unchanged since iter20). Frontend togglePublish sends no body, so server can only PUBLISH, not un-publish. Move to a Pydantic body.",
+    "ai_field endpoint stores JSON palette as both `design.brand.{k}_color` AND `design.brand.palette.{k}` — two sources of truth. Collapse to a single canonical path (palette.*).",
+    "Error handling in ai-nav-optimize and ai-collections-suggest swallows HTTPException from _claude_json: the inner raise becomes a generic 502 with `IA indisponible : ...` — specific 402 (budget exhausted) or 504 (timeout) codes are lost. Catch HTTPException separately and re-raise to preserve status codes.",
+    "BrandingContent.jsx: 4 uses of window.alert() for errors — replace with toast (consistency callout also in iter19/iter20)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration21_studio.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (7/7)",
+    "frontend": "100% — all 4 tabs render, all required AI + regen + seed-legal testids present, seed-legal returns 200, ai-field POST fires on tagline click"
+  },
+  "test_credentials": "Concepteur: concepteur@conceptfactory.fr / Concepteur2026! — Site: 65964cb0-7a1a-4c11-9644-1ad8f2371d48",
+  "seed_data_creation": "test_seed_legal_creates_three_pages wrote design.legal_pages (cgv, mentions_legales, confidentialite) to site 65964cb0... via the new seed-legal endpoint. ai-field tagline also mutated design.brand.tagline with a generated French value.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_iteration21_studio.py is the regression suite for Étape 5 Studio de marque. Tests accept LLM endpoints returning 200/402/502/504 (not timeouts). Concepteur's only site is 65964cb0-7a1a-4c11-9644-1ad8f2371d48 ('Test Fauteuils Releveurs'). All Studio testids: tab-{identity|navigation|collections|content}, ai-{name|tagline|voice|story|palette|fonts}, ai-nav-optimize, ai-collections-suggest, regen-{hero|about|benefits|faq|testimonials|contact|logo}, seed-legal, design-generate, design-publish, design-brief, design-regen-all, brand-{name|tagline|voice|story}, logo-{upload|prompt}, save-{brand|navigation}, nav-add-{header|footer}. Ingress timeout is still ~60s but ai-field calls return in <5s (tagline: ~2s).",
+  "rca of the issue": "N/A — no new bugs found. Prior fork's BrandingContent.jsx unterminated string (line 206) is confirmed fixed; new seed-legal button wiring is functional end-to-end."
+}

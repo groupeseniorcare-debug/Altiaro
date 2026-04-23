@@ -110,12 +110,17 @@ async def enrich_product_narrative(product_id: str, force: bool = False) -> dict
     tags = product.get("tags") or []
 
     system = (
-        "Tu es à la fois : (1) un rédacteur e-commerce premium pour le marché senior français, "
-        "et (2) un consultant SEO/AEO de niveau expert (top 1% mondial) qui maîtrise "
-        "les schémas structurés Google, les requêtes long-tail, People Also Ask, E-E-A-T, "
-        "et l'optimisation pour les moteurs de réponse IA (ChatGPT/Perplexity/Claude). "
-        "Tu produis un contenu qui ranke #1 en organique ET qui est cité par les IA. "
-        "Tu renvoies UNIQUEMENT du JSON valide, strict, sans commentaire ni markdown."
+        "Tu es à la fois : (1) un rédacteur e-commerce ULTRA PREMIUM pour le marché "
+        "senior français (niveau Hermès, Dyson, Apple), et (2) un consultant SEO/AEO "
+        "de niveau expert (top 1% mondial) qui maîtrise les schémas structurés Google, "
+        "les requêtes long-tail, People Also Ask, E-E-A-T, et l'optimisation pour les "
+        "moteurs de réponse IA (ChatGPT/Perplexity/Claude). "
+        "Ton style : éditorial, sensoriel, factuel. Tu décris les textures, les matières, "
+        "les gestes, le confort ressenti, le rituel d'usage — jamais des slogans. "
+        "Tu penses 'gros plan sur le cuir souple', 'lumière douce du matin', 'silencieux "
+        "comme un livre qu'on ferme'. Tu produis un contenu qui ranke #1 en organique "
+        "ET qui est cité par les IA. Tu renvoies UNIQUEMENT du JSON valide, strict, "
+        "sans commentaire ni markdown."
     )
 
     user = f"""Tu enrichis une fiche produit avec un narratif + un package SEO/AEO ultra-pertinent.
@@ -213,6 +218,8 @@ Retourne EXACTEMENT ce JSON :
 }}
 
 RÈGLES DURES :
+- Ton ÉDITORIAL PREMIUM : décris des matières, des textures, des gestes concrets, des moments de vie. Jamais de slogans marketing creux ("changez votre vie", "révolutionnaire"...).
+- Chaque `body` de section doit contenir AU MOINS une image sensorielle concrète (toucher, vue, son, confort ressenti).
 - Caractéristiques techniques plausibles (pas d'hallucination).
 - PAA : vraies questions long-tail, pas du remplissage.
 - best_for/not_for : honnêteté absolue (un produit qui admet ses limites vend 2× mieux).

@@ -152,58 +152,60 @@ export default function BrandingContent({ siteId, design, onReload }) {
 
       {/* Legal */}
       <Section title="Pages légales" testid="design-legal">
+        {Object.keys(legalPages).length === 0 && (
+          <div className="mb-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
+            <Info size={14} weight="duotone" className="flex-shrink-0 mt-0.5" />
+            <span>
+              Aucune page légale encore générée. Clique sur <strong>Générer les pages légales</strong> ci-dessous
+              pour créer les modèles CGV, Mentions légales et Confidentialité à partir des infos société.
+            </span>
+          </div>
+        )}
         <div className="grid md:grid-cols-3 gap-3 text-sm">
           {[
-            ["CGV", `/shop/${siteId}/cgv`],
-            ["Mentions légales", `/shop/${siteId}/mentions`],
-            ["Confidentialité", `/shop/${siteId}/confidentialite`],
-          ].map(([label, href]) => (
-            <a key={label} href={href} target="_blank" rel="noreferrer"
-              className="block p-3 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 text-center">
-              <div className="font-medium text-neutral-900">{label}</div>
-              <div className="text-xs text-neutral-500 mt-0.5">Ouvrir ↗</div>
-            </a>
-          ))}
+            ["CGV", `/shop/${siteId}/cgv`, "cgv"],
+            ["Mentions légales", `/shop/${siteId}/mentions`, "mentions_legales"],
+            ["Confidentialité", `/shop/${siteId}/confidentialite`, "confidentialite"],
+          ].map(([label, href, key]) => {
+            const exists = !!legalPages[key]?.body_md;
+            return (
+              <a
+                key={label}
+                href={exists ? href : undefined}
+                target={exists ? "_blank" : undefined}
+                rel="noreferrer"
+                onClick={(e) => { if (!exists) e.preventDefault(); }}
+                className={`block p-3 rounded-lg border text-center ${
+                  exists
+                    ? "bg-neutral-50 hover:bg-neutral-100 border-neutral-200 cursor-pointer"
+                    : "bg-neutral-50/50 border-dashed border-neutral-300 opacity-60 cursor-not-allowed"
+                }`}
+              >
+                <div className="font-medium text-neutral-900">{label}</div>
+                <div className="text-xs text-neutral-500 mt-0.5">{exists ? "Ouvrir ↗" : "Non générée"}</div>
+              </a>
+            );
+          })}
         </div>
-        <div className="text-xs text-neutral-500 mt-3 flex items-start gap-2">
-          <Info size={14} weight="duotone" className="flex-shrink-0 mt-0.5" />
-          <span>Générées automatiquement depuis les infos société (Compte → infos société).</span>
+        <div className="flex items-start justify-between mt-4 gap-3 flex-wrap">
+          <div className="text-xs text-neutral-500 flex items-start gap-2 flex-1 min-w-[220px]">
+            <Info size={14} weight="duotone" className="flex-shrink-0 mt-0.5" />
+            <span>Générées depuis les infos société (Compte → infos société). Régénère après chaque modification.</span>
+          </div>
+          <button
+            onClick={seedLegal}
+            disabled={seedingLegal}
+            data-testid="seed-legal"
+            className="h-9 px-3 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium flex items-center gap-1.5 disabled:opacity-60"
+          >
+            {seedingLegal ? <ArrowClockwise size={12} className="animate-spin" /> : <Sparkle size={12} weight="fill" />}
+            {seedingLegal ? "Génération…" : (Object.keys(legalPages).length ? "Régénérer les pages légales" : "Générer les pages légales")}
+          </button>
         </div>
       </Section>
 
       {/* Brief + regen all */}
       <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-6">
-        <div className="text-[11px] uppercase tracking-widest text-amber-700 mb-2 font-semibold">Régénérer tout le contenu avec un brief</div>
-        <textarea
-          value={tweak}
-          onChange={(e) => setTweak(e.target.value)}
-          placeholder="Ex. « ton plus chaleureux, mets l'accent sur l'installation offerte et la garantie 5 ans »"
-          className="w-full min-h-[80px] p-3 rounded-lg border border-amber-300 bg-white text-sm resize-y"
-          data-testid="design-brief"
-        />
-        <button
-          onClick={regenAll}
-          disabled={generating}
-          data-testid="design-regen-all"
-          className="mt-3 h-10 px-4 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium flex items-center gap-2 disabled:opacity-60"
-        >
-          {generating ? <ArrowClockwise size={14} className="animate-spin" /> : <Sparkle size={14} weight="fill" />}
-          {generating ? "Régénération (60-90s)…" : "Régénérer avec ce brief"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function Section({ title, children, testid }) {
-  return (
-    <div className="bg-white border border-neutral-200 rounded-2xl p-5" data-testid={testid}>
-      <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-3">{title}</div>
-      {children}
-    </div>
-  );
-}
--6">
         <div className="text-[11px] uppercase tracking-widest text-amber-700 mb-2 font-semibold">Régénérer tout le contenu avec un brief</div>
         <textarea
           value={tweak}
