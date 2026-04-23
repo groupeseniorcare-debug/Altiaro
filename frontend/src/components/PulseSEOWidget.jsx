@@ -6,6 +6,7 @@ import {
 import { api, apiCall } from "../lib/api";
 import GSCConnectCard from "./GSCConnectCard";
 import EeatHistoryPanel from "./EeatHistoryPanel";
+import AeoReadinessPanel from "./AeoReadinessPanel";
 
 /**
  * Widget "Pulse SEO" monochrome éditorial — affiche la performance éditoriale
@@ -172,6 +173,9 @@ export default function PulseSEOWidget({ siteId }) {
 
       {/* E-E-A-T history + badges */}
       <EeatHistoryPanel siteId={siteId} />
+
+      {/* AEO Readiness */}
+      <AeoReadinessPanel siteId={siteId} />
 
       {/* Google Search Console — connect / metrics band */}
       <GSCConnectCard siteId={siteId} />

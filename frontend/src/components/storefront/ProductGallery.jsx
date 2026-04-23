@@ -4,7 +4,7 @@ import { ShoppingBagOpen, MagnifyingGlassPlus, X } from "@phosphor-icons/react";
 /**
  * Premium product gallery — image principale + vignettes + zoom modal.
  */
-export default function ProductGallery({ images = [], name, design }) {
+export default function ProductGallery({ images = [], name, design, styledImages = [] }) {
   const primary = "#0A0A0A";
   const accent = "#F5F5F5";
   const [idx, setIdx] = useState(0);
@@ -12,6 +12,23 @@ export default function ProductGallery({ images = [], name, design }) {
 
   const hasImages = images && images.length > 0;
   const activeImg = hasImages ? images[idx] : null;
+
+  // Map styled image URLs to their AI style for better alt text
+  const styleByUrl = {};
+  (styledImages || []).forEach((g) => {
+    if (g?.url) styleByUrl[g.url] = g.style;
+  });
+  const styleLabel = {
+    closeup: "gros plan détail",
+    studio: "vue studio éditoriale",
+    lifestyle: "mise en situation dans un intérieur",
+    in_use: "en situation d'utilisation",
+  };
+  const altFor = (img, i) => {
+    const style = styleByUrl[img];
+    if (style && styleLabel[style]) return `${name} — ${styleLabel[style]}`;
+    return `${name} — vue ${i + 1}`;
+  };
 
   return (
     <div className="md:sticky md:top-24" data-testid="product-gallery">
@@ -24,7 +41,7 @@ export default function ProductGallery({ images = [], name, design }) {
           <>
             <img
               src={activeImg}
-              alt={`${name} — vue ${idx + 1}`}
+              alt={altFor(activeImg, idx)}
               className="w-full h-full object-cover"
               loading="eager"
             />
@@ -63,7 +80,7 @@ export default function ProductGallery({ images = [], name, design }) {
               }}
               aria-label={`Vue ${i + 1}`}
             >
-              <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
+              <img src={img} alt={altFor(img, i)} className="w-full h-full object-cover" loading="lazy" />
             </button>
           ))}
         </div>

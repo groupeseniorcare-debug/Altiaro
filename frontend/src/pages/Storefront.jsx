@@ -82,7 +82,7 @@ export function StorefrontHome() {
   const orgSchema = site
     ? {
         "@context": "https://schema.org",
-        "@type": "OnlineStore",   // More specific than Organization — AEO signal
+        "@type": design?.contact?.address ? "LocalBusiness" : "OnlineStore",
         name: site.name,
         url: canonical,
         logo: design?.brand?.logo_url,
@@ -117,6 +117,12 @@ export function StorefrontHome() {
               streetAddress: design.contact.address,
               addressCountry: "FR",
             }
+          : undefined,
+        openingHoursSpecification: design?.contact?.address && design?.contact?.support_hours
+          ? [{
+              "@type": "OpeningHoursSpecification",
+              description: design.contact.support_hours,
+            }]
           : undefined,
       }
     : null;

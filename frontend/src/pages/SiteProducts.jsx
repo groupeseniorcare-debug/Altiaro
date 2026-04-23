@@ -599,6 +599,8 @@ function ProductEditor({ siteId, initial, onClose, onSaved, onEnrichNarrative, e
   const [aiImgBusy, setAiImgBusy] = useState(false);
   const [aiImgStyle, setAiImgStyle] = useState("lifestyle");
   const [aiImgResult, setAiImgResult] = useState(null);
+  const [aeoBusy, setAeoBusy] = useState(false);
+  const [aeoResult, setAeoResult] = useState(null);
 
   const setI18n = (field, lang, value) => {
     setForm((f) => ({ ...f, [field]: { ...f[field], [lang]: value } }));
@@ -649,6 +651,20 @@ function ProductEditor({ siteId, initial, onClose, onSaved, onEnrichNarrative, e
     } else {
       setAiImgResult({ message: `${ok} images éditoriales générées. Recharge la page produit pour les voir.` });
     }
+  };
+
+  const aeoEnrich = async () => {
+    if (isNew) { window.alert("Enregistre d'abord le produit."); return; }
+    setAeoBusy(true);
+    setAeoResult(null);
+    const { data, error: err, rawDetail } = await apiCall(() =>
+      api.post(`/products/${initial.id}/aeo-enrich`, {})
+    );
+    setAeoBusy(false);
+    if (err) { window.alert(rawDetail?.detail || err); return; }
+    setAeoResult({
+      message: `+${data.added_faq} Q/R ajoutées (total : ${data.total_faq}) · ${data.conversational_keywords?.length || 0} mots-clés conversationnels`,
+    });
   };
 
   const submit = async (e) => {
@@ -747,7 +763,23 @@ function ProductEditor({ siteId, initial, onClose, onSaved, onEnrichNarrative, e
                 <SparkleIcon size={12} weight="fill" className={aiImgBusy ? "animate-pulse" : ""} />
                 {aiImgBusy ? "Série…" : "Série éditoriale (4 img)"}
               </button>
+              <button
+                type="button"
+                onClick={aeoEnrich}
+                disabled={aeoBusy}
+                data-testid="aeo-enrich-btn"
+                className="h-8 px-3 rounded-lg border border-neutral-200 bg-white text-[12px] font-semibold text-neutral-900 hover:border-neutral-900 flex items-center gap-1.5 transition disabled:opacity-50"
+                title="Génère 18-22 Q/R conversationnelles + mots-clés AEO pour être cité par ChatGPT/Perplexity"
+              >
+                <SparkleIcon size={12} weight="fill" className={aeoBusy ? "animate-pulse" : ""} />
+                {aeoBusy ? "AEO enrich…" : "Enrichir AEO"}
+              </button>
             </div>
+            {aeoResult?.message && (
+              <div className="mt-2 text-[11.5px] text-emerald-700 font-medium" data-testid="aeo-result">
+                ✓ {aeoResult.message}
+              </div>
+            )}
             <button
               type="button"
               onClick={onResync}

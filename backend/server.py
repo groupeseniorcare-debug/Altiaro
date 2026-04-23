@@ -70,6 +70,7 @@ from routes import product_images as product_images_routes
 from routes import launch as launch_routes
 from routes import seo_coach as seo_coach_routes
 from routes import gsc as gsc_routes
+from routes import aeo as aeo_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -131,6 +132,7 @@ api.include_router(product_images_routes.router)
 api.include_router(launch_routes.router)
 api.include_router(seo_coach_routes.router)
 api.include_router(gsc_routes.router)
+api.include_router(aeo_routes.router)
 
 
 @app.on_event("startup")
