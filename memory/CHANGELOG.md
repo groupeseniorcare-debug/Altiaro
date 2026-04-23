@@ -3,6 +3,22 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-02 · Refactoring `SiteDesign.jsx` → modules `/components/site-design/`
+
+Monolithe de **1417 lignes** découpé en 6 modules pour améliorer la maintenabilité :
+
+| Fichier | Lignes | Rôle |
+|---|---|---|
+| `pages/SiteDesign.jsx` | **214** | Orchestrateur (wizard switching, tabs, publish, live preview) |
+| `components/site-design/constants.js` | 58 | TABS, FONT_PAIRS, PALETTE_PRESETS, LINK_TYPES, `detectLinkType` |
+| `components/site-design/shared.jsx` | 66 | `AiField`, `Field`, `ColorPicker` (helpers réutilisables) |
+| `components/site-design/LivePreview.jsx` | 52 | Iframe preview sticky |
+| `components/site-design/IdentityTab.jsx` | 363 | Onglet identité (brand, logo, palette, typo, génération IA) |
+| `components/site-design/NavigationTab.jsx` | 379 | Onglet navigation (header/footer + `NavRow` + `MegaMenuEditor`) |
+| `components/site-design/CollectionsTab.jsx` | 295 | Onglet collections + `CollectionEditor` modal |
+
+Validation : aucune régression fonctionnelle, tous les data-testid préservés, ESLint clean sur les 6 nouveaux fichiers. Smoke test e2e réussi (login Concepteur → `/sites/:id/design` → tabs → storefront mobile → Cmd+K opérateur OK).
+
 ## 2026-02 · Storefront UI polish v2 — mobile-first premium
 
 ### Header refait mobile-first
