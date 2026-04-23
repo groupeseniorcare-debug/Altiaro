@@ -146,6 +146,42 @@ export default function SiteDesign() {
             </p>
           </div>
           <div className="flex gap-2 items-center flex-wrap">
+            {/* Template mode toggle — Monochrome (default) vs Brand palette */}
+            <div
+              className="h-11 rounded-xl p-1 flex items-center gap-0.5 border"
+              style={{ borderColor: "#E5E5E5", background: "#FAFAFA" }}
+              data-testid="template-mode-toggle"
+            >
+              {[
+                { key: "monochrome", label: "Monochrome" },
+                { key: "brand", label: "Palette" },
+              ].map((opt) => {
+                const active = (design?.template_mode || "monochrome") === opt.key;
+                return (
+                  <button
+                    key={opt.key}
+                    onClick={async () => {
+                      const { error } = await apiCall(() =>
+                        api.patch(`/sites/${siteId}/design/template-mode`, { mode: opt.key })
+                      );
+                      if (error) { window.alert(error); return; }
+                      await reload();
+                    }}
+                    data-testid={`tmpl-mode-${opt.key}`}
+                    className={`h-9 px-3 rounded-lg text-xs font-medium transition ${
+                      active
+                        ? "bg-white text-neutral-900 shadow-sm"
+                        : "text-neutral-500 hover:text-neutral-800"
+                    }`}
+                    title={opt.key === "monochrome"
+                      ? "Blanc, noir, gris · style éditorial magazine"
+                      : "Utilise les couleurs de ton identité de marque"}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
             <button
               onClick={enrichHomepage}
               disabled={enriching}

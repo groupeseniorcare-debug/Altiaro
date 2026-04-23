@@ -75,19 +75,37 @@ export function formatPrice(price, currency = "EUR", lang = "fr") {
 }
 
 export function designAccents(design) {
-  // MONOCHROME TEMPLATE — force the storefront chrome to black/white/gray regardless
-  // of the brand palette. The brand color is exposed as `brandAccent` for small
-  // brand-specific accents only (rating stars remain gold, we expose one optional
-  // hue for any micro-accent that *needs* to be brand-colored).
+  // The template has TWO modes, controlled by `design.template_mode`:
+  //   • "monochrome" (default) — black-on-white editorial magazine, cards gray
+  //   • "brand"                 — uses the site's brand palette (primary/accent)
+  //
+  // Both modes expose the same keys so every component can stay identical.
+  const mode = (design?.template_mode === "brand") ? "brand" : "monochrome";
+  const b = design?.brand || {};
+  if (mode === "brand") {
+    return {
+      mode,
+      primary: b.text_color || "#0A0A0A",
+      accent: b.accent_color || b.background_color || "#F5F5F5",
+      surface: b.background_color || "#FAFAFA",
+      divider: "#E5E5E5",
+      textMuted: "#737373",
+      textFaint: "#A3A3A3",
+      brandAccent: b.primary_color || "#0A0A0A",
+      fontHeading: b.font_heading || "Fraunces",
+      fontBody: b.font_body || "Inter",
+    };
+  }
   return {
-    primary: "#0A0A0A",           // main "ink" color (text, buttons)
-    accent: "#F5F5F5",            // light gray surfaces
-    surface: "#FAFAFA",           // softest gray
-    divider: "#E5E5E5",           // hairline dividers
-    textMuted: "#737373",         // secondary text
-    textFaint: "#A3A3A3",         // captions
-    brandAccent: design?.brand?.primary_color || "#0A0A0A",
-    fontHeading: design?.brand?.font_heading || "Fraunces",
-    fontBody: design?.brand?.font_body || "Inter",
+    mode,
+    primary: "#0A0A0A",
+    accent: "#F5F5F5",
+    surface: "#FAFAFA",
+    divider: "#E5E5E5",
+    textMuted: "#737373",
+    textFaint: "#A3A3A3",
+    brandAccent: b.primary_color || "#0A0A0A",
+    fontHeading: b.font_heading || "Fraunces",
+    fontBody: b.font_body || "Inter",
   };
 }

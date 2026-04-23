@@ -47,13 +47,12 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
 
   const shopRoot = `/shop/${siteId}`;
   const brand = design?.brand || {};
-  // MONOCHROME TEMPLATE — enforce white canvas + near-black ink regardless of the
-  // brand palette. The brand accent is reserved for small micro-accents only
-  // (underlines, hairlines, one or two icons). Prevents cream/beige leaks.
-  const primary = "#0A0A0A";
-  const accent = "#F5F5F5";
-  const bg = "#FFFFFF";
-  const textCol = "#0A0A0A";
+  // Template mode — "monochrome" (default) vs "brand". See designAccents().
+  const templateMode = design?.template_mode === "brand" ? "brand" : "monochrome";
+  const primary = templateMode === "brand" ? (brand.text_color || "#0A0A0A") : "#0A0A0A";
+  const accent = templateMode === "brand" ? (brand.accent_color || "#F5F5F5") : "#F5F5F5";
+  const bg = templateMode === "brand" ? (brand.background_color || "#FFFFFF") : "#FFFFFF";
+  const textCol = templateMode === "brand" ? (brand.text_color || "#0A0A0A") : "#0A0A0A";
   const brandAccent = brand.primary_color || "#0A0A0A";
   const fontHeading = brand.font_heading || "Fraunces";
   const fontBody = brand.font_body || "Inter";
@@ -554,77 +553,88 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
       <CartDrawer design={design} />
 
       {/* ================= FOOTER ================= */}
-      <footer className="mt-24 pb-[env(safe-area-inset-bottom)]" style={{ background: "#1C1917", color: "#D6D3D1" }} data-testid="storefront-footer">
+      <footer
+        className="mt-24 pb-[env(safe-area-inset-bottom)] bg-white"
+        style={{ color: "#525252", borderTop: "1px solid #E5E5E5" }}
+        data-testid="storefront-footer"
+      >
         {/* Reassurance band */}
-        <div className="border-b" style={{ borderColor: "#2A2725" }}>
-          <div className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+        <div style={{ borderBottom: "1px solid #E5E5E5" }}>
+          <div className="max-w-7xl mx-auto px-6 py-10 grid grid-cols-2 md:grid-cols-4 gap-6">
             {[
               { Icon: Truck, title: "Livraison offerte", sub: "Partout en Europe" },
               { Icon: ShieldCheck, title: "Paiement sécurisé", sub: "CB, PayPal, Virement" },
               { Icon: Phone, title: "Conseiller humain", sub: "Lun–Ven · 9h–18h" },
               { Icon: CreditCard, title: "Retour 14 jours", sub: "Satisfait ou remboursé" },
             ].map((b, i) => (
-              <div key={i} className="flex flex-col items-center gap-2" data-testid={`footer-reassurance-${i}`}>
-                <b.Icon size={24} weight="duotone" style={{ color: primary }} />
-                <div className="text-sm font-semibold text-white">{b.title}</div>
-                <div className="text-xs text-neutral-400">{b.sub}</div>
+              <div
+                key={i}
+                className="flex items-start gap-3 p-5"
+                style={{ background: "#F5F5F5", borderRadius: "2px" }}
+                data-testid={`footer-reassurance-${i}`}
+              >
+                <b.Icon size={22} weight="thin" style={{ color: "#0A0A0A" }} />
+                <div>
+                  <div className="text-[13px] font-semibold" style={{ color: "#0A0A0A" }}>{b.title}</div>
+                  <div className="text-[12px] mt-0.5" style={{ color: "#737373" }}>{b.sub}</div>
+                </div>
               </div>
             ))}
           </div>
         </div>
 
         {/* Main footer columns */}
-        <div className="max-w-7xl mx-auto px-6 py-14 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8">
+        <div className="max-w-7xl mx-auto px-6 py-16 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-10">
           <div className="col-span-2">
             <div
-              className="text-2xl font-semibold text-white mb-3"
-              style={{ fontFamily: `"${fontHeading}", serif` }}
+              className="text-2xl font-semibold mb-3"
+              style={{ fontFamily: `"${fontHeading}", serif`, color: "#0A0A0A" }}
             >
               {logoText}
             </div>
-            <p className="text-sm leading-relaxed mb-5 max-w-sm">{footerTagline}</p>
+            <p className="text-[13.5px] leading-relaxed mb-6 max-w-sm" style={{ color: "#737373" }}>{footerTagline}</p>
 
-            <div className="space-y-2 text-sm">
-              <a href={`mailto:${contactEmail}`} className="flex items-center gap-2 hover:text-white transition">
+            <div className="space-y-2 text-[13.5px]">
+              <a href={`mailto:${contactEmail}`} className="flex items-center gap-2 hover:opacity-60 transition" style={{ color: "#0A0A0A" }}>
                 <EnvelopeSimple size={15} /> {contactEmail}
               </a>
-              <a href={`tel:${contactPhone.replace(/\s/g, "")}`} className="flex items-center gap-2 hover:text-white transition">
+              <a href={`tel:${contactPhone.replace(/\s/g, "")}`} className="flex items-center gap-2 hover:opacity-60 transition" style={{ color: "#0A0A0A" }}>
                 <Phone size={15} /> {contactPhone} · {contactHours}
               </a>
               {contactAddress && (
-                <div className="flex items-start gap-2">
+                <div className="flex items-start gap-2" style={{ color: "#525252" }}>
                   <MapPin size={15} className="mt-0.5 shrink-0" /> <span>{contactAddress}</span>
                 </div>
               )}
             </div>
 
             {/* Social */}
-            <div className="flex items-center gap-3 mt-6">
+            <div className="flex items-center gap-2 mt-7">
               {social.facebook && (
-                <a href={social.facebook} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full border border-neutral-700 hover:bg-white hover:text-neutral-900 flex items-center justify-center transition" aria-label="Facebook">
-                  <FacebookLogo size={16} weight="fill" />
+                <a href={social.facebook} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full flex items-center justify-center transition hover:bg-neutral-900 hover:text-white" style={{ border: "1px solid #E5E5E5", color: "#0A0A0A" }} aria-label="Facebook">
+                  <FacebookLogo size={15} weight="regular" />
                 </a>
               )}
               {social.instagram && (
-                <a href={social.instagram} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full border border-neutral-700 hover:bg-white hover:text-neutral-900 flex items-center justify-center transition" aria-label="Instagram">
-                  <InstagramLogo size={16} weight="fill" />
+                <a href={social.instagram} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full flex items-center justify-center transition hover:bg-neutral-900 hover:text-white" style={{ border: "1px solid #E5E5E5", color: "#0A0A0A" }} aria-label="Instagram">
+                  <InstagramLogo size={15} weight="regular" />
                 </a>
               )}
               {social.youtube && (
-                <a href={social.youtube} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full border border-neutral-700 hover:bg-white hover:text-neutral-900 flex items-center justify-center transition" aria-label="YouTube">
-                  <YoutubeLogo size={16} weight="fill" />
+                <a href={social.youtube} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full flex items-center justify-center transition hover:bg-neutral-900 hover:text-white" style={{ border: "1px solid #E5E5E5", color: "#0A0A0A" }} aria-label="YouTube">
+                  <YoutubeLogo size={15} weight="regular" />
                 </a>
               )}
               {social.linkedin && (
-                <a href={social.linkedin} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full border border-neutral-700 hover:bg-white hover:text-neutral-900 flex items-center justify-center transition" aria-label="LinkedIn">
-                  <LinkedinLogo size={16} weight="fill" />
+                <a href={social.linkedin} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full flex items-center justify-center transition hover:bg-neutral-900 hover:text-white" style={{ border: "1px solid #E5E5E5", color: "#0A0A0A" }} aria-label="LinkedIn">
+                  <LinkedinLogo size={15} weight="regular" />
                 </a>
               )}
               {!social.facebook && !social.instagram && !social.youtube && !social.linkedin && (
                 <>
-                  <a href="#" className="w-9 h-9 rounded-full border border-neutral-700 hover:bg-white hover:text-neutral-900 flex items-center justify-center transition" aria-label="Facebook"><FacebookLogo size={16} weight="fill" /></a>
-                  <a href="#" className="w-9 h-9 rounded-full border border-neutral-700 hover:bg-white hover:text-neutral-900 flex items-center justify-center transition" aria-label="Instagram"><InstagramLogo size={16} weight="fill" /></a>
-                  <a href="#" className="w-9 h-9 rounded-full border border-neutral-700 hover:bg-white hover:text-neutral-900 flex items-center justify-center transition" aria-label="YouTube"><YoutubeLogo size={16} weight="fill" /></a>
+                  <a href="#" className="w-9 h-9 rounded-full flex items-center justify-center transition hover:bg-neutral-900 hover:text-white" style={{ border: "1px solid #E5E5E5", color: "#0A0A0A" }} aria-label="Facebook"><FacebookLogo size={15} /></a>
+                  <a href="#" className="w-9 h-9 rounded-full flex items-center justify-center transition hover:bg-neutral-900 hover:text-white" style={{ border: "1px solid #E5E5E5", color: "#0A0A0A" }} aria-label="Instagram"><InstagramLogo size={15} /></a>
+                  <a href="#" className="w-9 h-9 rounded-full flex items-center justify-center transition hover:bg-neutral-900 hover:text-white" style={{ border: "1px solid #E5E5E5", color: "#0A0A0A" }} aria-label="YouTube"><YoutubeLogo size={15} /></a>
                 </>
               )}
             </div>
@@ -664,17 +674,21 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
         </div>
 
         {/* Payment methods */}
-        <div className="border-t" style={{ borderColor: "#2A2725" }}>
-          <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-3 flex-wrap" data-testid="footer-payments">
-              <span className="text-xs uppercase tracking-widest text-neutral-500 mr-2">Paiements</span>
+        <div style={{ borderTop: "1px solid #E5E5E5" }}>
+          <div className="max-w-7xl mx-auto px-6 py-7 flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-2 flex-wrap" data-testid="footer-payments">
+              <span className="text-[10px] uppercase tracking-[0.3em] mr-3" style={{ color: "#A3A3A3" }}>Paiements</span>
               {["Visa", "Mastercard", "CB", "PayPal", "Apple Pay", "iDEAL", "Bancontact"].map((p) => (
-                <span key={p} className="px-2.5 py-1 rounded bg-white text-neutral-900 text-[11px] font-medium">
+                <span
+                  key={p}
+                  className="px-2.5 py-1 text-[11px] font-medium"
+                  style={{ background: "#F5F5F5", color: "#0A0A0A", borderRadius: "2px" }}
+                >
                   {p}
                 </span>
               ))}
             </div>
-            <div className="text-xs text-neutral-500">
+            <div className="text-[11px] tracking-wide" style={{ color: "#A3A3A3" }}>
               © {new Date().getFullYear()} {logoText} — Tous droits réservés.
             </div>
           </div>
@@ -687,11 +701,20 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
 function FooterCol({ title, items }) {
   return (
     <div>
-      <div className="text-[11px] uppercase tracking-widest text-white mb-4">{title}</div>
-      <ul className="space-y-2">
+      <div
+        className="text-[10px] uppercase tracking-[0.35em] mb-5"
+        style={{ color: "#0A0A0A", fontWeight: 600 }}
+      >
+        {title}
+      </div>
+      <ul className="space-y-2.5">
         {items.map((it, i) => (
           <li key={i}>
-            <Link to={it.href} className="text-sm hover:text-white transition">
+            <Link
+              to={it.href}
+              className="text-[13.5px] hover:opacity-60 transition"
+              style={{ color: "#525252" }}
+            >
               {it.label}
             </Link>
           </li>

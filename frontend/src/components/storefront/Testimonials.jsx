@@ -4,11 +4,40 @@ import { Star } from "@phosphor-icons/react";
 import { designAccents } from "./storefrontUtils";
 
 const DEFAULT = [
-  { name: "Françoise D.", location: "Lyon · 72 ans", rating: 5, text: "J'hésitais à commander en ligne à mon âge. Le conseiller a été patient, clair, et la livraison s'est parfaitement passée. Le produit correspond exactement à ce qui était décrit." },
-  { name: "Marc & Jeannine L.", location: "Rennes · 78 ans", rating: 5, text: "Nous avons équipé la salle de bain de ma belle-mère. Tout est arrivé en 2 jours, bien emballé, avec des instructions lisibles. Un vrai soulagement." },
-  { name: "Hélène P.", location: "Bordeaux · 65 ans", rating: 5, text: "Service client exceptionnel. J'ai appelé pour un conseil avant d'acheter, on m'a rappelée et orientée sans rien essayer de me vendre. Je recommande vraiment." },
-  { name: "Gérard M.", location: "Marseille · 80 ans", rating: 5, text: "Prix équitable, livraison rapide et un vrai suivi. C'est rare aujourd'hui d'être traité comme un client et pas comme un numéro." },
+  { name: "Françoise D.", location: "Lyon · 72 ans", rating: 5, avatar: "https://images.unsplash.com/photo-1559124056-8895c0a1d6b8?w=200&h=200&auto=format&fit=facearea&facepad=3", text: "J'hésitais à commander en ligne à mon âge. Le conseiller a été patient, clair, et la livraison s'est parfaitement passée. Le produit correspond exactement à ce qui était décrit." },
+  { name: "Marc & Jeannine L.", location: "Rennes · 78 ans", rating: 5, avatar: "https://images.unsplash.com/photo-1596495577886-d920f1fb7238?w=200&h=200&auto=format&fit=facearea&facepad=3", text: "Nous avons équipé la salle de bain de ma belle-mère. Tout est arrivé en 2 jours, bien emballé, avec des instructions lisibles. Un vrai soulagement." },
+  { name: "Hélène P.", location: "Bordeaux · 65 ans", rating: 5, avatar: "https://images.unsplash.com/photo-1581579438747-104c53e7c9e2?w=200&h=200&auto=format&fit=facearea&facepad=3", text: "Service client exceptionnel. J'ai appelé pour un conseil avant d'acheter, on m'a rappelée et orientée sans rien essayer de me vendre. Je recommande vraiment." },
+  { name: "Gérard M.", location: "Marseille · 80 ans", rating: 5, avatar: "https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=200&h=200&auto=format&fit=facearea&facepad=3", text: "Prix équitable, livraison rapide et un vrai suivi. C'est rare aujourd'hui d'être traité comme un client et pas comme un numéro." },
 ];
+
+function Avatar({ src, name, size = 44, primary, accent, fontHeading }) {
+  const [broken, setBroken] = React.useState(false);
+  const initials = (name || "").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  const showImg = src && !broken;
+  return (
+    <div
+      className="rounded-full overflow-hidden flex items-center justify-center shrink-0"
+      style={{ width: size, height: size, background: accent }}
+    >
+      {showImg ? (
+        <img
+          src={src}
+          alt={name}
+          loading="lazy"
+          onError={() => setBroken(true)}
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <span
+          className="font-semibold"
+          style={{ color: primary, fontFamily: `"${fontHeading}", serif`, fontSize: size * 0.38 }}
+        >
+          {initials || "·"}
+        </span>
+      )}
+    </div>
+  );
+}
 
 export function Testimonials({ design, lang }) {
   const { primary, accent, divider, textMuted, textFaint, fontHeading } = designAccents(design);
@@ -67,10 +96,19 @@ export function Testimonials({ design, lang }) {
               <span className="text-[60px] opacity-20 mr-1 leading-none" aria-hidden="true">“</span>
               {heroText}
             </blockquote>
-            <figcaption className="mt-8 pt-6" style={{ borderTop: `1px solid ${divider}` }}>
-              <div className="text-[14px] font-semibold" style={{ color: primary }}>{hero.name}</div>
-              <div className="text-[11px] uppercase tracking-[0.2em] mt-1" style={{ color: textFaint }}>
-                {hero.location}
+            <figcaption
+              className="mt-8 pt-6 flex items-center gap-4"
+              style={{ borderTop: `1px solid ${divider}` }}
+            >
+              <Avatar src={hero.avatar} name={hero.name} size={52} primary={primary} accent="#E5E5E5" fontHeading={fontHeading} />
+              <div>
+                <div className="text-[14px] font-semibold" style={{ color: primary }}>{hero.name}</div>
+                <div
+                  className="text-[11px] uppercase tracking-[0.2em] mt-1"
+                  style={{ color: textFaint }}
+                >
+                  {hero.location}
+                </div>
               </div>
             </figcaption>
           </motion.figure>
@@ -95,10 +133,12 @@ export function Testimonials({ design, lang }) {
                   <blockquote className="text-[14px] leading-relaxed line-clamp-4" style={{ color: primary }}>
                     {text}
                   </blockquote>
-                  <figcaption className="mt-4 flex items-center gap-2 text-[12px]" style={{ color: textMuted }}>
-                    <span className="font-semibold" style={{ color: primary }}>{t.name}</span>
-                    <span>·</span>
-                    <span>{t.location}</span>
+                  <figcaption className="mt-4 flex items-center gap-3">
+                    <Avatar src={t.avatar} name={t.name} size={36} primary={primary} accent="#E5E5E5" fontHeading={fontHeading} />
+                    <div>
+                      <div className="text-[12.5px] font-semibold leading-tight" style={{ color: primary }}>{t.name}</div>
+                      <div className="text-[11px] mt-0.5" style={{ color: textMuted }}>{t.location}</div>
+                    </div>
                   </figcaption>
                 </motion.figure>
               );

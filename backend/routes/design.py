@@ -1065,7 +1065,7 @@ async def ai_enrich_homepage(site_id: str, user: dict = Depends(get_current_user
         f"Voix : {voice}\n"
         f"Niche : {niche}\n"
         f"Produits phares ({len(product_names)}) : {json.dumps(product_names, ensure_ascii=False)}\n\n"
-        "Produis UN SEUL JSON avec ces 5 blocs :\n\n"
+        "Produis UN SEUL JSON avec ces 6 blocs :\n\n"
         "1) `press_mentions` : tableau de 6 médias français crédibles. Format : [{\"name\":\"...\"}].\n\n"
         "2) `founder_story` : portrait fictif cohérent. Format : "
         "{\"name\":\"Prénom Nom français élégant\", \"role\":\"Fondateur ou Fondatrice\", "
@@ -1078,6 +1078,9 @@ async def ai_enrich_homepage(site_id: str, user: dict = Depends(get_current_user
         "{\"title\":\"4-8 mots\", \"body\":\"250-400 car. usage concret en contexte lifestyle\"}.\n\n"
         "5) `values` : 4 piliers. Format : "
         "[{\"title\":\"1-3 mots\", \"description\":\"1 phrase 15-25 mots\"}, ...].\n\n"
+        "6) `brand_process` : 4 étapes du cycle de vie produit (sélection, fabrication, contrôle, logistique). "
+        "Format : [{\"icon\":\"Leaf|HandsClapping|ShieldCheck|Tree\", \"kicker\":\"01 · Sélection\", "
+        "\"title\":\"titre 4-8 mots\", \"body\":\"35-60 mots qui décrit l'engagement\"}].\n\n"
         "Renvoie UNIQUEMENT ce JSON valide."
     )
     session = f"enrich-{site_id}-{uuid.uuid4().hex[:6]}"
@@ -1121,6 +1124,16 @@ async def ai_enrich_homepage(site_id: str, user: dict = Depends(get_current_user
         if title:
             values.append({"title": title, "description": desc})
 
+    brand_process = []
+    valid_icons = {"Leaf", "HandsClapping", "ShieldCheck", "Tree"}
+    for i, s in enumerate((data.get("brand_process") or [])[:4]):
+        title = _sanitize_brand_text(str(s.get("title") or ""), max_len=60)
+        body = _sanitize_brand_text(str(s.get("body") or ""), max_len=240)
+        kicker = _sanitize_brand_text(str(s.get("kicker") or ""), max_len=30) or f"{str(i+1).zfill(2)} · Étape"
+        icon = s.get("icon") if s.get("icon") in valid_icons else ["Leaf", "HandsClapping", "ShieldCheck", "Tree"][i]
+        if title:
+            brand_process.append({"icon": icon, "kicker": kicker, "title": title, "body": body})
+
     now = datetime.now(timezone.utc).isoformat()
     await db.sites.update_one(
         {"id": site_id},
@@ -1130,6 +1143,7 @@ async def ai_enrich_homepage(site_id: str, user: dict = Depends(get_current_user
             "design.manifesto": manifesto,
             "design.editorial": editorial,
             "design.values": values,
+            "design.brand_process": brand_process,
             "design.updated_at": now,
         }},
     )
@@ -1141,6 +1155,7 @@ async def ai_enrich_homepage(site_id: str, user: dict = Depends(get_current_user
             "manifesto": True,
             "editorial": bool(editorial.get("title")),
             "values_count": len(values),
+            "brand_process_count": len(brand_process),
         },
     }
 
@@ -1346,6 +1361,27 @@ class BrandPatchInput(BaseModel):
     accent_color: Optional[str] = None
     font_heading: Optional[str] = None
     font_body: Optional[str] = None
+
+
+@router.patch("/sites/{site_id}/design/template-mode")
+async def set_template_mode(site_id: str, payload: dict, user: dict = Depends(get_current_user)):
+    """Set the storefront template mode: "monochrome" (default) or "brand".
+
+    Monochrome forces black-on-white + gray cards regardless of the brand palette.
+    Brand mode lets the site's palette bleed into surfaces, borders, etc.
+    """
+    await _check_site_access(site_id, user)
+    mode = (payload or {}).get("mode", "monochrome")
+    if mode not in {"monochrome", "brand"}:
+        raise HTTPException(status_code=400, detail="mode must be 'monochrome' or 'brand'")
+    await db.sites.update_one(
+        {"id": site_id},
+        {"$set": {
+            "design.template_mode": mode,
+            "design.updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    return {"ok": True, "template_mode": mode}
 
 
 @router.patch("/sites/{site_id}/design/brand")

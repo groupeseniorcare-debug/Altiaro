@@ -61,6 +61,7 @@ import ProductBundle from "../components/storefront/ProductBundle";
 import PaymentOptions from "../components/storefront/PaymentOptions";
 import MobileStickyBuy from "../components/storefront/MobileStickyBuy";
 import Manifesto from "../components/storefront/Manifesto";
+import BrandProcess from "../components/storefront/BrandProcess";
 import {
   PeopleAlsoAsk,
   BestForNotFor,
@@ -190,10 +191,11 @@ const DEFAULT_HOMEPAGE_ORDER = [
   { key: "manifesto",          visible: true },
   { key: "products",           visible: true },
   { key: "collections",        visible: true },
-  { key: "lifestyle_editorial", visible: false },
+  { key: "brand_process",      visible: true },
   { key: "founder_story",      visible: true },
   { key: "benefits",           visible: true },
   { key: "testimonials",       visible: true },
+  { key: "lifestyle_editorial", visible: false },
   { key: "featured_product",   visible: false },
   { key: "values",             visible: false },
   { key: "buying_guide",       visible: false },
@@ -201,7 +203,7 @@ const DEFAULT_HOMEPAGE_ORDER = [
   { key: "blog_teaser",        visible: false },
   { key: "faq",                visible: true },
   { key: "newsletter",         visible: true },
-  { key: "final_cta",          visible: true },
+  { key: "final_cta",          visible: false },
 ];
 
 function hasData(key, design, products) {
@@ -218,6 +220,7 @@ function hasData(key, design, products) {
     case "collections":
     case "founder_story":
     case "manifesto":
+    case "brand_process":
       return true;
     // These require real data — no fallback makes sense
     case "featured_product": return !!(products?.some((p) => p.featured));
@@ -254,6 +257,8 @@ function renderHomepageSections({ design, site, siteId, products, loading, lang 
           return <PressLogos mentions={design?.press_mentions} design={design} />;
         case "manifesto":
           return <Manifesto design={design} lang={lang} />;
+        case "brand_process":
+          return <BrandProcess design={design} lang={lang} />;
         case "benefits":
           return <Benefits design={design} lang={lang} />;
         case "collections":
