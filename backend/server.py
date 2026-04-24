@@ -73,6 +73,7 @@ from routes import gsc as gsc_routes
 from routes import aeo as aeo_routes
 from routes import internal_linking as internal_linking_routes
 from routes import citation_tracker as citation_tracker_routes
+from routes import ae_deals_watcher as ae_deals_watcher_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -137,6 +138,7 @@ api.include_router(gsc_routes.router)
 api.include_router(aeo_routes.router)
 api.include_router(internal_linking_routes.router)
 api.include_router(citation_tracker_routes.router)
+api.include_router(ae_deals_watcher_routes.router)
 
 
 @app.on_event("startup")
@@ -158,6 +160,90 @@ async def _reap_stale_launch_jobs():
             logger.info(f"[startup] reaped {res.modified_count} zombie launch_jobs")
     except Exception as e:
         logger.warning(f"[startup] launch_jobs reaper failed: {e}")
+
+
+async def _run_citation_tracker_all_sites(logger_=None):
+    """Run citation tracker weekly for every site that has at least one
+    enriched product (AEO Q/R already generated). Skips if LLM budget
+    exhausted."""
+    from datetime import datetime as _dt, timezone as _tz
+    log = logger_ or logger
+    ran = 0
+    skipped = 0
+    budget_hit = False
+    cursor = db.sites.find(
+        {"design.seo_coach.citation_auto_enabled": {"$ne": False}},
+        {"_id": 0, "id": 1, "design.brand.name": 1, "name": 1, "custom_domain": 1},
+    )
+    sites = await cursor.to_list(500)
+    log.info(f"[citation_tracker] scanning {len(sites)} sites")
+    for s in sites:
+        if budget_hit:
+            skipped += 1
+            continue
+        has_aeo = await db.products.find_one(
+            {"site_id": s["id"], "narrative.aeo_enriched_at": {"$exists": True}},
+            {"_id": 0, "id": 1},
+        )
+        if not has_aeo:
+            skipped += 1
+            continue
+        try:
+            from routes.citation_tracker import (
+                _pick_questions, _ask_claude_panel, _mentions_brand, _pick_text,
+            )
+            brand_name = _pick_text((s.get("design") or {}).get("brand", {}).get("name") or s.get("name") or "")
+            if not brand_name:
+                skipped += 1
+                continue
+            products = await db.products.find(
+                {"site_id": s["id"], "status": "active"},
+                {"_id": 0, "name": 1, "narrative": 1},
+            ).to_list(60)
+            questions = _pick_questions(s, products, max_questions=5)
+            if not questions:
+                skipped += 1
+                continue
+            results = []
+            hit = 0
+            for q in questions:
+                answer, err = await _ask_claude_panel(q)
+                if err == "budget_exceeded":
+                    budget_hit = True
+                    break
+                if err or not answer:
+                    results.append({"question": q, "answer": None, "cited": False, "error": err})
+                    continue
+                cited = _mentions_brand(answer, brand_name, s.get("custom_domain") or "")
+                if cited:
+                    hit += 1
+                results.append({"question": q, "answer": answer[:400], "cited": cited})
+            if budget_hit:
+                break
+            total = len(results)
+            rate = round((hit / total) * 100) if total else 0
+            snapshot = {
+                "at": _dt.now(_tz.utc).isoformat(),
+                "rate": rate,
+                "hit": hit,
+                "total": total,
+                "brand_name": brand_name,
+                "results": results,
+            }
+            await db.sites.update_one(
+                {"id": s["id"]},
+                {
+                    "$set": {"design.seo_coach.last_citation_run": snapshot},
+                    "$push": {"design.seo_coach.citation_history": {
+                        "$each": [{"at": snapshot["at"], "rate": rate, "hit": hit, "total": total}],
+                        "$slice": -26,
+                    }},
+                },
+            )
+            ran += 1
+        except Exception:
+            log.exception(f"[citation_tracker] site {s['id']} crashed")
+    return {"ran": ran, "skipped": skipped, "budget_hit": budget_hit}
 
 
 @app.on_event("startup")
@@ -423,6 +509,37 @@ async def startup():
             _scheduled_weekly_seo_coach,
             CronTrigger(day_of_week="mon", hour=8, minute=0),
             id="weekly_seo_coach", replace_existing=True, misfire_grace_time=3600,
+        )
+
+        # Every Thursday at 08:00 UTC (09h CET) — AI Citation Tracker run
+        async def _scheduled_citation_tracker():
+            logger.info("[scheduler] citation tracker weekly run start")
+            try:
+                result = await _run_citation_tracker_all_sites(logger)
+                logger.info(f"[scheduler] citation tracker : {result}")
+            except Exception:
+                logger.exception("[scheduler] citation tracker failed")
+
+        scheduler.add_job(
+            _scheduled_citation_tracker,
+            CronTrigger(day_of_week="thu", hour=8, minute=0),
+            id="citation_tracker_weekly", replace_existing=True, misfire_grace_time=3600,
+        )
+
+        # Every Tuesday at 06:00 UTC — AliExpress Deals Watcher
+        async def _scheduled_ae_deals_watch():
+            logger.info("[scheduler] AliExpress deals watch start")
+            try:
+                from routes.ae_deals_watcher import scan_all_sites
+                result = await scan_all_sites()
+                logger.info(f"[scheduler] AliExpress deals : {result}")
+            except Exception:
+                logger.exception("[scheduler] AliExpress deals failed")
+
+        scheduler.add_job(
+            _scheduled_ae_deals_watch,
+            CronTrigger(day_of_week="tue", hour=6, minute=0),
+            id="ae_deals_watch", replace_existing=True, misfire_grace_time=3600,
         )
 
         scheduler.start()

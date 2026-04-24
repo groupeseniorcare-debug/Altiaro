@@ -103,6 +103,8 @@ Les 50 étapes du playbook sont regroupées en **8 blocs thématiques ordonnés*
 | 61 | **Panneau AEO Readiness** (score 0-100 + checklist 7 items + bulk enrich Claude 18-22 Q/R par produit) | ✅ |
 | 62 | **Maillage interne automatique** (scan blog + produits, injection liens markdown déterministe, audit orphelines + most-linked) | ✅ |
 | 63 | **AI Citation Tracker** (panel Claude mesure taux de citation par les IA, sparkline historique, détail par question) | ✅ |
+| 64 | **Citation Tracker scheduler** (APScheduler jeudi 08:00 UTC, opt-out `citation_auto_enabled`, gestion budget LLM) | ✅ |
+| 65 | **AliExpress Weekly Deals Watcher** (APScheduler mardi 06:00 UTC, détection price drop ≥20 % + ≥500 cmd, UI cockpit avec import/dismiss) | ✅ |
 
 ## Règles critiques
 - Pas de Shopify — tout custom React/FastAPI.

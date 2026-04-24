@@ -3,6 +3,43 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-24 · Citation Tracker auto + AliExpress Weekly Deals Watcher
+
+### Citation Tracker Scheduler (P2 → livré)
+- **APScheduler** cron `jeudi 08:00 UTC` (09h CET) → `_run_citation_tracker_all_sites()`
+  itère tous les sites avec `design.seo_coach.citation_auto_enabled != False`
+  ayant ≥ 1 produit AEO-enriched. 5 questions/site, budget 0,10 € LLM.
+- **Budget-aware** : stoppe immédiatement tous les sites restants si `budget_exceeded`.
+- **Helper module-level** dans `server.py` (réutilisé par le scheduler +
+  futurs endpoints).
+
+### AliExpress Weekly Deals Watcher (P2 → livré)
+- **Backend `routes/ae_deals_watcher.py`** :
+  - `_scan_site()` : scan parallèle des keywords (niche + top-3 categories
+    des produits importés) via `aliexpress.ds.text.search`. Compare le prix
+    EUR actuel avec `ae_deals_history.last_price_eur`, détecte les drops
+    ≥ 20 % sur produits ≥ 500 commandes. Stocke dans `db.ae_deals`.
+  - `scan_all_sites()` — entry-point APScheduler, skip si AliExpress non
+    connecté.
+  - **3 endpoints** : `POST /api/sites/{id}/deals/scan` (manual trigger),
+    `GET /api/sites/{id}/deals?status=new|imported|dismissed|all`,
+    `POST /api/sites/{id}/deals/{item_id}/status` (dismiss/import/reset).
+- **APScheduler** cron `mardi 06:00 UTC` → `_scheduled_ae_deals_watch`.
+- **Frontend `components/AeDealsPanel.jsx`** — panel monochrome éditorial
+  dans `SiteDetail` : header Fraunces + CTA "Scanner maintenant", tabs
+  filter (Nouveaux/Importés/Ignorés), grille 2-col cards avec thumb 96×96,
+  badge `-X%` noir, prix Fraunces + prix barré, actions Voir/Importé/X.
+  Empty states élégants.
+- **Tests pytest** `tests/test_ae_deals_watcher.py` : **5 tests** (parse
+  orders variants, parse price EUR, build queries fallback).
+- **Validation e2e** : scan réel a retourné 20 produits, historique
+  stocké, détection fonctionnelle confirmée (-50 % simulé → 20 deals
+  surfacés dans l'UI cockpit).
+
+### Tests & validation
+- **36 tests pytest** (5 nouveaux + 11 internal_linking + 7 seo_coach +
+  7 seo_badges + 6 autres) tous verts.
+
 ## 2026-04-24 · Fix AliExpress OAuth + connexion réelle
 
 ### Bug `OverflowError: date value out of range` (P0 récurrent)
