@@ -3,6 +3,7 @@ import { ArrowRight, CheckCircle } from "@phosphor-icons/react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
 import { designAccents } from "./storefrontUtils";
+import { t } from "../../lib/i18n";
 
 const BACKEND = "";
 
@@ -10,7 +11,7 @@ const BACKEND = "";
  * NewsletterCTA — MONOCHROME. Gray card on white canvas, split layout with
  * a poised heading on the left and the email form on the right.
  */
-export default function NewsletterCTA({ design }) {
+export default function NewsletterCTA({ design, lang = "fr" }) {
   const { siteId } = useParams();
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -84,11 +85,11 @@ export default function NewsletterCTA({ design }) {
                     className="h-12 px-5 text-white text-[13px] font-medium flex items-center justify-center gap-2 disabled:opacity-60 transition-all hover:gap-3"
                     style={{ background: primary, borderRadius: "2px" }}
                   >
-                    {submitting ? "Envoi…" : <>S'inscrire <ArrowRight size={13} weight="bold" /></>}
+                    {submitting ? t(lang, "newsletter_sending") : <>{t(lang, "newsletter_subscribe")} <ArrowRight size={13} weight="bold" /></>}
                   </button>
                 </div>
                 <div className="text-[11px]" style={{ color: textMuted }}>
-                  En vous inscrivant, vous acceptez notre politique de confidentialité. Désinscription en 1 clic.
+                  {t(lang, "newsletter_consent_short")}
                 </div>
               </form>
             )}

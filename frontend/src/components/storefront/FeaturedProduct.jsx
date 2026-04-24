@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowRight, CheckCircle, Star } from "@phosphor-icons/react";
-import { pickLang } from "../../lib/i18n";
+import { pickLang, t } from "../../lib/i18n";
 import { formatPrice } from "./storefrontUtils";
 
 /**
@@ -42,10 +42,10 @@ export default function FeaturedProduct({ products, design, lang = "fr" }) {
   const bullets = design?.featured_bullets?.[lang]
     || design?.featured_bullets?.fr
     || [
-      "Testé par des ergothérapeutes",
-      "Livraison + installation offertes",
-      "Garantie 2 ans incluse",
-      "Essai 14 jours à domicile",
+      t(lang, "featured_tested_ergo"),
+      t(lang, "featured_install_free"),
+      t(lang, "featured_warranty_inc"),
+      t(lang, "featured_trial_14d"),
     ];
 
   return (
@@ -53,10 +53,10 @@ export default function FeaturedProduct({ products, design, lang = "fr" }) {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-14">
           <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-3">
-            Notre coup de cœur
+            {t(lang, "section_featured")}
           </div>
           <h2 className="text-4xl md:text-5xl" style={{ fontFamily: `${fontHeading}, serif`, color: "#1C1917" }}>
-            Le best-seller de la maison
+            {t(lang, "featured_heading")}
           </h2>
         </div>
 

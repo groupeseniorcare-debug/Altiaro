@@ -270,7 +270,7 @@ function renderHomepageSections({ design, site, siteId, products, loading, lang 
         case "faq":
           return <FAQSection design={design} lang={lang} />;
         case "newsletter":
-          return <NewsletterCTA design={design} />;
+          return <NewsletterCTA design={design} lang={lang} />;
         case "final_cta":
           return <FinalCTA design={design} lang={lang} />;
         default:

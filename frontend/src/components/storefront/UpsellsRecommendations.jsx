@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import axios from "axios";
 import { ShoppingBagOpen, Plus, Sparkle } from "@phosphor-icons/react";
-import { pickLang } from "../../lib/i18n";
+import { pickLang, t } from "../../lib/i18n";
 import { addToCart } from "../../lib/cart";
 import { BACKEND_URL, designAccents, formatPrice } from "./storefrontUtils";
 
@@ -58,12 +58,10 @@ export default function UpsellsRecommendations({
     setTimeout(() => setAddedIds((prev) => ({ ...prev, [p.id]: false })), 1800);
   };
 
-  const resolvedTitle = title || (mode === "post_purchase" ? "Complétez votre commande" : "Souvent acheté avec");
+  const resolvedTitle = title || (mode === "post_purchase" ? t(lang, "upsell_complete_order") : t(lang, "upsell_often_bought"));
   const resolvedSubtitle =
     subtitle ||
-    (mode === "post_purchase"
-      ? "Ajoutez ces accessoires à votre prochaine commande — frais de port offerts dès 50 €."
-      : "Accessoires sélectionnés par nos experts pour aller avec ce produit.");
+    (mode === "post_purchase" ? t(lang, "upsell_subtitle_post") : t(lang, "upsell_subtitle_related"));
 
   return (
     <section

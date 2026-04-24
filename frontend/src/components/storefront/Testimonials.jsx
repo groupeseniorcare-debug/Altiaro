@@ -114,7 +114,11 @@ function ReviewCard({ item, lang }) {
 export function Testimonials({ design, lang }) {
   const { primary, fontHeading } = designAccents(design);
   const items = design?.testimonials?.items || design?.testimonials;
-  const list = Array.isArray(items) && items.length ? items : DEFAULT;
+  const hasReal = Array.isArray(items) && items.length > 0;
+  // Fallback testimonials are FR-only (mock names + quotes). Skip section
+  // if storefront lang is not FR and no real testimonials exist in DB.
+  if (!hasReal && (lang || "fr") !== "fr") return null;
+  const list = hasReal ? items : DEFAULT;
   // Duplicate once so marquee loops seamlessly
   const doubled = [...list, ...list];
 

@@ -20,7 +20,7 @@ export function FinalCTA({ design, lang }) {
       || t(lang, "shop_title"),
     120,
   );
-  const eyebrow = designText(design, "final_cta.eyebrow", lang) || brandLabel || "Commencez maintenant";
+  const eyebrow = designText(design, "final_cta.eyebrow", lang) || brandLabel || t(lang, "final_cta_eyebrow");
   const kicker = designText(design, "final_cta.kicker", lang)
     || t(lang, "final_cta_subtitle");
   const heroCta = designText(design, "hero.cta_label", lang) || t(lang, "shop_now");

@@ -1,14 +1,11 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { pickLang } from "../../lib/i18n";
+import { pickLang, t } from "../../lib/i18n";
 import { designAccents } from "./storefrontUtils";
 
-const DEFAULT_STORY = {
+const DEFAULT_STORY_BASE = {
   image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=1400&auto=format&fit=crop",
   name: "Camille Lefèvre",
-  role: "Fondatrice",
-  quote:
-    "J'ai créé cette maison après avoir accompagné ma grand-mère. Chaque produit sélectionné passe entre mes mains. Aucun compromis sur la qualité, le service ni la dignité.",
   signature: "Camille L.",
 };
 
@@ -18,10 +15,10 @@ const DEFAULT_STORY = {
  */
 export default function FounderStory({ story, lang = "fr", design }) {
   const { primary, accent, divider, textMuted, fontHeading } = designAccents(design);
-  const s = story || DEFAULT_STORY;
-  const quote = pickLang(s.quote, lang) || s.quote || DEFAULT_STORY.quote;
-  const role = pickLang(s.role, lang) || s.role || DEFAULT_STORY.role;
-  const name = s.name || DEFAULT_STORY.name;
+  const s = story || {};
+  const quote = pickLang(s.quote, lang) || s.quote || t(lang, "founder_quote_default");
+  const role = pickLang(s.role, lang) || s.role || t(lang, "founder_role_default");
+  const name = s.name || DEFAULT_STORY_BASE.name;
   const signature = s.signature || name;
 
   return (

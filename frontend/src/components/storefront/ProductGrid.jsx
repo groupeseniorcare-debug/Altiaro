@@ -171,8 +171,8 @@ function ProductCard({ product: p, siteId, primary, accent, divider, textMuted, 
             <div className="flex items-center gap-1.5">
               <Link
                 to={href}
-                title="Voir le détail"
-                aria-label="Voir le détail"
+                title={t(lang, "product_view_detail")}
+                aria-label={t(lang, "product_view_detail")}
                 data-testid={`product-details-${p.id}`}
                 className="w-11 h-11 border flex items-center justify-center transition hover:border-black"
                 style={{ borderColor: divider, color: primary, borderRadius: "2px" }}
@@ -188,11 +188,11 @@ function ProductCard({ product: p, siteId, primary, accent, divider, textMuted, 
               >
                 {added ? (
                   <>
-                    <CheckCircle size={14} weight="fill" /> Ajouté
+                    <CheckCircle size={14} weight="fill" /> {t(lang, "added_to_cart")}
                   </>
                 ) : (
                   <>
-                    Ajouter
+                    {t(lang, "add_to_cart")}
                     <ShoppingBagOpen size={14} weight="bold" />
                   </>
                 )}
@@ -217,7 +217,7 @@ export function ProductGrid({ siteId, products, loading, design, lang }) {
           <div className="flex items-center gap-3 mb-5">
             <span className="h-px w-10" style={{ background: primary }} />
             <span className="text-[11px] uppercase tracking-[0.4em]" style={{ color: primary }}>
-              L'édition
+              {t(lang, "hero_edition")}
             </span>
           </div>
           <h2
@@ -228,7 +228,7 @@ export function ProductGrid({ siteId, products, loading, design, lang }) {
           </h2>
         </div>
         <div className="text-[12px] uppercase tracking-[0.3em]" style={{ color: textMuted }}>
-          {hasReal ? `${products.length} ${products.length > 1 ? "références" : "référence"}` : "Aperçu du template"}
+          {hasReal ? `${products.length} ${products.length > 1 ? t(lang, "product_references") : t(lang, "product_reference")}` : t(lang, "product_preview_template")}
         </div>
       </div>
 

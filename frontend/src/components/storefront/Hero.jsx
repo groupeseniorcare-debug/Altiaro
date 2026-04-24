@@ -21,15 +21,14 @@ export function Hero({ site, design, lang, products }) {
   const brandLabel = sanitizeBrandText(brand.logo_text || brand.name || "", 40);
   const heroTitleRaw = designText(design, "hero.title", lang) || brandLabel || site?.name || t(lang, "shop_title");
   const heroTitle = sanitizeBrandText(heroTitleRaw, 60);
-  const heroSub = designText(design, "hero.subtitle", lang)
-    || "Des produits sélectionnés avec soin pour préserver votre autonomie, votre confort et votre sérénité au quotidien.";
+  const heroSub = designText(design, "hero.subtitle", lang) || t(lang, "hero_subtitle_default");
   const heroCta = designText(design, "hero.cta_label", lang) || t(lang, "shop_now");
   const heroCta2 = designText(design, "hero.cta_secondary_label", lang) || t(lang, "nav_about");
-  const eyebrowRaw = designText(design, "hero.eyebrow", lang) || brand.tagline || "La maison bienveillante";
+  const eyebrowRaw = designText(design, "hero.eyebrow", lang) || brand.tagline || t(lang, "hero_eyebrow_default");
   const eyebrow = sanitizeBrandText(eyebrowRaw, 60);
   const rating = design?.hero?.rating || { score: 4.8, count: 2143 };
   const chapterNumber = "01";
-  const chapterLabel = "L'édition en cours";
+  const chapterLabel = t(lang, "hero_chapter_label");
 
   const firstProductImg = (() => {
     if (!Array.isArray(products) || products.length === 0) return null;
@@ -215,11 +214,11 @@ export function Hero({ site, design, lang, products }) {
               data-testid="hero-floating-card"
             >
               <div className="text-[9px] uppercase tracking-[0.32em] mb-1.5" style={{ color: textMuted }}>
-                Satisfait ou remboursé
+                {t(lang, "hero_trust_satisfied")}
               </div>
               <div className="text-[13px] leading-snug" style={{ color: primary }}>
-                14 jours pour changer d'avis —{" "}
-                <span style={{ color: textMuted }}>retour gratuit</span>
+                {t(lang, "hero_trust_14d_line1")}{" "}
+                <span style={{ color: textMuted }}>{t(lang, "hero_trust_14d_line2")}</span>
               </div>
             </motion.div>
           </motion.div>
@@ -230,7 +229,7 @@ export function Hero({ site, design, lang, products }) {
             style={{ color: textMuted }}
             aria-hidden="true"
           >
-            {brandLabel || "Collection"} — Édition {new Date().getFullYear()}
+            {brandLabel || t(lang, "hero_collection")} — {t(lang, "hero_edition")} {new Date().getFullYear()}
           </div>
         </motion.div>
       </div>

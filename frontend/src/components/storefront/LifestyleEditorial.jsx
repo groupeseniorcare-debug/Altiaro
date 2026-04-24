@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowRight } from "@phosphor-icons/react";
-import { pickLang } from "../../lib/i18n";
+import { pickLang, t } from "../../lib/i18n";
 
 /**
  * Lifestyle editorial — section full-bleed avec grande image + texte éditorial superposé à côté.
@@ -16,11 +16,10 @@ export default function LifestyleEditorial({ editorial, lang = "fr", design }) {
 
   const e = editorial || {};
   const image = e.image || "https://images.unsplash.com/photo-1551847677-dc82d764e1eb?w=1400&auto=format&fit=crop";
-  const eyebrow = pickLang(e.eyebrow, lang) || e.eyebrow || "Notre promesse";
-  const title = pickLang(e.title, lang) || e.title || "Chaque produit est pensé comme si c'était pour nos parents";
-  const body = pickLang(e.body, lang) || e.body
-    || "Nous testons chaque équipement avec des seniors, leurs aidants et nos ergothérapeutes partenaires. Un produit qui n'est pas utilisable par une personne de 80 ans n'entrera jamais dans notre catalogue. C'est non négociable.";
-  const ctaLabel = pickLang(e.cta_label, lang) || e.cta_label || "Découvrir notre démarche";
+  const eyebrow = pickLang(e.eyebrow, lang) || e.eyebrow || t(lang, "section_editorial");
+  const title = pickLang(e.title, lang) || e.title || t(lang, "editorial_fallback_title");
+  const body = pickLang(e.body, lang) || e.body || t(lang, "editorial_fallback_body");
+  const ctaLabel = pickLang(e.cta_label, lang) || e.cta_label || t(lang, "editorial_fallback_cta");
   const ctaHref = e.cta_href || `/shop/${siteId}#story`;
 
   return (

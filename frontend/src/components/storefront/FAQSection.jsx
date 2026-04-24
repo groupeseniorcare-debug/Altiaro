@@ -1,16 +1,17 @@
 import React from "react";
 import { designAccents } from "./storefrontUtils";
+import { t } from "../../lib/i18n";
 
 export function FAQSection({ design, lang }) {
   const { primary, accent, divider, textMuted, fontHeading } = designAccents(design);
   const items = design?.faq?.items || design?.faq;
   const list = Array.isArray(items) && items.length ? items : [
-    { question: "Sous quel délai serai-je livré ?", answer: "Les commandes sont expédiées sous 24h ouvrées. Vous recevez votre colis en 48 à 72h partout en France métropolitaine, avec un numéro de suivi dès l'expédition." },
-    { question: "Puis-je retourner un produit qui ne me convient pas ?", answer: "Oui, vous avez 14 jours à réception pour changer d'avis. Les frais de retour sont à notre charge et vous êtes remboursé sous 5 jours après réception." },
-    { question: "Comment puis-je contacter un conseiller ?", answer: "Par téléphone du lundi au vendredi de 9h à 18h, ou par email 7j/7 — nous répondons en moyenne en 2h ouvrées. Pas de chatbot : un vrai humain à votre écoute." },
-    { question: "Les produits sont-ils remboursés par la Sécurité sociale ?", answer: "Certains équipements sont pris en charge partiellement par la Sécu ou par votre mutuelle (LPPR). Demandez-nous un devis, nous vous aiderons à constituer le dossier." },
-    { question: "Proposez-vous l'installation à domicile ?", answer: "Sur les produits volumineux (fauteuils releveurs, lits médicaux), un technicien peut se déplacer pour l'installation et la prise en main. Détail lors de la commande." },
-    { question: "Mes données personnelles sont-elles protégées ?", answer: "Nous ne partageons jamais vos coordonnées avec des tiers à des fins commerciales. Nos serveurs sont hébergés en France, conforme RGPD." },
+    { question: t(lang, "faq_delivery_q"),   answer: t(lang, "faq_delivery_a") },
+    { question: t(lang, "faq_returns_q"),    answer: t(lang, "faq_returns_a") },
+    { question: t(lang, "faq_contact_q"),    answer: t(lang, "faq_contact_a") },
+    { question: t(lang, "faq_reimburse_q"),  answer: t(lang, "faq_reimburse_a") },
+    { question: t(lang, "faq_install_q"),    answer: t(lang, "faq_install_a") },
+    { question: t(lang, "faq_privacy_q"),    answer: t(lang, "faq_privacy_a") },
   ];
 
   return (
@@ -28,10 +29,10 @@ export function FAQSection({ design, lang }) {
             className="text-[36px] md:text-[48px] leading-[1.02] tracking-[-0.02em]"
             style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
           >
-            Questions<br />fréquentes.
+            {t(lang, "faq_title_line1")}<br />{t(lang, "faq_title_line2")}
           </h2>
           <p className="mt-4 text-[13px]" style={{ color: textMuted }}>
-            Une question qui n'est pas ci-dessous ? Notre équipe répond en 2h ouvrées en moyenne.
+            {t(lang, "faq_helper")}
           </p>
         </div>
 

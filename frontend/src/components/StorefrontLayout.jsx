@@ -177,9 +177,9 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
   const footerLinks = (Array.isArray(configuredFooter) && configuredFooter.length
     ? configuredFooter
     : [
-        { label: "CGV", href: `${shopRoot}/cgv` },
-        { label: "Mentions légales", href: `${shopRoot}/mentions` },
-        { label: "Confidentialité", href: `${shopRoot}/confidentialite` },
+        { label: "CGV",                            href: `${shopRoot}/cgv` },
+        { label: t(lang, "footer_legal_notice"),   href: `${shopRoot}/mentions` },
+        { label: t(lang, "footer_privacy"),        href: `${shopRoot}/confidentialite` },
       ]
   ).map((n) => ({ ...n, href: rewriteHref(n.href) }));
   const onSearch = (e) => {
@@ -383,7 +383,7 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
               <input
                 value={searchQ}
                 onChange={(e) => setSearchQ(e.target.value)}
-                placeholder="Rechercher…"
+                placeholder={t(lang, "search_placeholder")}
                 data-testid="header-search"
                 className="h-11 pl-9 pr-3 w-48 rounded-full border text-sm focus:outline-none focus:ring-1 focus:ring-neutral-400"
                 style={{ borderColor: "#E7E5E4", background: "#fff", color: textCol }}
@@ -396,7 +396,7 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
               className="xl:hidden w-11 h-11 min-w-[44px] min-h-[44px] rounded-full border flex items-center justify-center hover:bg-neutral-50 active:scale-95 transition-transform"
               style={{ borderColor: "#E7E5E4" }}
               data-testid="header-search-icon"
-              aria-label="Rechercher"
+              aria-label={t(lang, "search_placeholder")}
             >
               <MagnifyingGlass size={18} style={{ color: textCol }} />
             </button>
@@ -406,8 +406,8 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
               data-testid="header-account"
               className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full border bg-white hover:bg-neutral-50 flex items-center justify-center transition active:scale-95"
               style={{ borderColor: "#E7E5E4" }}
-              title={customer ? `${customer.first_name} ${customer.last_name}` : "Se connecter"}
-              aria-label={customer ? "Mon compte" : "Se connecter"}
+              title={customer ? `${customer.first_name} ${customer.last_name}` : t(lang, "footer_login")}
+              aria-label={customer ? t(lang, "footer_my_account") : t(lang, "footer_login")}
             >
               <User size={18} weight="regular" style={{ color: textCol }} />
             </Link>
@@ -450,7 +450,7 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
                 onClick={() => setMobileOpen(false)}
                 className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full hover:bg-neutral-50 flex items-center justify-center active:scale-95 transition-transform"
                 data-testid="mobile-menu-close"
-                aria-label="Fermer"
+                aria-label={t(lang, "close")}
               >
                 <X size={20} style={{ color: textCol }} />
               </button>
@@ -461,7 +461,7 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
                 <input
                   value={searchQ}
                   onChange={(e) => setSearchQ(e.target.value)}
-                  placeholder="Rechercher un produit…"
+                  placeholder={t(lang, "search_placeholder")}
                   className="h-12 w-full pl-11 pr-4 rounded-full border text-sm focus:outline-none"
                   style={{ borderColor: "#E7E5E4" }}
                   data-testid="mobile-search"
@@ -482,10 +482,10 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
                 </div>
                 <div>
                   <div className="text-sm font-semibold" style={{ color: textCol }}>
-                    {customer ? (customer.first_name || "Mon compte") : "Se connecter"}
+                    {customer ? (customer.first_name || t(lang, "footer_my_account")) : t(lang, "footer_login")}
                   </div>
                   <div className="text-xs opacity-60" style={{ color: textCol }}>
-                    {customer ? "Mes commandes & préférences" : "Accéder à mon espace"}
+                    {customer ? t(lang, "account_subtitle_customer") : t(lang, "account_subtitle_guest")}
                   </div>
                 </div>
               </div>
@@ -636,10 +636,10 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
                 className="font-light text-white leading-[1.1] tracking-[-0.03em] mb-6"
                 style={{ fontSize: "clamp(2rem, 4.2vw, 3.2rem)", fontFamily: `"${fontHeading}", serif` }}
               >
-                Rejoignez<br />notre journal.
+                {t(lang, "newsletter_title_line1")}<br />{t(lang, "newsletter_title_line2")}
               </h2>
               <p className="text-[14px] md:text-[15px] text-white/50 leading-[1.7] max-w-md mb-10">
-                Recevez nos conseils, les nouveautés et nos offres exclusives directement dans votre boîte mail.
+                {t(lang, "newsletter_lead")}
               </p>
               <form
                 data-testid="footer-newsletter-form"
@@ -648,7 +648,7 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
               >
                 <div className="flex-1">
                   <input
-                    placeholder="Votre email"
+                    placeholder={t(lang, "newsletter_placeholder")}
                     data-testid="footer-email-input"
                     className="w-full bg-transparent text-white text-[14px] placeholder:text-white/30 pb-3 border-b border-white/25 focus:border-white/60 outline-none transition-colors"
                     type="email"
@@ -659,14 +659,14 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
                   data-testid="footer-subscribe-btn"
                   className="group flex items-center gap-2.5 px-6 py-2.5 rounded-full glass-card text-white text-[13px] font-medium tracking-wide uppercase hover:bg-white/20 transition-all"
                 >
-                  S'inscrire
+                  {t(lang, "newsletter_subscribe")}
                   <span className="w-1.5 h-1.5 rounded-full bg-white group-hover:scale-125 transition-transform" />
                 </button>
               </form>
               <p className="text-[12px] text-white/30 max-w-md">
-                En vous inscrivant, vous acceptez notre{" "}
+                {t(lang, "newsletter_consent_prefix")}{" "}
                 <Link to={`${shopRoot}/confidentialite`} className="text-white/60 underline underline-offset-2 hover:text-white/80 transition-colors">
-                  politique de confidentialité.
+                  {t(lang, "newsletter_consent_link")}.
                 </Link>
               </p>
 
@@ -721,40 +721,41 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
             <div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-10">
                 <FooterCol
-                  title={t(lang, "nav_shop")}
+                  title={t(lang, "footer_col_shop")}
                   items={[
-                    { label: "Tous les produits", href: `${shopRoot}` },
-                    { label: "Collections", href: `${shopRoot}/collections` },
-                    { label: "Nouveautés", href: `${shopRoot}?sort=new` },
-                    { label: "Meilleures ventes", href: `${shopRoot}?sort=bestsellers` },
+                    { label: t(lang, "footer_all_products"),  href: `${shopRoot}` },
+                    { label: t(lang, "nav_collections"),      href: `${shopRoot}/collections` },
+                    { label: t(lang, "footer_new_arrivals"),  href: `${shopRoot}?sort=new` },
+                    { label: t(lang, "footer_bestsellers"),   href: `${shopRoot}?sort=bestsellers` },
                   ]}
                 />
                 <FooterCol
-                  title="Nous connaître"
+                  title={t(lang, "footer_col_about")}
                   items={[
-                    { label: "Notre histoire", href: `${shopRoot}/about` },
-                    { label: "Le Journal", href: `${shopRoot}/blog` },
-                    { label: "Ils parlent de nous", href: `${shopRoot}#press` },
-                    { label: "Contact", href: `${shopRoot}/contact` },
+                    { label: t(lang, "footer_our_story"),     href: `${shopRoot}/about` },
+                    { label: t(lang, "nav_journal"),          href: `${shopRoot}/blog` },
+                    { label: t(lang, "footer_press"),         href: `${shopRoot}#press` },
+                    { label: t(lang, "nav_contact"),          href: `${shopRoot}/contact` },
                   ]}
                 />
                 <FooterCol
-                  title="Service client"
+                  title={t(lang, "footer_col_service")}
                   items={[
-                    { label: "FAQ", href: `${shopRoot}#faq` },
-                    { label: "Livraison & délais", href: `${shopRoot}/livraison` },
-                    { label: "Retours", href: `${shopRoot}/retours` },
-                    { label: "Suivre ma commande", href: `${shopRoot}/track` },
-                    { label: customer ? "Mon compte" : "Se connecter", href: customer ? `${shopRoot}/account` : `${shopRoot}/account/login` },
+                    { label: t(lang, "section_faq"),          href: `${shopRoot}#faq` },
+                    { label: t(lang, "shipping"),             href: `${shopRoot}/livraison` },
+                    { label: t(lang, "footer_returns"),       href: `${shopRoot}/retours` },
+                    { label: t(lang, "footer_track_order"),   href: `${shopRoot}/track` },
+                    { label: customer ? t(lang, "footer_my_account") : t(lang, "footer_login"),
+                      href: customer ? `${shopRoot}/account` : `${shopRoot}/account/login` },
                   ]}
                 />
                 <FooterCol
-                  title="Légal"
+                  title={t(lang, "footer_col_legal")}
                   items={footerLinks.length > 0 ? footerLinks : [
-                    { label: "CGV", href: `${shopRoot}/cgv` },
-                    { label: "Mentions légales", href: `${shopRoot}/mentions` },
-                    { label: "Confidentialité", href: `${shopRoot}/confidentialite` },
-                    { label: "Cookies", href: `${shopRoot}/cookies` },
+                    { label: "CGV",                           href: `${shopRoot}/cgv` },
+                    { label: t(lang, "footer_legal_notice"),  href: `${shopRoot}/mentions` },
+                    { label: t(lang, "footer_privacy"),       href: `${shopRoot}/confidentialite` },
+                    { label: t(lang, "footer_cookies"),       href: `${shopRoot}/cookies` },
                   ]}
                 />
               </div>
@@ -771,10 +772,10 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
         <div className="relative z-10 max-w-7xl mx-auto px-6 py-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
             <p data-testid="footer-copyright" className="text-[12px] text-white/40">
-              © {new Date().getFullYear()} {logoText} — Tous droits réservés.
+              © {new Date().getFullYear()} {logoText} — {t(lang, "footer_all_rights")}.
             </p>
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-white/30 mb-3">Paiement sécurisé</p>
+              <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-white/30 mb-3">{t(lang, "trust_secure_payment")}</p>
               <div className="flex items-center gap-2.5 flex-wrap" data-testid="footer-payments">
                 {["Visa", "Mastercard", "CB", "PayPal", "Apple Pay", "iDEAL", "Bancontact"].map((p) => (
                   <span

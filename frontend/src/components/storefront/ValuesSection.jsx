@@ -1,6 +1,6 @@
 import React from "react";
 import { Heart, UsersThree, Lightbulb, HandHeart, Leaf, ShieldCheck } from "@phosphor-icons/react";
-import { pickLang } from "../../lib/i18n";
+import { pickLang, t } from "../../lib/i18n";
 
 const ICON_POOL = { Heart, UsersThree, Lightbulb, HandHeart, Leaf, ShieldCheck };
 
@@ -9,16 +9,16 @@ const ICON_POOL = { Heart, UsersThree, Lightbulb, HandHeart, Leaf, ShieldCheck }
  * Renders 4 pillars with icon + title + description + (optional) metric.
  *
  * Fed by design.values = [{icon, title, description, metric, metric_label}]
- * Falls back to default Altiaro pillars if undefined.
+ * Falls back to localized Altiaro pillars if undefined.
  */
 export default function ValuesSection({ values, lang = "fr", design }) {
   const pillars = values?.length
     ? values
     : [
-        { icon: "Heart", title: "Conçu avec tendresse", description: "Chaque produit est pensé pour préserver la dignité, l'autonomie et le confort des seniors.", metric: "10+", metric_label: "ans d'expérience" },
-        { icon: "UsersThree", title: "L'équipe à votre écoute", description: "Une conseillère répond à chaque appel. Pas de répondeur, pas d'attente — juste un humain qui comprend.", metric: "2h", metric_label: "délai de réponse moyen" },
-        { icon: "HandHeart", title: "Installation inclusée", description: "Sur demande, un technicien se déplace pour installer, expliquer et s'assurer que tout fonctionne.", metric: "100%", metric_label: "avec accompagnement" },
-        { icon: "Leaf", title: "Production responsable", description: "Nous sélectionnons nos fabricants avec soin. Matériaux durables, circuits courts quand possible.", metric: "15", metric_label: "partenaires audités" },
+        { icon: "Heart",      title: t(lang, "values_care_title"),    description: t(lang, "values_care_desc"),    metric: "10+",  metric_label: t(lang, "values_metric_years") },
+        { icon: "UsersThree", title: t(lang, "values_listen_title"),  description: t(lang, "values_listen_desc"),  metric: "2h",   metric_label: t(lang, "values_metric_reply") },
+        { icon: "HandHeart",  title: t(lang, "values_install_title"), description: t(lang, "values_install_desc"), metric: "100%", metric_label: t(lang, "values_metric_support") },
+        { icon: "Leaf",       title: t(lang, "values_eco_title"),     description: t(lang, "values_eco_desc"),     metric: "15",   metric_label: t(lang, "values_metric_partners") },
       ];
 
   const primary = design?.brand?.primary_color || "#1C1917";
@@ -29,9 +29,9 @@ export default function ValuesSection({ values, lang = "fr", design }) {
     <section className="py-20 md:py-28 px-6" data-testid="storefront-values" style={{ background: accent }}>
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-16">
-          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-3">Nos engagements</div>
+          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-3">{t(lang, "section_values")}</div>
           <h2 className="text-4xl md:text-5xl mb-4" style={{ fontFamily: `${fontHeading}, serif`, color: "#1C1917" }}>
-            Ce qui nous anime
+            {t(lang, "values_heading")}
           </h2>
         </div>
 
