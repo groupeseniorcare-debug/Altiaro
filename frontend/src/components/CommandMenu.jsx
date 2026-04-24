@@ -128,7 +128,7 @@ export default function CommandMenu() {
                   />
                   <Row
                     icon={Palette} label="Étape 5 — Studio de marque"
-                    onSelect={() => go(`/sites/${activeSiteId}/design`)}
+                    onSelect={() => go(`/sites/${activeSiteId}/branding?tab=avance`)}
                     testid="cmdk-step5"
                   />
                   <Row
@@ -216,7 +216,7 @@ export default function CommandMenu() {
                     <Row
                       icon={Tag} label="Régénérer le design de la marque"
                       hint="Claude"
-                      onSelect={() => go(`/sites/${activeSiteId}/design`)}
+                      onSelect={() => go(`/sites/${activeSiteId}/branding?tab=avance`)}
                       testid="cmdk-action-regen-design"
                     />
                     <Row

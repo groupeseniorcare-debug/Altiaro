@@ -9,7 +9,7 @@ const nowMonth = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 };
 
-export default function Finances() {
+export default function AdminFinances() {
   const [sites, setSites] = useState([]);
   const [selectedSite, setSelectedSite] = useState("");
   const [items, setItems] = useState([]);
@@ -25,12 +25,14 @@ export default function Finances() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 
+  // Chargement initial : liste des sites (le `selectedSite` est volontairement
+  // exclu des dépendances — on ne veut charger qu'au mount).
   useEffect(() => {
     apiCall(() => api.get("/sites")).then(({ data }) => {
       setSites(data || []);
       if (data?.length && !selectedSite) setSelectedSite(data[0].id);
     });
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadItems = useCallback(async (siteId) => {
     if (!siteId) return;

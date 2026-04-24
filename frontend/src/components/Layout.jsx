@@ -41,7 +41,7 @@ export default function Layout({ children }) {
         { to: "/admin/google-ads", label: "Google Ads", icon: GoogleLogo, testId: "nav-google-ads" },
         { to: "/admin/opportunities", label: "Opportunités", icon: Fire, testId: "nav-opportunities" },
         { to: "/admin/review", label: "Validations", icon: CheckSquare, testId: "nav-validations" },
-        { to: "/finances", label: "Finances", icon: ChartLineUp, testId: "nav-finances" },
+        { to: "/admin/finance", label: "Finance (Admin)", icon: ChartLineUp, testId: "nav-finances" },
         { to: "/billing", label: "Paiements", icon: CreditCard, testId: "nav-billing" },
         { to: "/users", label: "Équipe", icon: Users, testId: "nav-users" },
       ]
@@ -49,7 +49,7 @@ export default function Layout({ children }) {
         { to: "/", label: "Dashboard", icon: House, testId: "nav-dashboard" },
         { to: "/sites", label: "Sites", icon: SquaresFour, testId: "nav-sites" },
         { to: "/sites/new", label: "Lancer un site", icon: Rocket, testId: "nav-launch" },
-        { to: "/finances", label: "Finance", icon: ChartLineUp, testId: "nav-finances" },
+        { to: "/finance", label: "Finance", icon: ChartLineUp, testId: "nav-finances" },
         { to: "/billing", label: "Compte", icon: CreditCard, testId: "nav-billing" },
       ];
 

@@ -7,6 +7,7 @@ import Sites from "./pages/Sites";
 import NewSite from "./pages/NewSite";
 import SiteDetail from "./pages/SiteDetail";
 import Finance from "./pages/Finance";
+import AdminFinances from "./pages/AdminFinances";
 import Users from "./pages/Users";
 import NicheEngine from "./pages/Analyzer";
 import NicheAnalysisDetail from "./pages/NicheAnalysisDetail";
@@ -17,7 +18,6 @@ import SiteAliExpressImport from "./pages/SiteAliExpressImport";
 import SitePricing from "./pages/SitePricing";
 import SiteForecast from "./pages/SiteForecast";
 import SiteUpsells from "./pages/SiteUpsells";
-import SiteDesign from "./pages/SiteDesign";
 import SiteBranding from "./pages/SiteBranding";
 import SitePages from "./pages/SitePages";
 import SiteFulfillment from "./pages/SiteFulfillment";
@@ -224,11 +224,7 @@ function App() {
           />
           <Route
             path="/sites/:id/design"
-            element={
-              <ProtectedRoute>
-                <SiteDesign />
-              </ProtectedRoute>
-            }
+            element={<Navigate to="../branding?tab=avance" replace />}
           />
           <Route
             path="/sites/:id/branding"
@@ -385,12 +381,25 @@ function App() {
             }
           />
           <Route
-            path="/finances"
+            path="/finance"
             element={
               <ProtectedRoute>
                 <Finance />
               </ProtectedRoute>
             }
+          />
+          <Route
+            path="/admin/finance"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminFinances />
+              </ProtectedRoute>
+            }
+          />
+          {/* Ancienne URL `/finances` — redirige vers `/finance` (côté concepteur). Les admins cliquent sur "Finance (Admin)" dans la nav qui pointe directement sur /admin/finance. */}
+          <Route
+            path="/finances"
+            element={<Navigate to="/finance" replace />}
           />
           <Route
             path="/users"

@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { api, apiCall } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import Layout from "../components/Layout";
-import AdminFinances from "./Finances";
 import {
   ArrowDown,
   ArrowUp,
@@ -72,8 +71,25 @@ const presets = [
 ];
 
 export default function Finance() {
+  // Phase 2 split : cette page est DÉDIÉE au Concepteur.
+  // L'admin a sa propre route `/admin/finance` → `AdminFinances.jsx`.
+  // Plus de dispatch runtime ici — le choix se fait au routing (App.js + Layout.jsx).
   const { user } = useAuth();
-  if (user && user.role === "admin") return <AdminFinances />;
+  // Si un admin arrive ici par erreur (ex: vieux bookmark), on le protège d'une
+  // page vide en lui pointant explicitement la bonne URL.
+  if (user && user.role === "admin") {
+    return (
+      <Layout>
+        <div className="max-w-2xl mx-auto mt-16 p-6 bg-white border border-neutral-200 rounded-2xl">
+          <h1 className="text-xl font-semibold text-neutral-900 mb-2">Finance (Admin)</h1>
+          <p className="text-sm text-neutral-600 mb-4">
+            Cette page présente la vue Concepteur. La vue admin se trouve sur{" "}
+            <Link to="/admin/finance" className="underline text-neutral-900 font-medium">/admin/finance</Link>.
+          </p>
+        </div>
+      </Layout>
+    );
+  }
   return <ConcepteurFinance />;
 }
 

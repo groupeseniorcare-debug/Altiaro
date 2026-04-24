@@ -369,6 +369,13 @@ async def startup():
         )
         logger.info(f"Updated Concepteur password for {CONCEPTEUR_EMAIL}")
 
+    # ---------- Seed demo site (Phase 2) ---------- #
+    try:
+        from seed_demo_site import seed_demo_site_if_needed
+        await seed_demo_site_if_needed(db, logger)
+    except Exception as e:
+        logger.warning(f"[SEED] demo site failed : {e}")
+
     # ---------- APScheduler : weekly debits + bi-monthly payouts ---------- #
     try:
         from apscheduler.schedulers.asyncio import AsyncIOScheduler

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, CheckCircle, Storefront as StoreIcon, Rocket, Palette } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 import IdentityTab from "../components/site-design/IdentityTab";
 import LivePreview from "../components/site-design/LivePreview";
 import BrandWizard from "../components/BrandWizard";
 import LaunchProgress from "../components/LaunchProgress";
+import SiteDesignAdvanced from "../components/advanced/SiteDesignAdvanced";
 import {
   HeroEditor,
   BenefitsEditor,
@@ -17,9 +18,25 @@ import HomepageSectionsEditor from "../components/HomepageSectionsEditor";
  * Étape 5 — Identité & design.
  * Tout ce qui est VISUEL : marque, logo, palette, typo + homepage (hero,
  * sections, bénéfices, témoignages). PAS de pages légales (= Étape 6).
+ *
+ * Phase 2 unification : la page expose 2 onglets.
+ *   - "Essentiel" (défaut) — les 6 sections linéaires (identité, homepage,
+ *     hero, benefits, testimonials, footer background).
+ *   - "Avancé" — l'ancienne `pages/SiteDesign.jsx` absorbée (studio de marque
+ *     tabulé : identity / navigation / collections / content). Lazy-mounted
+ *     pour ne pas double-fetch `/sites/:id/design` inutilement.
+ *
+ * Support query string `?tab=simple|avance`. Le paramètre `?step=5` envoyé
+ * par le CockpitJourney force l'onglet "simple" (entrée par défaut de l'étape).
  */
 export default function SiteBranding() {
   const { id: siteId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Priority : step=5 (CockpitJourney) forces simple. Otherwise tab=avance|simple.
+  const forcedSimple = searchParams.get("step") === "5";
+  const urlTab = searchParams.get("tab");
+  const initialTab = forcedSimple || !urlTab || urlTab === "simple" ? "simple" : "advanced";
+  const [brandingTab, setBrandingTab] = useState(initialTab);
   const [site, setSite] = useState(null);
   const [design, setDesign] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -28,6 +45,15 @@ export default function SiteBranding() {
   const [previewOpen, setPreviewOpen] = useState(true);
   const [mode, setMode] = useState("auto");
   const [launchJobId, setLaunchJobId] = useState(null);
+
+  // Sync tab <-> URL. Keep ?step=5 if present (cockpit deep link).
+  const switchBrandingTab = (next) => {
+    setBrandingTab(next);
+    const params = new URLSearchParams(searchParams);
+    if (next === "simple") params.delete("tab");
+    else params.set("tab", next === "advanced" ? "avance" : next);
+    setSearchParams(params, { replace: true });
+  };
 
   const reload = async () => {
     const [{ data: s }, { data: d }] = await Promise.all([
@@ -173,6 +199,46 @@ export default function SiteBranding() {
           </div>
         </div>
 
+        {/* Tab selector — Phase 2 unification : "Essentiel" (défaut, linéaire) vs "Avancé" (studio tabulé absorbé depuis l'ancien /design) */}
+        <div
+          className="mb-6 inline-flex gap-1 p-1 bg-white border"
+          style={{ borderColor: "#E5E5E5", borderRadius: "4px" }}
+          role="tablist"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={brandingTab === "simple"}
+            data-testid="tab-branding-simple"
+            onClick={() => switchBrandingTab("simple")}
+            className={`h-9 px-4 text-[13px] font-medium transition ${
+              brandingTab === "simple"
+                ? "bg-neutral-900 text-white"
+                : "text-neutral-600 hover:bg-neutral-50"
+            }`}
+            style={{ borderRadius: "3px" }}
+          >
+            Essentiel
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={brandingTab === "advanced"}
+            data-testid="tab-branding-advanced"
+            onClick={() => switchBrandingTab("advanced")}
+            className={`h-9 px-4 text-[13px] font-medium transition ${
+              brandingTab === "advanced"
+                ? "bg-neutral-900 text-white"
+                : "text-neutral-600 hover:bg-neutral-50"
+            }`}
+            style={{ borderRadius: "3px" }}
+          >
+            Avancé
+          </button>
+        </div>
+
+        {brandingTab === "simple" && (
+        <>
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_480px] gap-8">
           <div className="space-y-10">
             {/* Identité */}
@@ -281,6 +347,14 @@ export default function SiteBranding() {
           >
             <StoreIcon size={14} weight="fill" /> Aperçu live
           </button>
+        )}
+        </>
+        )}
+
+        {brandingTab === "advanced" && (
+          <div data-testid="branding-advanced-panel">
+            <SiteDesignAdvanced embedded={true} />
+          </div>
         )}
       </div>
     </div>
