@@ -497,9 +497,16 @@ async def oauth_start(_admin: dict = Depends(require_admin)) -> dict:
         include_granted_scopes="true",
         prompt="consent",
     )
+    # Persist code_verifier (PKCE) + state pour pouvoir le réinjecter dans le
+    # callback. Sans ça, Google renvoie "invalid_grant : Missing code verifier".
     await db.platform_settings.update_one(
         {"key": "merchant_oauth_state"},
-        {"$set": {"key": "merchant_oauth_state", "state": state, "created_at": time.time()}},
+        {"$set": {
+            "key": "merchant_oauth_state",
+            "state": state,
+            "code_verifier": getattr(flow, "code_verifier", None),
+            "created_at": time.time(),
+        }},
         upsert=True,
     )
     return {"authorize_url": url, "state": state}
@@ -530,6 +537,17 @@ async def oauth_callback(
     flow = _build_flow()
     if not flow:
         return RedirectResponse(url=f"{target_err}&reason=config_missing", status_code=302)
+    # Retrieve PKCE code_verifier saved at oauth_start. Required by Google since
+    # Flow.authorization_url() auto-generates a code_challenge.
+    try:
+        state_doc = await db.platform_settings.find_one(
+            {"key": "merchant_oauth_state"}, {"_id": 0}
+        ) or {}
+        saved_verifier = state_doc.get("code_verifier")
+        if saved_verifier:
+            flow.code_verifier = saved_verifier
+    except Exception:
+        saved_verifier = None
     try:
         flow.fetch_token(code=code)
     except Exception as e:

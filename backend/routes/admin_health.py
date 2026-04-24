@@ -301,7 +301,13 @@ async def _ping_google_ads() -> dict:
             actions=["configure"],
             duration_ms=int((time.perf_counter() - t0) * 1000),
         )
-    doc = await db.platform_settings.find_one({"key": "google_ads"}) or {}
+    # Le callback Google Ads persiste les tokens dans `google_ads_credentials`
+    # (pas dans `platform_settings.google_ads`). On lit donc la bonne source :
+    # doc actif le plus récent avec refresh_token.
+    doc = await db.google_ads_credentials.find_one(
+        {"is_active": True, "refresh_token": {"$exists": True, "$nin": [None, ""]}},
+        sort=[("updated_at", -1)],
+    ) or {}
     connected = bool(doc.get("refresh_token"))
     dur = int((time.perf_counter() - t0) * 1000)
     if not connected:
@@ -315,7 +321,14 @@ async def _ping_google_ads() -> dict:
             actions=["connect"],
             duration_ms=dur,
         )
-    customer_id = doc.get("preferred_customer_id") or doc.get("login_customer_id")
+    # Schéma de google_ads_credentials : admin_user_id, refresh_token, scopes,
+    # updated_at. Pas de preferred_customer_id ici → on fallback sur l'env.
+    customer_id = (
+        doc.get("preferred_customer_id")
+        or doc.get("login_customer_id")
+        or os.environ.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID", "").strip()
+        or None
+    )
     return _result(
         "google_ads", "Google Ads (Keyword Planner + Campaigns)",
         status="ok",
@@ -323,7 +336,11 @@ async def _ping_google_ads() -> dict:
         connected=True,
         requires_oauth=True,
         configured_env=True,
-        details={"customer_id": customer_id, "connected_at": doc.get("connected_at")},
+        details={
+            "customer_id": customer_id,
+            "connected_at": doc.get("connected_at") or doc.get("updated_at"),
+            "scopes": doc.get("scopes"),
+        },
         actions=["test", "disconnect"],
         duration_ms=dur,
     )
