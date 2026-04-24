@@ -149,7 +149,7 @@ export default function CockpitJourney({ site, onRefresh }) {
       locked: isLocked("branding"),
       ready: readyBranding,
       cta: hasBrand && hasLogo ? "Branding configuré" : "Générer mon site (IA)",
-      to: `/sites/${site.id}/design?tab=identity&step=5`,
+      to: `/sites/${site.id}/branding?step=5`,
     },
     {
       key: "pages",
@@ -161,7 +161,7 @@ export default function CockpitJourney({ site, onRefresh }) {
       locked: isLocked("pages"),
       ready: readyPages,
       cta: hasAbout ? "Pages remplies" : "Compléter les pages",
-      to: `/sites/${site.id}/design?tab=content&step=6`,
+      to: `/sites/${site.id}/pages?step=6`,
     },
     {
       key: "content",

@@ -19,6 +19,8 @@ import SitePricing from "./pages/SitePricing";
 import SiteForecast from "./pages/SiteForecast";
 import SiteUpsells from "./pages/SiteUpsells";
 import SiteDesign from "./pages/SiteDesign";
+import SiteBranding from "./pages/SiteBranding";
+import SitePages from "./pages/SitePages";
 import SiteFulfillment from "./pages/SiteFulfillment";
 import Sourcing from "./pages/Sourcing";
 import AdminIntegrations from "./pages/AdminIntegrations";
@@ -226,6 +228,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <SiteDesign />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites/:id/branding"
+            element={
+              <ProtectedRoute>
+                <SiteBranding />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites/:id/pages"
+            element={
+              <ProtectedRoute>
+                <SitePages />
               </ProtectedRoute>
             }
           />

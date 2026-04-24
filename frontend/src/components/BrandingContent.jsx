@@ -92,9 +92,6 @@ export default function BrandingContent({ siteId, design, onReload, onChange }) 
   );
 }
 
-// ==========================================================================
-// Shared helpers
-// ==========================================================================
 function SectionCard({ title, testid, children, actions }) {
   return (
     <div className="bg-white border border-neutral-200 rounded-2xl p-5" data-testid={testid}>
@@ -203,7 +200,7 @@ function useSectionActions(siteId, section, onReload, onSaved) {
 // ==========================================================================
 // Per-section editors
 // ==========================================================================
-function HeroEditor({ siteId, design, onReload, onSaved }) {
+export function HeroEditor({ siteId, design, onReload, onSaved }) {
   const hero = design?.hero || {};
   const { saving, regenerating, save, regenerate } = useSectionActions(siteId, "hero", onReload, onSaved);
   const [form, setForm] = useState({});
@@ -251,7 +248,7 @@ function HeroEditor({ siteId, design, onReload, onSaved }) {
   );
 }
 
-function AboutEditor({ siteId, design, onReload, onSaved }) {
+export function AboutEditor({ siteId, design, onReload, onSaved }) {
   const about = design?.about || {};
   const { saving, regenerating, save, regenerate } = useSectionActions(siteId, "about", onReload, onSaved);
   const [headline, setHeadline] = useState("");
@@ -315,7 +312,7 @@ function AboutEditor({ siteId, design, onReload, onSaved }) {
   );
 }
 
-function BenefitsEditor({ siteId, design, onReload, onSaved }) {
+export function BenefitsEditor({ siteId, design, onReload, onSaved }) {
   const benefits = Array.isArray(design?.benefits) ? design.benefits : [];
   const { saving, regenerating, save, regenerate } = useSectionActions(siteId, "benefits", onReload, onSaved);
   const [items, setItems] = useState([]);
@@ -379,7 +376,7 @@ function BenefitsEditor({ siteId, design, onReload, onSaved }) {
   );
 }
 
-function FAQEditor({ siteId, design, onReload, onSaved }) {
+export function FAQEditor({ siteId, design, onReload, onSaved }) {
   const faq = Array.isArray(design?.faq) ? design.faq : [];
   const { saving, regenerating, save, regenerate } = useSectionActions(siteId, "faq", onReload, onSaved);
   const [items, setItems] = useState([]);
@@ -437,7 +434,7 @@ function FAQEditor({ siteId, design, onReload, onSaved }) {
   );
 }
 
-function TestimonialsEditor({ siteId, design, onReload, onSaved }) {
+export function TestimonialsEditor({ siteId, design, onReload, onSaved }) {
   const tests = Array.isArray(design?.testimonials) ? design.testimonials : [];
   const { saving, regenerating, save, regenerate } = useSectionActions(siteId, "testimonials", onReload, onSaved);
   const [items, setItems] = useState([]);
@@ -509,7 +506,7 @@ function TestimonialsEditor({ siteId, design, onReload, onSaved }) {
   );
 }
 
-function ContactEditor({ siteId, design, onReload, onSaved }) {
+export function ContactEditor({ siteId, design, onReload, onSaved }) {
   const contact = design?.contact || {};
   const { saving, regenerating, save, regenerate } = useSectionActions(siteId, "contact", onReload, onSaved);
   const [form, setForm] = useState({});
@@ -568,7 +565,7 @@ function ContactEditor({ siteId, design, onReload, onSaved }) {
   );
 }
 
-function LegalEditor({ siteId, design, onReload, onSaved }) {
+export function LegalEditor({ siteId, design, onReload, onSaved }) {
   const legal = design?.legal_pages || {};
   const [seeding, setSeeding] = useState(false);
   const seed = async () => {

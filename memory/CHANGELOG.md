@@ -3,6 +3,39 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-24 (late evening) · Séparation radicale Étapes 5 / 6
+
+Retour user : « étape 5 et 6 ont les mêmes onglets, je ne sais pas laquelle
+sert à quoi ». La solution n'était PAS un banner en plus — c'est **deux
+pages dédiées**.
+
+### Nouvelles pages dédiées
+- **`/sites/:id/branding` (Étape 5 · Identité & design)** — tout le VISUEL :
+  Identité (nom, baseline, voix, logo, palette, typo), Sections homepage,
+  Hero, Bénéfices, Témoignages. **Live preview sticky à droite**. Sections
+  numérotées 1-5 avec badges Fraunces. Deux CTA header : "Générer mon site
+  (IA)" + "Étape suivante · Rédiger les pages".
+- **`/sites/:id/pages` (Étape 6 · Pages essentielles)** — seulement les
+  PAGES hors produits : À propos, FAQ, Contact, Livraison, Retours, CGV,
+  Mentions, Confidentialité, Cookies, Médiation. **Progress bar "X/10"**
+  + chips par page (vert si remplie). **Gros CTA noir "✨ Rédiger toutes les
+  pages (IA)"** qui appelle `/api/sites/:id/design/generate-pages`.
+
+### Refonte de BrandingContent
+- 7 editors internes exportés en `export function` (AboutEditor, FAQEditor,
+  ContactEditor, LegalEditor, HeroEditor, BenefitsEditor, TestimonialsEditor)
+  pour pouvoir les réutiliser dans les 2 nouvelles pages dédiées sans
+  dupliquer du code.
+- `/design` reste disponible comme "éditeur avancé power-user" (4 onglets
+  classiques) mais n'est plus la cible des étapes 5/6 du cockpit.
+
+### CockpitJourney
+- Étape 5 → `/sites/:id/branding?step=5`
+- Étape 6 → `/sites/:id/pages?step=6`
+- Étape 7 → `/blog-posts?step=7`
+- Parcours linéaire 5 → 6 → 7 avec boutons "Étape suivante" en bas de chaque
+  page, impossible de se perdre.
+
 ## 2026-04-24 (evening) · UX Guidance Étapes 5/6/7 (anti-confusion)
 
 Feedback user : « Étapes 5 et 6 font la même chose, Studio incompréhensible,
