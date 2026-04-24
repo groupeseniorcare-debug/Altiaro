@@ -4,6 +4,7 @@ Monte les routers modulaires définis dans /app/backend/routes/.
 """
 import os
 import logging
+import uuid
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -77,6 +78,7 @@ from routes import citation_tracker as citation_tracker_routes
 from routes import ae_deals_watcher as ae_deals_watcher_routes
 from routes import testimonials_ai as testimonials_ai_routes
 from routes import merchant as merchant_routes
+from routes import resend_domain as resend_domain_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -150,6 +152,7 @@ api.include_router(citation_tracker_routes.router)
 api.include_router(ae_deals_watcher_routes.router)
 api.include_router(testimonials_ai_routes.router)
 api.include_router(merchant_routes.router)
+api.include_router(resend_domain_routes.router)
 
 
 @app.on_event("startup")
@@ -338,6 +341,7 @@ async def startup():
     existing = await db.users.find_one({"email": ADMIN_EMAIL})
     if existing is None:
         await db.users.insert_one({
+            "id": str(uuid.uuid4()),  # Phase 6 : UUID stable pour référence externe
             "email": ADMIN_EMAIL,
             "password_hash": hash_password(ADMIN_PASSWORD),
             "name": "Admin",
@@ -358,6 +362,7 @@ async def startup():
     existing_c = await db.users.find_one({"email": CONCEPTEUR_EMAIL})
     if existing_c is None:
         await db.users.insert_one({
+            "id": str(uuid.uuid4()),  # Phase 6 : UUID stable pour référence externe
             "email": CONCEPTEUR_EMAIL,
             "password_hash": hash_password(CONCEPTEUR_PASSWORD),
             "name": "Marie Concepteur",
@@ -372,6 +377,25 @@ async def startup():
             {"$set": {"password_hash": hash_password(CONCEPTEUR_PASSWORD), "status": "active"}},
         )
         logger.info(f"Updated Concepteur password for {CONCEPTEUR_EMAIL}")
+
+    # Phase 6 · Backfill UUID id sur users legacy (idempotent, non destructif).
+    # Contexte : avant Phase 6, les users seedés n'avaient pas de champ "id" UUID.
+    # Leur RBAC continue d'utiliser str(_id) via deps.serialize_user (inchangé pour
+    # préserver la compat des sites existants qui ont operator_id = str(ObjectId)).
+    # Ce UUID sert uniquement comme alias stable utilisable par les scripts externes.
+    try:
+        import uuid as _uuid
+        backfill_cursor = db.users.find({"id": {"$exists": False}}, {"_id": 1, "email": 1})
+        backfill_count = 0
+        async for u in backfill_cursor:
+            new_uuid = str(_uuid.uuid4())
+            await db.users.update_one({"_id": u["_id"]}, {"$set": {"id": new_uuid}})
+            backfill_count += 1
+            logger.info(f"[phase6-backfill] user {u.get('email')} got uuid id={new_uuid}")
+        if backfill_count:
+            logger.info(f"[phase6-backfill] {backfill_count} user(s) got a stable UUID id")
+    except Exception:
+        logger.exception("[phase6-backfill] skipped due to error (non-blocking)")
 
     # ---------- Seed demo site (Phase 2) ---------- #
     try:
