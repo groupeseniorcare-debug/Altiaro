@@ -3,6 +3,66 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-24 · AEO Readiness + Maillage interne + Citation Tracker IA
+
+### Panneau AEO Readiness (suite du boost AEO)
+- **Backend `routes/aeo.py`** (374 lignes) :
+  - `POST /api/products/{id}/aeo-enrich` — génère 18-22 Q/R conversationnelles
+    + mots-clés longue-traîne via Claude, fusionne avec FAQ existante
+    (dedup case-insensitive).
+  - `POST /api/sites/{id}/products/aeo-enrich-bulk` — job background enrichit
+    jusqu'à 50 produits avec throttling `Semaphore(3)`. Gestion budget LLM
+    via flag `budget_hit` qui arrête propre.
+  - `GET /api/sites/{id}/aeo-readiness` — score 0-100 local (zéro coût LLM) :
+    35 % produits AEO-ready · 20 pts richesse Q/R · 15 pts keywords
+    conversationnels · 10 pts llms-full.txt · 10 pts contactPoint · 10 pts blog.
+- **Frontend `components/AeoReadinessPanel.jsx`** — score Fraunces XXL +
+  barre de progression Débutant→Pro→Élite + CTA bulk enrich + checklist
+  right-col + footer stats (`ready / total · Q/R moy · keywords`).
+
+### Maillage interne automatique (P1, signal ranking #1)
+- **Backend `routes/internal_linking.py`** (déterministe, zéro LLM) :
+  - `POST /api/sites/{id}/internal-linking/auto-inject` — scanne tous les
+    posts + product descriptions + narrative sections, construit une
+    link-map pondérée (pillar 10 > product 8 > collection 6 > blog 4),
+    injecte des liens markdown `[keyword](url)` sur la première occurrence
+    non protégée (skip code blocks, existing anchors, h1, self-links).
+    Stop word filter FR + longueur min 5 char + unicode word boundaries.
+  - `GET /api/sites/{id}/internal-linking/stats` — audit : liens sortants
+    totaux, pages orphelines (0 incoming), top pages citées, dernier run.
+  - Persist `design.seo_coach.last_internal_linking_stats` pour UI + post-
+    audit.
+- **Frontend `components/InternalLinkingPanel.jsx`** — score Fraunces
+  (liens détectés) + stats-line `docs scannés · liens/doc · cibles uniques`
+  + CTA "Injecter le maillage interne" + right-col orphan pages (avec
+  warning icon) + most-linked leaderboard.
+- **Tests pytest** `tests/test_internal_linking.py` : **11 tests** couvrant
+  priorité pillar/product, skip upsells, filtre stop-words, max links,
+  skip markdown existant, skip code-blocks, skip self-URL, case-insensitive,
+  word boundaries stricts (`fauteuil` ≠ `fauteuils`).
+
+### AI Citation Tracker (P2, visibilité moteurs IA)
+- **Backend `routes/citation_tracker.py`** :
+  - `POST /api/sites/{id}/citation-tracker/run` — interroge Claude (panel IA)
+    sur 6 questions conversationnelles du site (extraites de `narrative.faq`
+    + fallback synthetic par produit). Détecte si la marque ou le domaine
+    est cité via regex word-boundary case-insensitive dans answer +
+    brands_cited.
+  - `GET /api/sites/{id}/citation-tracker` — dernier snapshot + historique
+    26 semaines (6 mois) pour sparkline.
+  - Persistence `design.seo_coach.last_citation_run` + array `citation_history`
+    avec `$slice: -26`.
+- **Frontend `components/CitationTrackerPanel.jsx`** — score Fraunces XXL
+  (rate %) + sparkline SVG pur (polyline + dots) + CTA "Mesurer maintenant"
+  + right-col résultats détaillés (Q + extrait réponse, check/xmark par ligne).
+
+### Tests & validation
+- **Testing agent iter29** : 100 % backend (28/28 : 11 unit + 17 API) + 100 %
+  frontend (3 nouveaux panneaux + boutons testids + previous panels OK +
+  zéro console error). Aucun bug identifié.
+- **Design** : strict monochrome editorial préservé (Fraunces / `#0A0A0A` /
+  hairlines `#E5E5E5` / background cards `#F5F5F5`).
+
 ## 2026-04-23 · Historique E-E-A-T + Badges + Boost AEO/SEO
 
 ### Historique hebdomadaire + Badges achievements (dopamine-driven)

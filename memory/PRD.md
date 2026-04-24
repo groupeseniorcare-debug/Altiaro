@@ -100,6 +100,9 @@ Les 50 étapes du playbook sont regroupées en **8 blocs thématiques ordonnés*
 | 58 | **Google Search Console OAuth** (multi-tenant, refresh_token, metrics position/clicks/CTR, UI dormante + guide setup) | ✅ (backend + UI) · ⏳ (en attente des clés Google Cloud) |
 | 59 | **Historique E-E-A-T + Badges** (snapshots hebdo, sparkline SVG, 9 badges d'achievement, rule engine) | ✅ |
 | 60 | **Boost AEO/SEO** (sitemap images, llms-full.txt, Organization enrichi, Speakable FAQ, Article schema v2, IndexNow auto-submit) | ✅ |
+| 61 | **Panneau AEO Readiness** (score 0-100 + checklist 7 items + bulk enrich Claude 18-22 Q/R par produit) | ✅ |
+| 62 | **Maillage interne automatique** (scan blog + produits, injection liens markdown déterministe, audit orphelines + most-linked) | ✅ |
+| 63 | **AI Citation Tracker** (panel Claude mesure taux de citation par les IA, sparkline historique, détail par question) | ✅ |
 
 ## Règles critiques
 - Pas de Shopify — tout custom React/FastAPI.
