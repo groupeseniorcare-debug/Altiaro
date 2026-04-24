@@ -60,12 +60,21 @@ MARKET_AGGREGATES = {
 
 
 # ============== CLAUDE : variantes + prix concurrents ============== #
-_SYSTEM_PROMPT = """Tu es un expert senior en e-commerce européen pour la Silver Economy \
-(60+ ans). Ta mission : aider un Concepteur à décider s'il doit lancer un site \
-e-commerce spécialisé sur un produit. Sois factuel, français, pragmatique. JSON strict uniquement."""
+_SYSTEM_PROMPT = """Tu es un expert senior en e-commerce européen spécialisé Silver Economy \
+(clientèle 60+ ans, aidants familiaux, prescripteurs médicaux). Ta mission : \
+aider un Concepteur Altiaro à décider s'il doit lancer un site e-commerce \
+spécialisé sur un produit / niche donné pour un pays donné.
+
+Principes directeurs :
+- Silver Economy = volumes modérés (1 500-15 000 recherches/mois par pays \
+suffisent largement si la marge est bonne), panier moyen élevé (50-2000€), \
+conversion 1.5-3.5%. NE JUGE PAS la niche trop sévèrement sur le volume seul.
+- Sois factuel et concret, pas vague. Donne des VRAIS chiffres réalistes \
+plutôt que des estimations pessimistes génériques.
+- Sors JSON strict, sans markdown, sans commentaires."""
 
 _USER_TEMPLATE = """Produit / niche à évaluer : **{product}**
-Pays cible : **{country_name}**
+Pays cible : **{country_name}** (code {country_code})
 
 Renvoie EXACTEMENT ce JSON (pas de markdown, pas de commentaire) :
 
@@ -76,39 +85,79 @@ Renvoie EXACTEMENT ce JSON (pas de markdown, pas de commentaire) :
   "market_trend": "growing" | "stable" | "declining",
   "is_saturated": true | false,
   "red_flags": ["<string>", ...],
+  "reasons_pro": ["<string>", "<string>", "<string>"],
+  "reasons_con": ["<string>", "<string>"],
+  "recommended_angle": "<1-2 phrases : angle produit / positionnement le plus porteur dans ce pays pour ce produit>",
   "top_competitors": ["<domain.tld>", ...],
   "regulatory_notes": "<1 phrase si réglementation spéciale, sinon ''>",
   "estimated_keyword_metrics": [
     {{"keyword": "<kw>", "volume_monthly": <int>, "cpc_eur": <float>, "competition_index": <int 0-100>}},
-    ... 6 items (produit principal + 5 variantes)
+    ... 6 items (produit principal + 5 variantes, 0-100)
   ]
 }}
 
-Règles :
-- corrected_query : corrige les fautes d'orthographe du produit donné et reformule en \
-terminologie d'acheteur. Exemples : "matela medica" → "matelas médical", \
-"fauteuil releveur éléctrique" → "fauteuil releveur électrique", \
-"monte-escalier" → "monte-escalier". Si la requête est déjà parfaite, répète-la telle quelle.
-- keyword_variants : 5 requêtes de recherche français (ou langue du pays) que \
-cible un client final qui veut ACHETER ce produit. Vraies formulations \
-d'acheteurs 60+, pas du keyword stuffing. Pas de modificateurs ("pas cher", \
-"promo"). Exemples : pour "fauteuil releveur électrique" → ["fauteuil releveur", \
-"fauteuil électrique senior", "fauteuil médicalisé", "fauteuil relaxation \
-personne âgée", "fauteuil massant senior"].
-- avg_price_eur : prix public TTC pratiqué chez les concurrents principaux \
-dans le pays. Fourchette réaliste. Pour "fauteuil releveur" en France : \
-min 600, median 1200, max 2500.
-- market_trend : tendance 12 mois du marché.
-- is_saturated : true si + de 10 gros acteurs établis dominent la SERP.
-- red_flags : max 3 alertes critiques. Exemples : "dispositif médical, remboursement Sécu complexe", "marque \
-Amazon domine à >50% PDM", "tendance baissière -30% sur 3 ans".
-- top_competitors : 3-5 domaines que le Concepteur va devoir affronter.
-- regulatory_notes : "" si rien, sinon la mention clé (ex: "dispositif médical \
-classe I, marquage CE requis").
-- estimated_keyword_metrics : estime les volumes mensuels Google et CPC de chaque \
-mot-clé (produit + 5 variantes). Utilise ta connaissance du marché FR/EU pour la \
-Silver Economy. competition_index 0-100 (0=facile, 100=saturé). Valeurs de \
-fallback si l'API Google n'est pas disponible."""
+Règles de qualité :
+
+1. **corrected_query** : corrige les fautes d'orthographe et reformule en \
+terminologie d'acheteur standard. Exemples : "matela medica" → "matelas médical", \
+"fauteuille releveur" → "fauteuil releveur". Sinon renvoie identique.
+
+2. **keyword_variants** : 5 vraies requêtes d'acheteurs 60+ dans la langue du \
+pays. Pas de modificateurs commerciaux ("pas cher", "promo"). Exemples pour \
+"fauteuil releveur" en France : ["fauteuil releveur électrique", "fauteuil \
+releveur pour personne âgée", "fauteuil médicalisé relax", "fauteuil \
+releveur 2 moteurs", "fauteuil releveur remboursement"].
+
+3. **avg_price_eur** : prix public TTC réellement pratiqués dans ce pays sur \
+les e-shops Silver (ex: matelpro.com, seniorissimo.fr, age-international.co.uk). \
+Fourchette réaliste, pas de pessimisme. Références concrètes :
+   - Fauteuil releveur FR/DE/BE : min 600, median 1200, max 2500
+   - Enfile-bas contention : min 15, median 29, max 60
+   - Monte-escalier : min 2500, median 4500, max 9000
+   - Rollator / déambulateur : min 80, median 180, max 400
+   - Téléalarme senior : min 20, median 35, max 80 (souvent abo)
+   Ajuste au produit demandé. PAS de valeurs aléatoires.
+
+4. **estimated_keyword_metrics** : estime le volume mensuel Google réel par \
+mot-clé pour **ce pays**. Référence population : FR 68M, DE 84M, UK 67M, \
+NL 17M, BE 12M, CH 9M. Silver Economy concerne typiquement 20-25% de la pop. \
+Règle de 3 : si "fauteuil releveur" fait ~4000/mois en France, il fera \
+environ 5000/mois en Allemagne, 4000 au UK, 1000 aux Pays-Bas, 700 en \
+Belgique, 550 en Suisse. Le produit PRINCIPAL a le plus gros volume, \
+les variantes entre 30% et 80% du principal. Ne jamais mettre 0 sauf si \
+produit vraiment inexistant localement.
+
+5. **cpc_eur** : enchère moyenne Ads réaliste pour ce pays, Silver = \
+typiquement 0.4-2.5€. Exemples : FR fauteuil releveur ~0.8€, UK stairlift \
+~1.8€, DE Seniorensessel ~0.9€. Ne pas exagérer à 5€.
+
+6. **competition_index** 0-100 : 0=très peu de marques, 100=monopoles \
+dominants. Silver Economy moyenne : 40-70. Ne mets pas 90+ sauf si c'est \
+vraiment trusté par 1-2 acteurs majeurs.
+
+7. **reasons_pro** (3 items) : POURQUOI cette niche est attractive dans ce \
+pays. Chiffré si possible. Ex : "Marge brute 60-70% (achat 300€/vente 1200€)", \
+"Public vieillissant en croissance +4%/an", "Prescription médicale \
+possible = panier moyen élevé".
+
+8. **reasons_con** (2 items) : obstacles concrets. Ex : "Logistique \
+complexe (produit lourd >50kg)", "SAV/retour coûteux si défaut moteur".
+
+9. **recommended_angle** : angle premium qui fonctionne le mieux dans ce \
+pays pour ce produit. Ex FR : "Positionnement 'confort + design scandinave' \
+avec livraison + installation incluses". Pas de généralité.
+
+10. **market_trend** : ne mets "declining" que si tu es CERTAIN. \
+Par défaut "stable" ou "growing" pour la Silver Economy qui bénéficie \
+démographiquement.
+
+11. **is_saturated** : true UNIQUEMENT si 3+ gros acteurs contrôlent >60% \
+du marché (ex: Amazon, grande enseigne historique). Les marchés Silver sont \
+majoritairement fragmentés.
+
+12. **red_flags** (max 3) : alertes critiques seulement. Si rien → liste \
+vide. Ne répète pas "marché concurrentiel" comme red flag — ce n'en est pas \
+un en soi."""
 
 
 def _strip_json(raw: str) -> str:
@@ -119,9 +168,11 @@ def _strip_json(raw: str) -> str:
     return s.strip()
 
 
-async def _claude_analysis(product: str, country_name: str) -> dict:
+async def _claude_analysis(product: str, country_name: str, country_code: str = "FR") -> dict:
     from emergentintegrations.llm.chat import LlmChat, UserMessage
-    user_prompt = _USER_TEMPLATE.format(product=product, country_name=country_name)
+    user_prompt = _USER_TEMPLATE.format(
+        product=product, country_name=country_name, country_code=country_code
+    )
     chat = (
         LlmChat(
             api_key=EMERGENT_LLM_KEY,
@@ -149,9 +200,12 @@ async def _claude_analysis(product: str, country_name: str) -> dict:
 
 
 # ============== GOOGLE ADS : volumes réels ============== #
-async def _fetch_google_volumes(seed_keywords: list[str], country: str) -> list[dict]:
+async def _fetch_google_volumes(seed_keywords: list[str], country: str) -> tuple[list[dict], str]:
     """Appelle shared_keyword_ideas en interne (réutilise le router Google Ads).
-    Retourne la liste des ideas avec volumes/cpc/competition.
+    Retourne (ideas, reason).
+      - ideas : liste non vide si OK
+      - reason : "ok" | "not_connected" | "developer_token_test_only" |
+                 "permission_denied" | "unknown_error:<msg>"
     """
     from routes.google_ads import (
         _get_platform_client, MARKETS,
@@ -161,12 +215,12 @@ async def _fetch_google_volumes(seed_keywords: list[str], country: str) -> list[
         raise HTTPException(400, f"Pays non supporté : {country}")
     seeds = [s for s in seed_keywords if s and s.strip()][:10]
     if not seeds:
-        return []
+        return [], "no_seeds"
 
     client, customer_id = await _get_platform_client()
     if not client or not customer_id:
         logger.warning("Google Ads non connecté — quickscan sans volumes réels")
-        return []
+        return [], "not_connected"
 
     def _call():
         svc = client.get_service("KeywordPlanIdeaService")
@@ -196,10 +250,22 @@ async def _fetch_google_volumes(seed_keywords: list[str], country: str) -> list[
         return out
 
     try:
-        return await asyncio.to_thread(_call)
+        result = await asyncio.to_thread(_call)
+        return result, "ok"
     except Exception as e:
-        logger.exception(f"Google Ads quickscan failed: {e}")
-        return []
+        msg = str(e)
+        # Classifier la cause pour UI
+        if "developer token is only approved for use with test accounts" in msg.lower() \
+                or "developer token" in msg.lower() and "test" in msg.lower():
+            reason = "developer_token_test_only"
+            logger.warning("[quickscan] Google Ads dev token en niveau test — besoin Basic access")
+        elif "PERMISSION_DENIED" in msg:
+            reason = "permission_denied"
+            logger.warning(f"[quickscan] Google Ads permission denied: {msg[:200]}")
+        else:
+            reason = f"unknown_error:{str(e)[:120]}"
+            logger.exception(f"Google Ads quickscan failed: {e}")
+        return [], reason
 
 
 # ============== SCORING ============== #
@@ -251,44 +317,68 @@ def _compute_verdict(metrics: dict, insights: dict) -> dict:
             red_flags.append(rf)
 
     required_failures = [c for c in checklist if c["required"] and c["status"] == "fail"]
+    # Silver-friendly : 1 required fail isolé → CAUTION (GO_WITH_RESERVE) si le reste
+    # est correct. 2+ required fails OU market declining OU saturé → NO_GO.
     hard_fail = (
-        len(required_failures) > 0
+        len(required_failures) >= 2
         or insights.get("market_trend") == "declining"
         or insights.get("is_saturated")
     )
+    soft_fail = len(required_failures) == 1
     competition_warn = competition > MAX_COMPETITION_INDEX
 
-    # Score 0-100 (concurrence pèse moins car déjà soft)
+    # Score 0-100 (Silver Economy friendly — marges > volume brut)
     score = 0
-    if avg_price >= 100:
-        score += 25
+    # Prix : bonus plus doux, Silver = panier moyen naturellement élevé
+    if avg_price >= 500:
+        score += 30
+    elif avg_price >= 100:
+        score += 22
     elif avg_price >= MIN_PRICE_EUR:
         score += 15
-    if volume >= 20000:
+    # Volume : bonus progressif, pas d'all-or-nothing
+    if volume >= 10000:
         score += 30
+    elif volume >= 5000:
+        score += 25
     elif volume >= MIN_VOLUME_TOTAL:
-        score += 20
+        score += 18
+    elif volume >= max(MIN_VOLUME_TOTAL // 2, 500):
+        score += 8
+    # Concurrence : Silver est rarement >75, donc la zone 40-70 = normale
     if competition <= 33:
         score += 20
+    elif competition <= 55:
+        score += 17
     elif competition <= MAX_COMPETITION_INDEX:
-        score += 15
+        score += 12
     elif competition <= 85:
-        score += 8
-    if acq_pct <= 25:
+        score += 5
+    # Coût Ads : le plus critique pour la rentabilité
+    if acq_pct <= 15:
         score += 25
+    elif acq_pct <= 25:
+        score += 20
     elif acq_pct <= MAX_ACQ_COST_PCT:
-        score += 15
+        score += 12
+    elif acq_pct <= MAX_ACQ_COST_PCT * 1.5:
+        score += 5
 
     # Verdict
     if hard_fail:
         verdict = "NO_GO"
+    elif soft_fail:
+        # 1 critère required seul coince → CAUTION, pas NO_GO (petit marché OK)
+        verdict = "GO_WITH_RESERVE"
     elif competition_warn:
         verdict = "GO_WITH_RESERVE"
         red_flags.insert(0, "Concurrence très élevée (>75/100) — coût Ads pénalisant")
-    elif score >= 75:
+    elif score >= 65:
         verdict = "GO"
-    else:
+    elif score >= 40:
         verdict = "GO_WITH_RESERVE"
+    else:
+        verdict = "NO_GO"
 
     # Reason + recommendation
     if verdict == "GO":
@@ -464,14 +554,14 @@ async def _run_single_scan(product: str, country: str, user_id: Optional[str]) -
     country_name = market["name"]
 
     # Étape 1 — Claude
-    insights = await _claude_analysis(product, country_name)
+    insights = await _claude_analysis(product, country_name, country_code=cc)
     variants = insights.get("keyword_variants") or []
     avg_price = insights.get("avg_price_eur") or {}
     price_median = float(avg_price.get("median") or 0)
 
-    # Étape 2 — Google Ads
+    # Étape 2 — Google Ads (returns (ideas, reason))
     seeds = [product] + list(variants)
-    ideas = await _fetch_google_volumes(seeds, country)
+    ideas, google_reason = await _fetch_google_volumes(seeds, country)
     data_source = "google_ads" if ideas else "claude_estimate"
 
     # Fallback Claude estimates
@@ -558,8 +648,12 @@ async def _run_single_scan(product: str, country: str, user_id: Optional[str]) -
             "top_competitors": insights.get("top_competitors", [])[:5],
             "regulatory_notes": insights.get("regulatory_notes", ""),
         },
+        "reasons_pro": (insights.get("reasons_pro") or [])[:4],
+        "reasons_con": (insights.get("reasons_con") or [])[:3],
+        "recommended_angle": insights.get("recommended_angle", ""),
         "google_ads_connected": data_source == "google_ads",
         "data_source": data_source,
+        "data_source_reason": google_reason,  # "ok"|"not_connected"|"developer_token_test_only"|…
         "thresholds": {
             "min_price_eur": MIN_PRICE_EUR,
             "min_volume_total": MIN_VOLUME_TOTAL,
