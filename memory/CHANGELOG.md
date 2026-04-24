@@ -3,6 +3,39 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-24 (latest) · Étape 5 section 6 "Image footer" + HeroImageCard + test e2e
+
+### Section 6 · Image de fond du footer (nouveau)
+- **Backend** : `POST /api/sites/{id}/design/footer/background`
+  (body `{background_url: string|null}`) persiste ou reset
+  `design.footer.background_url`.
+- **Frontend `FooterBackgroundCard`** (dans `SiteBranding.jsx` section 6) :
+  - Preview 21:9 avec l'overlay sombre simulé + badge "Image par défaut"
+  - Upload image via input file (réutilise `/api/uploads/image`, max 8 Mo)
+  - Champ URL custom + bouton "Enregistrer"
+  - Lien "Réinitialiser" pour revenir au default Chutex quand une custom
+    est active.
+
+### HeroImageCard avec progress indicator
+- Section 3 (Hero) : nouveau `HeroImageCard` avec vignette 96×96 de
+  l'image actuelle, CTA "Régénérer (IA)" ou "Générer (IA)" si absente.
+- Pendant la génération : barre de progression `elapsed / ~45s`, label
+  "Nano Banana en cours", mise à jour 1Hz.
+- Le Concepteur peut régénérer à la demande sans passer par le wizard
+  complet.
+
+### Test e2e — site Verda créé
+- Site `a1fda286-…` "Verda · Mobilité Senior" (niche : monte-escaliers)
+  créé + wizard lancé. Job completed à 100 % avec dégradation gracieuse
+  sur 3 appels Claude (upstream 502 transient). Les fallbacks ont
+  fonctionné correctement.
+- Tests directs post-wizard :
+  - `POST /design/generate-hero-image` → 14 s, image persistée.
+  - `POST /design/footer/background` avec URL custom → OK.
+  - `POST /design/footer/background` avec `null` → reset au default Chutex.
+- Screenshot validé : sections 3 (Hero card avec boutons) + 6 (Footer bg
+  preview + upload + URL input) affichent correctement tous les testids.
+
 ## 2026-04-24 (late-late night) · Wizard auto : hero IA + testimonials IA + progress indicator
 
 ### Hero image auto-généré au wizard

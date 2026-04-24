@@ -579,6 +579,10 @@ class LogoUrlInput(BaseModel):
     logo_url: str = Field(..., min_length=3, max_length=2048)
 
 
+class FooterBgInput(BaseModel):
+    background_url: Optional[str] = Field(None, max_length=2048)
+
+
 @router.post("/sites/{site_id}/design/brand/logo")
 async def set_brand_logo(site_id: str, data: LogoUrlInput, user: dict = Depends(get_current_user)):
     """Permet au Concepteur d'uploader son propre logo (via /uploads/image) puis
@@ -590,6 +594,22 @@ async def set_brand_logo(site_id: str, data: LogoUrlInput, user: dict = Depends(
         {"$set": {"design.brand.logo_url": data.logo_url, "updated_at": now}},
     )
     return {"ok": True, "logo_url": data.logo_url}
+
+
+@router.post("/sites/{site_id}/design/footer/background")
+async def set_footer_background(site_id: str, data: FooterBgInput, user: dict = Depends(get_current_user)):
+    """Permet au Concepteur de définir (ou reset à None) l'image de fond du
+    footer. Accepte une URL absolue (Unsplash, CDN) ou une URL relative de
+    `/api/uploads/...`."""
+    await _check_site_access(site_id, user)
+    now = datetime.now(timezone.utc).isoformat()
+    update = {"$set": {"design.updated_at": now}}
+    if data.background_url:
+        update["$set"]["design.footer.background_url"] = data.background_url
+    else:
+        update["$unset"] = {"design.footer.background_url": ""}
+    await db.sites.update_one({"id": site_id}, update)
+    return {"ok": True, "background_url": data.background_url or None}
 
 
 

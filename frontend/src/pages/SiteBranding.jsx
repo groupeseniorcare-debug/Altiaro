@@ -200,6 +200,7 @@ export default function SiteBranding() {
                 title="Hero (premier écran)"
                 subtitle="Titre principal, sous-titre, CTA, visuel d'ouverture."
               />
+              <HeroImageCard siteId={siteId} design={design} onReload={reload} />
               <HeroEditor siteId={siteId} design={design} onReload={reload} onSaved={() => setPreviewKey(Date.now())} />
             </section>
 
@@ -222,6 +223,16 @@ export default function SiteBranding() {
               />
               <TestimonialsAiCard siteId={siteId} design={design} onReload={reload} />
               <TestimonialsEditor siteId={siteId} design={design} onReload={reload} onSaved={() => setPreviewKey(Date.now())} />
+            </section>
+
+            {/* Footer background image */}
+            <section data-testid="section-footer-bg">
+              <SectionHeader
+                number="6"
+                title="Image de fond du footer"
+                subtitle="Visuel qui apparaît derrière les liens du footer (overlay sombre automatique)."
+              />
+              <FooterBackgroundCard siteId={siteId} design={design} onReload={reload} />
             </section>
 
             {/* Footer CTA */}
@@ -454,3 +465,263 @@ function TestimonialsAiCard({ siteId, design, onReload }) {
     </div>
   );
 }
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
+const DEFAULT_FOOTER_BG = "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=2400&q=80&auto=format&fit=crop";
+
+function resolveImageUrl(raw) {
+  if (!raw) return null;
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+  if (raw.startsWith("/api/")) return `${BACKEND_URL}${raw}`;
+  return raw;
+}
+
+/**
+ * Footer background image card — upload, URL custom, or reset to default.
+ */
+function FooterBackgroundCard({ siteId, design, onReload }) {
+  const [busy, setBusy] = React.useState(false);
+  const [urlInput, setUrlInput] = React.useState("");
+  const [toast, setToast] = React.useState("");
+  const current = design?.footer?.background_url || null;
+  const effective = current || DEFAULT_FOOTER_BG;
+
+  const uploadFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    setToast("");
+    const fd = new FormData();
+    fd.append("file", file);
+    const { data, error, rawDetail } = await apiCall(() =>
+      api.post(`/uploads/image`, fd, { headers: { "Content-Type": "multipart/form-data" } })
+    );
+    if (error) {
+      setBusy(false);
+      setToast(rawDetail?.detail || error);
+      return;
+    }
+    await save(data.url);
+    setBusy(false);
+  };
+
+  const save = async (url) => {
+    const { error, rawDetail } = await apiCall(() =>
+      api.post(`/sites/${siteId}/design/footer/background`, { background_url: url })
+    );
+    if (error) {
+      setToast(rawDetail?.detail || error);
+      return;
+    }
+    setToast("✅ Image du footer enregistrée");
+    setUrlInput("");
+    await onReload();
+    setTimeout(() => setToast(""), 4000);
+  };
+
+  const reset = async () => {
+    const { error } = await apiCall(() =>
+      api.post(`/sites/${siteId}/design/footer/background`, { background_url: null })
+    );
+    if (error) { setToast(error); return; }
+    setToast("✅ Image réinitialisée");
+    await onReload();
+    setTimeout(() => setToast(""), 4000);
+  };
+
+  return (
+    <div
+      data-testid="footer-bg-card"
+      className="p-5 md:p-6 bg-white"
+      style={{ border: "1px solid #E5E5E5", borderRadius: "4px" }}
+    >
+      {/* Preview */}
+      <div
+        className="relative overflow-hidden mb-4"
+        style={{ aspectRatio: "21 / 9", borderRadius: "4px", background: "#0A0A0A" }}
+        data-testid="footer-bg-preview"
+      >
+        <img
+          src={resolveImageUrl(effective)}
+          alt="Footer background"
+          className="absolute inset-0 w-full h-full object-cover"
+          loading="lazy"
+        />
+        <div className="absolute inset-0" style={{ background: "rgba(10, 10, 10, 0.78)" }} />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-white/80 text-[11px] uppercase tracking-[0.35em] font-medium">
+            Aperçu de l'overlay
+          </span>
+        </div>
+        {!current && (
+          <span
+            className="absolute top-3 left-3 text-[10px] uppercase tracking-[0.2em] font-medium px-2 py-1 text-white/70"
+            style={{ background: "rgba(255,255,255,0.1)", borderRadius: "2px", backdropFilter: "blur(6px)" }}
+          >
+            Image par défaut
+          </span>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <label
+          className="h-11 px-4 border cursor-pointer flex items-center justify-center gap-2 hover:border-neutral-900 transition text-[13px] font-medium text-neutral-900"
+          style={{ borderColor: "#E5E5E5", borderRadius: "2px", opacity: busy ? 0.6 : 1 }}
+          data-testid="footer-bg-upload-label"
+        >
+          <input type="file" accept="image/*" className="hidden" onChange={uploadFile} disabled={busy} data-testid="footer-bg-upload-input" />
+          {busy ? "Upload en cours…" : "Téléverser une image"}
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="url"
+            placeholder="…ou coller une URL publique"
+            value={urlInput}
+            onChange={(e) => setUrlInput(e.target.value)}
+            className="flex-1 h-11 px-3 border text-[13px] text-neutral-900 outline-none focus:border-neutral-900"
+            style={{ borderColor: "#E5E5E5", borderRadius: "2px" }}
+            data-testid="footer-bg-url-input"
+          />
+          <button
+            onClick={() => urlInput && save(urlInput)}
+            disabled={!urlInput || busy}
+            className="h-11 px-4 bg-neutral-900 hover:bg-black disabled:opacity-40 text-white text-[12.5px] font-semibold"
+            style={{ borderRadius: "2px" }}
+            data-testid="footer-bg-url-save"
+          >
+            Enregistrer
+          </button>
+        </div>
+      </div>
+      {current && (
+        <button
+          onClick={reset}
+          className="mt-3 text-[11.5px] text-neutral-500 hover:text-neutral-900 underline underline-offset-2"
+          data-testid="footer-bg-reset"
+        >
+          Réinitialiser l'image (revenir à celle par défaut)
+        </button>
+      )}
+      {toast && (
+        <div
+          className={`mt-3 text-[12px] font-medium ${toast.startsWith("✅") ? "text-emerald-700" : "text-rose-600"}`}
+          data-testid="footer-bg-toast"
+        >
+          {toast}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Hero image card — shows current hero image + button to regenerate it via
+ * Nano Banana with a progress indicator during the 20-60s generation.
+ */
+function HeroImageCard({ siteId, design, onReload }) {
+  const [busy, setBusy] = React.useState(false);
+  const [elapsed, setElapsed] = React.useState(0);
+  const [toast, setToast] = React.useState("");
+  const timerRef = React.useRef(null);
+  const current = design?.hero?.image || null;
+
+  React.useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
+
+  const regen = async () => {
+    if (current && !window.confirm("Régénérer une nouvelle image hero via Nano Banana ? Cela remplacera l'image actuelle.")) return;
+    setBusy(true);
+    setElapsed(0);
+    setToast("");
+    const startedAt = Date.now();
+    timerRef.current = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    const { error, rawDetail } = await apiCall(() =>
+      api.post(`/sites/${siteId}/design/generate-hero-image`, { tweak: "" })
+    );
+    clearInterval(timerRef.current);
+    timerRef.current = null;
+    setBusy(false);
+    if (error) {
+      setToast(rawDetail?.detail || error);
+      return;
+    }
+    setToast("✅ Image hero régénérée");
+    await onReload();
+    setTimeout(() => setToast(""), 4000);
+  };
+
+  const estimatedTotal = 45;
+  const pct = busy ? Math.min(100, Math.round((elapsed / estimatedTotal) * 100)) : 0;
+
+  return (
+    <div
+      data-testid="hero-image-card"
+      className="mb-5 p-5 md:p-6 bg-white"
+      style={{ border: "1px solid #E5E5E5", borderRadius: "4px" }}
+    >
+      <div className="flex items-start justify-between gap-6 flex-wrap">
+        <div className="flex items-start gap-4 flex-1 min-w-0">
+          <div
+            className="w-24 h-24 md:w-28 md:h-28 shrink-0 overflow-hidden"
+            style={{ background: "#F5F5F5", borderRadius: "2px" }}
+          >
+            {current ? (
+              <img src={resolveImageUrl(current)} alt="Hero" className="w-full h-full object-cover" loading="lazy" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-neutral-300 text-[10px] uppercase tracking-wider">
+                Pas d'image
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 mb-1.5 font-medium">Nano Banana · lifestyle 3:2</div>
+            <div className="text-[16px] text-neutral-900 leading-tight" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
+              Image hero (premier écran)
+            </div>
+            <p className="text-[12.5px] text-neutral-600 mt-1.5 leading-[1.5]">
+              Générée par IA au moment du wizard. Elle sert aussi de fallback pour le fond du footer si aucune image custom n'est définie.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={regen}
+          disabled={busy}
+          data-testid="hero-image-regen"
+          className="shrink-0 h-10 px-4 bg-neutral-900 hover:bg-black disabled:opacity-60 text-white text-[12.5px] font-semibold"
+          style={{ borderRadius: "2px" }}
+        >
+          {busy ? "Génération…" : current ? "Régénérer (IA)" : "Générer (IA)"}
+        </button>
+      </div>
+
+      {busy && (
+        <div className="mt-5" data-testid="hero-image-progress">
+          <div className="flex items-center justify-between text-[11px] mb-2">
+            <span className="uppercase tracking-[0.25em] font-medium text-neutral-900">Nano Banana en cours</span>
+            <span className="tabular-nums text-neutral-500">
+              {elapsed}s <span className="text-neutral-300">/ ~{estimatedTotal}s</span>
+            </span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden" style={{ background: "#F0F0F0", borderRadius: "999px" }}>
+            <div
+              className="h-full bg-neutral-900 transition-all duration-500"
+              style={{ width: `${pct}%`, borderRadius: "999px" }}
+            />
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div
+          className={`mt-3 text-[12px] font-medium ${toast.startsWith("✅") ? "text-emerald-700" : "text-rose-600"}`}
+          data-testid="hero-image-toast"
+        >
+          {toast}
+        </div>
+      )}
+    </div>
+  );
+}
+
