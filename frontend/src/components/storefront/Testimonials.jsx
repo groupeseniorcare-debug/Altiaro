@@ -1,58 +1,121 @@
 import React from "react";
-import { motion } from "framer-motion";
 import { Star } from "@phosphor-icons/react";
 import { designAccents } from "./storefrontUtils";
 
+/**
+ * Premium reviews marquee — inspired by Chutex Care.
+ * Tall cards (320×480) with full-bleed portrait, dark gradient overlay,
+ * 5-star rating overlay + bottom quote + name + subtitle.
+ * Scrolls horizontally with `animate-marquee-reviews` (pauses on hover).
+ */
+
 const DEFAULT = [
-  { name: "Françoise D.", location: "Lyon · 72 ans", rating: 5, avatar: "https://images.unsplash.com/photo-1559124056-8895c0a1d6b8?w=200&h=200&auto=format&fit=facearea&facepad=3", text: "J'hésitais à commander en ligne à mon âge. Le conseiller a été patient, clair, et la livraison s'est parfaitement passée. Le produit correspond exactement à ce qui était décrit." },
-  { name: "Marc & Jeannine L.", location: "Rennes · 78 ans", rating: 5, avatar: "https://images.unsplash.com/photo-1596495577886-d920f1fb7238?w=200&h=200&auto=format&fit=facearea&facepad=3", text: "Nous avons équipé la salle de bain de ma belle-mère. Tout est arrivé en 2 jours, bien emballé, avec des instructions lisibles. Un vrai soulagement." },
-  { name: "Hélène P.", location: "Bordeaux · 65 ans", rating: 5, avatar: "https://images.unsplash.com/photo-1581579438747-104c53e7c9e2?w=200&h=200&auto=format&fit=facearea&facepad=3", text: "Service client exceptionnel. J'ai appelé pour un conseil avant d'acheter, on m'a rappelée et orientée sans rien essayer de me vendre. Je recommande vraiment." },
-  { name: "Gérard M.", location: "Marseille · 80 ans", rating: 5, avatar: "https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=200&h=200&auto=format&fit=facearea&facepad=3", text: "Prix équitable, livraison rapide et un vrai suivi. C'est rare aujourd'hui d'être traité comme un client et pas comme un numéro." },
+  {
+    name: "Françoise D.",
+    location: "Lyon · 72 ans",
+    role: "Cliente · 72 ans",
+    rating: 5,
+    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&h=900&fit=crop&crop=faces",
+    text: "J'hésitais à commander en ligne à mon âge. Le conseiller a été patient, et la livraison s'est parfaitement passée.",
+  },
+  {
+    name: "Marc & Jeannine L.",
+    location: "Rennes · 78 ans",
+    role: "Couple · 78 ans",
+    rating: 5,
+    image: "https://images.unsplash.com/photo-1556911220-bff31c812dba?w=600&h=900&fit=crop&crop=faces",
+    text: "Nous avons équipé la salle de bain de ma belle-mère. Tout est arrivé en 2 jours, bien emballé. Un vrai soulagement.",
+  },
+  {
+    name: "Hélène P.",
+    location: "Bordeaux · 65 ans",
+    role: "Cliente · 65 ans",
+    rating: 5,
+    image: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=600&h=900&fit=crop&crop=faces",
+    text: "Service client exceptionnel. J'ai appelé pour un conseil, on m'a rappelée et orientée sans rien essayer de me vendre.",
+  },
+  {
+    name: "Gérard M.",
+    location: "Marseille · 80 ans",
+    role: "Client · 80 ans",
+    rating: 5,
+    image: "https://images.unsplash.com/photo-1541534401786-2077eed87a74?w=600&h=900&fit=crop&crop=faces",
+    text: "Prix équitable, livraison rapide et un vrai suivi. C'est rare aujourd'hui d'être traité comme un client et pas un numéro.",
+  },
+  {
+    name: "Catherine V.",
+    location: "Nantes · 68 ans",
+    role: "Cliente · 68 ans",
+    rating: 5,
+    image: "https://images.unsplash.com/photo-1551836022-deb4988cc6c0?w=600&h=900&fit=crop&crop=faces",
+    text: "La qualité des produits est au rendez-vous. J'apprécie la transparence sur les matériaux et les fabricants.",
+  },
+  {
+    name: "Thomas K.",
+    location: "Paris · 45 ans",
+    role: "Aidant familial",
+    rating: 5,
+    image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=600&h=900&fit=crop&crop=faces",
+    text: "Une vraie tranquillité d'esprit pour accompagner mon père. Simple à mettre en place, interface claire.",
+  },
 ];
 
-function Avatar({ src, name, size = 44, primary, accent, fontHeading }) {
-  const [broken, setBroken] = React.useState(false);
-  const initials = (name || "").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-  const showImg = src && !broken;
+function ReviewCard({ item, lang }) {
+  const text = typeof item.text === "string" ? item.text : item.quote?.[lang] || item.quote?.fr || "";
+  const img = item.image || item.avatar || item.photo;
   return (
     <div
-      className="rounded-full overflow-hidden flex items-center justify-center shrink-0"
-      style={{ width: size, height: size, background: accent }}
+      className="flex-shrink-0 w-[280px] md:w-[320px] h-[420px] md:h-[480px] rounded-2xl overflow-hidden relative group"
+      data-testid="review-card"
     >
-      {showImg ? (
+      {img ? (
         <img
-          src={src}
-          alt={name}
+          src={img}
+          alt={item.name}
           loading="lazy"
-          onError={() => setBroken(true)}
-          className="w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
         />
       ) : (
-        <span
-          className="font-semibold"
-          style={{ color: primary, fontFamily: `"${fontHeading}", serif`, fontSize: size * 0.38 }}
-        >
-          {initials || "·"}
-        </span>
+        <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #1a1a1a, #3a3a3a)" }} />
       )}
+
+      {/* Top gradient + stars */}
+      <div className="absolute top-0 left-0 right-0 p-3 md:p-4 bg-gradient-to-b from-black/40 to-transparent">
+        <div className="flex gap-0.5">
+          {[...Array(item.rating || 5)].map((_, i) => (
+            <Star key={i} size={11} weight="fill" className="text-white" />
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom gradient + quote */}
+      <div className="absolute bottom-0 left-0 right-0 p-5 pt-24 bg-gradient-to-t from-black/80 via-black/50 to-transparent">
+        <p className="text-white/90 text-[13px] leading-[1.6] mb-4 line-clamp-3">
+          &ldquo;{text}&rdquo;
+        </p>
+        <div>
+          <p className="text-white font-semibold text-sm">{item.name}</p>
+          <p className="text-white/50 mt-0.5 text-xs">{item.role || item.location}</p>
+        </div>
+      </div>
     </div>
   );
 }
 
 export function Testimonials({ design, lang }) {
-  const { primary, accent, divider, textMuted, textFaint, fontHeading } = designAccents(design);
+  const { primary, fontHeading } = designAccents(design);
   const items = design?.testimonials?.items || design?.testimonials;
   const list = Array.isArray(items) && items.length ? items : DEFAULT;
-  const hero = list[0];
-  const rest = list.slice(1, 4);
-
-  const heroText = typeof hero.text === "string" ? hero.text : hero.quote?.[lang] || hero.quote?.fr || "";
+  // Duplicate once so marquee loops seamlessly
+  const doubled = [...list, ...list];
 
   return (
-    <section className="py-24 md:py-36 px-6 bg-white" data-testid="storefront-testimonials">
-      <div className="max-w-7xl mx-auto">
-        {/* Section header — aligned left, editorial */}
-        <div className="flex items-end justify-between flex-wrap gap-6 mb-16 md:mb-20">
+    <section
+      className="py-24 md:py-36 bg-white overflow-hidden"
+      data-testid="storefront-testimonials"
+    >
+      <div className="max-w-7xl mx-auto px-6 mb-14 md:mb-16">
+        <div className="flex items-end justify-between flex-wrap gap-6">
           <div>
             <div className="flex items-center gap-3 mb-5">
               <span className="h-px w-10" style={{ background: primary }} />
@@ -67,7 +130,7 @@ export function Testimonials({ design, lang }) {
               Ils en parlent<br />mieux que nous.
             </h2>
           </div>
-          <div className="flex items-center gap-2" style={{ color: textMuted }}>
+          <div className="flex items-center gap-2 text-neutral-500">
             <div className="flex" style={{ color: "#F5B800" }}>
               {[...Array(5)].map((_, i) => <Star key={i} size={14} weight="fill" />)}
             </div>
@@ -75,75 +138,25 @@ export function Testimonials({ design, lang }) {
             <span className="text-[13px]">· 2 143 avis vérifiés</span>
           </div>
         </div>
+      </div>
 
-        {/* Split layout — big hero card + 3 smaller gray cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 md:gap-6">
-          <motion.figure
-            initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 0.7 }}
-            className="lg:col-span-3 p-8 md:p-12 flex flex-col"
-            style={{ background: accent, borderRadius: "2px" }}
-          >
-            <div className="flex mb-6" style={{ color: "#F5B800" }}>
-              {[...Array(hero.rating || 5)].map((_, i) => <Star key={i} size={16} weight="fill" />)}
-            </div>
-            <blockquote
-              className="text-[22px] md:text-[28px] leading-[1.35] flex-1"
-              style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
-            >
-              <span className="text-[60px] opacity-20 mr-1 leading-none" aria-hidden="true">“</span>
-              {heroText}
-            </blockquote>
-            <figcaption
-              className="mt-8 pt-6 flex items-center gap-4"
-              style={{ borderTop: `1px solid ${divider}` }}
-            >
-              <Avatar src={hero.avatar} name={hero.name} size={52} primary={primary} accent="#E5E5E5" fontHeading={fontHeading} />
-              <div>
-                <div className="text-[14px] font-semibold" style={{ color: primary }}>{hero.name}</div>
-                <div
-                  className="text-[11px] uppercase tracking-[0.2em] mt-1"
-                  style={{ color: textFaint }}
-                >
-                  {hero.location}
-                </div>
-              </div>
-            </figcaption>
-          </motion.figure>
-
-          <div className="lg:col-span-2 grid grid-cols-1 gap-4 md:gap-6">
-            {rest.map((t, i) => {
-              const text = typeof t.text === "string" ? t.text : t.quote?.[lang] || t.quote?.fr || "";
-              return (
-                <motion.figure
-                  key={i}
-                  initial={{ opacity: 0, y: 24 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-60px" }}
-                  transition={{ duration: 0.6, delay: 0.1 * i }}
-                  className="p-6 md:p-7"
-                  style={{ background: accent, borderRadius: "2px" }}
-                  data-testid={`testimonial-${i + 1}`}
-                >
-                  <div className="flex mb-3" style={{ color: "#F5B800" }}>
-                    {[...Array(t.rating || 5)].map((_, j) => <Star key={j} size={13} weight="fill" />)}
-                  </div>
-                  <blockquote className="text-[14px] leading-relaxed line-clamp-4" style={{ color: primary }}>
-                    {text}
-                  </blockquote>
-                  <figcaption className="mt-4 flex items-center gap-3">
-                    <Avatar src={t.avatar} name={t.name} size={36} primary={primary} accent="#E5E5E5" fontHeading={fontHeading} />
-                    <div>
-                      <div className="text-[12.5px] font-semibold leading-tight" style={{ color: primary }}>{t.name}</div>
-                      <div className="text-[11px] mt-0.5" style={{ color: textMuted }}>{t.location}</div>
-                    </div>
-                  </figcaption>
-                </motion.figure>
-              );
-            })}
+      {/* Marquee row */}
+      <div className="relative" data-testid="reviews-marquee">
+        <div className="hidden md:flex w-max animate-marquee-reviews">
+          <div className="flex gap-5 shrink-0 pr-5">
+            {doubled.map((t, i) => (
+              <ReviewCard key={i} item={t} lang={lang} />
+            ))}
           </div>
+        </div>
+
+        {/* Mobile fallback: vertical scroll */}
+        <div className="md:hidden px-6 flex gap-4 overflow-x-auto snap-x snap-mandatory pb-4 -mx-6">
+          {list.map((t, i) => (
+            <div key={i} className="snap-start shrink-0">
+              <ReviewCard item={t} lang={lang} />
+            </div>
+          ))}
         </div>
       </div>
     </section>

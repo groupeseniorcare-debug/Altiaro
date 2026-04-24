@@ -3,6 +3,42 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-24 (night) · Storefront premium — Reviews marquee, Footer glass, utilities
+
+Inspiration : https://chutex-premium-1.preview.emergentagent.com/
+
+### Reviews marquee (Chutex-style)
+- `components/storefront/Testimonials.jsx` entièrement réécrit : horizontal
+  marquee infinie de cards portraits 280×420 / 320×480 px, photo full-bleed
+  avec gradient noir en haut (stars) et bas (citation + nom + rôle).
+- Animation CSS `animate-marquee-reviews 60s linear infinite`, pause on hover.
+- Mobile fallback : scroll horizontal snap natif (pas d'animation).
+- 6 avis par défaut (clients FR 65-80 ans + aidant familial) avec photos
+  Unsplash. Header : "Ils en parlent mieux que nous." + note 4.8/5 · 2 143 avis.
+
+### Footer premium
+- `components/StorefrontLayout.jsx` footer réécrit de bout en bout :
+  - Image de fond full-bleed + overlay `rgba(10, 26, 31, 0.72)`
+  - SVG wave en haut (séparateur avec blanc de la section précédente)
+  - 4 glass cards "Livraison offerte / Paiement sécurisé / Conseiller humain
+    / Retour 14 jours"
+  - 2 colonnes : newsletter Fraunces XXL "Rejoignez notre journal" + input
+    email avec subscribe-button glass round pill · 4-col link grid à droite
+  - Bottom bar : logo Fraunces blanc, email contact, copyright + glass
+    payment pills (Visa, Mastercard, CB, PayPal, Apple Pay, iDEAL, Bancontact)
+- Text hierarchy respectée : `text-white/40` labels, `text-white/60` liens,
+  `text-white/30` copyright.
+
+### Glass utilities
+- Ajouté dans `index.css` : classes `.glass-card` (blur 12px, 8% alpha) et
+  `.glass-card-strong` (blur 24px, 14% alpha) — réutilisables partout.
+- Keyframe `@keyframes marquee-reviews` également ajoutée.
+
+### Validation
+- Lint : ✅ aucun souci
+- Screenshot : reviews marquee ✓, footer wave + image ✓, 4 glass cards ✓,
+  newsletter input ✓, 4 colonnes liens ✓, payment pills ✓.
+
 ## 2026-04-24 (late evening) · Séparation radicale Étapes 5 / 6
 
 Retour user : « étape 5 et 6 ont les mêmes onglets, je ne sais pas laquelle

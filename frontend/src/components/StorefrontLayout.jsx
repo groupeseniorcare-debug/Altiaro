@@ -556,15 +556,32 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
 
       <CartDrawer design={design} />
 
-      {/* ================= FOOTER ================= */}
+      {/* ================= FOOTER — Premium Chutex-style ================= */}
       <footer
-        className="mt-24 pb-[env(safe-area-inset-bottom)] bg-white"
-        style={{ color: "#525252", borderTop: "1px solid #E5E5E5" }}
+        className="mt-24 pb-[env(safe-area-inset-bottom)] relative overflow-hidden"
         data-testid="storefront-footer"
       >
-        {/* Reassurance band */}
-        <div style={{ borderBottom: "1px solid #E5E5E5" }}>
-          <div className="max-w-7xl mx-auto px-6 py-10 grid grid-cols-2 md:grid-cols-4 gap-6">
+        {/* Background image + dark overlay */}
+        <div className="absolute inset-0">
+          <img
+            alt=""
+            aria-hidden="true"
+            className="w-full h-full object-cover"
+            src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=2000&q=80&auto=format&fit=crop"
+          />
+          <div className="absolute inset-0" style={{ background: "rgba(10, 26, 31, 0.72)" }} />
+        </div>
+
+        {/* SVG wave separator at top */}
+        <div className="relative z-10">
+          <svg viewBox="0 0 1514 80" className="w-full block" preserveAspectRatio="none" style={{ marginBottom: "-1px" }}>
+            <path d="M0 80V0h1514v80C1514 80 1214 30 757 30S0 80 0 80Z" fill="white" />
+          </svg>
+        </div>
+
+        {/* Reassurance band — glass cards */}
+        <div className="relative z-10 pt-12 md:pt-16">
+          <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { Icon: Truck, title: "Livraison offerte", sub: "Partout en Europe" },
               { Icon: ShieldCheck, title: "Paiement sécurisé", sub: "CB, PayPal, Virement" },
@@ -573,127 +590,180 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
             ].map((b, i) => (
               <div
                 key={i}
-                className="flex items-start gap-3 p-5"
-                style={{ background: "#F5F5F5", borderRadius: "2px" }}
+                className="flex items-start gap-3 p-5 glass-card"
+                style={{ borderRadius: "12px" }}
                 data-testid={`footer-reassurance-${i}`}
               >
-                <b.Icon size={22} weight="thin" style={{ color: "#0A0A0A" }} />
+                <b.Icon size={22} weight="thin" className="text-white shrink-0" />
                 <div>
-                  <div className="text-[13px] font-semibold" style={{ color: "#0A0A0A" }}>{b.title}</div>
-                  <div className="text-[12px] mt-0.5" style={{ color: "#737373" }}>{b.sub}</div>
+                  <div className="text-[13px] font-semibold text-white">{b.title}</div>
+                  <div className="text-[12px] mt-0.5 text-white/60">{b.sub}</div>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Main footer columns */}
-        <div className="max-w-7xl mx-auto px-6 py-16 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-10">
-          <div className="col-span-2">
-            <div
-              className="text-2xl font-semibold mb-3"
-              style={{ fontFamily: `"${fontHeading}", serif`, color: "#0A0A0A" }}
-            >
-              {logoText}
-            </div>
-            <p className="text-[13.5px] leading-relaxed mb-6 max-w-sm" style={{ color: "#737373" }}>{footerTagline}</p>
-
-            <div className="space-y-2 text-[13.5px]">
-              <a href={`mailto:${contactEmail}`} className="flex items-center gap-2 hover:opacity-60 transition" style={{ color: "#0A0A0A" }}>
-                <EnvelopeSimple size={15} /> {contactEmail}
-              </a>
-              <a href={`tel:${contactPhone.replace(/\s/g, "")}`} className="flex items-center gap-2 hover:opacity-60 transition" style={{ color: "#0A0A0A" }}>
-                <Phone size={15} /> {contactPhone} · {contactHours}
-              </a>
-              {contactAddress && (
-                <div className="flex items-start gap-2" style={{ color: "#525252" }}>
-                  <MapPin size={15} className="mt-0.5 shrink-0" /> <span>{contactAddress}</span>
+        {/* Main footer columns — newsletter + 4 link groups */}
+        <div className="relative z-10 max-w-7xl mx-auto px-6 pt-20 md:pt-24 pb-10 md:pb-14">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-16 lg:gap-20">
+            {/* Newsletter */}
+            <div>
+              <h2
+                data-testid="footer-newsletter-title"
+                className="font-light text-white leading-[1.1] tracking-[-0.03em] mb-6"
+                style={{ fontSize: "clamp(2.2rem, 5vw, 3.8rem)", fontFamily: `"${fontHeading}", serif` }}
+              >
+                Rejoignez<br />notre journal.
+              </h2>
+              <p className="text-[14px] md:text-[15px] text-white/50 leading-[1.7] max-w-md mb-10">
+                Recevez nos conseils, les nouveautés et nos offres exclusives directement dans votre boîte mail.
+              </p>
+              <form
+                data-testid="footer-newsletter-form"
+                onSubmit={(e) => { e.preventDefault(); }}
+                className="flex items-end gap-4 mb-4 max-w-md"
+              >
+                <div className="flex-1">
+                  <input
+                    placeholder="Votre email"
+                    data-testid="footer-email-input"
+                    className="w-full bg-transparent text-white text-[14px] placeholder:text-white/30 pb-3 border-b border-white/25 focus:border-white/60 outline-none transition-colors"
+                    type="email"
+                  />
                 </div>
-              )}
+                <button
+                  type="submit"
+                  data-testid="footer-subscribe-btn"
+                  className="group flex items-center gap-2.5 px-6 py-2.5 rounded-full glass-card text-white text-[13px] font-medium tracking-wide uppercase hover:bg-white/20 transition-all"
+                >
+                  S'inscrire
+                  <span className="w-1.5 h-1.5 rounded-full bg-white group-hover:scale-125 transition-transform" />
+                </button>
+              </form>
+              <p className="text-[12px] text-white/30 max-w-md">
+                En vous inscrivant, vous acceptez notre{" "}
+                <Link to={`${shopRoot}/confidentialite`} className="text-white/60 underline underline-offset-2 hover:text-white/80 transition-colors">
+                  politique de confidentialité.
+                </Link>
+              </p>
+
+              {/* Social icons */}
+              <div className="flex items-center gap-4 mt-10" data-testid="footer-social">
+                {social.instagram && (
+                  <a href={social.instagram} target="_blank" rel="noreferrer" className="text-white/40 hover:text-white transition-colors" aria-label="Instagram">
+                    <InstagramLogo size={20} weight="regular" />
+                  </a>
+                )}
+                {social.facebook && (
+                  <a href={social.facebook} target="_blank" rel="noreferrer" className="text-white/40 hover:text-white transition-colors" aria-label="Facebook">
+                    <FacebookLogo size={20} weight="regular" />
+                  </a>
+                )}
+                {social.linkedin && (
+                  <a href={social.linkedin} target="_blank" rel="noreferrer" className="text-white/40 hover:text-white transition-colors" aria-label="LinkedIn">
+                    <LinkedinLogo size={20} weight="regular" />
+                  </a>
+                )}
+                {social.youtube && (
+                  <a href={social.youtube} target="_blank" rel="noreferrer" className="text-white/40 hover:text-white transition-colors" aria-label="YouTube">
+                    <YoutubeLogo size={20} weight="regular" />
+                  </a>
+                )}
+                {!social.instagram && !social.facebook && !social.linkedin && !social.youtube && (
+                  <>
+                    <span className="text-white/40" aria-label="Instagram"><InstagramLogo size={20} /></span>
+                    <span className="text-white/40" aria-label="Facebook"><FacebookLogo size={20} /></span>
+                    <span className="text-white/40" aria-label="LinkedIn"><LinkedinLogo size={20} /></span>
+                  </>
+                )}
+              </div>
             </div>
 
-            {/* Social */}
-            <div className="flex items-center gap-2 mt-7">
-              {social.facebook && (
-                <a href={social.facebook} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full flex items-center justify-center transition hover:bg-neutral-900 hover:text-white" style={{ border: "1px solid #E5E5E5", color: "#0A0A0A" }} aria-label="Facebook">
-                  <FacebookLogo size={15} weight="regular" />
-                </a>
-              )}
-              {social.instagram && (
-                <a href={social.instagram} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full flex items-center justify-center transition hover:bg-neutral-900 hover:text-white" style={{ border: "1px solid #E5E5E5", color: "#0A0A0A" }} aria-label="Instagram">
-                  <InstagramLogo size={15} weight="regular" />
-                </a>
-              )}
-              {social.youtube && (
-                <a href={social.youtube} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full flex items-center justify-center transition hover:bg-neutral-900 hover:text-white" style={{ border: "1px solid #E5E5E5", color: "#0A0A0A" }} aria-label="YouTube">
-                  <YoutubeLogo size={15} weight="regular" />
-                </a>
-              )}
-              {social.linkedin && (
-                <a href={social.linkedin} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full flex items-center justify-center transition hover:bg-neutral-900 hover:text-white" style={{ border: "1px solid #E5E5E5", color: "#0A0A0A" }} aria-label="LinkedIn">
-                  <LinkedinLogo size={15} weight="regular" />
-                </a>
-              )}
-              {!social.facebook && !social.instagram && !social.youtube && !social.linkedin && (
-                <>
-                  <a href="#" className="w-9 h-9 rounded-full flex items-center justify-center transition hover:bg-neutral-900 hover:text-white" style={{ border: "1px solid #E5E5E5", color: "#0A0A0A" }} aria-label="Facebook"><FacebookLogo size={15} /></a>
-                  <a href="#" className="w-9 h-9 rounded-full flex items-center justify-center transition hover:bg-neutral-900 hover:text-white" style={{ border: "1px solid #E5E5E5", color: "#0A0A0A" }} aria-label="Instagram"><InstagramLogo size={15} /></a>
-                  <a href="#" className="w-9 h-9 rounded-full flex items-center justify-center transition hover:bg-neutral-900 hover:text-white" style={{ border: "1px solid #E5E5E5", color: "#0A0A0A" }} aria-label="YouTube"><YoutubeLogo size={15} /></a>
-                </>
-              )}
+            {/* Right column: 4 link groups */}
+            <div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-10">
+                <FooterCol
+                  title="Boutique"
+                  items={[
+                    { label: "Tous les produits", href: `${shopRoot}` },
+                    { label: "Collections", href: `${shopRoot}/collections` },
+                    { label: "Nouveautés", href: `${shopRoot}?sort=new` },
+                    { label: "Meilleures ventes", href: `${shopRoot}?sort=bestsellers` },
+                  ]}
+                />
+                <FooterCol
+                  title="Nous connaître"
+                  items={[
+                    { label: "Notre histoire", href: `${shopRoot}/about` },
+                    { label: "Le Journal", href: `${shopRoot}/blog` },
+                    { label: "Ils parlent de nous", href: `${shopRoot}#press` },
+                    { label: "Contact", href: `${shopRoot}/contact` },
+                  ]}
+                />
+                <FooterCol
+                  title="Service client"
+                  items={[
+                    { label: "FAQ", href: `${shopRoot}#faq` },
+                    { label: "Livraison & délais", href: `${shopRoot}/livraison` },
+                    { label: "Retours", href: `${shopRoot}/retours` },
+                    { label: "Suivre ma commande", href: `${shopRoot}/track` },
+                    { label: customer ? "Mon compte" : "Se connecter", href: customer ? `${shopRoot}/account` : `${shopRoot}/account/login` },
+                  ]}
+                />
+                <FooterCol
+                  title="Légal"
+                  items={footerLinks.length > 0 ? footerLinks : [
+                    { label: "CGV", href: `${shopRoot}/cgv` },
+                    { label: "Mentions légales", href: `${shopRoot}/mentions` },
+                    { label: "Confidentialité", href: `${shopRoot}/confidentialite` },
+                    { label: "Cookies", href: `${shopRoot}/cookies` },
+                  ]}
+                />
+              </div>
             </div>
           </div>
-
-          <FooterCol title="Boutique" items={[
-            { label: "Tous les produits", href: `${shopRoot}` },
-            { label: "Collections", href: `${shopRoot}/collections` },
-            { label: "Nouveautés", href: `${shopRoot}?sort=new` },
-            { label: "Meilleures ventes", href: `${shopRoot}?sort=bestsellers` },
-          ]} />
-
-          <FooterCol title="Nous connaître" items={[
-            { label: "Notre histoire", href: `${shopRoot}/about` },
-            { label: "Le Journal", href: `${shopRoot}/blog` },
-            { label: "Ils parlent de nous", href: `${shopRoot}#press` },
-            { label: "Contact", href: `${shopRoot}/contact` },
-          ]} />
-
-          <FooterCol title="Service client" items={[
-            { label: "FAQ", href: `${shopRoot}#faq` },
-            { label: "Livraison & délais", href: `${shopRoot}/livraison` },
-            { label: "Retours & remboursements", href: `${shopRoot}/retours` },
-            { label: "Suivre ma commande", href: `${shopRoot}/track` },
-            { label: customer ? "Mon compte" : "Se connecter", href: customer ? `${shopRoot}/account` : `${shopRoot}/account/login` },
-          ]} />
-
-          <FooterCol
-            title="Légal"
-            items={footerLinks.length > 0 ? footerLinks : [
-              { label: "CGV", href: `${shopRoot}/cgv` },
-              { label: "Mentions légales", href: `${shopRoot}/mentions` },
-              { label: "Confidentialité", href: `${shopRoot}/confidentialite` },
-              { label: "Cookies", href: `${shopRoot}/cookies` },
-            ]}
-          />
         </div>
 
-        {/* Payment methods */}
-        <div style={{ borderTop: "1px solid #E5E5E5" }}>
-          <div className="max-w-7xl mx-auto px-6 py-7 flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-2 flex-wrap" data-testid="footer-payments">
-              <span className="text-[10px] uppercase tracking-[0.3em] mr-3" style={{ color: "#A3A3A3" }}>Paiements</span>
-              {["Visa", "Mastercard", "CB", "PayPal", "Apple Pay", "iDEAL", "Bancontact"].map((p) => (
-                <span
-                  key={p}
-                  className="px-2.5 py-1 text-[11px] font-medium"
-                  style={{ background: "#F5F5F5", color: "#0A0A0A", borderRadius: "2px" }}
-                >
-                  {p}
-                </span>
-              ))}
+        {/* Divider hairline */}
+        <div className="relative z-10 max-w-7xl mx-auto px-6">
+          <div className="h-px bg-white/10" />
+        </div>
+
+        {/* Bottom bar — contact + copyright + payments */}
+        <div className="relative z-10 max-w-7xl mx-auto px-6 py-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+            <div>
+              <div
+                className="text-2xl font-semibold text-white mb-3"
+                style={{ fontFamily: `"${fontHeading}", serif` }}
+                data-testid="footer-logo"
+              >
+                {logoText}
+              </div>
+              <p className="text-[14px] text-white/50 mb-3">
+                Nous contacter :{" "}
+                <a href={`mailto:${contactEmail}`} data-testid="footer-contact-email" className="text-white font-medium hover:text-white/80 transition-colors">
+                  {contactEmail}
+                </a>
+              </p>
+              <p data-testid="footer-copyright" className="text-[12px] text-white/30">
+                © {new Date().getFullYear()} {logoText} — Tous droits réservés.
+              </p>
             </div>
-            <div className="text-[11px] tracking-wide" style={{ color: "#A3A3A3" }}>
-              © {new Date().getFullYear()} {logoText} — Tous droits réservés.
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-white/30 mb-3">Paiement sécurisé</p>
+              <div className="flex items-center gap-2.5 flex-wrap" data-testid="footer-payments">
+                {["Visa", "Mastercard", "CB", "PayPal", "Apple Pay", "iDEAL", "Bancontact"].map((p) => (
+                  <span
+                    key={p}
+                    className="h-8 px-2.5 glass-card flex items-center justify-center text-[11px] font-medium text-white/80"
+                    style={{ borderRadius: "6px" }}
+                  >
+                    {p}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -705,25 +775,20 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
 function FooterCol({ title, items }) {
   return (
     <div>
-      <div
-        className="text-[10px] uppercase tracking-[0.35em] mb-5"
-        style={{ color: "#0A0A0A", fontWeight: 600 }}
-      >
+      <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-white/40 mb-6">
         {title}
-      </div>
-      <ul className="space-y-2.5">
+      </p>
+      <div className="flex flex-col gap-4">
         {items.map((it, i) => (
-          <li key={i}>
-            <Link
-              to={it.href}
-              className="text-[13.5px] hover:opacity-60 transition"
-              style={{ color: "#525252" }}
-            >
-              {it.label}
-            </Link>
-          </li>
+          <Link
+            key={i}
+            to={it.href}
+            className="text-[14px] text-white/60 hover:text-white transition-colors"
+          >
+            {it.label}
+          </Link>
         ))}
-      </ul>
+      </div>
     </div>
   );
 }

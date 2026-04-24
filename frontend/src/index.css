@@ -132,3 +132,30 @@ code, .font-mono, .tabular-nums {
   to { opacity: 1; }
 }
 .animate-fade-in { animation: fade-in 220ms ease-out; }
+
+
+/* Premium reviews marquee — infinite scroll, Chutex-inspired */
+@keyframes marquee-reviews {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-marquee-reviews {
+  animation: marquee-reviews 60s linear infinite;
+}
+.animate-marquee-reviews:hover {
+  animation-play-state: paused;
+}
+
+/* Glass card helpers (backdrop-blur aesthetics) */
+.glass-card {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.glass-card-strong {
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
