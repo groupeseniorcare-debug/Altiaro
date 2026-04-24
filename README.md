@@ -82,7 +82,9 @@ Trois rôles distincts, scopés strictement par `user.role` + `operator_id` :
 │   ├── CHANGELOG.md            Historique des sprints
 │   └── test_credentials.md     Comptes seedés (cf. section dédiée)
 │
-├── deliverables/               2 playbooks markdown (legacy — désynchronisés avec seed_prompts.py)
+├── deliverables/               Livrables produit (cf. `deliverables/README.md`)
+│   ├── README.md               Guide du dossier + sources de vérité actives
+│   └── archive/                2 playbooks markdown legacy (stack Shopify, obsolètes)
 ├── docs/GSC_SETUP.md           Guide OAuth Google Search Console
 ├── design_guidelines.json      Blueprint UI (palette, typo, patterns)
 ├── test_reports/pytest/        Rapports JSON par itération

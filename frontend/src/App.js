@@ -44,13 +44,11 @@ import Landing from "./pages/Landing";
 import Legal from "./pages/Legal";
 import Signup from "./pages/Signup";
 import VerifyEmail from "./pages/VerifyEmail";
-import {
-  StorefrontHome,
-  StorefrontProduct,
-  StorefrontCart,
-  StorefrontCheckout,
-  StorefrontConfirmation,
-} from "./pages/Storefront";
+import StorefrontHome from "./pages/StorefrontHome";
+import StorefrontProduct from "./pages/StorefrontProduct";
+import StorefrontCart from "./pages/StorefrontCart";
+import StorefrontCheckout from "./pages/StorefrontCheckout";
+import StorefrontConfirmation from "./pages/StorefrontConfirmation";
 import {
   StorefrontCollections,
   StorefrontCollection,

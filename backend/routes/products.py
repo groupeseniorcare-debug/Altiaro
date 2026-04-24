@@ -86,6 +86,12 @@ async def update_product(site_id: str, product_id: str, data: ProductUpdateInput
 @router.delete("/{product_id}")
 async def delete_product(site_id: str, product_id: str, user: dict = Depends(get_current_user)):
     await _check_site_access(site_id, user)
+    # Notify search engines BEFORE delete (URL still resolves for the submission payload).
+    # Phase 4 fix : suppression = signal fort de désindexation à envoyer à Bing/Yandex/etc.
+    try:
+        fire_and_forget_indexnow(_product_urls(site_id, product_id))
+    except Exception:
+        pass
     await db.products.delete_one({"id": product_id, "site_id": site_id})
     return {"ok": True}
 
