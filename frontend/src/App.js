@@ -87,6 +87,19 @@ function ProtectedRoute({ children, adminOnly = false }) {
   return children;
 }
 
+/**
+ * Redirect helper pour l'ancienne URL `/sites/:id/design` → `/sites/:id/branding?tab=avance`.
+ * Phase 2 : SiteDesign a été absorbé comme onglet "Avancé" de SiteBranding.
+ * Un composant dédié (plutôt qu'un `<Navigate to="..">` relatif) est nécessaire
+ * car le pattern relatif `../` ne résout pas correctement avec un param dynamique
+ * en React Router v7 — il oublie le `:id` et retombe sur la home.
+ */
+function SiteDesignRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/sites/${id}/branding?tab=avance`} replace />;
+}
+
+
 function HomeRoute() {
   // Public landing when not authed, Dashboard when authed
   const { user } = useAuth();
@@ -224,7 +237,11 @@ function App() {
           />
           <Route
             path="/sites/:id/design"
-            element={<Navigate to="../branding?tab=avance" replace />}
+            element={
+              <ProtectedRoute>
+                <SiteDesignRedirect />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/sites/:id/branding"
