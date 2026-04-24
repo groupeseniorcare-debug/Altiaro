@@ -800,27 +800,27 @@ async def connect_one(key: str, request: Request, _admin: dict = Depends(require
         from routes.aliexpress import get_authorize_url_admin
         return await get_authorize_url_admin(request, _admin)
     if key == "google_ads":
-        # Construit l'URL OAuth Ads depuis l'endpoint existant
-        cid = os.environ.get("GOOGLE_ADS_CLIENT_ID", "")
-        redirect = os.environ.get("GOOGLE_ADS_REDIRECT_URI", "")
-        if not cid or not redirect:
-            raise HTTPException(status_code=400, detail="Google Ads OAuth not configured")
-        scope = "https://www.googleapis.com/auth/adwords"
-        url = (
-            "https://accounts.google.com/o/oauth2/v2/auth"
-            f"?client_id={cid}&redirect_uri={redirect}&response_type=code"
-            f"&scope={scope}&access_type=offline&prompt=consent"
-        )
-        return {"authorize_url": url}
+        # Délégation à l'endpoint dédié (PKCE + state persisté en DB).
+        # Reconstruire l'URL à la main ici cassait le callback (pas de state,
+        # pas de code_verifier → fetch_token échouait).
+        from routes.google_ads import oauth_start as ads_oauth_start
+        resp = await ads_oauth_start(_admin)  # {"authorization_url": ..., "state": ...}
+        url = resp.get("authorization_url") or resp.get("authorize_url")
+        if not url:
+            raise HTTPException(status_code=500, detail="Google Ads OAuth start n'a pas renvoyé d'URL")
+        return {"authorize_url": url, "state": resp.get("state")}
     if key == "google_search_console":
-        return {"docs_url": "/docs/GSC_SETUP.md", "message": "GSC se connecte site par site (Concepteur). Voir /docs/GSC_SETUP.md."}
-    if key == "google_merchant_center":
-        # Lien direct vers l'OAuth start (admin only) — retourne un JSON {authorize_url, state}
         return {
-            "docs_url": "https://merchants.google.com",
-            "oauth_start_url": "/api/merchant/oauth/start",
-            "message": "Cliquez sur Connecter pour démarrer l'OAuth Google (scope content).",
+            "docs_url": "/docs/GSC_SETUP.md",
+            "message": "GSC se connecte site par site depuis le cockpit /sites/{id}/seo (panel GSC). Voir /docs/GSC_SETUP.md.",
         }
+    if key == "google_merchant_center":
+        # Délégation à l'endpoint merchant qui gère le state CSRF
+        # + persiste correctement les tokens à l'étape callback.
+        from routes.merchant import oauth_start as merchant_oauth_start
+        resp = await merchant_oauth_start(_admin)
+        # merchant renvoie déjà {"authorize_url": ..., "state": ...}
+        return resp
 
     # Tout le reste : configurer dans .env, pas d'OAuth plateforme
     docs_map = {

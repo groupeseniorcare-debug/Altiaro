@@ -146,7 +146,7 @@ async def oauth_callback(request: Request, code: Optional[str] = None, state: Op
         frontend_base = f"{request.url.scheme}://{request.url.hostname}"
     if error or not code or not state:
         return RedirectResponse(
-            f"{frontend_base}/admin/google-ads?status=error&reason={error or 'missing_code'}",
+            f"{frontend_base}/admin/integrations?google_ads=error&reason={error or 'missing_code'}",
             status_code=302,
         )
     _require_config()
@@ -175,11 +175,14 @@ async def oauth_callback(request: Request, code: Optional[str] = None, state: Op
         )
         # Cleanup OAuth state
         await db.google_ads_oauth_state.delete_one({"state": state})
-        return RedirectResponse(f"{frontend_base}/admin/google-ads?status=connected", status_code=302)
+        return RedirectResponse(
+            f"{frontend_base}/admin/integrations?google_ads=connected",
+            status_code=302,
+        )
     except Exception as e:
         logger.exception("Google Ads OAuth callback failed")
         return RedirectResponse(
-            f"{frontend_base}/admin/google-ads?status=error&reason={str(e)[:100]}",
+            f"{frontend_base}/admin/integrations?google_ads=error&reason={str(e)[:100]}",
             status_code=302,
         )
 

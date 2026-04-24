@@ -75,6 +75,7 @@ export default function AdminIntegrations() {
   const [loading, setLoading] = useState(false);
   const [cardLoading, setCardLoading] = useState({}); // {key: true}
   const [errorModal, setErrorModal] = useState(null); // integration object or null
+  const [oauthToast, setOauthToast] = useState(null); // {service, status, message}
   const pollRef = useRef(null);
 
   const fetchHealth = useCallback(async (force = false) => {
@@ -105,9 +106,16 @@ export default function AdminIntegrations() {
       window.alert(error || "Impossible de démarrer la connexion.");
       return;
     }
+    // OAuth flow → full page redirect (préserve cookies httpOnly SameSite=None).
+    // Popup + noopener cassait la session admin : le cookie n'était pas
+    // réinjecté sur le callback, et la page /admin/integrations ne se
+    // rafraîchissait pas automatiquement au retour.
     if (data.authorize_url) {
-      window.open(data.authorize_url, "_blank", "noopener");
-    } else if (data.docs_url) {
+      window.location.href = data.authorize_url;
+      return;
+    }
+    // Docs externes (non-OAuth) → nouvelle fenêtre OK
+    if (data.docs_url) {
       if (data.docs_url.startsWith("http")) {
         window.open(data.docs_url, "_blank", "noopener");
       } else {
@@ -137,6 +145,38 @@ export default function AdminIntegrations() {
     };
   }, [fetchHealth]);
 
+  // Parse OAuth callback querystrings (?google_ads=connected, ?merchant=connected,
+  // ?aliexpress=connected, etc.) pour afficher un toast immédiat + force refresh.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const qs = new URLSearchParams(window.location.search);
+    const services = ["google_ads", "merchant", "aliexpress", "gsc"];
+    for (const svc of services) {
+      const val = qs.get(svc);
+      if (!val) continue;
+      const serviceLabels = {
+        google_ads: "Google Ads",
+        merchant: "Google Merchant Center",
+        aliexpress: "AliExpress",
+        gsc: "Google Search Console",
+      };
+      const label = serviceLabels[svc] || svc;
+      if (val === "connected") {
+        setOauthToast({ service: svc, status: "ok", message: `${label} connecté avec succès.` });
+      } else if (val === "error") {
+        const reason = qs.get("reason") || "inconnu";
+        setOauthToast({ service: svc, status: "error", message: `${label} : échec OAuth (${reason}).` });
+      }
+      // Clean URL (sans reload)
+      window.history.replaceState({}, "", window.location.pathname);
+      // Force refresh immédiat pour voir la card passer ok/error
+      fetchHealth(true);
+      // Auto-dismiss toast après 8s
+      setTimeout(() => setOauthToast(null), 8000);
+      break;
+    }
+  }, [fetchHealth]);
+
   if (user && user.role !== "admin") {
     return (
       <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center">
@@ -148,6 +188,30 @@ export default function AdminIntegrations() {
   return (
     <div className="min-h-screen bg-[#FAF7F2]">
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-8">
+        {oauthToast && (
+          <div
+            data-testid={`oauth-toast-${oauthToast.service}`}
+            className={`mb-6 px-4 py-3 rounded-xl border flex items-center gap-3 ${
+              oauthToast.status === "ok"
+                ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+                : "bg-rose-50 border-rose-200 text-rose-900"
+            }`}
+          >
+            {oauthToast.status === "ok" ? (
+              <CheckCircle size={20} weight="duotone" />
+            ) : (
+              <XCircle size={20} weight="duotone" />
+            )}
+            <span className="text-sm font-medium">{oauthToast.message}</span>
+            <button
+              onClick={() => setOauthToast(null)}
+              className="ml-auto text-xs opacity-70 hover:opacity-100"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         <Link
           to="/"
           className="inline-flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900 mb-6"
