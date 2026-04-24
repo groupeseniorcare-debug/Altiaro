@@ -294,7 +294,7 @@ export function StorefrontProduct() {
                     {[...Array(5)].map((_, i) => (<Star key={i} size={14} weight="fill" />))}
                   </div>
                   <span className="font-semibold" style={{ color: "#0A0A0A" }}>{(p.rating?.score ?? 4.8).toFixed(1)}</span>
-                  <span>· {p.rating?.count ?? 127} avis</span>
+                  <span>· {p.rating?.count ?? 127} {t(lang, "testimonials_verified_reviews")}</span>
                 </div>
                 <span className="w-px h-4" style={{ background: "#E5E5E5" }} />
                 <div className="flex items-center gap-1.5">
@@ -416,7 +416,7 @@ export function StorefrontProduct() {
 
               <div className="mt-6 space-y-3">
                 <DeliveryEstimate design={design} />
-                <PaymentOptions price={p.price} currency={p.currency} design={design} />
+                <PaymentOptions price={p.price} currency={p.currency} design={design} lang={lang} />
               </div>
 
               <div className="mt-8 grid grid-cols-2 gap-2.5" data-testid="product-trust-badges">
@@ -424,7 +424,7 @@ export function StorefrontProduct() {
                   { Icon: Truck,       label: t(lang, "trust_free_shipping"), sub: "48–72 h" },
                   { Icon: ShieldCheck, label: t(lang, "trust_warranty_2y"),   sub: "Pièces & MO" },
                   { Icon: CheckCircle, label: t(lang, "trust_returns_14d"),   sub: { fr: "Gratuit", en: "Free", de: "Kostenlos", nl: "Gratis", it: "Gratis", es: "Gratis" }[lang] || "Gratuit" },
-                  { Icon: Star,        label: "4.8 / 5",                      sub: `${p.rating?.count ?? 127} avis` },
+                  { Icon: Star,        label: "4.8 / 5",                      sub: `${p.rating?.count ?? 127} ${t(lang, "testimonials_verified_reviews")}` },
                 ].map((b, i) => (
                   <div
                     key={i}

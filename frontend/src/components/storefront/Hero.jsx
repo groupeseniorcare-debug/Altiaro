@@ -154,7 +154,7 @@ export function Hero({ site, design, lang, products }) {
                 <span className="font-medium" style={{ color: primary }}>
                   {rating.score}/5
                 </span>
-                <span>· {rating.count?.toLocaleString?.("fr-FR") || rating.count} avis</span>
+                <span>· {rating.count?.toLocaleString?.("fr-FR") || rating.count} {t(lang, "testimonials_verified_reviews")}</span>
               </div>
             )}
             <span className="opacity-30">·</span>

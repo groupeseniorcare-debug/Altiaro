@@ -374,6 +374,7 @@ const DICT = {
     footer_reassurance_shipping_sub: "Throughout Europe",
     footer_reassurance_payment_sub:  "Card, PayPal, bank transfer",
     footer_reassurance_returns_sub:  "Satisfied or refunded",
+    payment_methods_short:           "Visa, Mastercard, PayPal, Apple Pay, Google Pay",
     footer_terms:                    "Terms",
     values_metric_support:  "with full support",
     values_metric_partners: "audited partners",
@@ -617,6 +618,7 @@ const DICT = {
     footer_reassurance_shipping_sub: "In ganz Europa",
     footer_reassurance_payment_sub:  "Karte, PayPal, Überweisung",
     footer_reassurance_returns_sub:  "Zufrieden oder Geld zurück",
+    payment_methods_short:           "Visa, Mastercard, PayPal, Apple Pay, Giropay, Klarna",
     footer_terms:                    "AGB",
   },
   nl: {
@@ -776,6 +778,7 @@ const DICT = {
     footer_reassurance_shipping_sub: "In heel Europa",
     footer_reassurance_payment_sub:  "Kaart, PayPal, overschrijving",
     footer_reassurance_returns_sub:  "Tevreden of geld terug",
+    payment_methods_short:           "Visa, Mastercard, iDEAL, PayPal, Apple Pay, Bancontact",
     footer_terms:                    "Algemene voorwaarden",
     values_heading:         "Wat ons drijft",
     hero_subtitle_default:  "Zorgvuldig geselecteerde producten om dagelijks uw zelfstandigheid, comfort en gemoedsrust te behouden.",
@@ -1017,6 +1020,7 @@ const DICT = {
     footer_reassurance_shipping_sub: "In tutta Europa",
     footer_reassurance_payment_sub:  "Carta, PayPal, bonifico",
     footer_reassurance_returns_sub:  "Soddisfatti o rimborsati",
+    payment_methods_short:           "Visa, Mastercard, PayPal, Apple Pay, Google Pay",
     footer_terms:                    "Termini",
   },
   es: {
@@ -1217,6 +1221,7 @@ const DICT = {
     footer_reassurance_shipping_sub: "Por toda Europa",
     footer_reassurance_payment_sub:  "Tarjeta, PayPal, transferencia",
     footer_reassurance_returns_sub:  "Satisfecho o reembolsado",
+    payment_methods_short:           "Visa, Mastercard, PayPal, Apple Pay, Bizum",
     footer_terms:                    "Términos",
   },
 };

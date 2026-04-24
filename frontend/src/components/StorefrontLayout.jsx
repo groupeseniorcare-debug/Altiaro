@@ -777,15 +777,19 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
             <div>
               <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-white/30 mb-3">{t(lang, "trust_secure_payment")}</p>
               <div className="flex items-center gap-2.5 flex-wrap" data-testid="footer-payments">
-                {["Visa", "Mastercard", "CB", "PayPal", "Apple Pay", "iDEAL", "Bancontact"].map((p) => (
-                  <span
-                    key={p}
-                    className="h-8 px-2.5 glass-card flex items-center justify-center text-[11px] font-medium text-white/80"
-                    style={{ borderRadius: "6px" }}
-                  >
-                    {p}
-                  </span>
-                ))}
+                {t(lang, "payment_methods_short").split(",").map((raw) => {
+                  const p = raw.trim();
+                  if (!p) return null;
+                  return (
+                    <span
+                      key={p}
+                      className="h-8 px-2.5 glass-card flex items-center justify-center text-[11px] font-medium text-white/80"
+                      style={{ borderRadius: "6px" }}
+                    >
+                      {p}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           </div>

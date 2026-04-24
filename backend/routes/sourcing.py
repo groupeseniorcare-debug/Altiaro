@@ -221,6 +221,88 @@ async def _ae_call(method: str, biz_params: dict) -> dict:
         return r.json()
 
 
+async def _ae_ds_product_detail(product_id: str, site_id: Optional[str] = None) -> dict | None:
+    """
+    Fetch a product detail using the **Dropshipping API** (`aliexpress.ds.product.get`).
+    This is the correct API for apps that completed OAuth (buyerApp / DS).
+    The previously used `aliexpress.affiliate.productdetail.get` requires an
+    Affiliate-type app and returns `InsufficientPermission` otherwise.
+
+    Returns a normalised dict {title, images, main_image, cost_usd, sku, currency}
+    or None if the product truly can't be found.
+    Raises HTTPException on upstream 502 / missing OAuth.
+    """
+    # Import tardif pour éviter les cycles d'import.
+    from routes.aliexpress import _signed_post, SYNC_API_URL
+    biz = {
+        "method": "aliexpress.ds.product.get",
+        "product_id": str(product_id),
+        "ship_to_country": "FR",
+        "target_currency": "USD",
+        "target_language": "EN",
+    }
+    raw = await _signed_post(SYNC_API_URL, biz, site_id=site_id)
+    payload = raw.get("aliexpress_ds_product_get_response") or raw
+    result = payload.get("result") or payload
+    base = result.get("ae_item_base_info_dto") or {}
+    multimedia = result.get("ae_multimedia_info_dto") or {}
+    skus_wrap = result.get("ae_item_sku_info_dtos") or {}
+    skus = skus_wrap.get("ae_item_sku_info_d_t_o") or []
+    if not base and not skus:
+        return None
+
+    # Title
+    title = base.get("subject") or base.get("product_title") or ""
+
+    # Images (image_urls est une chaîne ; séparateur officiel = ";")
+    images: list[str] = []
+    raw_imgs = multimedia.get("image_urls") or base.get("product_image_url") or ""
+    if isinstance(raw_imgs, str):
+        images = [u.strip() for u in raw_imgs.split(";") if u.strip()]
+    elif isinstance(raw_imgs, list):
+        images = [str(u) for u in raw_imgs if u]
+    main_image = base.get("main_image_url") or (images[0] if images else "")
+    if main_image and main_image not in images:
+        images.insert(0, main_image)
+    images = images[:8]
+
+    # Prix : min offer_sale_price sur les SKUs, sinon base.sale_price
+    cost_usd = 0.0
+    if isinstance(skus, list) and skus:
+        prices = []
+        for s in skus:
+            v = s.get("offer_sale_price") or s.get("sku_price")
+            if v:
+                try:
+                    prices.append(float(v))
+                except (ValueError, TypeError):
+                    pass
+        if prices:
+            cost_usd = min(prices)
+    if not cost_usd:
+        try:
+            cost_usd = float(base.get("sale_price") or base.get("price") or 0)
+        except (ValueError, TypeError):
+            cost_usd = 0.0
+
+    # SKU : prend le 1er sku si dispo, sinon product_id comme fallback
+    sku = ""
+    if isinstance(skus, list) and skus:
+        sku = str(skus[0].get("sku_id") or skus[0].get("id") or "")
+    if not sku:
+        sku = str(base.get("product_id") or product_id)
+
+    currency = base.get("currency_code") or "USD"
+    return {
+        "title": title,
+        "main_image": main_image,
+        "images": images,
+        "cost_usd": cost_usd,
+        "sku": sku,
+        "currency": currency,
+    }
+
+
 async def _ae_search(keyword: str, page: int = 1, size: int = 20, country: str = "FR") -> list:
     biz = {
         "keywords": keyword,
@@ -711,51 +793,38 @@ async def preview_by_url(
 
     elif provider == "aliexpress":
         if not (AE_APP_KEY and AE_APP_SECRET):
-            raise HTTPException(503, "AliExpress Affiliate non configuré.")
+            raise HTTPException(503, "AliExpress non configuré côté serveur.")
         try:
-            resp = await _ae_call(
-                "aliexpress.affiliate.productdetail.get",
-                {"product_ids": product_id, "target_currency": "USD", "target_language": "EN",
-                 "tracking_id": AE_TRACKING_ID or "default"},
-            )
-            items = (((resp or {}).get("aliexpress_affiliate_productdetail_get_response") or {})
-                     .get("resp_result") or {}).get("result") or {}
-            prods = (items.get("products") or {}).get("product") or []
-            if not prods:
-                raise HTTPException(404, "Produit AliExpress introuvable.")
-            p = prods[0]
-            title = p.get("product_title") or ""
-            image = p.get("product_main_image_url") or ""
-            imgs_raw = p.get("product_small_image_urls") or {}
-            if isinstance(imgs_raw, dict):
-                images = imgs_raw.get("string") or []
-            elif isinstance(imgs_raw, list):
-                images = imgs_raw
-            images = [i for i in images[:6] if isinstance(i, str)]
-            if image and image not in images:
-                images.insert(0, image)
-            try:
-                cost_usd = float(p.get("target_sale_price") or p.get("sale_price") or 0)
-            except (ValueError, TypeError):
-                cost_usd = 0.0
-            sku = p.get("sku_id") or ""
-            # AE : la livraison par pays dépend des SKUs. On marque "likely_available"
-            # pour tous les pays cibles (check réel requiert appel shipping API qui
-            # n'est pas toujours disponible sur le tier affiliate standard).
-            for cc in target_countries:
-                shipping_by_country[cc] = {
-                    "available": True,
-                    "confidence": "presumed",
-                    "reason": "AliExpress livre la plupart des pays EU — vérifiez lors du placement de la commande",
-                }
-            # Free shipping AE est souvent indiqué dans le flag "promotion_link" ou
-            # "original_price"==0 mais ce n'est pas fiable. On suppose non-gratuit par défaut.
-            free_shipping = False
-            shipping_cost_eur = 0.0
+            detail = await _ae_ds_product_detail(product_id, site_id=site_id)
         except HTTPException:
             raise
         except Exception as e:
+            logger.exception("[sourcing] AE preview failed")
             raise HTTPException(502, f"AliExpress indisponible : {str(e)[:180]}")
+        if not detail:
+            raise HTTPException(
+                404,
+                "Produit AliExpress introuvable. Vérifie l'URL (format /item/{id}.html) "
+                "ou que le produit n'a pas été retiré par le vendeur.",
+            )
+        title = detail["title"]
+        image = detail["main_image"]
+        images = detail["images"]
+        cost_usd = detail["cost_usd"]
+        sku = detail["sku"]
+        # AE : la livraison par pays dépend des SKUs. On marque "likely_available"
+        # pour tous les pays cibles (check réel requiert appel shipping API qui
+        # n'est pas toujours disponible sur le tier affiliate standard).
+        for cc in target_countries:
+            shipping_by_country[cc] = {
+                "available": True,
+                "confidence": "presumed",
+                "reason": "AliExpress livre la plupart des pays EU — vérifiez lors du placement de la commande",
+            }
+        # Free shipping AE est souvent indiqué dans le flag "promotion_link" ou
+        # "original_price"==0 mais ce n'est pas fiable. On suppose non-gratuit par défaut.
+        free_shipping = False
+        shipping_cost_eur = 0.0
 
     else:
         raise HTTPException(400, "Provider inconnu")
@@ -847,28 +916,24 @@ async def import_by_url(site_id: str, data: ImportUrlInput, user: dict = Depends
                 cost_usd = 0.0
     elif provider == "aliexpress":
         if not (AE_APP_KEY and AE_APP_SECRET):
-            raise HTTPException(503, "AliExpress Affiliate non configuré.")
+            raise HTTPException(503, "AliExpress non configuré côté serveur.")
         try:
-            resp = await _ae_call(
-                "aliexpress.affiliate.productdetail.get",
-                {"product_ids": product_id, "target_currency": "USD", "target_language": "EN",
-                 "tracking_id": AE_TRACKING_ID or "default"},
-            )
-            items = (((resp or {}).get("aliexpress_affiliate_productdetail_get_response") or {})
-                     .get("resp_result") or {}).get("result") or {}
-            prods = (items.get("products") or {}).get("product") or []
-            if prods:
-                p = prods[0]
-                title = p.get("product_title") or ""
-                image = p.get("product_main_image_url") or ""
-                try:
-                    cost_usd = float(p.get("target_sale_price") or p.get("sale_price") or 0)
-                except (ValueError, TypeError):
-                    cost_usd = 0.0
+            detail = await _ae_ds_product_detail(product_id, site_id=site_id)
         except HTTPException:
             raise
         except Exception as e:
+            logger.exception("[sourcing] AE import-by-url failed")
             raise HTTPException(502, f"AliExpress indisponible : {str(e)[:180]}")
+        if not detail:
+            raise HTTPException(
+                404,
+                "Produit AliExpress introuvable. Vérifie l'URL (format /item/{id}.html) "
+                "ou que le produit n'a pas été retiré par le vendeur.",
+            )
+        title = detail["title"]
+        image = detail["main_image"]
+        cost_usd = detail["cost_usd"]
+        sku = detail["sku"]
 
     if not title:
         raise HTTPException(404, "Impossible de lire le produit depuis cette URL.")

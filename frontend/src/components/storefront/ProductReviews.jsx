@@ -81,7 +81,7 @@ export default function ProductReviews({ product, design, lang = "fr" }) {
         {/* List */}
         <div>
           <div className="flex items-center justify-between mb-6">
-            <div className="text-[13px]" style={{ color: textMuted }}>{sorted.length} avis affichés</div>
+            <div className="text-[13px]" style={{ color: textMuted }}>{sorted.length} {t(lang, "testimonials_verified_reviews")}</div>
             <div className="relative">
               <select
                 value={sort}
