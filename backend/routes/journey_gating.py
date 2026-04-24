@@ -54,25 +54,75 @@ STEP_LABELS = {
 # ────────── Helpers de check par étape ────────── #
 
 async def _check_pricing(site_id: str, site: dict) -> dict:
-    """≥1 QuickScan en DB avec verdict GO ou CAUTION pour ce site."""
-    count_ok = await db.quick_scans.count_documents({
-        "site_id": site_id,
-        "verdict": {"$in": ["GO", "GO_WITH_RESERVE"]},
-    })
-    count_total = await db.quick_scans.count_documents({"site_id": site_id})
-    completed = count_ok >= 1
-    if completed:
-        reason = f"{count_ok} marché(s) GO/CAUTION sur {count_total} scan(s)"
-    elif count_total > 0:
-        reason = f"{count_total} scan(s) générés — aucun GO/CAUTION · réessayez sur un autre pays/produit"
+    """Étape 1 complétée dès qu'une analyse a été EXÉCUTÉE pour ce site.
+
+    Deux sources acceptées (le cockpit utilise la 1ère, QuickScan standalone la 2nde) :
+      (A) `site.design.pricing_analysis.generated_at` renseigné (endpoint
+          `POST /sites/{id}/pricing-analysis`)
+      (B) ≥1 document dans `db.quick_scans` avec ce `site_id` (endpoint
+          `POST /quick-scan` ou `/quick-scan/multi`)
+
+    Aucun seuil de verdict : le concepteur choisit lui-même son angle même si
+    tous les marchés ressortent NO_GO (il prendra ses risques). Le message
+    détaille toutefois le verdict par marché pour éclairer sa décision.
+    """
+    # Source A : analyse Claude "cockpit" persistée dans le site
+    pa = (site.get("design") or {}).get("pricing_analysis") or {}
+    pa_generated_at = pa.get("generated_at")
+
+    # Source B : quick_scans rattachés au site
+    scans = await db.quick_scans.find(
+        {"site_id": site_id},
+        {"_id": 0, "verdict": 1, "country": 1},
+    ).to_list(length=500)
+    count_total = len(scans)
+    from collections import Counter
+    verdict_counts = Counter((s.get("verdict") or "").upper() for s in scans)
+    count_go = verdict_counts.get("GO", 0)
+    count_caution = verdict_counts.get("GO_WITH_RESERVE", 0) + verdict_counts.get("CAUTION", 0)
+    count_nogo = verdict_counts.get("NO_GO", 0)
+
+    completed = bool(pa_generated_at) or (count_total >= 1)
+
+    # Message humain
+    if pa_generated_at and count_total == 0:
+        niche = pa.get("niche") or "niche"
+        n_competitors = len(pa.get("competitors") or [])
+        n_ranges = len(pa.get("recommended_ranges") or [])
+        reason = (
+            f"Analyse pricing effectuée ({n_competitors} concurrents, "
+            f"{n_ranges} fourchettes) · {niche}"
+        )
+    elif count_total >= 1:
+        bits = []
+        if count_go:      bits.append(f"{count_go} GO")
+        if count_caution: bits.append(f"{count_caution} CAUTION")
+        if count_nogo:    bits.append(f"{count_nogo} NO_GO")
+        summary = " · ".join(bits) if bits else f"{count_total} scan(s)"
+        if pa_generated_at:
+            reason = f"Analyse effectuée ✓ — {summary}"
+        elif count_go + count_caution == 0:
+            reason = (
+                f"Analyse effectuée ✓ — {summary} · "
+                f"niche à risque, tu peux avancer mais vérifie ton angle"
+            )
+        else:
+            reason = f"Analyse effectuée ✓ — {summary}"
     else:
-        reason = "Lance un QuickScan sur un pays cible pour débloquer la suite"
+        reason = "Lance l'analyse pricing IA (ou un QuickScan) pour débloquer la suite"
+
     return {
         "key": "pricing",
         "label": STEP_LABELS["pricing"],
         "completed": completed,
         "reason": reason,
-        "counters": {"total_scans": count_total, "go_or_caution": count_ok},
+        "counters": {
+            "pricing_analysis_done": bool(pa_generated_at),
+            "total_scans": count_total,
+            "go": count_go,
+            "caution": count_caution,
+            "nogo": count_nogo,
+        },
     }
 
 

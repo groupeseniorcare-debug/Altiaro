@@ -101,3 +101,56 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: |
+  Reprise de projet (état des lieux + fix gating étape 1 + audits chantiers 5/6/7).
+  Bug rapporté : "étape 1 complète mais étape 2 bloquée" malgré analyse pricing effectuée.
+
+backend:
+  - task: "Fix gating étape 1 (pricing) — reconnaître pricing_analysis ET quick_scans"
+    implemented: true
+    working: true
+    file: "backend/routes/journey_gating.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: false
+        agent: "main"
+        comment: |
+          Cause racine : 2 systèmes déconnectés.
+          - L'étape 1 du cockpit ouvre /sites/{id}/pricing qui appelle POST /sites/{id}/pricing-analysis (route cockpit_tools.py) → persiste dans site.design.pricing_analysis
+          - Mais _check_pricing vérifiait uniquement db.quick_scans (endpoint standalone /quick-scan)
+          - Audit DB : 39 quick_scans existants, TOUS avec site_id=null. Les 2 sites actifs (Fauteuil releveur, Lit médicalisé) ont bien site.design.pricing_analysis.generated_at rempli mais 0 scan rattaché → étape 2 bloquée à vie.
+      - working: true
+        agent: "main"
+        comment: |
+          Fix appliqué : _check_pricing accepte désormais 2 sources :
+          (A) site.design.pricing_analysis.generated_at (outil cockpit actuel)
+          (B) ≥1 quick_scan avec site_id=site_id (peu importe le verdict — GO/CAUTION/NO_GO)
+          Le "reason" détaille verdicts (GO/CAUTION/NO_GO) pour éclairer le choix du concepteur.
+          Test direct : compute_step_statuses() pour les 3 sites retourne :
+            - Démo Altiaro (draft)      : pricing.completed=False (aucune analyse, normal)
+            - Fauteuil releveur (active): pricing.completed=True + import.blocked_by_previous=False ✓
+            - Lit médicalisé (active)   : pricing.completed=True + import.blocked_by_previous=False ✓
+          → Nécessite re-test E2E via testing agent (curl POST + GET /steps/status) sur un site neuf.
+
+metadata:
+  created_by: "main_agent"
+  version: "1.1"
+  test_sequence: 0
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Fix gating étape 1 (pricing) — reconnaître pricing_analysis ET quick_scans"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Reprise projet : état des lieux complet livré au user + fix P0 du gating étape 1.
+      En attente validation audit 5+6+7 avant de coder. Test backend à lancer sur un site neuf
+      pour valider l'unlock de l'étape 2 après analyse pricing (et non plus seulement quickscan).
