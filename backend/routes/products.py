@@ -1,4 +1,5 @@
 """Products CRUD per site + import from URL."""
+import asyncio
 import os
 import uuid
 from datetime import datetime, timezone
@@ -54,6 +55,12 @@ async def create_product(site_id: str, data: ProductCreateInput, user: dict = De
         fire_and_forget_indexnow(_product_urls(site_id, doc["id"]))
     except Exception:
         pass
+    # Merchant Center push (fire-and-forget, silent no-op si pas connecté)
+    try:
+        from routes.merchant import sync_product_if_connected
+        asyncio.create_task(sync_product_if_connected(site_id, doc["id"]))
+    except Exception:
+        pass
     return doc
 
 
@@ -80,6 +87,12 @@ async def update_product(site_id: str, product_id: str, data: ProductUpdateInput
         fire_and_forget_indexnow(_product_urls(site_id, product_id))
     except Exception:
         pass
+    # Merchant Center push (fire-and-forget, silent no-op si pas connecté)
+    try:
+        from routes.merchant import sync_product_if_connected
+        asyncio.create_task(sync_product_if_connected(site_id, product_id))
+    except Exception:
+        pass
     return await db.products.find_one({"id": product_id, "site_id": site_id}, {"_id": 0})
 
 
@@ -92,7 +105,18 @@ async def delete_product(site_id: str, product_id: str, user: dict = Depends(get
         fire_and_forget_indexnow(_product_urls(site_id, product_id))
     except Exception:
         pass
+    # Capture SKU BEFORE delete — needed by Merchant Center delete hook (offerId = sku)
+    existing = await db.products.find_one(
+        {"id": product_id, "site_id": site_id}, {"_id": 0, "sku": 1, "id": 1}
+    )
+    sku = str((existing or {}).get("sku") or product_id) if existing else product_id
     await db.products.delete_one({"id": product_id, "site_id": site_id})
+    # Merchant Center delete (fire-and-forget, silent no-op si pas connecté)
+    try:
+        from routes.merchant import delete_product_if_connected
+        asyncio.create_task(delete_product_if_connected(site_id, product_id, sku))
+    except Exception:
+        pass
     return {"ok": True}
 
 

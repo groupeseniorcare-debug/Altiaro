@@ -76,6 +76,7 @@ from routes import internal_linking as internal_linking_routes
 from routes import citation_tracker as citation_tracker_routes
 from routes import ae_deals_watcher as ae_deals_watcher_routes
 from routes import testimonials_ai as testimonials_ai_routes
+from routes import merchant as merchant_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -148,6 +149,7 @@ api.include_router(internal_linking_routes.router)
 api.include_router(citation_tracker_routes.router)
 api.include_router(ae_deals_watcher_routes.router)
 api.include_router(testimonials_ai_routes.router)
+api.include_router(merchant_routes.router)
 
 
 @app.on_event("startup")
@@ -558,9 +560,32 @@ async def startup():
             id="ae_deals_watch", replace_existing=True, misfire_grace_time=3600,
         )
 
+        # Daily 04:00 UTC — Google Merchant Center full re-sync
+        # Skip silencieux si pas connecté (voir routes.merchant.daily_merchant_sync)
+        async def _scheduled_merchant_daily_sync():
+            logger.info("[scheduler] merchant daily sync start")
+            try:
+                from routes.merchant import daily_merchant_sync
+                await daily_merchant_sync()
+                logger.info("[scheduler] merchant daily sync done")
+            except Exception:
+                logger.exception("[scheduler] merchant daily sync failed")
+
+        scheduler.add_job(
+            _scheduled_merchant_daily_sync,
+            CronTrigger(hour=4, minute=0),
+            id="merchant_daily_sync", replace_existing=True, misfire_grace_time=3600,
+        )
+
         scheduler.start()
         app.state.scheduler = scheduler
-        logger.info("APScheduler started : weekly_debits + bimonthly_payouts + opportunity_scan + dns_auto_config (5min)")
+        logger.info(
+            "APScheduler started : 12 jobs · weekly_debits · bimonthly_payouts · "
+            "reviews_check_due · ae_tracking_sync · cj_tracking_sync (2h) · "
+            "opportunity_scan · dns_auto_config (5min) · monthly_blog_cluster · "
+            "weekly_seo_coach · citation_tracker_weekly · ae_deals_watch · "
+            "merchant_daily_sync (04h UTC)"
+        )
     except Exception:
         logger.exception("Failed to start APScheduler")
 

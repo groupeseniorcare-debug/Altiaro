@@ -379,15 +379,129 @@ async def _ping_gsc() -> dict:
 
 
 async def _ping_google_merchant() -> dict:
-    # P0 ROADMAP — endpoint pas encore codé.
+    """Statut dynamique du Merchant Center, lu depuis platform_settings.merchant.
+
+    Étapes résolues par ordre de priorité :
+    - GOOGLE_CLIENT_ID/SECRET absents → not_configured
+    - OAuth pas finalisé (pas de refresh_token) → warning
+    - merchant_id manquant (ni en DB ni en env) → warning
+    - last_sync_status == "error" → error
+    - last_sync_status == "partial" → warning
+    - Tout est OK → ok
+    """
+    t0 = time.perf_counter()
+    cid = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+    secret = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+    configured_env = bool(cid and secret)
+
+    if not configured_env:
+        return _result(
+            "google_merchant_center", "Google Merchant Center",
+            status="not_configured",
+            message="GOOGLE_CLIENT_ID/SECRET manquants dans .env",
+            requires_oauth=True,
+            configured_env=False,
+            docs_url="https://merchants.google.com",
+            actions=["configure"],
+            duration_ms=int((time.perf_counter() - t0) * 1000),
+        )
+
+    try:
+        settings = await db.platform_settings.find_one({"key": "merchant"}) or {}
+    except Exception as e:
+        return _result(
+            "google_merchant_center", "Google Merchant Center",
+            status="error",
+            message=f"Erreur DB : {str(e)[:50]}",
+            requires_oauth=True,
+            configured_env=True,
+            docs_url="https://merchants.google.com",
+            actions=["test"],
+            duration_ms=int((time.perf_counter() - t0) * 1000),
+        )
+
+    refresh_token = settings.get("refresh_token")
+    merchant_id = settings.get("merchant_id") or os.environ.get("MERCHANT_ID", "").strip()
+    last_sync_at = settings.get("last_sync_at")
+    last_sync_status = settings.get("last_sync_status")
+    connected_at = settings.get("connected_at")
+
+    details = {
+        "connected_at": connected_at,
+        "last_sync_at": last_sync_at,
+        "last_sync_status": last_sync_status,
+        "merchant_id": merchant_id or None,
+    }
+
+    if not refresh_token:
+        return _result(
+            "google_merchant_center", "Google Merchant Center",
+            status="warning",
+            message="OAuth à finaliser · cliquez sur Connecter",
+            requires_oauth=True,
+            configured_env=True,
+            details=details,
+            docs_url="https://merchants.google.com",
+            actions=["connect"],
+            duration_ms=int((time.perf_counter() - t0) * 1000),
+        )
+
+    if not merchant_id:
+        return _result(
+            "google_merchant_center", "Google Merchant Center",
+            status="warning",
+            message="Connecté · renseignez le Merchant ID",
+            connected=True,
+            requires_oauth=True,
+            configured_env=True,
+            details=details,
+            docs_url="https://merchants.google.com",
+            actions=["configure"],
+            duration_ms=int((time.perf_counter() - t0) * 1000),
+        )
+
+    if last_sync_status == "error":
+        return _result(
+            "google_merchant_center", "Google Merchant Center",
+            status="error",
+            message=f"Dernière sync en échec · Merchant ID {merchant_id}",
+            connected=True,
+            requires_oauth=True,
+            configured_env=True,
+            details=details,
+            docs_url="https://merchants.google.com",
+            actions=["test"],
+            duration_ms=int((time.perf_counter() - t0) * 1000),
+        )
+
+    if last_sync_status == "partial":
+        return _result(
+            "google_merchant_center", "Google Merchant Center",
+            status="warning",
+            message="Sync partielle · voir détails par site",
+            connected=True,
+            requires_oauth=True,
+            configured_env=True,
+            details=details,
+            docs_url="https://merchants.google.com",
+            actions=["test"],
+            duration_ms=int((time.perf_counter() - t0) * 1000),
+        )
+
+    if last_sync_at:
+        msg = f"Connecté · Merchant ID {merchant_id} · sync OK"
+    else:
+        msg = f"Connecté · Merchant ID {merchant_id} · prêt à synchroniser"
     return _result(
         "google_merchant_center", "Google Merchant Center",
-        status="not_configured",
-        message="Endpoint pas encore implémenté (P0 ROADMAP)",
+        status="ok",
+        message=msg,
+        connected=True,
         requires_oauth=True,
-        docs_url="https://merchants.google.com",
-        actions=["docs"],
-        duration_ms=0,
+        configured_env=True,
+        details=details,
+        actions=["test"],
+        duration_ms=int((time.perf_counter() - t0) * 1000),
     )
 
 
@@ -701,7 +815,12 @@ async def connect_one(key: str, request: Request, _admin: dict = Depends(require
     if key == "google_search_console":
         return {"docs_url": "/docs/GSC_SETUP.md", "message": "GSC se connecte site par site (Concepteur). Voir /docs/GSC_SETUP.md."}
     if key == "google_merchant_center":
-        return {"docs_url": "https://merchants.google.com", "message": "Intégration pas encore implémentée (P0 ROADMAP)."}
+        # Lien direct vers l'OAuth start (admin only) — retourne un JSON {authorize_url, state}
+        return {
+            "docs_url": "https://merchants.google.com",
+            "oauth_start_url": "/api/merchant/oauth/start",
+            "message": "Cliquez sur Connecter pour démarrer l'OAuth Google (scope content).",
+        }
 
     # Tout le reste : configurer dans .env, pas d'OAuth plateforme
     docs_map = {

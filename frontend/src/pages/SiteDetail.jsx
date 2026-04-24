@@ -10,6 +10,7 @@ import CockpitJourney from "../components/CockpitJourney";
 import PulseSEOWidget from "../components/PulseSEOWidget";
 import AeDealsPanel from "../components/AeDealsPanel";
 import SEOCoachBell from "../components/SEOCoachBell";
+import MerchantShoppingPanel from "../components/MerchantShoppingPanel";
 import {
   ArrowLeft,
   Lock,
@@ -349,6 +350,12 @@ export default function SiteDetail() {
         <div className="mb-10">
           <AeDealsPanel siteId={id} />
         </div>
+
+        {user?.role === "admin" && (
+          <div className="mb-10">
+            <MerchantShoppingPanel siteId={id} isAdmin={true} />
+          </div>
+        )}
 
         <div className="mb-10">
           <SiteQAPanel site={site} />

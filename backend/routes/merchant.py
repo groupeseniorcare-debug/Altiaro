@@ -477,7 +477,7 @@ async def daily_merchant_sync() -> None:
             await sync_all_site_products(s["id"], triggered_by="cron_daily")
         except Exception as e:
             logger.warning(f"[merchant] daily_sync site={s['id']} failed: {e}")
-    logger.info(f"[merchant] daily_sync done")
+    logger.info("[merchant] daily_sync done")
 
 
 # ============================================================== #
