@@ -74,6 +74,7 @@ from routes import aeo as aeo_routes
 from routes import internal_linking as internal_linking_routes
 from routes import citation_tracker as citation_tracker_routes
 from routes import ae_deals_watcher as ae_deals_watcher_routes
+from routes import testimonials_ai as testimonials_ai_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -139,6 +140,7 @@ api.include_router(aeo_routes.router)
 api.include_router(internal_linking_routes.router)
 api.include_router(citation_tracker_routes.router)
 api.include_router(ae_deals_watcher_routes.router)
+api.include_router(testimonials_ai_routes.router)
 
 
 @app.on_event("startup")

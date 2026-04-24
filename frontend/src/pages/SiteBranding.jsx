@@ -220,6 +220,7 @@ export default function SiteBranding() {
                 title="Témoignages"
                 subtitle="Social proof client sur la page d'accueil."
               />
+              <TestimonialsAiCard siteId={siteId} design={design} onReload={reload} />
               <TestimonialsEditor siteId={siteId} design={design} onReload={reload} onSaved={() => setPreviewKey(Date.now())} />
             </section>
 
@@ -291,6 +292,91 @@ function SectionHeader({ number, title, subtitle }) {
         </div>
         <p className="text-[12px] text-neutral-500 mt-0.5">{subtitle}</p>
       </div>
+    </div>
+  );
+}
+
+/**
+ * CTA card — génère avec l'IA 6 témoignages + portraits niche-adaptatifs.
+ * Utilise Claude pour les textes et Nano Banana pour les photos.
+ */
+function TestimonialsAiCard({ siteId, design, onReload }) {
+  const [busy, setBusy] = React.useState(false);
+  const [toast, setToast] = React.useState("");
+  const existing = (design?.testimonials?.items || []).length;
+  const aiAt = design?.testimonials?.ai_generated_at;
+
+  const run = async (force) => {
+    if (existing >= 3 && !force) {
+      if (!window.confirm(
+        `${existing} témoignages existent déjà. Les régénérer va les remplacer par 6 nouveaux générés par l'IA (textes + photos adaptés à votre niche). Continuer ?`
+      )) return;
+    }
+    setBusy(true);
+    setToast("");
+    const { data, error, rawDetail } = await apiCall(() =>
+      api.post(`/sites/${siteId}/testimonials/ai-generate`, {
+        count: 6,
+        force: force || existing >= 3,
+        skip_images: false,
+      })
+    );
+    setBusy(false);
+    if (error) {
+      setToast(rawDetail?.detail || error);
+      return;
+    }
+    setToast(`✅ ${data?.count || 0} témoignages générés · ${data?.with_images || 0} portraits IA`);
+    await onReload();
+    setTimeout(() => setToast(""), 5000);
+  };
+
+  return (
+    <div
+      data-testid="testimonials-ai-card"
+      className="mb-5 p-5 md:p-6 bg-white"
+      style={{ border: "1px solid #E5E5E5", borderRadius: "4px" }}
+    >
+      <div className="flex items-start justify-between gap-6 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 mb-1.5 font-medium">
+            Nano Banana + Claude
+          </div>
+          <div
+            className="text-[17px] text-neutral-900 leading-tight"
+            style={{ fontFamily: "'Fraunces', Georgia, serif" }}
+          >
+            Générer des témoignages niche-adaptés avec l'IA
+          </div>
+          <p className="text-[12.5px] text-neutral-600 mt-1.5 leading-[1.5] max-w-xl">
+            6 témoignages authentiques (seniors + aidants) avec portraits
+            photographiques générés selon votre niche et vos produits. Le
+            texte et les images s'ajustent à chaque marque.
+          </p>
+          {aiAt && (
+            <div className="text-[11px] text-neutral-400 mt-2">
+              Dernier run IA : {new Date(aiAt).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+            </div>
+          )}
+        </div>
+        <button
+          onClick={() => run(false)}
+          disabled={busy}
+          data-testid="testimonials-ai-run"
+          className="shrink-0 h-10 px-4 bg-neutral-900 hover:bg-black disabled:opacity-60 text-white text-[12.5px] font-semibold flex items-center gap-2"
+          style={{ borderRadius: "2px" }}
+        >
+          {busy ? "Génération IA (2-3 min)…" : existing >= 3 ? "Régénérer les avis (IA)" : "✨ Générer 6 avis + photos (IA)"}
+        </button>
+      </div>
+      {toast && (
+        <div
+          data-testid="testimonials-ai-toast"
+          className="mt-3 text-[12px] text-emerald-700 font-medium"
+        >
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

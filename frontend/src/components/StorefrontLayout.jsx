@@ -77,6 +77,18 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
   const contactAddress = contact.address || "";
   const social = design?.social || {};
 
+  // Footer background image — use site's own hero image (or first product) for
+  // a consistent, niche-adaptive premium look.
+  const heroImgRaw = design?.hero?.image || design?.hero?.background_image || null;
+  const heroImg = heroImgRaw
+    ? (heroImgRaw.startsWith("http") ? heroImgRaw : `${BACKEND_URL}${heroImgRaw}`)
+    : null;
+  const footerBgImage =
+    design?.footer?.background_url
+    || heroImg
+    || design?.lifestyle_image
+    || null;
+
   const cssVars = {
     "--cf-primary": primary,
     "--cf-accent": accent,
@@ -556,63 +568,83 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
 
       <CartDrawer design={design} />
 
-      {/* ================= FOOTER — Premium Chutex-style ================= */}
+      {/* Reassurance band — gray cards, above footer */}
+      <section
+        className="mt-24 bg-white"
+        style={{ borderTop: "1px solid #E5E5E5", borderBottom: "1px solid #E5E5E5" }}
+        data-testid="reassurance-band"
+      >
+        <div className="max-w-7xl mx-auto px-6 py-10 grid grid-cols-2 md:grid-cols-4 gap-6">
+          {[
+            { Icon: Truck, title: "Livraison offerte", sub: "Partout en Europe" },
+            { Icon: ShieldCheck, title: "Paiement sécurisé", sub: "CB, PayPal, Virement" },
+            { Icon: Phone, title: "Conseiller humain", sub: "Lun–Ven · 9h–18h" },
+            { Icon: CreditCard, title: "Retour 14 jours", sub: "Satisfait ou remboursé" },
+          ].map((b, i) => (
+            <div
+              key={i}
+              className="flex items-start gap-3 p-5"
+              style={{ background: "#F5F5F5", borderRadius: "2px" }}
+              data-testid={`footer-reassurance-${i}`}
+            >
+              <b.Icon size={22} weight="thin" style={{ color: "#0A0A0A" }} />
+              <div>
+                <div className="text-[13px] font-semibold" style={{ color: "#0A0A0A" }}>{b.title}</div>
+                <div className="text-[12px] mt-0.5" style={{ color: "#737373" }}>{b.sub}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ================= FOOTER — Premium with site's own image ================= */}
       <footer
-        className="mt-24 pb-[env(safe-area-inset-bottom)] relative overflow-hidden"
+        className="pb-[env(safe-area-inset-bottom)] relative overflow-hidden"
         data-testid="storefront-footer"
       >
-        {/* Background image + dark overlay */}
+        {/* Background image — use site's hero image or first product image */}
         <div className="absolute inset-0">
-          <img
-            alt=""
-            aria-hidden="true"
-            className="w-full h-full object-cover"
-            src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=2000&q=80&auto=format&fit=crop"
-          />
-          <div className="absolute inset-0" style={{ background: "rgba(10, 26, 31, 0.72)" }} />
-        </div>
-
-        {/* SVG wave separator at top */}
-        <div className="relative z-10">
-          <svg viewBox="0 0 1514 80" className="w-full block" preserveAspectRatio="none" style={{ marginBottom: "-1px" }}>
-            <path d="M0 80V0h1514v80C1514 80 1214 30 757 30S0 80 0 80Z" fill="white" />
-          </svg>
-        </div>
-
-        {/* Reassurance band — glass cards */}
-        <div className="relative z-10 pt-12 md:pt-16">
-          <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { Icon: Truck, title: "Livraison offerte", sub: "Partout en Europe" },
-              { Icon: ShieldCheck, title: "Paiement sécurisé", sub: "CB, PayPal, Virement" },
-              { Icon: Phone, title: "Conseiller humain", sub: "Lun–Ven · 9h–18h" },
-              { Icon: CreditCard, title: "Retour 14 jours", sub: "Satisfait ou remboursé" },
-            ].map((b, i) => (
-              <div
-                key={i}
-                className="flex items-start gap-3 p-5 glass-card"
-                style={{ borderRadius: "12px" }}
-                data-testid={`footer-reassurance-${i}`}
-              >
-                <b.Icon size={22} weight="thin" className="text-white shrink-0" />
-                <div>
-                  <div className="text-[13px] font-semibold text-white">{b.title}</div>
-                  <div className="text-[12px] mt-0.5 text-white/60">{b.sub}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+          {footerBgImage ? (
+            <img
+              alt=""
+              aria-hidden="true"
+              className="w-full h-full object-cover"
+              src={footerBgImage}
+            />
+          ) : (
+            <div className="w-full h-full" style={{ background: "linear-gradient(135deg, #1a1a1a, #2a2a2a)" }} />
+          )}
+          <div className="absolute inset-0" style={{ background: "rgba(10, 10, 10, 0.78)" }} />
         </div>
 
         {/* Main footer columns — newsletter + 4 link groups */}
-        <div className="relative z-10 max-w-7xl mx-auto px-6 pt-20 md:pt-24 pb-10 md:pb-14">
+        <div className="relative z-10 max-w-7xl mx-auto px-6 pt-16 md:pt-20 pb-10 md:pb-14">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-16 lg:gap-20">
-            {/* Newsletter */}
+            {/* Newsletter + Logo */}
             <div>
+              {/* Brand logo */}
+              <div className="mb-8" data-testid="footer-brand-logo">
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt={logoText}
+                    className="h-10 w-auto brightness-0 invert"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div
+                    className="text-[26px] font-semibold text-white"
+                    style={{ fontFamily: `"${fontHeading}", serif` }}
+                  >
+                    {logoText}
+                  </div>
+                )}
+              </div>
+
               <h2
                 data-testid="footer-newsletter-title"
                 className="font-light text-white leading-[1.1] tracking-[-0.03em] mb-6"
-                style={{ fontSize: "clamp(2.2rem, 5vw, 3.8rem)", fontFamily: `"${fontHeading}", serif` }}
+                style={{ fontSize: "clamp(2rem, 4.2vw, 3.2rem)", fontFamily: `"${fontHeading}", serif` }}
               >
                 Rejoignez<br />notre journal.
               </h2>
@@ -648,8 +680,23 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
                 </Link>
               </p>
 
+              {/* Contact infos */}
+              <div className="mt-10 space-y-2 text-[13.5px]">
+                <a href={`mailto:${contactEmail}`} className="flex items-center gap-2 text-white/70 hover:text-white transition">
+                  <EnvelopeSimple size={14} /> {contactEmail}
+                </a>
+                <a href={`tel:${contactPhone.replace(/\s/g, "")}`} className="flex items-center gap-2 text-white/70 hover:text-white transition">
+                  <Phone size={14} /> {contactPhone} · {contactHours}
+                </a>
+                {contactAddress && (
+                  <div className="flex items-start gap-2 text-white/55">
+                    <MapPin size={14} className="mt-0.5 shrink-0" /> <span>{contactAddress}</span>
+                  </div>
+                )}
+              </div>
+
               {/* Social icons */}
-              <div className="flex items-center gap-4 mt-10" data-testid="footer-social">
+              <div className="flex items-center gap-4 mt-6" data-testid="footer-social">
                 {social.instagram && (
                   <a href={social.instagram} target="_blank" rel="noreferrer" className="text-white/40 hover:text-white transition-colors" aria-label="Instagram">
                     <InstagramLogo size={20} weight="regular" />
@@ -730,27 +777,12 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
           <div className="h-px bg-white/10" />
         </div>
 
-        {/* Bottom bar — contact + copyright + payments */}
+        {/* Bottom bar — copyright + payments */}
         <div className="relative z-10 max-w-7xl mx-auto px-6 py-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
-            <div>
-              <div
-                className="text-2xl font-semibold text-white mb-3"
-                style={{ fontFamily: `"${fontHeading}", serif` }}
-                data-testid="footer-logo"
-              >
-                {logoText}
-              </div>
-              <p className="text-[14px] text-white/50 mb-3">
-                Nous contacter :{" "}
-                <a href={`mailto:${contactEmail}`} data-testid="footer-contact-email" className="text-white font-medium hover:text-white/80 transition-colors">
-                  {contactEmail}
-                </a>
-              </p>
-              <p data-testid="footer-copyright" className="text-[12px] text-white/30">
-                © {new Date().getFullYear()} {logoText} — Tous droits réservés.
-              </p>
-            </div>
+            <p data-testid="footer-copyright" className="text-[12px] text-white/40">
+              © {new Date().getFullYear()} {logoText} — Tous droits réservés.
+            </p>
             <div>
               <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-white/30 mb-3">Paiement sécurisé</p>
               <div className="flex items-center gap-2.5 flex-wrap" data-testid="footer-payments">

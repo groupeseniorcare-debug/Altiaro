@@ -2,6 +2,15 @@ import React from "react";
 import { Star } from "@phosphor-icons/react";
 import { designAccents } from "./storefrontUtils";
 
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
+
+function resolveImage(raw) {
+  if (!raw) return null;
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+  if (raw.startsWith("/api/")) return `${BACKEND_URL}${raw}`;
+  return raw;
+}
+
 /**
  * Premium reviews marquee — inspired by Chutex Care.
  * Tall cards (320×480) with full-bleed portrait, dark gradient overlay,
@@ -62,7 +71,7 @@ const DEFAULT = [
 
 function ReviewCard({ item, lang }) {
   const text = typeof item.text === "string" ? item.text : item.quote?.[lang] || item.quote?.fr || "";
-  const img = item.image || item.avatar || item.photo;
+  const img = resolveImage(item.image || item.avatar || item.photo);
   return (
     <div
       className="flex-shrink-0 w-[280px] md:w-[320px] h-[420px] md:h-[480px] rounded-2xl overflow-hidden relative group"

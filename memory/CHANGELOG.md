@@ -3,6 +3,58 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-24 (night) · Testimonials IA niche-adaptés + footer premium avec image site
+
+### Reassurance cards restaurées (style gris pré-Chutex)
+Retour user : les 4 cartes (livraison, paiement, conseiller, retour) doivent
+rester en gris clair AU-DESSUS du footer, pas à l'intérieur. Section dédiée
+`data-testid="reassurance-band"` avec fond blanc + border hairline + cards
+`#F5F5F5` + icons thin.
+
+### Footer : image de fond = image du site lui-même
+- `footerBgImage` calculé à partir de `design.footer.background_url`,
+  `design.hero.image`, `design.hero.background_image`, ou
+  `design.lifestyle_image` — dans cet ordre de priorité. Fallback : noir pur
+  `#0A0A0A` si aucune image.
+- Plus d'image Unsplash générique Chutex : chaque site aura son propre
+  visuel cohérent avec son univers de marque.
+- Overlay sombre `rgba(10,10,10,0.78)` pour garantir la lisibilité.
+
+### Logo dans le footer
+- `data-testid="footer-brand-logo"` ajouté en haut à gauche.
+- Affiche le `brand.logo_url` en `brightness-0 invert` (blanc) ou fallback
+  sur le `logoText` Fraunces en blanc.
+- SVG wave supprimée (n'était pas demandée, visuel plus net).
+
+### Testimonials IA niche-adaptés (NOUVEAU)
+Retour user : les photos et textes des avis doivent s'adapter à la niche
+de chaque site (senior sur fauteuil releveur pour fauteuils, etc.).
+
+**Backend `routes/testimonials_ai.py`** :
+- `POST /api/sites/{id}/testimonials/ai-generate` → pipeline Claude (textes)
+  + Nano Banana (portraits 3:4), persona mix 4 seniors + 1 aidant + 1 couple,
+  chaque citation mentionne un détail concret du produit/service.
+- Prompts image ULTRA-SPÉCIFIQUES générés par Claude eux-mêmes :
+  _"Candid portrait of a 72yo French woman sitting in her gray electric
+  stand-up armchair in her bright living room, soft morning light…"_
+- Concurrent Nano calls limités à 2 (Semaphore) pour respecter les quotas.
+- `skip_images=true` mode rapide (15 s au lieu de 3 min) pour itérer.
+- Persistance : `design.testimonials.items[]` avec URLs `/api/uploads/testimonials_ai/`.
+- `GET /api/sites/{id}/testimonials` pour lecture.
+
+**Frontend** :
+- Carte CTA "Nano Banana + Claude" ajoutée en Étape 5 section Témoignages
+  (`TestimonialsAiCard`) — bouton "✨ Générer 6 avis + photos (IA)".
+- `Testimonials.jsx` résout maintenant les chemins `/api/uploads/...` via
+  `resolveImage()` helper.
+
+### Validation
+- Test e2e : 3 testimonials générés en ~12 s pour le site Soléa (niche
+  "fauteuils releveurs") avec des citations ultra-spécifiques (télécommande,
+  tissu gris, problèmes de genoux).
+- Screenshots : reassurance-band gray ✓, footer avec logo invert + 4 cols +
+  payment pills glass ✓.
+
 ## 2026-04-24 (night) · Storefront premium — Reviews marquee, Footer glass, utilities
 
 Inspiration : https://chutex-premium-1.preview.emergentagent.com/
