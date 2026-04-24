@@ -1,33 +1,96 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
+import { useLocation, useParams } from "react-router-dom";
 
 /**
- * Injects GA4 + Google Ads conversion tracking into the storefront.
+ * Injects GA4 + Google Ads conversion tracking into the storefront — AND
+ * persists events internally to /api/public/sites/{id}/track (Chantier 7).
+ *
  * Reads from `site.design.tracking = { ga4_measurement_id, gads_conversion_id, gads_conversion_label }`.
  *
- * Fired events : page_view (auto), view_item, add_to_cart, begin_checkout, purchase.
+ * Fired events : page_view (auto), product_view, add_to_cart, begin_checkout, purchase.
  * Call the helpers exposed on window.altiaroTrack from product / cart / checkout pages.
  *
- * Even when NO GA4/Ads IDs are configured, the helpers still push events to
- * `window.dataLayer` so Google Tag Manager users can pick them up.
+ * Even when NO GA4/Ads IDs are configured, the helpers still:
+ *  1. Push events to `window.dataLayer` (GTM users)
+ *  2. Send events to Altiaro's internal analytics endpoint (for the Dashboard)
  */
+
+const SESSION_KEY = "altiaro.sess";
+const SESSION_TTL_MIN = 30;
+
+function getOrCreateSession() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(SESSION_KEY);
+    const now = Date.now();
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.id && parsed?.updated_at && now - parsed.updated_at < SESSION_TTL_MIN * 60 * 1000) {
+        parsed.updated_at = now;
+        window.localStorage.setItem(SESSION_KEY, JSON.stringify(parsed));
+        return parsed.id;
+      }
+    }
+    const fresh = {
+      id: `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+      updated_at: now,
+    };
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
+    return fresh.id;
+  } catch (_) {
+    // LS unavailable (privacy mode) → ephemeral session
+    return `eph-${Math.random().toString(36).slice(2, 12)}`;
+  }
+}
+
+function postEvent(siteId, payload) {
+  if (!siteId || !payload?.event) return;
+  const base = process.env.REACT_APP_BACKEND_URL || "";
+  const url = `${base}/api/public/sites/${siteId}/track`;
+  const body = JSON.stringify({
+    session_id: getOrCreateSession(),
+    lang: (document?.documentElement?.lang || "fr").slice(0, 2),
+    path: window.location?.pathname || "",
+    referrer: document?.referrer || "",
+    ...payload,
+  });
+  try {
+    // Prefer sendBeacon for "unload" reliability; fallback to fetch keepalive
+    if (navigator?.sendBeacon) {
+      const blob = new Blob([body], { type: "application/json" });
+      if (navigator.sendBeacon(url, blob)) return;
+    }
+    fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      keepalive: true,
+      mode: "cors",
+      credentials: "omit",
+    }).catch(() => {});
+  } catch (_) { /* no-op — tracking is best-effort */ }
+}
+
 export default function StorefrontTracking({ site }) {
   const tracking = site?.design?.tracking || {};
   const ga4Id = tracking.ga4_measurement_id || "";
   const gadsId = tracking.gads_conversion_id || "";
   const gadsLabel = tracking.gads_conversion_label || "";
+  const siteId = site?.id;
+  const location = useLocation();
+  const params = useParams();
+  const lastPathRef = useRef(null);
 
+  // ---- 1. gtag bootstrap (inchangé) ---- //
   useEffect(() => {
     if (window.__altiaroTrackingLoaded) return;
     window.__altiaroTrackingLoaded = true;
 
-    // Always initialize the dataLayer + gtag stub so events can queue even
-    // before gtag.js is loaded.
     window.dataLayer = window.dataLayer || [];
     function gtag() { window.dataLayer.push(arguments); }
     window.gtag = gtag;
     gtag("js", new Date());
 
-    // Load gtag.js only if at least one ID is configured (saves ~40 KB otherwise).
     const firstTagId = ga4Id || gadsId;
     if (firstTagId) {
       const s = document.createElement("script");
@@ -38,9 +101,10 @@ export default function StorefrontTracking({ site }) {
       if (gadsId) gtag("config", gadsId);
     }
 
-    // Public helper exposed to the rest of the storefront. Always defined so
-    // product/cart/checkout calls don't need to null-check; events always push
-    // to dataLayer (GTM compatible) even without GA4/Ads IDs.
+    // ---- 2. Public helper API ---- //
+    // Each helper does TWO things : (a) push to gtag/dataLayer, (b) POST to
+    // /api/public/sites/{id}/track so the Altiaro dashboard can rebuild the
+    // funnel without depending on GA4 API quotas.
     window.altiaroTrack = {
       viewItem: (product, lang = "fr") => {
         try {
@@ -54,7 +118,14 @@ export default function StorefrontTracking({ site }) {
               quantity: 1,
             }],
           });
-        } catch (e) { /* no-op */ }
+        } catch (_) {}
+        postEvent(siteId, {
+          event: "product_view",
+          product_id: product.id,
+          value: Number(product.price || 0) || null,
+          currency: product.currency || "EUR",
+          lang,
+        });
       },
       addToCart: (product, quantity = 1, lang = "fr") => {
         try {
@@ -68,13 +139,16 @@ export default function StorefrontTracking({ site }) {
               quantity,
             }],
           });
-        } catch (e) { /* no-op */ }
+        } catch (_) {}
+        postEvent(siteId, {
+          event: "add_to_cart",
+          product_id: product.id,
+          value: Number(product.price || 0) * quantity || null,
+          currency: product.currency || "EUR",
+          lang,
+          meta: { quantity },
+        });
       },
-      /**
-       * Impulse-cart upsell click ("Ajouter avec -X%" inside the cart drawer).
-       * Fires BOTH `add_to_cart` (with discounted value) and a custom
-       * `upsell_impulse` event so marketers can segment high-intent carts.
-       */
       upsellImpulse: (product, discountPct = 20, lang = "fr") => {
         try {
           const basePrice = Number(product.price || 0);
@@ -99,9 +173,25 @@ export default function StorefrontTracking({ site }) {
             item_id: product.id,
             item_name: itemName,
           });
-        } catch (e) { /* no-op */ }
+        } catch (_) {}
+        const base = Number(product.price || 0);
+        const discounted = Math.round(base * (1 - discountPct / 100) * 100) / 100;
+        postEvent(siteId, {
+          event: "add_to_cart",
+          product_id: product.id,
+          value: discounted,
+          currency: product.currency || "EUR",
+          lang,
+          meta: { upsell_impulse: true, discount_pct: discountPct },
+        });
       },
-      beginCheckout: (items, total, currency = "EUR") => {
+      beginCheckout: (items, total, currencyOrLang = "EUR") => {
+        // Backward compat: original signature was (items, total, lang) in some
+        // callsites — detect a 2-letter code as lang, otherwise currency.
+        const currency =
+          typeof currencyOrLang === "string" && currencyOrLang.length === 3
+            ? currencyOrLang
+            : "EUR";
         try {
           gtag("event", "begin_checkout", {
             currency, value: Number(total || 0),
@@ -112,7 +202,13 @@ export default function StorefrontTracking({ site }) {
               quantity: it.quantity || 1,
             })),
           });
-        } catch (e) { /* no-op */ }
+        } catch (_) {}
+        postEvent(siteId, {
+          event: "begin_checkout",
+          value: Number(total || 0) || null,
+          currency,
+          meta: { items_count: (items || []).length },
+        });
       },
       purchase: (order) => {
         try {
@@ -129,7 +225,6 @@ export default function StorefrontTracking({ site }) {
               quantity: it.quantity || 1,
             })),
           });
-          // Google Ads conversion (only if Ads conversion fully configured)
           if (gadsId && gadsLabel) {
             gtag("event", "conversion", {
               send_to: `${gadsId}/${gadsLabel}`,
@@ -138,10 +233,33 @@ export default function StorefrontTracking({ site }) {
               transaction_id: order.order_number || order.id,
             });
           }
-        } catch (e) { /* no-op */ }
+        } catch (_) {}
+        postEvent(siteId, {
+          event: "purchase",
+          value: Number(order.total || 0) || null,
+          currency: order.currency || "EUR",
+          meta: {
+            order_id: order.id,
+            order_number: order.order_number,
+            items_count: (order.items || []).length,
+          },
+        });
       },
     };
-  }, [ga4Id, gadsId, gadsLabel]);
+  }, [ga4Id, gadsId, gadsLabel, siteId]);
+
+  // ---- 3. Auto page_view sur chaque navigation (react-router) ---- //
+  useEffect(() => {
+    if (!siteId) return;
+    const path = location.pathname + location.search;
+    if (lastPathRef.current === path) return;
+    lastPathRef.current = path;
+    postEvent(siteId, {
+      event: "page_view",
+      path: location.pathname,
+      country: (params?.country || "").toUpperCase() || null,
+    });
+  }, [location.pathname, location.search, siteId, params]);
 
   return null;
 }

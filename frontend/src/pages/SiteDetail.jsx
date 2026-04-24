@@ -19,11 +19,9 @@ import SiteQAPanel from "../components/SiteQAPanel";
  * Règles (cf. brief) :
  *   - 1 header compact + CockpitJourney central. Point.
  *   - Widgets SEO/AEO/GMC/QA MASQUÉS tant que l'étape courante < 8.
- *   - `current_step` dérivé de GET /sites/:id/steps/status (source unique).
- *   - Site totalement validé → PostValidationBanner en haut, CockpitJourney toujours visible dessous.
+ *   - `current_step` dérivé de GET /sites/:id/journey (single source of truth).
+ *   - Site totalement validé → PostValidationBanner + sidebar complète.
  */
-const STEP_ORDER = ["pricing", "import", "upsells", "forecast", "branding", "pages", "content", "seo", "qa"];
-
 export default function SiteDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -38,13 +36,24 @@ export default function SiteDetail() {
   const [domainMsg, setDomainMsg] = useState(null);
 
   const load = useCallback(async () => {
-    const [siteRes, statusRes, domRes] = await Promise.all([
+    const [siteRes, journeyRes, domRes] = await Promise.all([
       apiCall(() => api.get(`/sites/${id}`)),
-      apiCall(() => api.get(`/sites/${id}/steps/status`)),
+      apiCall(() => api.get(`/sites/${id}/journey`)),
       apiCall(() => api.get(`/sites/${id}/domain`)),
     ]);
     if (siteRes.data) setSite(siteRes.data);
-    if (statusRes.data) setStatus(statusRes.data);
+    if (journeyRes.data) {
+      // Adapte la shape /journey vers celle attendue par le header compact
+      const j = journeyRes.data;
+      setStatus({
+        steps: j.steps,
+        completed_count: j.progress?.complete ?? 0,
+        total_count: j.progress?.total ?? 9,
+        progress_pct: j.progress?.pct ?? 0,
+        all_completed: j.all_completed,
+        current_step: j.current_step,
+      });
+    }
     if (domRes.data) {
       setDomainStatus(domRes.data);
       setDomainInput(domRes.data.custom_domain || "");
@@ -56,13 +65,13 @@ export default function SiteDetail() {
 
   // ───── Gating visuel par progression ───── //
   const steps = status?.steps || [];
-  const firstIncompleteKey = steps.find((s) => !s.completed)?.key || null;
-  const currentStepIdx = firstIncompleteKey
-    ? STEP_ORDER.indexOf(firstIncompleteKey) + 1
-    : STEP_ORDER.length + 1;
+  // /journey expose status.current_step (slug) + all_completed. On dérive
+  // currentStepIdx depuis l'ordre des steps renvoyés.
+  const currentIdx = steps.findIndex((s) => s.status === "current");
+  const currentStepIdx = currentIdx === -1 ? steps.length + 1 : currentIdx + 1;
   const canShowSeoSidebar = currentStepIdx >= 8;
   const canShowQa = currentStepIdx >= 9;
-  const allCompleted = steps.length > 0 && steps.every((s) => s.completed);
+  const allCompleted = status?.all_completed === true;
 
   // ───── Domain modal handlers ───── //
   const refreshDomain = async () => {

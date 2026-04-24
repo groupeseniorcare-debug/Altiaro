@@ -89,6 +89,7 @@ from routes import testimonials_ai as testimonials_ai_routes
 from routes import merchant as merchant_routes
 from routes import resend_domain as resend_domain_routes
 from routes import journey_gating as journey_gating_routes
+from routes import analytics as analytics_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -164,6 +165,7 @@ api.include_router(testimonials_ai_routes.router)
 api.include_router(merchant_routes.router)
 api.include_router(resend_domain_routes.router)
 api.include_router(journey_gating_routes.router)
+api.include_router(analytics_routes.router)
 
 
 @app.on_event("startup")
@@ -300,6 +302,11 @@ async def startup():
     await db.billing_profiles.create_index("user_id", unique=True)
     await db.ledger.create_index([("concepteur_id", 1), ("created_at", -1)])
     await db.ledger.create_index([("type", 1), ("status", 1)])
+
+    # Chantier 7 — Storefront events (analytics interne)
+    await db.storefront_events.create_index([("site_id", 1), ("created_at", -1)])
+    await db.storefront_events.create_index([("site_id", 1), ("event", 1), ("created_at", -1)])
+    await db.storefront_events.create_index([("site_id", 1), ("session_id", 1)])
 
     # Seed niche catalog (idempotent)
     try:

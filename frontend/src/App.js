@@ -21,6 +21,7 @@ import SiteUpsells from "./pages/SiteUpsells";
 import SiteBranding from "./pages/SiteBranding";
 import SitePages from "./pages/SitePages";
 import SiteFulfillment from "./pages/SiteFulfillment";
+import SiteAnalytics from "./pages/SiteAnalytics";
 import Sourcing from "./pages/Sourcing";
 import AdminIntegrations from "./pages/AdminIntegrations";
 import AdminReview from "./pages/AdminReview";
@@ -270,6 +271,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <SiteFulfillment />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites/:id/analytics"
+            element={
+              <ProtectedRoute>
+                <SiteAnalytics />
               </ProtectedRoute>
             }
           />

@@ -227,7 +227,10 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
-      Chantier 5 livré. Tests curl manuels OK (sitemap 6 hreflang, robots multi-lang,
-      llms.txt?lang=de allemand valide, PATCH seo-settings + reset OK).
-      Tests Claude translate non-exécutés (pas d'article en DB, coût LLM).
-      En attente validation user avant Chantier 6.
+      Chantier 7 (Phase 2) livré. Dashboard analytics interne fonctionnel.
+      - Backend analytics.py : POST /public/track + GET overview/funnel/live
+      - StorefrontTracking.jsx : fire-and-forget parallèle à gtag
+      - SiteAnalytics.jsx : page premium avec recharts
+      - force_site_validated.py : helper dev pour tester l'UI
+      - seed_analytics.py : 50 events factices réalistes
+      Validation UI : KPIs + funnel + chart + top pays rendus avec data seedée.

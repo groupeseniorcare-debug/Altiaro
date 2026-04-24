@@ -427,6 +427,81 @@ async def get_steps_status(
     }
 
 
+# Mapping: la clé interne "content" est exposée côté frontend sous le slug "blog"
+# (le modèle métier = articles de blog SEO, c'est plus naturel pour l'utilisateur).
+# On garde "content" en interne pour ne pas casser la DB / les checkers existants.
+SLUG_MAP = {"content": "blog"}
+
+
+@router.get("/sites/{site_id}/journey")
+async def get_journey(
+    site_id: str,
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Schéma "journey" de plus haut niveau pour les UIs modernes.
+
+    Contrat stable (utilisé par SiteDetail, SiteAnalytics, PostValidationBanner,
+    route guards). S'appuie sur compute_step_statuses — single source of truth.
+
+    Réponse :
+      {
+        "site_id": str,
+        "current_step": slug | null,
+        "progress": {"complete": int, "total": int, "pct": int},
+        "all_completed": bool,
+        "steps": [
+          {
+            "slug": "pricing" | "import" | ... | "blog" | "seo" | "qa",
+            "key":  "pricing" | ... | "content" | ...,   # legacy clé DB
+            "label": str,
+            "status": "complete" | "current" | "locked",
+            "completed": bool,                           # backward-compat
+            "reason": str,
+            "order": int,
+            "counters": dict,
+          }, ...
+        ]
+      }
+    """
+    await _check_site_access(site_id, user)
+    statuses = await compute_step_statuses(site_id)
+    total = len(statuses)
+    complete_count = sum(1 for s in statuses if s["completed"])
+    current_idx = next((i for i, s in enumerate(statuses) if not s["completed"]), total)
+
+    steps: list[dict] = []
+    for i, s in enumerate(statuses):
+        if s["completed"]:
+            status_token = "complete"
+        elif i == current_idx:
+            status_token = "current"
+        else:
+            status_token = "locked"
+        steps.append({
+            "slug": SLUG_MAP.get(s["key"], s["key"]),
+            "key": s["key"],
+            "label": s["label"],
+            "status": status_token,
+            "completed": s["completed"],
+            "reason": s.get("reason"),
+            "order": s.get("order"),
+            "counters": s.get("counters"),
+        })
+
+    current_slug = steps[current_idx]["slug"] if current_idx < total else None
+    return {
+        "site_id": site_id,
+        "current_step": current_slug,
+        "progress": {
+            "complete": complete_count,
+            "total": total,
+            "pct": round((complete_count / total) * 100) if total else 0,
+        },
+        "all_completed": complete_count == total and total > 0,
+        "steps": steps,
+    }
+
+
 @router.get("/sites/{site_id}/steps/can-access/{step_key}")
 async def can_access_step(
     site_id: str,
