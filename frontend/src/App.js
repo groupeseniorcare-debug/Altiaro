@@ -38,6 +38,7 @@ import StorefrontOrderDetail from "./pages/StorefrontOrderDetail";
 import StorefrontTrack from "./pages/StorefrontTrack";
 import StorefrontSearch from "./pages/StorefrontSearch";
 import GoogleAds from "./pages/GoogleAds";
+import AdminSiteGoogleAds from "./pages/AdminSiteGoogleAds";
 import Opportunities from "./pages/Opportunities";
 import QuickScan from "./pages/QuickScan";
 import LaunchSite from "./pages/LaunchSite";
@@ -393,6 +394,14 @@ function App() {
             element={
               <ProtectedRoute adminOnly>
                 <GoogleAds />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/sites/:id/google-ads"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminSiteGoogleAds />
               </ProtectedRoute>
             }
           />

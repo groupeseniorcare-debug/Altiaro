@@ -1,0 +1,101 @@
+Campaign,Ad group,Keyword,Match type,Max CPC
+Search — Transactionnel,Fauteuil Releveur Achat,acheter fauteuil releveur,Phrase,1.65
+Search — Transactionnel,Fauteuil Releveur Achat,fauteuil releveur prix,Phrase,1.45
+Search — Transactionnel,Fauteuil Releveur Achat,fauteuil releveur pas cher,Phrase,1.55
+Search — Transactionnel,Fauteuil Releveur Achat,fauteuil releveur livraison,Phrase,1.25
+Search — Transactionnel,Fauteuil Releveur Achat,commander fauteuil releveur,Phrase,1.50
+Search — Transactionnel,Fauteuil Releveur Achat,fauteuil releveur en ligne,Phrase,1.40
+Search — Transactionnel,Fauteuil Releveur Achat,meilleur prix fauteuil releveur,Phrase,1.70
+Search — Transactionnel,Fauteuil Releveur Achat,fauteuil releveur électrique prix,Phrase,1.60
+Search — Transactionnel,Fauteuil Releveur Achat,fauteuil releveur personne âgée,Exact,1.75
+Search — Transactionnel,Fauteuil Releveur Achat,fauteuil releveur massage,Broad,1.35
+Search — Transactionnel,Fauteuil Releveur Achat,fauteuil releveur confort,Broad,1.20
+Search — Transactionnel,Fauteuil Releveur Achat,fauteuil releveur 2 moteurs,Phrase,1.55
+Search — Transactionnel,Fauteuil Releveur Achat,fauteuil releveur cuir,Broad,1.30
+Search — Transactionnel,Fauteuil Releveur Achat,fauteuil releveur tissu,Broad,1.25
+Search — Transactionnel,Fauteuil Releveur Achat,fauteuil releveur qualité,Phrase,1.40
+Search — Transactionnel,Fauteuil Releveur Achat,promotion fauteuil releveur,Phrase,1.80
+Search — Transactionnel,Fauteuil Releveur Achat,fauteuil releveur livraison gratuite,Phrase,1.50
+Search — Transactionnel,Fauteuil Releveur Achat,fauteuil releveur senior,Exact,1.65
+Search — Transactionnel,Fauteuil Releveur Achat,fauteuil releveur relaxation,Broad,1.15
+Search — Transactionnel,Fauteuil Releveur Achat,vente fauteuil releveur,Phrase,1.45
+Search — Informationnel,Guide Fauteuil Releveur,comment choisir fauteuil releveur,Phrase,1.45
+Search — Informationnel,Guide Fauteuil Releveur,guide achat fauteuil releveur,Phrase,1.52
+Search — Informationnel,Guide Fauteuil Releveur,comparatif fauteuil releveur,Phrase,1.68
+Search — Informationnel,Guide Fauteuil Releveur,meilleur fauteuil releveur,Phrase,1.75
+Search — Informationnel,Guide Fauteuil Releveur,avis fauteuil releveur,Phrase,1.38
+Search — Informationnel,Guide Fauteuil Releveur,avantages fauteuil releveur,Phrase,1.25
+Search — Informationnel,Guide Fauteuil Releveur,fauteuil releveur conseils,Phrase,1.42
+Search — Informationnel,Guide Fauteuil Releveur,quel fauteuil releveur choisir,Exact,1.58
+Search — Informationnel,Guide Fauteuil Releveur,fauteuil releveur critères choix,Phrase,1.35
+Search — Informationnel,Guide Fauteuil Releveur,guide fauteuil personne âgée,Phrase,1.28
+Search — Informationnel,Guide Fauteuil Releveur,fauteuil releveur fonctionnalités,Broad,0.95
+Search — Informationnel,Guide Fauteuil Releveur,bien choisir fauteuil releveur,Phrase,1.48
+Search — Informationnel,Guide Fauteuil Releveur,fauteuil releveur caractéristiques,Broad,0.88
+Search — Informationnel,Guide Fauteuil Releveur,conseil achat fauteuil releveur,Phrase,1.32
+Search — Informationnel,Guide Fauteuil Releveur,fauteuil releveur pour senior,Phrase,1.18
+Search — Informationnel,Guide Fauteuil Releveur,fauteuil releveur électrique guide,Phrase,1.55
+Search — Informationnel,Guide Fauteuil Releveur,comparateur fauteuil releveur,Exact,1.62
+Search — Informationnel,Guide Fauteuil Releveur,fauteuil releveur test,Broad,0.78
+Search — Informationnel,Guide Fauteuil Releveur,choisir fauteuil releveur qualité,Phrase,1.25
+Search — Informationnel,Guide Fauteuil Releveur,fauteuil releveur recommandations,Broad,0.82
+Search — Local,Fauteuil Releveur Local,fauteuil releveur près de chez moi,Phrase,1.65
+Search — Local,Fauteuil Releveur Local,fauteuil releveur [VILLE],Broad,1.45
+Search — Local,Fauteuil Releveur Local,magasin fauteuil releveur,Phrase,1.55
+Search — Local,Fauteuil Releveur Local,fauteuil releveur livraison locale,Phrase,1.40
+Search — Local,Fauteuil Releveur Local,fauteuil releveur magasin près,Broad,1.50
+Search — Local,Fauteuil Releveur Local,showroom fauteuil releveur,Phrase,1.35
+Search — Local,Fauteuil Releveur Local,fauteuil releveur boutique,Phrase,1.30
+Search — Local,Fauteuil Releveur Local,fauteuil releveur livraison rapide,Phrase,1.25
+Search — Local,Fauteuil Releveur Local,fauteuil releveur local,Exact,1.70
+Search — Local,Fauteuil Releveur Local,acheter fauteuil releveur près,Broad,1.20
+Search — Local,Fauteuil Releveur Local,fauteuil releveur proximité,Phrase,1.60
+Search — Local,Fauteuil Releveur Local,point de vente fauteuil releveur,Phrase,1.15
+Search — Local,Fauteuil Releveur Local,fauteuil releveur code postal,Broad,0.95
+Search — Local,Fauteuil Releveur Local,essayer fauteuil releveur magasin,Phrase,1.80
+Search — Local,Fauteuil Releveur Local,fauteuil releveur livraison domicile,Phrase,1.10
+Search — Local,Fauteuil Releveur Local,revendeur fauteuil releveur,Phrase,1.05
+Search — Local,Fauteuil Releveur Local,fauteuil releveur installation,Phrase,0.85
+Search — Local,Fauteuil Releveur Local,magasin médical fauteuil,Broad,0.75
+Search — Local,Fauteuil Releveur Local,fauteuil releveur vendeur,Phrase,0.65
+Search — Local,Fauteuil Releveur Local,distributeur fauteuil releveur,Phrase,0.55
+Search — Brand,Brand - Fauteuil Releveur,confort médical fauteuil,Phrase,1.45
+Search — Brand,Brand - Fauteuil Releveur,confort médical releveur,Exact,1.65
+Search — Brand,Brand - Fauteuil Releveur,fauteuil confort médical,Phrase,1.50
+Search — Brand,Brand - Fauteuil Releveur,releveur confort médical,Phrase,1.55
+Search — Brand,Brand - Fauteuil Releveur,confort médical shop,Exact,1.40
+Search — Brand,Brand - Fauteuil Releveur,confort médical avis,Phrase,1.20
+Search — Brand,Brand - Fauteuil Releveur,confort médical france,Phrase,1.35
+Search — Brand,Brand - Fauteuil Releveur,confort médical site,Broad,0.95
+Search — Brand,Brand - Fauteuil Releveur,confort médical officiel,Phrase,1.60
+Search — Brand,Brand - Fauteuil Releveur,acheter confort médical,Phrase,1.70
+Search — Brand,Brand - Fauteuil Releveur,boutique confort médical,Phrase,1.30
+Search — Brand,Brand - Fauteuil Releveur,spécialiste confort médical,Broad,1.15
+Search — Brand,Brand - Fauteuil Releveur,confort médical qualité,Phrase,1.25
+Search — Brand,Brand - Fauteuil Releveur,confort médical garantie,Phrase,1.10
+Search — Brand,Brand - Fauteuil Releveur,confort médical livraison,Broad,0.85
+Search — Brand,Brand - Fauteuil Releveur,confort médical promotions,Phrase,1.05
+Search — Brand,Brand - Fauteuil Releveur,confort médical expert,Phrase,1.40
+Search — Brand,Brand - Fauteuil Releveur,commander confort médical,Phrase,1.55
+Search — Brand,Brand - Fauteuil Releveur,confort médical professionnel,Broad,1.00
+Search — Brand,Brand - Fauteuil Releveur,confort médical fiable,Phrase,1.20
+Search — Concurrents,Concurrents Fauteuil Releveur,invacare fauteuil releveur,Phrase,1.65
+Search — Concurrents,Concurrents Fauteuil Releveur,himolla fauteuil releveur,Phrase,1.58
+Search — Concurrents,Concurrents Fauteuil Releveur,relax fauteuil releveur,Phrase,1.42
+Search — Concurrents,Concurrents Fauteuil Releveur,thiriez fauteuil releveur,Phrase,1.55
+Search — Concurrents,Concurrents Fauteuil Releveur,liftea fauteuil releveur,Exact,1.72
+Search — Concurrents,Concurrents Fauteuil Releveur,medical confort fauteuil,Phrase,1.48
+Search — Concurrents,Concurrents Fauteuil Releveur,stannah fauteuil releveur,Phrase,1.63
+Search — Concurrents,Concurrents Fauteuil Releveur,medilax fauteuil releveur,Exact,1.51
+Search — Concurrents,Concurrents Fauteuil Releveur,alternative invacare,Phrase,1.38
+Search — Concurrents,Concurrents Fauteuil Releveur,concurrent himolla,Broad,1.25
+Search — Concurrents,Concurrents Fauteuil Releveur,meilleur que relax,Phrase,1.44
+Search — Concurrents,Concurrents Fauteuil Releveur,pride fauteuil releveur,Phrase,1.59
+Search — Concurrents,Concurrents Fauteuil Releveur,okin moteur fauteuil,Phrase,1.33
+Search — Concurrents,Concurrents Fauteuil Releveur,moins cher que invacare,Phrase,1.47
+Search — Concurrents,Concurrents Fauteuil Releveur,comparatif fauteuil releveur,Phrase,1.28
+Search — Concurrents,Concurrents Fauteuil Releveur,pro activ fauteuil,Broad,1.41
+Search — Concurrents,Concurrents Fauteuil Releveur,lamura fauteuil releveur,Exact,1.54
+Search — Concurrents,Concurrents Fauteuil Releveur,dispositif médical agréé,Phrase,1.36
+Search — Concurrents,Concurrents Fauteuil Releveur,fauteuil certifié médical,Phrase,1.29
+Search — Concurrents,Concurrents Fauteuil Releveur,marque fauteuil releveur,Broad,1.22

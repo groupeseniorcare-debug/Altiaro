@@ -2,9 +2,10 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   MagnifyingGlass, CircleNotch, CheckCircle, Warning, Article, Cursor, Eye, Target,
-  Lightning, TrendUp, Sparkle, ClockClockwise, ChartBar,
+  Lightning, TrendUp, Sparkle, ClockClockwise, ChartBar, MegaphoneSimple,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../../lib/api";
+import { useAuth } from "../../lib/auth";
 
 function MiniCard({ icon: Icon, label, value, sub, tone = "neutral", testId }) {
   const tones = {
@@ -56,6 +57,8 @@ const CRON_LABELS = {
 
 export default function SeoTab({ siteId }) {
   const navigate = useNavigate();
+  const { user } = useAuth() || {};
+  const isAdmin = user?.role === "admin";
   const [gscStatus, setGscStatus] = useState(null);
   const [gscMetrics, setGscMetrics] = useState(null);
   const [blog, setBlog] = useState([]);
@@ -63,17 +66,19 @@ export default function SeoTab({ siteId }) {
   const [gaps, setGaps] = useState([]);
   const [reports, setReports] = useState([]);
   const [automation, setAutomation] = useState([]);
+  const [gadsConfig, setGadsConfig] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [gs, bp, ek, cg, rp, al] = await Promise.all([
+    const [gs, bp, ek, cg, rp, al, ga] = await Promise.all([
       apiCall(() => api.get(`/sites/${siteId}/gsc/status`)),
       apiCall(() => api.get(`/sites/${siteId}/blog-posts`)),
       apiCall(() => api.get(`/sites/${siteId}/seo/emerging-keywords?limit=10`)),
       apiCall(() => api.get(`/sites/${siteId}/seo/content-gaps?limit=5`)),
       apiCall(() => api.get(`/sites/${siteId}/seo/weekly-reports?limit=4`)),
       apiCall(() => api.get(`/sites/${siteId}/seo/automation-log?limit=10`)),
+      apiCall(() => api.get(`/sites/${siteId}/google-ads/config`)),
     ]);
     if (!gs.error) setGscStatus(gs.data);
     if (!bp.error) {
@@ -84,6 +89,7 @@ export default function SeoTab({ siteId }) {
     if (!cg.error) setGaps(cg.data?.gaps || []);
     if (!rp.error) setReports(rp.data?.reports || []);
     if (!al.error) setAutomation(al.data?.events || []);
+    if (!ga.error) setGadsConfig(ga.data);
     setLoading(false);
   }, [siteId]);
 
@@ -347,6 +353,56 @@ export default function SeoTab({ siteId }) {
             })}
           </ul>
         )}
+      </div>
+
+      {/* Campagnes Google Ads — Phase 7 */}
+      <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden" data-testid="seo-gads-block">
+        <div className="p-5 border-b border-neutral-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-neutral-900 flex items-center gap-2">
+              <MegaphoneSimple size={14} weight="duotone" /> Campagnes Google Ads
+            </h3>
+            <p className="text-[11px] text-neutral-500">Pixel natif + export assets pour campagne manuelle</p>
+          </div>
+          {isAdmin ? (
+            <button
+              onClick={() => navigate(`/admin/sites/${siteId}/google-ads`)}
+              className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium transition"
+              data-testid="seo-gads-manage"
+            >
+              Gérer dans l'admin
+            </button>
+          ) : (
+            <span className="text-[11px] text-neutral-400">Admin-only</span>
+          )}
+        </div>
+        <div className="px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2 text-sm">
+            {gadsConfig?.enabled && gadsConfig?.conversion_id ? (
+              <>
+                <CheckCircle size={16} weight="fill" className="text-emerald-600" />
+                <span className="text-neutral-900">
+                  Pixel actif — conversions trackées
+                  {gadsConfig.updated_at && (
+                    <span className="text-neutral-500"> depuis le {new Date(gadsConfig.updated_at).toLocaleDateString("fr-FR")}</span>
+                  )}
+                </span>
+              </>
+            ) : (
+              <>
+                <Warning size={16} weight="duotone" className="text-amber-500" />
+                <span className="text-neutral-700">
+                  Pixel désactivé — {isAdmin ? "configure-le depuis l'admin" : "à configurer par l'admin"}
+                </span>
+              </>
+            )}
+          </div>
+          {isAdmin && (
+            <span className="text-[11px] text-neutral-500">
+              CTA : <strong>Générer un export</strong> dans l'admin
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Historique automatisations */}

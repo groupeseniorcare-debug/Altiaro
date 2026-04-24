@@ -91,6 +91,7 @@ from routes import resend_domain as resend_domain_routes
 from routes import journey_gating as journey_gating_routes
 from routes import analytics as analytics_routes
 from routes import seo_automation as seo_automation_routes
+from routes import google_ads_manual as google_ads_manual_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -168,6 +169,7 @@ api.include_router(resend_domain_routes.router)
 api.include_router(journey_gating_routes.router)
 api.include_router(analytics_routes.router)
 api.include_router(seo_automation_routes.router)
+api.include_router(google_ads_manual_routes.router)
 
 
 @app.on_event("startup")
@@ -553,6 +555,9 @@ async def startup():
         )
         # Indexes Phase 6 (idempotent)
         await ensure_seo_automation_indexes()
+        # Indexes Phase 7 (idempotent)
+        from routes.google_ads_manual import ensure_gads_manual_indexes
+        await ensure_gads_manual_indexes()
 
         async def _wrap_cron(fn, name: str):
             logger.info(f"[scheduler] {name} start")
