@@ -3,6 +3,28 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-24 · Fix AliExpress OAuth + connexion réelle
+
+### Bug `OverflowError: date value out of range` (P0 récurrent)
+- **Root cause** : AliExpress retourne `refresh_token_valid_time` comme
+  timestamp Unix **en millisecondes** (ex: `1777184305000`), mais notre code
+  le traitait comme une durée en secondes → `now + timedelta(seconds=1.7e12)`
+  dépassait l'année 56000 et levait `OverflowError`. Le token n'était donc
+  jamais persisté malgré 2 callbacks AliExpress `code:0` réussis.
+- **Fix** dans `_finalize_oauth` : détection automatique
+  timestamp-absolu-ms vs duration-seconds (seuil `> 1e12`), fallback 365 j
+  si données manquantes. Try/except sur `ValueError/OverflowError/OSError`.
+- **Restauration one-shot** : script Python a rejoué les tokens du dernier
+  callback `rest_token_response` dans `platform_settings.aliexpress` sans
+  re-déclencher l'OAuth.
+
+### Validation e2e
+- `GET /api/admin/aliexpress/status` → `connected: true`, user `fr912906817plhae`.
+- `POST /api/aliexpress/products/search` keyword "fauteuil releveur" →
+  `code: "00"`, **7 950 produits** retournés, marché FR / prix EUR.
+- Infrastructure AliExpress dropshipping 100 % opérationnelle : search +
+  import + place-order + tracking tous câblés.
+
 ## 2026-04-24 · AEO Readiness + Maillage interne + Citation Tracker IA
 
 ### Panneau AEO Readiness (suite du boost AEO)

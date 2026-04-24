@@ -222,9 +222,25 @@ async def _finalize_oauth(site_id: str, code: str) -> HTMLResponse:
 
     now = datetime.now(timezone.utc)
     expires_in = int(token_payload.get("expires_in") or 172800)
-    refresh_in = int(token_payload.get("refresh_token_valid_time") or token_payload.get("refresh_expires_in") or 365 * 86400)
     expires_at = now + timedelta(seconds=expires_in)
-    refresh_at = now + timedelta(seconds=refresh_in)
+
+    # refresh_token_valid_time (AliExpress) = absolute Unix timestamp in **milliseconds**.
+    # refresh_expires_in = duration in seconds. Handle both safely.
+    refresh_at = None
+    rtvt = token_payload.get("refresh_token_valid_time")
+    rei = token_payload.get("refresh_expires_in")
+    try:
+        if rtvt:
+            ms = int(rtvt)
+            # If the value is >10^12 it's ms ; if 10^9-10^11 it's seconds.
+            ts_s = ms / 1000 if ms > 1e12 else ms
+            refresh_at = datetime.fromtimestamp(ts_s, tz=timezone.utc)
+        elif rei:
+            refresh_at = now + timedelta(seconds=int(rei))
+        else:
+            refresh_at = now + timedelta(days=365)
+    except (ValueError, OverflowError, OSError):
+        refresh_at = now + timedelta(days=365)
 
     await _set_platform_settings({
         "key": "aliexpress",

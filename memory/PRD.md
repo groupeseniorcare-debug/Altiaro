@@ -73,7 +73,7 @@ Les 50 étapes du playbook sont regroupées en **8 blocs thématiques ordonnés*
 | 31 | **SEO avancé (sitemap hreflang, robots, Merchant Feed RSS, Schema.org, OG, canonical)** | ✅ |
 | 32 | **CJ Dropshipping API activée (clé user) — recherche + import 1-clic fonctionnel** | ✅ |
 | 33 | **Google Ads Center Admin only (OAuth2 + Keyword Planner + Campaigns list)** | ✅ |
-| 34 | AliExpress Affiliate API activée | ⏳ (attente clés user) |
+| 34 | AliExpress Affiliate API activée | ✅ (clés OK + OAuth validé le 24/04 après fix bug `refresh_token_valid_time` ms→datetime) |
 | 35 | Resend (emails transactionnels) | ✅ |
 | 36 | **Storefront Apple/Dyson (narrative scroll + typographie premium)** | ✅ |
 | 37 | OVH Domaines (recherche + achat) | ✅ (markup Mollie branché, facturation Concepteur via Mollie puis déclenchement OVH auto via webhook) |
