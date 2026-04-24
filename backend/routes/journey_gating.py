@@ -415,14 +415,73 @@ async def force_partial_import(
     user: dict = Depends(get_current_user),
 ) -> dict:
     """Accepte explicitement de passer à l'étape 3 sans couverture 100% des
-    pays. Persiste `site.import_force_partial = True`.
+    pays. Persiste `site.import_force_partial = {value, forced_at, forced_by,
+    missing_countries}` avec traçabilité complète.
     """
+    await _check_site_access(site_id, user)
+    # Recalcule la couverture actuelle pour figer le snapshot au moment du force
+    from datetime import datetime, timezone
+    statuses = await compute_step_statuses(site_id)
+    import_step = next((s for s in statuses if s["key"] == "import"), None)
+    missing = ((import_step or {}).get("counters") or {}).get("missing_countries") or []
+    flag = {
+        "value": True,
+        "forced_at": datetime.now(timezone.utc).isoformat(),
+        "forced_by": user.get("id"),
+        "forced_by_email": user.get("email"),
+        "missing_countries_at_time": missing,
+    }
+    await db.sites.update_one(
+        {"id": site_id},
+        {"$set": {"import_force_partial": True, "import_force_partial_meta": flag}},
+    )
+    return {"ok": True, "import_force_partial": True, "meta": flag}
+
+
+@router.post("/sites/{site_id}/steps/import/revoke-force-partial")
+async def revoke_force_partial(
+    site_id: str,
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Annule la décision de couverture partielle. L'étape import redevient
+    bloquée tant que la couverture pays n'est pas 100%."""
     await _check_site_access(site_id, user)
     await db.sites.update_one(
         {"id": site_id},
-        {"$set": {"import_force_partial": True}},
+        {"$unset": {"import_force_partial": "", "import_force_partial_meta": ""}},
     )
-    return {"ok": True, "import_force_partial": True}
+    return {"ok": True, "import_force_partial": False}
+
+
+# ────────── Gating hard HTTP 409 ────────── #
+
+async def require_step(site_id: str, prev_step: str) -> None:
+    """Dépendance FastAPI-friendly (à appeler manuellement dans les routes).
+    Lève HTTPException(409) si l'étape `prev_step` n'est pas complétée.
+
+    Usage :
+        await require_step(site_id, "pricing")  # avant un product import
+    """
+    if prev_step not in STEP_ORDER:
+        return  # no-op si la clé n'existe pas (compat)
+    statuses = await compute_step_statuses(site_id)
+    target = next((s for s in statuses if s["key"] == prev_step), None)
+    if not target:
+        return
+    if not target["completed"]:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "step_not_completed",
+                "required_step": prev_step,
+                "reason": target["reason"],
+                "message": (
+                    f"Impossible d'effectuer cette action : "
+                    f"l'étape '{target['label']}' doit être complétée d'abord. "
+                    f"Détail : {target['reason']}"
+                ),
+            },
+        )
 
 
 # ────────── Compatibilité legacy : déprécier validate-step manuel ────────── #

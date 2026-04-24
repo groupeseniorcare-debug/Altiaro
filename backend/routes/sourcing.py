@@ -26,6 +26,9 @@ from pydantic import BaseModel
 
 from deps import db, get_current_user, _check_site_access
 
+import logging
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 CJ_API_KEY = os.environ.get("CJ_API_KEY", "")
@@ -590,6 +593,9 @@ class ImportUrlInput(BaseModel):
     url: str
     role: Optional[str] = "main"  # "main" or "upsell"
     linked_product_ids: Optional[List[str]] = None
+    # Phase Chantier 2 — propagés du preview pour tagger le produit importé
+    shipping_countries: Optional[List[str]] = None   # pays livrés par ce produit
+    product_type: Optional[str] = None               # "main" | "upsell" | "accessory"
 
 
 def _parse_provider_url(url: str) -> tuple[str, str]:
@@ -618,10 +624,200 @@ def _parse_provider_url(url: str) -> tuple[str, str]:
     raise HTTPException(400, "URL non reconnue. Formats acceptés : https://cjdropshipping.com/product/… ou https://www.aliexpress.com/item/…")
 
 
+@router.post("/sites/{site_id}/sourcing/preview-url")
+async def preview_by_url(
+    site_id: str,
+    data: ImportUrlInput,
+    user: dict = Depends(get_current_user),
+):
+    """Retourne un preview d'un produit (sans l'importer) pour affichage UI
+    avec les checks livraison par pays. L'utilisateur voit :
+      - Titre, image, prix d'achat, prix suggéré, marge
+      - Livrable dans chaque pays cible du site (✅ / ❌)
+      - Livraison gratuite (true/false) — warning si non
+      - L'url source normalisée
+
+    Gating : nécessite l'étape 'pricing' complétée.
+    """
+    from routes.journey_gating import require_step
+    await _check_site_access(site_id, user)
+    await require_step(site_id, "pricing")
+    provider, product_id = _parse_provider_url(data.url)
+
+    # Récupère les target_countries du site
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "selected_countries": 1, "country": 1, "countries": 1})
+    target_countries: list[str] = []
+    if site:
+        target_countries = (
+            site.get("selected_countries")
+            or site.get("countries")
+            or ([site["country"]] if site.get("country") else [])
+        )
+    target_countries = [c.upper() for c in target_countries if c]
+
+    title = ""
+    image = ""
+    cost_usd = 0.0
+    sku = ""
+    shipping_by_country: dict = {}
+    free_shipping: bool | None = None
+    shipping_cost_eur: float = 0.0
+    images: list = []
+
+    if provider == "cj":
+        detail = await _cj_product_detail(product_id)
+        if not detail:
+            raise HTTPException(404, "Produit CJ introuvable. Vérifie l'URL ou ton accès CJ.")
+        title = detail.get("productNameEn") or detail.get("productName") or ""
+        imgs_raw = detail.get("productImageSet") or detail.get("productImages") or []
+        if isinstance(imgs_raw, list):
+            images = [i for i in imgs_raw if isinstance(i, str)][:6]
+        sku = detail.get("productSku") or ""
+        sell = detail.get("sellPrice")
+        if sell is not None:
+            s = str(sell).split("--")[0].split("~")[0].replace("$", "").replace("US", "").strip()
+            try:
+                cost_usd = float(s)
+            except (ValueError, TypeError):
+                cost_usd = 0.0
+        # CJ freight check for each target country
+        # Use first variant vid if available, else empty string (fallback auto-pick)
+        first_vid = ""
+        variants_raw = detail.get("variants") or []
+        if isinstance(variants_raw, list) and variants_raw:
+            first_vid = str(variants_raw[0].get("vid") or variants_raw[0].get("id") or "")
+        for cc in target_countries:
+            try:
+                freights = await _cj_freight_to_country(product_id, first_vid, cc)
+                if freights:
+                    f0 = freights[0]
+                    shipping_by_country[cc] = {
+                        "available": True,
+                        "price_usd": float(f0.get("logisticPrice") or 0),
+                        "days": f0.get("logisticAging") or f0.get("aging") or "—",
+                        "method": f0.get("logisticName") or "CJ",
+                    }
+                else:
+                    shipping_by_country[cc] = {"available": False, "reason": "aucune méthode CJ"}
+            except Exception as e:
+                shipping_by_country[cc] = {"available": False, "reason": str(e)[:100]}
+        # Free shipping = premier coût USD == 0
+        first_price = next((v.get("price_usd") for v in shipping_by_country.values() if v.get("available")), None)
+        free_shipping = bool(first_price is not None and first_price <= 0.01)
+        if first_price is not None:
+            shipping_cost_eur = round(first_price * 0.92, 2)
+
+    elif provider == "aliexpress":
+        if not (AE_APP_KEY and AE_APP_SECRET):
+            raise HTTPException(503, "AliExpress Affiliate non configuré.")
+        try:
+            resp = await _ae_call(
+                "aliexpress.affiliate.productdetail.get",
+                {"product_ids": product_id, "target_currency": "USD", "target_language": "EN",
+                 "tracking_id": AE_TRACKING_ID or "default"},
+            )
+            items = (((resp or {}).get("aliexpress_affiliate_productdetail_get_response") or {})
+                     .get("resp_result") or {}).get("result") or {}
+            prods = (items.get("products") or {}).get("product") or []
+            if not prods:
+                raise HTTPException(404, "Produit AliExpress introuvable.")
+            p = prods[0]
+            title = p.get("product_title") or ""
+            image = p.get("product_main_image_url") or ""
+            imgs_raw = p.get("product_small_image_urls") or {}
+            if isinstance(imgs_raw, dict):
+                images = imgs_raw.get("string") or []
+            elif isinstance(imgs_raw, list):
+                images = imgs_raw
+            images = [i for i in images[:6] if isinstance(i, str)]
+            if image and image not in images:
+                images.insert(0, image)
+            try:
+                cost_usd = float(p.get("target_sale_price") or p.get("sale_price") or 0)
+            except (ValueError, TypeError):
+                cost_usd = 0.0
+            sku = p.get("sku_id") or ""
+            # AE : la livraison par pays dépend des SKUs. On marque "likely_available"
+            # pour tous les pays cibles (check réel requiert appel shipping API qui
+            # n'est pas toujours disponible sur le tier affiliate standard).
+            for cc in target_countries:
+                shipping_by_country[cc] = {
+                    "available": True,
+                    "confidence": "presumed",
+                    "reason": "AliExpress livre la plupart des pays EU — vérifiez lors du placement de la commande",
+                }
+            # Free shipping AE est souvent indiqué dans le flag "promotion_link" ou
+            # "original_price"==0 mais ce n'est pas fiable. On suppose non-gratuit par défaut.
+            free_shipping = False
+            shipping_cost_eur = 0.0
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(502, f"AliExpress indisponible : {str(e)[:180]}")
+
+    else:
+        raise HTTPException(400, "Provider inconnu")
+
+    if not title:
+        raise HTTPException(404, "Produit vide (pas de titre). Vérifie l'URL.")
+
+    rate = 0.92 if provider == "cj" else 1.0
+    cost_eur = round(cost_usd * rate, 2)
+    suggested_price_eur = round(cost_eur * 2.5 + shipping_cost_eur, 2) if cost_eur > 0 else 0.0
+    margin_eur = round(suggested_price_eur - cost_eur - shipping_cost_eur, 2)
+    margin_pct = round((margin_eur / suggested_price_eur) * 100, 1) if suggested_price_eur else 0
+
+    # Warnings
+    warnings: list[str] = []
+    missing = [c for c, v in shipping_by_country.items() if not v.get("available")]
+    if missing:
+        warnings.append(
+            f"⚠️ Non livrable dans : {', '.join(missing)}. "
+            "Tes clients dans ces pays ne pourront pas commander ce produit."
+        )
+    if not free_shipping and provider == "cj":
+        warnings.append(
+            f"⚠️ Livraison payante (~{shipping_cost_eur}€) — "
+            "privilégie les produits avec livraison gratuite pour préserver ta marge."
+        )
+    if cost_eur > 0 and margin_pct < 50:
+        warnings.append(
+            f"⚠️ Marge estimée faible ({margin_pct}%) — vérifie si tu peux "
+            f"vendre au-dessus du prix suggéré ({suggested_price_eur}€)."
+        )
+
+    return {
+        "provider": provider,
+        "product_id": product_id,
+        "title": title,
+        "images": images,
+        "primary_image": image or (images[0] if images else None),
+        "sku": sku,
+        "cost_usd": cost_usd,
+        "cost_eur": cost_eur,
+        "shipping_cost_eur": shipping_cost_eur,
+        "suggested_price_eur": suggested_price_eur,
+        "margin_eur": margin_eur,
+        "margin_pct": margin_pct,
+        "free_shipping": free_shipping,
+        "target_countries": target_countries,
+        "shipping_by_country": shipping_by_country,
+        "missing_countries": missing,
+        "can_import": True,  # on autorise l'import même en couverture partielle
+        "warnings": warnings,
+        "url": data.url,
+    }
+
+
 @router.post("/sites/{site_id}/sourcing/import-by-url")
 async def import_by_url(site_id: str, data: ImportUrlInput, user: dict = Depends(get_current_user)):
-    """Import a product directly from its provider URL (no search needed)."""
+    """Import a product directly from its provider URL (no search needed).
+
+    Gating : nécessite l'étape 'pricing' complétée (409 sinon).
+    """
+    from routes.journey_gating import require_step
     await _check_site_access(site_id, user)
+    await require_step(site_id, "pricing")
     provider, product_id = _parse_provider_url(data.url)
 
     # Load product meta from the provider
@@ -696,7 +892,32 @@ async def import_by_url(site_id: str, data: ImportUrlInput, user: dict = Depends
     if provider == "cj":
         await asyncio.sleep(1.2)
     # Delegate to the existing importer (handles translation + specs + shipping + save)
-    return await import_product(site_id, import_payload, user)
+    result = await import_product(site_id, import_payload, user)
+
+    # Phase Chantier 2 — enrich persisted doc with coverage & type
+    # Si le frontend a passé shipping_countries (depuis le preview), on le persiste.
+    # Sinon, on déduit depuis les pays cibles du site (hypothèse safe : le check
+    # effectué au preview s'applique au moment de l'import).
+    try:
+        product_id_new = (result or {}).get("id") or (result or {}).get("product_id")
+        if product_id_new:
+            patch: dict = {}
+            if data.shipping_countries is not None:
+                patch["shipping_countries"] = [c.upper() for c in data.shipping_countries]
+            if data.product_type:
+                patch["type"] = data.product_type
+                if data.product_type in ("upsell", "accessory"):
+                    patch["is_upsell"] = True
+            if patch:
+                patch["updated_at"] = datetime.now(timezone.utc).isoformat()
+                await db.products.update_one(
+                    {"id": product_id_new, "site_id": site_id},
+                    {"$set": patch},
+                )
+    except Exception:
+        logger.exception("[sourcing] post-import enrich failed (non-blocking)")
+
+    return result
 
 
 # =====================================================================
@@ -704,8 +925,6 @@ async def import_by_url(site_id: str, data: ImportUrlInput, user: dict = Depends
 # Auto-place a supplier order at CJ when the customer order becomes "paid",
 # and sync tracking back to the customer order periodically.
 # =====================================================================
-import logging
-logger = logging.getLogger(__name__)
 
 
 _CJ_STATUS_MAP = {
