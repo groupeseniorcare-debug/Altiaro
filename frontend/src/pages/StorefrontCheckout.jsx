@@ -21,7 +21,7 @@ import { Card, Field, Row } from "../components/storefront/storefrontFormUtils";
  * (fix latent : `ShieldCheck` was used but not imported)
  * ========================================================= */
 export default function StorefrontCheckout() {
-  const { siteId, site, design, lang, setLang } = useSiteAndLang();
+  const { siteId, site, design, lang, setLang, availableLangs } = useSiteAndLang();
   const navigate = useNavigate();
   const [items] = useState(() => readCart(siteId));
   const [form, setForm] = useState({
@@ -99,7 +99,7 @@ export default function StorefrontCheckout() {
   };
 
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+    <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
       <div className="max-w-5xl mx-auto px-6 py-12" data-testid="storefront-checkout">
         <h1 className="font-heading text-4xl font-semibold text-[#1C1917] mb-8">{t(lang, "checkout")}</h1>
 

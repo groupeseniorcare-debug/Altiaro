@@ -16,7 +16,7 @@ import UpsellsRecommendations from "../components/storefront/UpsellsRecommendati
  * (fix latent : `UpsellsRecommendations` was used but not imported)
  * ========================================================= */
 export default function StorefrontConfirmation() {
-  const { siteId, site, design, lang, setLang } = useSiteAndLang();
+  const { siteId, site, design, lang, setLang, availableLangs } = useSiteAndLang();
   const [search] = useSearchParams();
   const orderNumber = search.get("order");
   const isSuccessPage = window.location.pathname.includes("/checkout/success");
@@ -52,7 +52,7 @@ export default function StorefrontConfirmation() {
   const failed = order?.status === "failed" || order?.status === "expired" || order?.status === "cancelled";
 
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+    <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
       <div className="max-w-2xl mx-auto px-6 py-16 text-center" data-testid="storefront-confirmation">
         <div className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-6 ${
           paid ? "bg-[#D1FAE5]" : failed ? "bg-[#FFE4E6]" : "bg-[#FEF3C7]"

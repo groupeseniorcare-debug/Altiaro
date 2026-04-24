@@ -114,7 +114,7 @@ export function StorefrontAbout() {
   ];
 
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+    <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
       <SEOHead title={`À propos · ${site?.name || ""}`} description={`${site?.name || "Notre maison"} — Notre histoire, nos valeurs, notre équipe.`} />
       <PageHero
         eyebrow="À propos"
@@ -197,7 +197,7 @@ export function StorefrontContact() {
   };
 
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+    <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
       <SEOHead title={`Contact · ${site?.name || ""}`} description="Contactez notre équipe par email, téléphone ou via le formulaire." />
       <PageHero
         eyebrow="Contact"
@@ -344,7 +344,7 @@ export function StorefrontLivraison() {
   ];
 
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+    <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
       <SEOHead title={`Livraison & délais · ${site?.name || ""}`} description="Délais, coûts, suivi, installation à domicile : tout savoir sur la livraison." />
       <PageHero
         eyebrow="Livraison"
@@ -447,7 +447,7 @@ export function StorefrontRetours() {
       ];
 
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+    <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
       <SEOHead title={`Retours & remboursements · ${site?.name || ""}`} description="14 jours pour changer d'avis, retour gratuit, remboursement sous 5 jours." />
       <PageHero
         eyebrow="Retours & remboursements"
@@ -523,7 +523,7 @@ export function StorefrontFAQ() {
     ? aiItems.map((f) => ({ q: f.question, a: f.answer || "" }))
     : legacyFaq;
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+    <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
       <PageHero
         eyebrow="FAQ"
         title={aiPage.headline || "Questions fréquentes"}
@@ -557,7 +557,7 @@ function LegalPage({ kind, title }) {
   const { site, design, lang, setLang } = useSiteDesign();
   const page = design?.legal_pages?.[kind];
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+    <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
       <PageHero eyebrow="Mentions légales" title={title} design={design} />
       <div className="max-w-3xl mx-auto px-6 py-16" data-testid={`page-${kind}`}>
         {page ? (

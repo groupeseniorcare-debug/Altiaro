@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useState, useCallback } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { fetchPublicSite } from "../StorefrontLayout";
 import {
@@ -30,20 +30,64 @@ export function buildHreflangs(site, path) {
   return codes.map((c) => ({ code: c, href: `${base}?lang=${c}` }));
 }
 
+/**
+ * Phase 3 — Hook central du storefront : site + langue courante + available_langs
+ * + primaryLang. Résout la langue au mount avec la priorité :
+ *   1. ?lang=xx dans l'URL (si supportée)
+ *   2. localStorage "cf_lang_<siteId>" (si supportée)
+ *   3. navigator.language.slice(0,2) (si supportée)
+ *   4. primary_lang du site (fallback)
+ *
+ * setLang() persiste en localStorage + sync query string + émet un event
+ * `language_change` vers le tracker analytics (Chantier 7).
+ */
+function _detectInitialLang(urlLang, storageLang, availableLangs, primaryLang) {
+  const supports = (lg) => !!lg && availableLangs.includes(lg);
+  if (supports(urlLang)) return urlLang;
+  if (supports(storageLang)) return storageLang;
+  if (typeof navigator !== "undefined") {
+    const nav = (navigator.language || "fr").slice(0, 2).toLowerCase();
+    if (supports(nav)) return nav;
+  }
+  return supports(primaryLang) ? primaryLang : (availableLangs[0] || "fr");
+}
+
+function _postLanguageChange(siteId, fromLang, toLang) {
+  try {
+    const base = process.env.REACT_APP_BACKEND_URL || "";
+    const url = `${base}/api/public/sites/${siteId}/track`;
+    const body = JSON.stringify({
+      event: "page_view",   // fallback sémantique ALLOWED_EVENTS
+      session_id: localStorage.getItem("altiaro.sess") ? JSON.parse(localStorage.getItem("altiaro.sess"))?.id : `lang-${Date.now()}`,
+      path: window.location?.pathname || "",
+      lang: toLang,
+      meta: { language_change: true, from: fromLang, to: toLang },
+    });
+    if (navigator?.sendBeacon) {
+      navigator.sendBeacon(url, new Blob([body], { type: "application/json" }));
+    } else {
+      fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true, mode: "cors", credentials: "omit" }).catch(() => {});
+    }
+  } catch (_) { /* best-effort */ }
+}
+
+
 export function useSiteAndLang() {
   const { siteId: urlSiteId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [site, setSite] = useState(null);
   const [design, setDesign] = useState(null);
+  const [availableLangs, setAvailableLangs] = useState(["fr"]);
+  const [primaryLang, setPrimaryLang] = useState("fr");
   const storageKey = `cf_lang_${urlSiteId}`;
-  const [lang, setLangState] = useState(() => localStorage.getItem(storageKey) || "fr");
-  const setLang = (l) => {
-    localStorage.setItem(storageKey, l);
-    setLangState(l);
-  };
-  // Phase 4 fix-up : l'URL peut contenir un UUID ou un slug humain (ex: `demo-altiaro`).
-  // `fetchPublicSite` route vers le bon endpoint backend. On récupère ensuite
-  // l'`id` canonique (UUID) dans la réponse et on l'utilise pour tous les
-  // endpoints dérivés (`/design`, `/products`, etc.).
+  const urlLang = (searchParams.get("lang") || "").toLowerCase();
+  const [lang, setLangState] = useState(() => {
+    const stored = (typeof window !== "undefined" && localStorage.getItem(storageKey)) || null;
+    // available/primary pas encore chargés — on prend ce qu'on peut
+    return urlLang || stored || "fr";
+  });
+
+  // Fetch public site, design, i18n-config en parallèle
   useEffect(() => {
     let cancelled = false;
     fetchPublicSite(urlSiteId)
@@ -51,18 +95,98 @@ export function useSiteAndLang() {
         if (cancelled) return;
         setSite(data);
         const resolvedId = data?.id || urlSiteId;
+        // design
         axios
           .get(`${BACKEND_URL}/api/public/sites/${resolvedId}/design`)
-          .then(({ data: design }) => !cancelled && setDesign(design?.published ? design.design : null))
+          .then(({ data: d }) => !cancelled && setDesign(d?.published ? d.design : null))
           .catch(() => !cancelled && setDesign(null));
+        // i18n-config
+        axios
+          .get(`${BACKEND_URL}/api/public/sites/${resolvedId}/i18n-config`)
+          .then(({ data: cfg }) => {
+            if (cancelled) return;
+            const avail = cfg?.available_langs || ["fr"];
+            const prim = cfg?.primary_lang || "fr";
+            setAvailableLangs(avail);
+            setPrimaryLang(prim);
+            // Re-compute initial lang now that we know what's available
+            const stored = localStorage.getItem(storageKey) || null;
+            const resolved = _detectInitialLang(urlLang, stored, avail, prim);
+            setLangState(resolved);
+            if (resolved && !urlLang) {
+              // Sync URL to the resolved lang (not primary by default to keep clean URL)
+              // Only touch URL if user explicitly stored a non-primary pref
+              if (stored && stored !== prim && avail.includes(stored)) {
+                setSearchParams((prev) => {
+                  const next = new URLSearchParams(prev);
+                  next.set("lang", stored);
+                  return next;
+                }, { replace: true });
+              }
+            }
+          })
+          .catch(() => { /* fallback silent */ });
       })
       .catch(() => !cancelled && setSite({ error: true }));
     return () => { cancelled = true; };
   }, [urlSiteId]);
-  // `siteId` exposé = UUID canonique (pour les API calls). `urlSlug` = valeur
-  // utilisateur dans l'URL (pour construire des liens canonicals user-friendly).
+
+  // Keep document lang attribute synced
+  useEffect(() => {
+    if (typeof document !== "undefined" && lang) {
+      document.documentElement.lang = lang;
+    }
+  }, [lang]);
+
+  // Inject <link rel="alternate" hreflang="xx"> dynamically (SEO)
+  useEffect(() => {
+    if (typeof document === "undefined" || !availableLangs?.length) return;
+    // Remove our previous dynamic alternates
+    document.querySelectorAll('link[data-altiaro-hreflang]').forEach((n) => n.remove());
+    const origin = window.location.origin;
+    const path = window.location.pathname;
+    availableLangs.forEach((lg) => {
+      const link = document.createElement("link");
+      link.setAttribute("rel", "alternate");
+      link.setAttribute("hreflang", lg);
+      link.setAttribute("href", `${origin}${path}?lang=${lg}`);
+      link.setAttribute("data-altiaro-hreflang", "1");
+      document.head.appendChild(link);
+    });
+    // x-default → primary
+    const xd = document.createElement("link");
+    xd.setAttribute("rel", "alternate");
+    xd.setAttribute("hreflang", "x-default");
+    xd.setAttribute("href", `${origin}${path}?lang=${primaryLang}`);
+    xd.setAttribute("data-altiaro-hreflang", "1");
+    document.head.appendChild(xd);
+  }, [availableLangs, primaryLang]);
+
+  const setLang = useCallback((next) => {
+    if (!next || !availableLangs.includes(next)) return;
+    const prev = lang;
+    localStorage.setItem(storageKey, next);
+    setLangState(next);
+    setSearchParams((p) => {
+      const n = new URLSearchParams(p);
+      n.set("lang", next);
+      return n;
+    }, { replace: true });
+    const resolvedId = site?.id || urlSiteId;
+    if (resolvedId && prev !== next) _postLanguageChange(resolvedId, prev, next);
+  }, [lang, availableLangs, setSearchParams, storageKey, site, urlSiteId]);
+
   const resolvedId = site?.id || urlSiteId;
-  return { siteId: resolvedId, urlSlug: urlSiteId, site, design, lang, setLang };
+  return {
+    siteId: resolvedId,
+    urlSlug: urlSiteId,
+    site,
+    design,
+    lang,
+    setLang,
+    availableLangs,
+    primaryLang,
+  };
 }
 
 export function designText(design, path, lang) {

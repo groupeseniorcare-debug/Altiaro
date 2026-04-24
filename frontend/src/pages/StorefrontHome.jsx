@@ -33,7 +33,7 @@ import BrandProcess from "../components/storefront/BrandProcess";
  * STOREFRONT HOME — Phase 4 : extrait de `pages/Storefront.jsx`
  * ========================================================= */
 export default function StorefrontHome() {
-  const { siteId, site, design, lang, setLang } = useSiteAndLang();
+  const { siteId, site, design, lang, setLang, availableLangs } = useSiteAndLang();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -157,7 +157,7 @@ export default function StorefrontHome() {
   };
 
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+    <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
       <div data-testid="storefront-home">
         <SEOHead
           title={seoTitle}

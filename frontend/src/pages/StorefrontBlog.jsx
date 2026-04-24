@@ -165,7 +165,7 @@ export function StorefrontBlog() {
   const canonical = typeof window !== "undefined" ? `${window.location.origin}/shop/${siteId}/blog` : undefined;
 
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+    <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
       <SEOHead
         title={`Journal · ${site?.name || ""}`}
         description={`Guides, conseils et actualités autour ${site?.niche || "des produits senior"}.`}
@@ -252,7 +252,7 @@ export function StorefrontBlogPost() {
 
   if (!post) {
     return (
-      <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+      <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
         <div className="max-w-2xl mx-auto px-6 py-32 text-center">
           <h1 className="text-3xl font-semibold mb-3" style={{ fontFamily: `"${fontHeading}", serif` }}>Article introuvable</h1>
           <Link to={`/shop/${siteId}/blog`} className="text-sm hover:underline" style={{ color: primary }}>← Retour au journal</Link>
@@ -313,7 +313,7 @@ export function StorefrontBlogPost() {
   };
 
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+    <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
       <SEOHead
         title={`${title} · ${site?.name || ""}`}
         description={pickLang(post.excerpt, lang) || post.excerpt || title}

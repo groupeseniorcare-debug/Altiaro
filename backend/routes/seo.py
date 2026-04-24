@@ -19,6 +19,41 @@ from seo_constants import (
 router = APIRouter()
 
 
+@router.get("/public/sites/{site_id}/i18n-config")
+async def i18n_config(site_id: str):
+    """Chantier 3 (Phase 3) — Expose la config i18n publique d'un storefront.
+
+    Le frontend appelle ce endpoint au mount du layout storefront pour savoir
+    quelles langues proposer dans le sélecteur et quelle langue par défaut
+    afficher. Public (pas d'auth) — utilisé par les visiteurs finaux.
+    """
+    site = await db.sites.find_one(
+        {"id": site_id},
+        {"_id": 0, "id": 1, "seo_countries": 1, "selected_countries": 1, "primary_country": 1},
+    )
+    if not site:
+        raise HTTPException(404, "Site not found")
+    seo_cc = get_seo_countries(site)
+    seo_langs = get_seo_langs(site)
+    # Primary country : explicite sur site.primary_country, sinon 1er ads_country,
+    # sinon 1er seo_country (fallback raisonnable).
+    primary_country = (
+        (site.get("primary_country") or "").upper()
+        or (site.get("selected_countries") or [None])[0]
+        or (seo_cc[0] if seo_cc else "FR")
+    )
+    primary_lang = LANG_BY_COUNTRY.get(primary_country, "fr")
+    if primary_lang not in seo_langs:
+        primary_lang = seo_langs[0] if seo_langs else "fr"
+    return {
+        "site_id": site_id,
+        "primary_lang": primary_lang,
+        "primary_country": primary_country,
+        "available_langs": seo_langs,
+        "all_supported_langs": ALL_SUPPORTED_LANGS,
+    }
+
+
 def _origin() -> str:
     return os.environ.get("PUBLIC_ORIGIN") or "https://senior-france.preview.emergentagent.com"
 

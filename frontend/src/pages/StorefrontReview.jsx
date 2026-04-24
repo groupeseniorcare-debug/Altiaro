@@ -45,7 +45,7 @@ export default function StorefrontReview() {
   const fontHeading = design?.brand?.font_heading || "Fraunces";
 
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+    <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
       <SEOHead title={`Laisser un avis · ${site?.name || ""}`} noindex robots="noindex, nofollow" />
       <section className="max-w-2xl mx-auto px-6 md:px-10 py-16 md:py-24" data-testid="review-page">
         {err ? (

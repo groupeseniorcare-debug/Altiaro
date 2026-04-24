@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { LANGUAGES, t } from "../lib/i18n";
+import LanguageSwitcher from "./storefront/LanguageSwitcher";
 import { readCart, cartTotals } from "../lib/cart";
 import { getCustomer } from "../lib/customerAuth";
 import CartDrawer from "./CartDrawer";
@@ -24,7 +25,7 @@ const navItems = (shopRoot) => [
   { label: "Contact", href: `${shopRoot}/contact` },
 ];
 
-export default function StorefrontLayout({ children, lang, setLang, site, design }) {
+export default function StorefrontLayout({ children, lang, setLang, availableLangs, site, design }) {
   const { siteId } = useParams();
   const navigate = useNavigate();
   const [cartCount, setCartCount] = useState(0);
@@ -219,18 +220,12 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
               <Phone size={13} weight="bold" /> {t(lang, "support_seniors")}
             </span>
           </div>
-          <select
-            value={lang}
-            onChange={(e) => setLang(e.target.value)}
-            data-testid="lang-switcher"
-            className="bg-transparent border border-white/20 rounded-sm px-2 py-0.5 text-[11px] tracking-wide hover:bg-white/10 cursor-pointer outline-none"
-          >
-            {LANGUAGES.map((l) => (
-              <option key={l.code} value={l.code} style={{ color: textCol }}>
-                {l.flag} {l.label}
-              </option>
-            ))}
-          </select>
+          <LanguageSwitcher
+            lang={lang}
+            setLang={setLang}
+            availableLangs={availableLangs && availableLangs.length ? availableLangs : LANGUAGES.map((l) => l.code)}
+            tone="light"
+          />
         </div>
       </div>
 

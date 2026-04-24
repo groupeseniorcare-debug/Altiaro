@@ -22,7 +22,7 @@ const SORT_OPTIONS = [
  * COLLECTIONS INDEX — /shop/:siteId/collections
  * ========================================================= */
 export function StorefrontCollections() {
-  const { siteId, site, design, lang, setLang } = useSiteAndLang();
+  const { siteId, site, design, lang, setLang, availableLangs } = useSiteAndLang();
   const [collections, setCollections] = useState([]);
   const { primary, fontHeading } = designAccents(design);
 
@@ -33,7 +33,7 @@ export function StorefrontCollections() {
   }, [siteId]);
 
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+    <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
       <SEOHead
         title={`Collections · ${site?.name || ""}`}
         description="Explorez nos univers produits."
@@ -81,7 +81,7 @@ export function StorefrontCollections() {
  * ========================================================= */
 export function StorefrontCollection() {
   const { siteId, slug } = useParams();
-  const { site, design, lang, setLang } = useSiteAndLang();
+  const { site, design, lang, setLang, availableLangs } = useSiteAndLang();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -191,7 +191,7 @@ export function StorefrontCollection() {
   } : null;
 
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+    <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
       <SEOHead
         title={`${title} · ${site?.name || ""}`}
         description={description || `Découvrez notre collection ${title}`}

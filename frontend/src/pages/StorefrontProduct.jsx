@@ -51,7 +51,7 @@ import {
 
 export function StorefrontProduct() {
   const { siteId, productId } = useParams();
-  const { site, design, lang, setLang } = useSiteAndLang();
+  const { site, design, lang, setLang, availableLangs } = useSiteAndLang();
   const navigate = useNavigate();
   const [p, setP] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -81,14 +81,14 @@ export function StorefrontProduct() {
 
   if (loading) {
     return (
-      <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+      <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
         <div className="max-w-6xl mx-auto px-6 py-12 text-[#78716C]">…</div>
       </StorefrontLayout>
     );
   }
   if (!p) {
     return (
-      <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+      <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
         <div className="max-w-6xl mx-auto px-6 py-12">
           <div className="text-[#9F1239]">404 · Produit introuvable.</div>
           <button onClick={() => navigate(`/shop/${siteId}`)} className="mt-4 text-[#B84B31]">
@@ -100,7 +100,7 @@ export function StorefrontProduct() {
   }
 
   return (
-    <StorefrontLayout lang={lang} setLang={setLang} site={site} design={design}>
+    <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
       <SEOHead
         title={
           p.narrative?.seo?.title

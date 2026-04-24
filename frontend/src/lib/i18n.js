@@ -2,10 +2,12 @@
 // Les textes sont volontairement simples et senior-friendly.
 
 export const LANGUAGES = [
-  { code: "fr", label: "Français", flag: "🇫🇷" },
-  { code: "en", label: "English", flag: "🇬🇧" },
-  { code: "de", label: "Deutsch", flag: "🇩🇪" },
+  { code: "fr", label: "Français",   flag: "🇫🇷" },
+  { code: "en", label: "English",    flag: "🇬🇧" },
+  { code: "de", label: "Deutsch",    flag: "🇩🇪" },
   { code: "nl", label: "Nederlands", flag: "🇳🇱" },
+  { code: "it", label: "Italiano",   flag: "🇮🇹" },
+  { code: "es", label: "Español",    flag: "🇪🇸" },
 ];
 
 const DICT = {
@@ -177,6 +179,90 @@ const DICT = {
     our_collection: "Onze selectie",
     shop_now: "Ontdek de collectie",
   },
+  it: {
+    shop_title: "La nostra boutique",
+    shop_subtitle: "Prodotti selezionati per il comfort e l'autonomia.",
+    featured: "In evidenza",
+    view_product: "Scopri il prodotto",
+    add_to_cart: "Aggiungi al carrello",
+    added_to_cart: "Aggiunto",
+    cart: "Carrello",
+    cart_empty: "Il carrello è vuoto.",
+    cart_empty_cta: "Vai alla boutique",
+    quantity: "Quantità",
+    remove: "Rimuovi",
+    subtotal: "Subtotale",
+    shipping: "Spedizione",
+    free: "Gratis",
+    total: "Totale",
+    checkout: "Paga",
+    continue_shopping: "Continua gli acquisti",
+    your_details: "I vostri dati",
+    full_name: "Nome completo",
+    email: "E-mail",
+    phone: "Telefono",
+    shipping_address: "Indirizzo di spedizione",
+    address_line1: "Via e numero",
+    address_line2: "Indirizzo riga 2 (facoltativo)",
+    city: "Città",
+    postal_code: "CAP",
+    country: "Paese",
+    order_notes: "Istruzioni di consegna (facoltativo)",
+    place_order: "Conferma l'ordine",
+    order_confirmed: "Grazie! Il vostro ordine è stato registrato.",
+    order_number: "Numero ordine",
+    order_pending_pay: "Riceverete un'e-mail con il link di pagamento sicuro.",
+    back_to_shop: "Torna alla boutique",
+    out_of_stock: "Temporaneamente esaurito",
+    free_shipping_above: "Spedizione gratuita da 50€",
+    secure_checkout: "Pagamento 100% sicuro",
+    support_seniors: "Servizio clienti · 7 giorni su 7",
+    no_products: "Nessun prodotto disponibile.",
+    our_collection: "La nostra selezione",
+    shop_now: "Scopri la collezione",
+  },
+  es: {
+    shop_title: "Nuestra boutique",
+    shop_subtitle: "Productos seleccionados para comodidad y autonomía.",
+    featured: "Destacados",
+    view_product: "Ver producto",
+    add_to_cart: "Añadir al carrito",
+    added_to_cart: "Añadido",
+    cart: "Carrito",
+    cart_empty: "Su carrito está vacío.",
+    cart_empty_cta: "Ver la boutique",
+    quantity: "Cantidad",
+    remove: "Eliminar",
+    subtotal: "Subtotal",
+    shipping: "Envío",
+    free: "Gratis",
+    total: "Total",
+    checkout: "Pagar",
+    continue_shopping: "Seguir comprando",
+    your_details: "Sus datos",
+    full_name: "Nombre completo",
+    email: "Correo electrónico",
+    phone: "Teléfono",
+    shipping_address: "Dirección de envío",
+    address_line1: "Calle y número",
+    address_line2: "Dirección línea 2 (opcional)",
+    city: "Ciudad",
+    postal_code: "Código postal",
+    country: "País",
+    order_notes: "Instrucciones de entrega (opcional)",
+    place_order: "Realizar el pedido",
+    order_confirmed: "¡Gracias! Su pedido ha sido registrado.",
+    order_number: "Número de pedido",
+    order_pending_pay: "Recibirá un email con el enlace de pago seguro.",
+    back_to_shop: "Volver a la boutique",
+    out_of_stock: "Temporalmente agotado",
+    free_shipping_above: "Envío gratuito desde 50€",
+    secure_checkout: "Pago 100% seguro",
+    support_seniors: "Atención al cliente · 7 días/7",
+    no_products: "Todavía no hay productos.",
+    our_collection: "Nuestra selección",
+    shop_now: "Descubrir la colección",
+  },
 };
 
 export function t(lang, key) {
@@ -187,6 +273,38 @@ export function pickLang(obj, lang) {
   if (!obj) return "";
   if (typeof obj === "string") return obj;
   return obj[lang] || obj.fr || obj.en || Object.values(obj)[0] || "";
+}
+
+/**
+ * Phase 3 — Retourne la valeur d'un champ traduit depuis 2 patterns :
+ *
+ *   (A) Pattern dict legacy        : obj.name = {fr: "...", en: "..."}
+ *   (B) Pattern translations (blog): obj.title (str) + obj.translations.en = {title, ...}
+ *
+ * Fallback : langue demandée → primary_lang → 'fr' → 1re valeur trouvée.
+ * Retourne toujours une string (never null/undefined) pour éviter les "[object]" UI.
+ */
+export function localizeField(obj, field, lang, primaryLang = "fr") {
+  if (!obj || !field) return "";
+  // Priorité 1 : translations.{lang}.{field} (pattern Chantier 5)
+  const tr = obj.translations;
+  if (tr && typeof tr === "object") {
+    const inLang = tr[lang];
+    if (inLang && typeof inLang === "object" && inLang[field]) return String(inLang[field]);
+    const inPrimary = tr[primaryLang];
+    if (inPrimary && typeof inPrimary === "object" && inPrimary[field]) return String(inPrimary[field]);
+  }
+  const raw = obj[field];
+  if (raw == null) return "";
+  // Priorité 2 : string direct
+  if (typeof raw === "string") return raw;
+  // Priorité 3 : dict legacy
+  if (typeof raw === "object") {
+    return String(
+      raw[lang] || raw[primaryLang] || raw.fr || raw.en || Object.values(raw)[0] || ""
+    );
+  }
+  return String(raw);
 }
 
 export const COUNTRY_OPTIONS = [
