@@ -2,21 +2,38 @@ import React from "react";
 import { motion } from "framer-motion";
 import { ShieldCheck, Truck, HandHeart, Star } from "@phosphor-icons/react";
 import { BENEFIT_ICON, designAccents } from "./storefrontUtils";
-import { pickLang } from "../../lib/i18n";
+import { pickLang, t } from "../../lib/i18n";
 
-const DEFAULT_BENEFITS = [
-  { icon: "Truck", title: "Livraison offerte", description: "Partout en France métropolitaine. Délai 48–72h selon les produits." },
-  { icon: "ShieldCheck", title: "Garantie 2 ans", description: "Sérénité totale. En cas de problème, on reprend le produit à nos frais." },
-  { icon: "HandHeart", title: "Accompagnement humain", description: "Un vrai conseiller au téléphone. Lundi au vendredi, 9h–18h." },
-  { icon: "Star", title: "4.8/5 · 2 143 avis", description: "La confiance de milliers de familles françaises depuis 2018." },
+// Headers / strings localisés au rendu (pas hardcodés) — cf. DICT[lang]
+const DEFAULT_BENEFITS_BUILDER = (lang) => [
+  { icon: "Truck",       title: t(lang, "trust_free_shipping"),    description: t(lang, "benefit_free_shipping_desc") },
+  { icon: "ShieldCheck", title: t(lang, "trust_warranty_2y"),      description: t(lang, "benefit_warranty_desc") },
+  { icon: "HandHeart",   title: t(lang, "trust_human_service"),    description: t(lang, "benefit_human_desc") },
+  { icon: "Star",        title: "4.8/5 · 2 143",                   description: t(lang, "benefit_returns_desc") },
 ];
+
+// Eyebrow + titre H2 par langue (chaînes trop spécifiques pour le DICT plat)
+const BENEFITS_EYEBROW = {
+  fr: "Notre engagement",     en: "Our commitment",        de: "Unser Versprechen",
+  nl: "Onze belofte",         it: "Il nostro impegno",     es: "Nuestro compromiso",
+};
+const BENEFITS_HEADING = {
+  fr: ["Aucun compromis,", "aucun raccourci."],
+  en: ["No compromises,", "no shortcuts."],
+  de: ["Keine Kompromisse,", "keine Abkürzungen."],
+  nl: ["Geen compromissen,", "geen shortcuts."],
+  it: ["Nessun compromesso,", "nessuna scorciatoia."],
+  es: ["Sin concesiones,", "sin atajos."],
+};
 
 const FALLBACK_ICONS = { Truck, ShieldCheck, HandHeart, Star };
 
 export function Benefits({ design, lang }) {
   const { primary, accent, divider, textMuted, fontHeading } = designAccents(design);
   const items = design?.benefits?.items || design?.benefits;
-  const list = Array.isArray(items) && items.length ? items : DEFAULT_BENEFITS;
+  const list = Array.isArray(items) && items.length ? items : DEFAULT_BENEFITS_BUILDER(lang);
+  const eyebrow = BENEFITS_EYEBROW[lang] || BENEFITS_EYEBROW.fr;
+  const [h1, h2] = BENEFITS_HEADING[lang] || BENEFITS_HEADING.fr;
 
   return (
     <section
@@ -29,14 +46,14 @@ export function Benefits({ design, lang }) {
           <div className="flex items-center gap-3 mb-5">
             <span className="h-px w-10" style={{ background: primary }} />
             <span className="text-[11px] uppercase tracking-[0.4em]" style={{ color: primary }}>
-              Notre engagement
+              {eyebrow}
             </span>
           </div>
           <h2
             className="text-[40px] md:text-[56px] lg:text-[64px] leading-[1.02] tracking-[-0.02em]"
             style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
           >
-            Aucun compromis,<br />aucun raccourci.
+            {h1}<br />{h2}
           </h2>
         </div>
 

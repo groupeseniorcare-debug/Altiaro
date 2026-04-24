@@ -17,12 +17,12 @@ import {
 const BACKEND_URL = "";
 
 /* ------- Nav items (pages naturelles du template) ------- */
-const navItems = (shopRoot) => [
-  { label: "Boutique", href: `${shopRoot}` },
-  { label: "Collections", href: `${shopRoot}/collections` },
-  { label: "Journal", href: `${shopRoot}/blog` },
-  { label: "À propos", href: `${shopRoot}/about` },
-  { label: "Contact", href: `${shopRoot}/contact` },
+const navItems = (shopRoot, lang) => [
+  { label: t(lang, "nav_shop"),        href: `${shopRoot}` },
+  { label: t(lang, "nav_collections"), href: `${shopRoot}/collections` },
+  { label: t(lang, "nav_journal"),     href: `${shopRoot}/blog` },
+  { label: t(lang, "nav_about"),       href: `${shopRoot}/about` },
+  { label: t(lang, "nav_contact"),     href: `${shopRoot}/contact` },
 ];
 
 export default function StorefrontLayout({ children, lang, setLang, availableLangs, site, design }) {
@@ -172,7 +172,7 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
   const configuredFooter = design?.navigation?.footer;
   const nav = (Array.isArray(configuredHeader) && configuredHeader.length
     ? configuredHeader
-    : navItems(shopRoot)
+    : navItems(shopRoot, lang)
   ).map((n) => ({ ...n, href: rewriteHref(n.href) }));
   const footerLinks = (Array.isArray(configuredFooter) && configuredFooter.length
     ? configuredFooter
@@ -573,10 +573,10 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
       >
         <div className="max-w-7xl mx-auto px-6 py-10 grid grid-cols-2 md:grid-cols-4 gap-6">
           {[
-            { Icon: Truck, title: "Livraison offerte", sub: "Partout en Europe" },
-            { Icon: ShieldCheck, title: "Paiement sécurisé", sub: "CB, PayPal, Virement" },
-            { Icon: Phone, title: "Conseiller humain", sub: "Lun–Ven · 9h–18h" },
-            { Icon: CreditCard, title: "Retour 14 jours", sub: "Satisfait ou remboursé" },
+            { Icon: Truck,       title: t(lang, "trust_free_shipping"),  sub: { fr: "Partout en Europe", en: "Throughout Europe", de: "In ganz Europa", nl: "In heel Europa", it: "In tutta Europa", es: "Por toda Europa" }[lang] || "" },
+            { Icon: ShieldCheck, title: t(lang, "trust_secure_payment"), sub: "CB, PayPal, Virement" },
+            { Icon: Phone,       title: t(lang, "trust_human_service"),  sub: t(lang, "support_seniors") },
+            { Icon: CreditCard,  title: t(lang, "trust_returns_14d"),    sub: { fr: "Satisfait ou remboursé", en: "Satisfied or refunded", de: "Zufrieden oder Geld zurück", nl: "Tevreden of geld terug", it: "Soddisfatti o rimborsati", es: "Satisfecho o reembolsado" }[lang] || "" },
           ].map((b, i) => (
             <div
               key={i}
@@ -721,7 +721,7 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
             <div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-10">
                 <FooterCol
-                  title="Boutique"
+                  title={t(lang, "nav_shop")}
                   items={[
                     { label: "Tous les produits", href: `${shopRoot}` },
                     { label: "Collections", href: `${shopRoot}/collections` },

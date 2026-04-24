@@ -23,8 +23,8 @@ export function Hero({ site, design, lang, products }) {
   const heroTitle = sanitizeBrandText(heroTitleRaw, 60);
   const heroSub = designText(design, "hero.subtitle", lang)
     || "Des produits sélectionnés avec soin pour préserver votre autonomie, votre confort et votre sérénité au quotidien.";
-  const heroCta = designText(design, "hero.cta_label", lang) || "Découvrir la collection";
-  const heroCta2 = designText(design, "hero.cta_secondary_label", lang) || "Notre histoire";
+  const heroCta = designText(design, "hero.cta_label", lang) || t(lang, "shop_now");
+  const heroCta2 = designText(design, "hero.cta_secondary_label", lang) || t(lang, "nav_about");
   const eyebrowRaw = designText(design, "hero.eyebrow", lang) || brand.tagline || "La maison bienveillante";
   const eyebrow = sanitizeBrandText(eyebrowRaw, 60);
   const rating = design?.hero?.rating || { score: 4.8, count: 2143 };
@@ -160,11 +160,11 @@ export function Hero({ site, design, lang, products }) {
             )}
             <span className="opacity-30">·</span>
             <span className="flex items-center gap-1.5">
-              <Truck size={13} weight="bold" /> Livraison offerte
+              <Truck size={13} weight="bold" /> {t(lang, "trust_free_shipping")}
             </span>
             <span className="opacity-30">·</span>
             <span className="flex items-center gap-1.5">
-              <ShieldCheck size={13} weight="bold" /> Garantie 2 ans
+              <ShieldCheck size={13} weight="bold" /> {t(lang, "trust_warranty_2y")}
             </span>
           </motion.div>
         </motion.div>

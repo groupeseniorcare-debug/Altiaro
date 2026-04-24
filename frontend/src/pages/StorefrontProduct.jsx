@@ -421,10 +421,10 @@ export function StorefrontProduct() {
 
               <div className="mt-8 grid grid-cols-2 gap-2.5" data-testid="product-trust-badges">
                 {[
-                  { Icon: Truck, label: "Livraison offerte", sub: "48–72 h" },
-                  { Icon: ShieldCheck, label: "Garantie 2 ans", sub: "Pièces & MO" },
-                  { Icon: CheckCircle, label: "Retour 14 jours", sub: "Gratuit" },
-                  { Icon: Star, label: "4.8 / 5", sub: `${p.rating?.count ?? 127} avis` },
+                  { Icon: Truck,       label: t(lang, "trust_free_shipping"), sub: "48–72 h" },
+                  { Icon: ShieldCheck, label: t(lang, "trust_warranty_2y"),   sub: "Pièces & MO" },
+                  { Icon: CheckCircle, label: t(lang, "trust_returns_14d"),   sub: { fr: "Gratuit", en: "Free", de: "Kostenlos", nl: "Gratis", it: "Gratis", es: "Gratis" }[lang] || "Gratuit" },
+                  { Icon: Star,        label: "4.8 / 5",                      sub: `${p.rating?.count ?? 127} avis` },
                 ].map((b, i) => (
                   <div
                     key={i}

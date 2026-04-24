@@ -22,7 +22,7 @@ export function FinalCTA({ design, lang }) {
   );
   const eyebrow = designText(design, "final_cta.eyebrow", lang) || brandLabel || "Commencez maintenant";
   const kicker = designText(design, "final_cta.kicker", lang)
-    || "Parcourez notre sélection. Livraison offerte, retour gratuit sous 14 jours.";
+    || t(lang, "final_cta_subtitle");
   const heroCta = designText(design, "hero.cta_label", lang) || t(lang, "shop_now");
 
   return (

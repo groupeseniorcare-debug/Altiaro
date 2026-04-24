@@ -41,10 +41,12 @@ function getHighlights(p, lang) {
   }
   // Derived generic premium promises — always works as a last resort
   const generic = [];
-  if (p.compare_at_price && p.compare_at_price > p.price) generic.push("Bon rapport qualité/prix");
-  generic.push("Livraison offerte sous 72h");
-  generic.push("Garantie 2 ans incluse");
-  generic.push("Retour gratuit 14 jours");
+  if (p.compare_at_price && p.compare_at_price > p.price) {
+    generic.push({ fr: "Bon rapport qualité/prix", en: "Great value", de: "Gutes Preis-Leistungs-Verhältnis", nl: "Goede prijs-kwaliteitverhouding", it: "Ottimo rapporto qualità-prezzo", es: "Buena relación calidad-precio" }[lang] || "Bon rapport qualité/prix");
+  }
+  generic.push(t(lang, "free_shipping_72h"));
+  generic.push(t(lang, "trust_warranty_2y"));
+  generic.push(t(lang, "trust_returns_14d"));
   return generic.slice(0, 4);
 }
 
@@ -162,7 +164,7 @@ function ProductCard({ product: p, siteId, primary, accent, divider, textMuted, 
                 )}
               </div>
               <div className="text-[10px] uppercase tracking-[0.2em] mt-1.5" style={{ color: textFaint }}>
-                Livraison offerte
+                {t(lang, "trust_free_shipping")}
               </div>
             </div>
 
