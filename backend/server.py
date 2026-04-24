@@ -90,6 +90,7 @@ from routes import merchant as merchant_routes
 from routes import resend_domain as resend_domain_routes
 from routes import journey_gating as journey_gating_routes
 from routes import analytics as analytics_routes
+from routes import seo_automation as seo_automation_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -166,6 +167,7 @@ api.include_router(merchant_routes.router)
 api.include_router(resend_domain_routes.router)
 api.include_router(journey_gating_routes.router)
 api.include_router(analytics_routes.router)
+api.include_router(seo_automation_routes.router)
 
 
 @app.on_event("startup")
@@ -539,20 +541,80 @@ async def startup():
             id="dns_auto_config", replace_existing=True, misfire_grace_time=300,
         )
 
-        # 1st of every month at 06:00 UTC — Blog cluster mensuel (1 pilier + 4 satellites)
-        async def _scheduled_monthly_blog_cluster():
-            logger.info("[scheduler] monthly blog cluster run start")
-            try:
-                from routes.blog_posts import run_monthly_clusters_for_all_sites
-                result = await run_monthly_clusters_for_all_sites()
-                logger.info(f"[scheduler] monthly blog cluster : {result}")
-            except Exception:
-                logger.exception("[scheduler] monthly blog cluster failed")
+        # ==================================================================
+        #  Phase 6 — Automatisations SEO/AEO agressives (remplace blog mensuel)
+        # ==================================================================
+        from routes.seo_automation import (
+            run_blog_auto_batch, run_emerging_keywords_scan,
+            run_content_refresh_monthly, run_internal_linking_weekly,
+            run_gsc_position_alerts, run_paa_faq_enrichment,
+            run_content_gap_monthly, run_sitemap_republish_ondemand,
+            run_seo_weekly_report, ensure_seo_automation_indexes,
+        )
+        # Indexes Phase 6 (idempotent)
+        await ensure_seo_automation_indexes()
 
+        async def _wrap_cron(fn, name: str):
+            logger.info(f"[scheduler] {name} start")
+            try:
+                r = await fn()
+                logger.info(f"[scheduler] {name} : {r}")
+            except Exception:
+                logger.exception(f"[scheduler] {name} failed")
+
+        # (1) Blog auto 3x/semaine — Mon/Wed/Fri 06:00 UTC
         scheduler.add_job(
-            _scheduled_monthly_blog_cluster,
-            CronTrigger(day=1, hour=6, minute=0),
-            id="monthly_blog_cluster", replace_existing=True, misfire_grace_time=7200,
+            lambda: _wrap_cron(run_blog_auto_batch, "blog_auto_weekly_batch"),
+            CronTrigger(day_of_week="mon,wed,fri", hour=6, minute=0),
+            id="blog_auto_weekly_batch", replace_existing=True, misfire_grace_time=7200,
+        )
+        # (2) Emerging keywords — Mon 07:00 UTC
+        scheduler.add_job(
+            lambda: _wrap_cron(run_emerging_keywords_scan, "emerging_keywords_scan"),
+            CronTrigger(day_of_week="mon", hour=7, minute=0),
+            id="emerging_keywords_scan", replace_existing=True, misfire_grace_time=3600,
+        )
+        # (3) Content refresh — 1st of month 08:00 UTC
+        scheduler.add_job(
+            lambda: _wrap_cron(run_content_refresh_monthly, "content_refresh_monthly"),
+            CronTrigger(day=1, hour=8, minute=0),
+            id="content_refresh_monthly", replace_existing=True, misfire_grace_time=7200,
+        )
+        # (4) Internal linking — Tue 09:00 UTC
+        scheduler.add_job(
+            lambda: _wrap_cron(run_internal_linking_weekly, "internal_linking_weekly"),
+            CronTrigger(day_of_week="tue", hour=9, minute=0),
+            id="internal_linking_weekly", replace_existing=True, misfire_grace_time=3600,
+        )
+        # (5) GSC position alerts — Daily 09:00 UTC
+        scheduler.add_job(
+            lambda: _wrap_cron(run_gsc_position_alerts, "gsc_position_alerts_daily"),
+            CronTrigger(hour=9, minute=0),
+            id="gsc_position_alerts_daily", replace_existing=True, misfire_grace_time=3600,
+        )
+        # (6) PAA / FAQ enrichment — Thu 10:00 UTC
+        scheduler.add_job(
+            lambda: _wrap_cron(run_paa_faq_enrichment, "paa_faq_enrichment_weekly"),
+            CronTrigger(day_of_week="thu", hour=10, minute=0),
+            id="paa_faq_enrichment_weekly", replace_existing=True, misfire_grace_time=7200,
+        )
+        # (7) Content gap — 15th of month 11:00 UTC
+        scheduler.add_job(
+            lambda: _wrap_cron(run_content_gap_monthly, "content_gap_monthly"),
+            CronTrigger(day=15, hour=11, minute=0),
+            id="content_gap_monthly", replace_existing=True, misfire_grace_time=7200,
+        )
+        # (8) Sitemap republish on-demand — every 10 min
+        scheduler.add_job(
+            lambda: _wrap_cron(run_sitemap_republish_ondemand, "sitemap_republish_ondemand"),
+            "interval", minutes=10,
+            id="sitemap_republish_ondemand", replace_existing=True, misfire_grace_time=600,
+        )
+        # (9) SEO weekly report — Sun 20:00 UTC
+        scheduler.add_job(
+            lambda: _wrap_cron(run_seo_weekly_report, "seo_weekly_report"),
+            CronTrigger(day_of_week="sun", hour=20, minute=0),
+            id="seo_weekly_report", replace_existing=True, misfire_grace_time=3600,
         )
 
         # Every Monday at 08:00 UTC (09h CET) — Coach SEO weekly digest email
@@ -622,11 +684,14 @@ async def startup():
         scheduler.start()
         app.state.scheduler = scheduler
         logger.info(
-            "APScheduler started : 12 jobs · weekly_debits · bimonthly_payouts · "
+            "APScheduler started : 20 jobs · weekly_debits · bimonthly_payouts · "
             "reviews_check_due · ae_tracking_sync · cj_tracking_sync (2h) · "
-            "opportunity_scan · dns_auto_config (5min) · monthly_blog_cluster · "
+            "opportunity_scan · dns_auto_config (5min) · "
             "weekly_seo_coach · citation_tracker_weekly · ae_deals_watch · "
-            "merchant_daily_sync (04h UTC)"
+            "merchant_daily_sync · [Phase 6] blog_auto_weekly_batch (Mon/Wed/Fri) · "
+            "emerging_keywords_scan · content_refresh_monthly · internal_linking_weekly · "
+            "gsc_position_alerts_daily · paa_faq_enrichment_weekly · content_gap_monthly · "
+            "sitemap_republish_ondemand (10min) · seo_weekly_report"
         )
     except Exception:
         logger.exception("Failed to start APScheduler")

@@ -105,6 +105,12 @@ async def create_blog_post(
     # Chantier 5 — Auto-translate en background pour toutes les langues seo_countries
     # manquantes. Si pas de EMERGENT_LLM_KEY → skip silencieux.
     background.add_task(_bg_auto_translate_post, site_id, post["slug"])
+    # Phase 6 — marque sitemap dirty pour re-submit auto (cron 10min)
+    try:
+        from routes.seo_automation import mark_sitemap_dirty
+        background.add_task(mark_sitemap_dirty, site_id)
+    except Exception:
+        pass
     return post
 
 
@@ -140,6 +146,12 @@ async def update_blog_post(
     await db.sites.update_one({"id": site_id}, {"$set": {"design.blog_posts": posts}})
     if content_changed:
         background.add_task(_bg_auto_translate_post, site_id, slug)
+    # Phase 6 — sitemap dirty
+    try:
+        from routes.seo_automation import mark_sitemap_dirty
+        background.add_task(mark_sitemap_dirty, site_id)
+    except Exception:
+        pass
     return found
 
 

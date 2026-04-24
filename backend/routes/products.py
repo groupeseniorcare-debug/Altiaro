@@ -61,6 +61,12 @@ async def create_product(site_id: str, data: ProductCreateInput, user: dict = De
         asyncio.create_task(sync_product_if_connected(site_id, doc["id"]))
     except Exception:
         pass
+    # Phase 6 — sitemap dirty
+    try:
+        from routes.seo_automation import mark_sitemap_dirty
+        asyncio.create_task(mark_sitemap_dirty(site_id))
+    except Exception:
+        pass
     return doc
 
 
@@ -91,6 +97,12 @@ async def update_product(site_id: str, product_id: str, data: ProductUpdateInput
     try:
         from routes.merchant import sync_product_if_connected
         asyncio.create_task(sync_product_if_connected(site_id, product_id))
+    except Exception:
+        pass
+    # Phase 6 — sitemap dirty
+    try:
+        from routes.seo_automation import mark_sitemap_dirty
+        asyncio.create_task(mark_sitemap_dirty(site_id))
     except Exception:
         pass
     return await db.products.find_one({"id": product_id, "site_id": site_id}, {"_id": 0})
