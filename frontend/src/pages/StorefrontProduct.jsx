@@ -226,7 +226,7 @@ export function StorefrontProduct() {
         <div className="bg-white" style={{ borderBottom: "1px solid #E5E5E5" }}>
           <div className="max-w-7xl mx-auto px-6 md:px-10 py-3 flex items-center justify-between text-[11px] uppercase tracking-[0.3em]" style={{ color: "#737373" }}>
             <div className="flex items-center gap-4 flex-wrap">
-              <span className="flex items-center gap-1.5"><Truck size={12} weight="bold" /> Livraison offerte</span>
+              <span className="flex items-center gap-1.5"><Truck size={12} weight="bold" /> {t(lang, "delivery_free_short")}</span>
               <span className="opacity-40 hidden md:inline">·</span>
               <span className="hidden md:flex items-center gap-1.5"><ShieldCheck size={12} weight="bold" /> Garantie 2 ans</span>
               <span className="opacity-40 hidden md:inline">·</span>
@@ -326,7 +326,7 @@ export function StorefrontProduct() {
                 )}
               </div>
               <div className="text-[11px] uppercase tracking-[0.25em]" style={{ color: "#737373" }}>
-                TVA incluse · Livraison offerte
+                TVA incluse · {t(lang, "delivery_free_short")}
               </div>
 
               {(() => {
@@ -334,10 +334,10 @@ export function StorefrontProduct() {
                   .map((h) => (typeof h === "string" ? h : pickLang(h, lang) || h?.fr))
                   .filter(Boolean).slice(0, 4);
                 const list = highlights.length ? highlights : [
-                  "Livraison offerte sous 72h",
-                  "Garantie 2 ans incluse",
-                  "Retour gratuit 14 jours",
-                  "Conseiller humain 7j/7",
+                  t(lang, "product_highlight_delivery_72h"),
+                  t(lang, "product_highlight_warranty_2y"),
+                  t(lang, "product_highlight_returns_14d"),
+                  t(lang, "product_highlight_support_7d"),
                 ];
                 return (
                   <ul
@@ -469,7 +469,7 @@ export function StorefrontProduct() {
           <BestForNotFor best_for={p.narrative?.seo?.best_for} not_for={p.narrative?.seo?.not_for} design={design} />
           <UsageSteps steps={p.narrative?.seo?.usage_steps} productName={pickLang(p.name, lang)} design={design} />
           <ProductFAQ faq={p.narrative?.faq} design={design} />
-          <PeopleAlsoAsk items={p.narrative?.seo?.people_also_ask} design={design} />
+          <PeopleAlsoAsk items={p.narrative?.seo?.people_also_ask} design={design} lang={lang} />
           <ProductReviews product={p} design={design} lang={lang} />
           <RelatedQueries queries={p.narrative?.seo?.related_queries} design={design} />
           <UpsellsRecommendations

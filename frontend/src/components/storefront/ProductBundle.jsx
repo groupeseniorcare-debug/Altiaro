@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { Plus, Check, ShoppingBag, ShoppingBagOpen } from "@phosphor-icons/react";
-import { pickLang } from "../../lib/i18n";
+import { pickLang, t } from "../../lib/i18n";
 import { BACKEND_URL, designAccents, formatPrice } from "./storefrontUtils";
 import { addToCart } from "../../lib/cart";
 import { toast } from "sonner";
@@ -170,7 +170,7 @@ export default function ProductBundle({ currentProduct, lang = "fr", design }) {
             style={{ background: primary }}
           >
             <ShoppingBag size={18} weight="regular" />
-            Ajouter le pack au panier
+            {t(lang, "bundle_add_to_cart")}
           </button>
         </div>
       </div>

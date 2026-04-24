@@ -5,6 +5,7 @@ import {
   CheckCircle, XCircle,
 } from "@phosphor-icons/react";
 import { designAccents } from "./storefrontUtils";
+import { t } from "../../lib/i18n";
 
 /**
  * SEO/AEO enrichment blocks for Product pages.
@@ -16,7 +17,7 @@ import { designAccents } from "./storefrontUtils";
  */
 
 /* ---------- People Also Ask (PAA) ---------- */
-export function PeopleAlsoAsk({ items, design }) {
+export function PeopleAlsoAsk({ items, design, lang = "fr" }) {
   if (!items || items.length === 0) return null;
   const { primary, fontHeading } = designAccents(design);
   return (
@@ -24,13 +25,13 @@ export function PeopleAlsoAsk({ items, design }) {
       <div className="flex items-end justify-between flex-wrap gap-3 mb-8">
         <div>
           <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-2">
-            Ce que l'on nous demande le plus
+            {t(lang, "faq_section_eyebrow")}
           </div>
           <h2
             className="text-3xl md:text-4xl font-semibold"
             style={{ fontFamily: `"${fontHeading}", serif`, color: "#1C1917" }}
           >
-            Questions fréquentes sur ce type de produit
+            {t(lang, "faq_section_title")}
           </h2>
         </div>
       </div>

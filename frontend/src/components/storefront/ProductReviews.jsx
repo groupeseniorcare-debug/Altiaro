@@ -119,7 +119,7 @@ export default function ProductReviews({ product, design, lang = "fr" }) {
                           className="text-[10px] uppercase tracking-[0.25em] px-2 py-1 font-semibold"
                           style={{ background: accent, color: primary, borderRadius: "2px" }}
                         >
-                          Achat vérifié
+                          {t(lang, "review_verified_purchase")}
                         </span>
                       )}
                     </div>
