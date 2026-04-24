@@ -424,3 +424,97 @@ async def analytics_live(
         "window_minutes": 5,
         "checked_at": now.isoformat(),
     }
+
+@router.get("/sites/{site_id}/analytics/products")
+async def analytics_products(
+    site_id: str,
+    range: str = "30d",
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Phase 5 — Tableau Produits du dashboard post-validation.
+    Retourne pour chaque produit du site : title (langue FR par défaut),
+    image, vues, achats, CA sur la période.
+    """
+    await _check_site_access(site_id, user)
+    if range not in VALID_RANGES:
+        raise HTTPException(400, f"range must be one of {sorted(VALID_RANGES)}")
+    delta = _range_to_delta(range)
+    now = datetime.now(timezone.utc)
+    since = now - delta
+
+    # 1) Liste des produits du site (toujours renvoyée, même sans events)
+    products: list[dict] = []
+    async for p in db.products.find(
+        {"site_id": site_id},
+        {
+            "_id": 0, "id": 1, "name": 1, "images": 1, "primary_image": 1,
+            "price": 1, "stock": 1, "cost_price_ht": 1, "created_at": 1,
+        },
+    ):
+        # Résout le titre FR (fallback EN puis première valeur)
+        name = p.get("name")
+        if isinstance(name, dict):
+            title = name.get("fr") or name.get("en") or next(iter(name.values()), "")
+        else:
+            title = str(name or "")
+        image = ""
+        imgs = p.get("images") or []
+        if isinstance(imgs, list) and imgs:
+            image = imgs[0] if isinstance(imgs[0], str) else (imgs[0].get("url") or "")
+        if not image:
+            image = p.get("primary_image") or ""
+        products.append({
+            "product_id": p["id"],
+            "title": title,
+            "image": image,
+            "price": float(p.get("price") or 0),
+            "cost_ht": float(p.get("cost_price_ht") or 0),
+            "stock": p.get("stock"),
+            "views": 0,
+            "purchases": 0,
+            "revenue": 0.0,
+        })
+
+    # 2) Agrégation par product_id sur storefront_events de la période
+    pipeline = [
+        {"$match": {
+            "site_id": site_id,
+            "created_at": {"$gte": since, "$lt": now},
+            "product_id": {"$ne": None},
+            "event": {"$in": ["product_view", "purchase"]},
+        }},
+        {"$group": {
+            "_id": {"pid": "$product_id", "event": "$event"},
+            "count": {"$sum": 1},
+            "revenue": {"$sum": {"$ifNull": ["$value", 0]}},
+        }},
+    ]
+    stats_by_pid: dict[str, dict] = {}
+    async for row in db.storefront_events.aggregate(pipeline):
+        pid = row["_id"]["pid"]
+        ev = row["_id"]["event"]
+        stats = stats_by_pid.setdefault(pid, {"views": 0, "purchases": 0, "revenue": 0.0})
+        if ev == "product_view":
+            stats["views"] = int(row["count"])
+        elif ev == "purchase":
+            stats["purchases"] = int(row["count"])
+            stats["revenue"] = round(float(row.get("revenue") or 0.0), 2)
+
+    # 3) Merge & tri (CA desc, puis achats, puis vues)
+    for p in products:
+        s = stats_by_pid.get(p["product_id"])
+        if s:
+            p["views"] = s["views"]
+            p["purchases"] = s["purchases"]
+            p["revenue"] = s["revenue"]
+    products.sort(key=lambda x: (-x["revenue"], -x["purchases"], -x["views"]))
+
+    return {
+        "site_id": site_id,
+        "range": range,
+        "since": since.isoformat(),
+        "until": now.isoformat(),
+        "products": products,
+        "total_count": len(products),
+    }
+
