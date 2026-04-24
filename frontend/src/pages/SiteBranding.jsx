@@ -299,12 +299,54 @@ function SectionHeader({ number, title, subtitle }) {
 /**
  * CTA card — génère avec l'IA 6 témoignages + portraits niche-adaptatifs.
  * Utilise Claude pour les textes et Nano Banana pour les photos.
+ * Mode background : le bouton lance le job et le card poll `ai_status`
+ * pour afficher la progression en temps réel (60-120 s).
  */
 function TestimonialsAiCard({ siteId, design, onReload }) {
   const [busy, setBusy] = React.useState(false);
   const [toast, setToast] = React.useState("");
+  const [progress, setProgress] = React.useState(null); // null | {status, elapsed, items, with_images}
+  const pollRef = React.useRef(null);
   const existing = (design?.testimonials?.items || []).length;
   const aiAt = design?.testimonials?.ai_generated_at;
+  const initialStatus = design?.testimonials?.ai_status;
+
+  // Auto-poll if a job is already running (e.g. triggered by the wizard)
+  React.useEffect(() => {
+    if (initialStatus === "running" && !pollRef.current) {
+      startPolling();
+    }
+    // Cleanup on unmount
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialStatus]);
+
+  const startPolling = () => {
+    if (pollRef.current) return;
+    const startedAt = Date.now();
+    setBusy(true);
+    setProgress({ status: "running", elapsed: 0, items: 0, with_images: 0 });
+    pollRef.current = setInterval(async () => {
+      const { data } = await apiCall(() => api.get(`/sites/${siteId}/testimonials`));
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      const status = data?.ai_status;
+      const items = (data?.items || []).length;
+      const withImages = data?.ai_with_images || 0;
+      setProgress({ status, elapsed, items, with_images: withImages });
+      if (status === "done" || status === "failed") {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+        setBusy(false);
+        if (status === "done") {
+          setToast(`✅ ${items} témoignages générés · ${withImages} portraits IA`);
+          await onReload();
+        } else {
+          setToast(`❌ Échec : ${data?.ai_error || "indisponible"}`);
+        }
+        setTimeout(() => { setToast(""); setProgress(null); }, 6000);
+      }
+    }, 4000);
+  };
 
   const run = async (force) => {
     if (existing >= 3 && !force) {
@@ -312,24 +354,26 @@ function TestimonialsAiCard({ siteId, design, onReload }) {
         `${existing} témoignages existent déjà. Les régénérer va les remplacer par 6 nouveaux générés par l'IA (textes + photos adaptés à votre niche). Continuer ?`
       )) return;
     }
-    setBusy(true);
     setToast("");
-    const { data, error, rawDetail } = await apiCall(() =>
+    const { error, rawDetail } = await apiCall(() =>
       api.post(`/sites/${siteId}/testimonials/ai-generate`, {
         count: 6,
         force: force || existing >= 3,
         skip_images: false,
       })
     );
-    setBusy(false);
     if (error) {
       setToast(rawDetail?.detail || error);
       return;
     }
-    setToast(`✅ ${data?.count || 0} témoignages générés · ${data?.with_images || 0} portraits IA`);
-    await onReload();
-    setTimeout(() => setToast(""), 5000);
+    startPolling();
   };
+
+  // Progress bar : roughly 120 s for 6 items + 6 portraits
+  const estimatedTotal = 120;
+  const pct = progress
+    ? Math.min(100, Math.round((progress.elapsed / estimatedTotal) * 100))
+    : 0;
 
   return (
     <div
@@ -353,7 +397,7 @@ function TestimonialsAiCard({ siteId, design, onReload }) {
             photographiques générés selon votre niche et vos produits. Le
             texte et les images s'ajustent à chaque marque.
           </p>
-          {aiAt && (
+          {aiAt && !busy && (
             <div className="text-[11px] text-neutral-400 mt-2">
               Dernier run IA : {new Date(aiAt).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
             </div>
@@ -366,13 +410,43 @@ function TestimonialsAiCard({ siteId, design, onReload }) {
           className="shrink-0 h-10 px-4 bg-neutral-900 hover:bg-black disabled:opacity-60 text-white text-[12.5px] font-semibold flex items-center gap-2"
           style={{ borderRadius: "2px" }}
         >
-          {busy ? "Génération IA (2-3 min)…" : existing >= 3 ? "Régénérer les avis (IA)" : "✨ Générer 6 avis + photos (IA)"}
+          {busy ? "Génération IA…" : existing >= 3 ? "Régénérer les avis (IA)" : "✨ Générer 6 avis + photos (IA)"}
         </button>
       </div>
+
+      {/* Progress indicator — visible during the 60-120 s Nano Banana job */}
+      {progress && progress.status === "running" && (
+        <div className="mt-5" data-testid="testimonials-ai-progress">
+          <div className="flex items-center justify-between text-[11px] mb-2">
+            <span className="uppercase tracking-[0.25em] font-medium text-neutral-900">
+              Génération en cours
+            </span>
+            <span className="tabular-nums text-neutral-500">
+              {progress.elapsed}s <span className="text-neutral-300">/ ~{estimatedTotal}s</span>
+            </span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden" style={{ background: "#F0F0F0", borderRadius: "999px" }}>
+            <div
+              className="h-full bg-neutral-900 transition-all duration-500"
+              style={{ width: `${pct}%`, borderRadius: "999px" }}
+            />
+          </div>
+          <div className="mt-2 flex items-center gap-2 text-[11.5px] text-neutral-500">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-neutral-900 opacity-60" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-neutral-900" />
+            </span>
+            {progress.items > 0
+              ? `Textes rédigés · ${progress.with_images} portraits générés…`
+              : "Claude rédige les 6 témoignages…"}
+          </div>
+        </div>
+      )}
+
       {toast && (
         <div
           data-testid="testimonials-ai-toast"
-          className="mt-3 text-[12px] text-emerald-700 font-medium"
+          className={`mt-3 text-[12px] font-medium ${toast.startsWith("✅") ? "text-emerald-700" : "text-neutral-700"}`}
         >
           {toast}
         </div>

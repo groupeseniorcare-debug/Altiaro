@@ -3,6 +3,34 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-24 (late-late night) · Wizard auto : hero IA + testimonials IA + progress indicator
+
+### Hero image auto-généré au wizard
+- Nouvelle étape `5bis` ajoutée dans `routes/launch.py` à 54 % de
+  progression : `generate_hero_image(tweak="")` avec timeout 120 s.
+- Chaque nouveau site obtient automatiquement son image lifestyle 3:2
+  au moment du wizard, sans action supplémentaire du Concepteur.
+
+### Testimonials IA auto-déclenchés post-wizard
+- Nouvelle étape `5ter` à 56 % : `asyncio.create_task(_run_generation_bg(...))`
+  lance la génération des 6 témoignages + 6 portraits en arrière-plan sans
+  bloquer le wizard. Le site storefront affichera les avis dès qu'ils
+  seront prêts (~90-120 s après la fin du wizard).
+
+### Progress indicator UI (polling ai_status)
+- `TestimonialsAiCard` étendu : polling 4 s sur `GET /testimonials`,
+  barre de progression `elapsed / ~120s`, pulsing dot animé, label
+  dynamique ("Claude rédige…" → "X portraits générés…"), détection
+  automatique si un job est déjà en cours (ex: déclenché par le wizard).
+- Cleanup interval à l'unmount pour éviter les memory leaks.
+
+### Footer background default = image Chutex
+- `StorefrontLayout.jsx` : `DEFAULT_FOOTER_BG` = image Unsplash océan
+  éditoriale (la même que Chutex) appliquée par défaut à tous les sites.
+- Priorité : `design.footer.background_url` (override Concepteur) >
+  `design.lifestyle_image` > `design.hero.image` > DEFAULT. Le Concepteur
+  peut toujours changer l'image via les étapes 5/6.
+
 ## 2026-04-24 (late night) · Hero image IA + testimonials bg-mode + logo footer définitif
 
 ### Hero image IA par site (endpoint dédié)

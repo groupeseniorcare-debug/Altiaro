@@ -274,6 +274,40 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                 if "402" in msg or "budget" in msg.lower():
                     budget_exhausted = True
 
+        # 5bis) Hero image IA (Nano Banana lifestyle 3:2) ------------------
+        await _advance(job_id, "hero-image", "Image hero IA (lifestyle)", 54)
+        if not budget_exhausted:
+            try:
+                await asyncio.wait_for(
+                    design_routes.generate_hero_image(
+                        site_id=site_id,
+                        data=design_routes.RegenInput(tweak=""),
+                        user=fake_user,
+                    ),
+                    timeout=120,
+                )
+            except asyncio.TimeoutError:
+                logger.warning("[launch] hero-image timed out")
+            except Exception as e:
+                logger.warning(f"[launch] hero-image failed: {str(e)[:120]}")
+
+        # 5ter) Témoignages IA niche-adaptés (6 avis + portraits) ----------
+        await _advance(job_id, "testimonials-ai", "6 avis + portraits IA (Nano Banana)", 56)
+        if not budget_exhausted:
+            try:
+                from routes.testimonials_ai import _run_generation_bg, GenerateInput as TGenInput
+                # Fire in background — storefront will display them once ready.
+                # Don't block the launch job.
+                fresh_site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+                if fresh_site:
+                    asyncio.create_task(_run_generation_bg(
+                        site_id,
+                        fresh_site,
+                        TGenInput(count=6, force=True, skip_images=False),
+                    ))
+            except Exception as e:
+                logger.warning(f"[launch] testimonials-ai trigger failed: {str(e)[:120]}")
+
         # 6) Collections AI suggest ---------------------------------------
         await _advance(job_id, "collections", "Suggestion de collections IA", 60)
         if not budget_exhausted:

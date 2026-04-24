@@ -77,17 +77,19 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
   const contactAddress = contact.address || "";
   const social = design?.social || {};
 
-  // Footer background image — use site's own hero image (or first product) for
-  // a consistent, niche-adaptive premium look.
+  // Footer background image — prioritise Concepteur override, then site's
+  // own hero, else a calm editorial default image applied to every new site.
+  // Concepteurs can always swap it during Step 5 / Step 6.
+  const DEFAULT_FOOTER_BG = "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=2400&q=80&auto=format&fit=crop";
   const heroImgRaw = design?.hero?.image || design?.hero?.background_image || null;
   const heroImg = heroImgRaw
     ? (heroImgRaw.startsWith("http") ? heroImgRaw : `${BACKEND_URL}${heroImgRaw}`)
     : null;
   const footerBgImage =
     design?.footer?.background_url
-    || heroImg
     || design?.lifestyle_image
-    || null;
+    || heroImg
+    || DEFAULT_FOOTER_BG;
 
   const cssVars = {
     "--cf-primary": primary,
