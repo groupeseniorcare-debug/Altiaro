@@ -688,49 +688,27 @@ class StepValidateInput(BaseModel):
     validated: bool = True
 
 
-@router.post("/sites/{site_id}/journey/validate-step")
+@router.post("/sites/{site_id}/journey/validate-step", deprecated=True)
 async def validate_journey_step(
     site_id: str, body: StepValidateInput, user=Depends(get_current_user),
 ):
-    """Mark a cockpit journey step as validated (or un-validate it).
-    The Concepteur drives his own progress — there are no product-count gates."""
-    await _check_site_access(site_id, user)
-    if body.step not in VALID_STEP_KEYS:
-        raise HTTPException(400, f"Étape inconnue : {body.step}")
+    """DEPRECATED (Chantier 1) — La validation manuelle est supprimée.
 
-    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "journey_validated": 1, "design.financial_forecast": 1})
-    validated = set((site or {}).get("journey_validated") or [])
-    if body.validated:
-        # Launch gate : block validation of "forecast" step if the realistic
-        # scenario cannot sustain the CPA (margin per order too thin).
-        if body.step == "forecast":
-            fc = ((site or {}).get("design") or {}).get("financial_forecast") or {}
-            gate = fc.get("launch_gate") or {}
-            if gate.get("status") == "blocked":
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        "Étape bloquée : marge par commande trop faible face au CPA. "
-                        + (gate.get("message") or "")
-                        + " Corrige tes prix, marges ou upsells avant de lancer."
-                    ),
-                )
-            if not fc.get("generated_at"):
-                raise HTTPException(
-                    status_code=400,
-                    detail="Calcule d'abord ton prévisionnel avant de valider cette étape.",
-                )
-        validated.add(body.step)
-    else:
-        validated.discard(body.step)
-    await db.sites.update_one(
-        {"id": site_id},
-        {"$set": {
-            "journey_validated": sorted(validated),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }},
+    Les 9 étapes sont maintenant complétées automatiquement selon les données
+    en DB (5 produits importés = étape 2 OK, design publié = étape 5 OK, etc.).
+
+    Utilisez GET /api/sites/{site_id}/steps/status pour obtenir l'état auto.
+    Cet endpoint est conservé en 410 Gone pour forcer les clients frontend
+    obsolètes à basculer.
+    """
+    raise HTTPException(
+        status_code=410,
+        detail=(
+            "La validation manuelle des étapes est supprimée. "
+            "Les étapes sont désormais complétées automatiquement par les données. "
+            "Consultez GET /api/sites/{site_id}/steps/status pour voir l'état."
+        ),
     )
-    return {"ok": True, "validated_steps": sorted(validated)}
 
 
 @router.get("/sites/{site_id}/upsell-recommendations")

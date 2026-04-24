@@ -1,0 +1,449 @@
+"""
+Journey gating — Chantier 1 (Altiaro).
+
+Source de vérité UNIQUE pour le statut des 9 étapes du cockpit concepteur.
+Pas de validation manuelle : chaque étape est considérée comme complétée
+uniquement si les données correspondantes existent en DB.
+
+Règles de completion (selon brief user) :
+  1. pricing   — ≥1 QuickScan généré pour ce site avec verdict GO ou CAUTION
+  2. import    — ≥5 produits dans db.products pour ce site
+                 + couverture 100% des pays cibles (sinon "soft_blocked" avec override)
+  3. upsells   — ≥3 produits typés upsell/accessoire
+  4. forecast  — financial_forecast généré
+  5. branding  — design.published == true
+  6. pages     — pages légales + about/faq/contact remplies
+  7. content   — ≥1 pillar + ≥3 satellites blog
+  8. seo       — seo_score ≥ 70
+  9. qa        — qa_audit ready_for_submission == true (envoyé à l'admin)
+
+Pattern : un endpoint `GET /api/sites/{site_id}/steps/status` qui calcule
+tout à chaque appel. Pas de cache. Pas de flag manuel en DB.
+"""
+from __future__ import annotations
+
+import logging
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from deps import db, get_current_user, _check_site_access
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+# Ordre canonique des 9 étapes
+STEP_ORDER = [
+    "pricing", "import", "upsells", "forecast", "branding",
+    "pages", "content", "seo", "qa",
+]
+
+STEP_LABELS = {
+    "pricing":  "Analyse concurrence & pricing",
+    "import":   "Import du catalogue",
+    "upsells":  "Upsells & accessoires",
+    "forecast": "Étude financière 30j",
+    "branding": "Identité & branding",
+    "pages":    "Pages essentielles (about, FAQ, CGV…)",
+    "content":  "Blog & contenu SEO",
+    "seo":      "Santé SEO / AEO",
+    "qa":       "QA automatique & soumission",
+}
+
+
+# ────────── Helpers de check par étape ────────── #
+
+async def _check_pricing(site_id: str, site: dict) -> dict:
+    """≥1 QuickScan en DB avec verdict GO ou CAUTION pour ce site."""
+    count_ok = await db.quick_scans.count_documents({
+        "site_id": site_id,
+        "verdict": {"$in": ["GO", "GO_WITH_RESERVE"]},
+    })
+    count_total = await db.quick_scans.count_documents({"site_id": site_id})
+    completed = count_ok >= 1
+    if completed:
+        reason = f"{count_ok} marché(s) GO/CAUTION sur {count_total} scan(s)"
+    elif count_total > 0:
+        reason = f"{count_total} scan(s) générés — aucun GO/CAUTION · réessayez sur un autre pays/produit"
+    else:
+        reason = "Lance un QuickScan sur un pays cible pour débloquer la suite"
+    return {
+        "key": "pricing",
+        "label": STEP_LABELS["pricing"],
+        "completed": completed,
+        "reason": reason,
+        "counters": {"total_scans": count_total, "go_or_caution": count_ok},
+    }
+
+
+async def _check_import(site_id: str, site: dict) -> dict:
+    """≥5 produits dans db.products pour ce site + couverture pays."""
+    product_count = await db.products.count_documents({"site_id": site_id})
+    min_products = 5
+
+    # Couverture pays : chaque pays cible du site doit être couvert
+    # par au moins 1 produit livrable (champ future : product.shipping_countries[]).
+    target_countries = site.get("countries") or []
+    if not target_countries and site.get("country"):
+        target_countries = [site["country"]]
+
+    coverage: dict = {}
+    missing: list = []
+    if target_countries:
+        # Récupère tous les produits pour calculer leur couverture agrégée.
+        async for p in db.products.find(
+            {"site_id": site_id},
+            {"_id": 0, "id": 1, "shipping_countries": 1},
+        ):
+            for cc in (p.get("shipping_countries") or []):
+                coverage[cc] = coverage.get(cc, 0) + 1
+        for cc in target_countries:
+            if coverage.get(cc, 0) == 0:
+                missing.append(cc)
+
+    has_enough_products = product_count >= min_products
+    has_full_coverage = len(missing) == 0
+    # Override : le concepteur peut forcer le passage même avec couverture
+    # incomplète (option explicite persistée dans site.import_force_partial).
+    force_partial = bool(site.get("import_force_partial"))
+
+    if not has_enough_products:
+        completed = False
+        reason = f"{product_count}/{min_products} produits importés"
+    elif not has_full_coverage and not force_partial:
+        completed = False
+        reason = (
+            f"5+ produits OK, mais {len(missing)} pays sans couverture : "
+            f"{', '.join(missing)} · ajoute un produit livrable OU confirme "
+            f"le passage partiel"
+        )
+    else:
+        completed = True
+        if force_partial and not has_full_coverage:
+            reason = f"{product_count} produits · couverture partielle assumée (manque : {', '.join(missing)})"
+        else:
+            reason = f"{product_count} produits · couverture 100% sur {len(target_countries)} pays"
+
+    return {
+        "key": "import",
+        "label": STEP_LABELS["import"],
+        "completed": completed,
+        "reason": reason,
+        "counters": {
+            "product_count": product_count,
+            "min_required": min_products,
+            "target_countries": target_countries,
+            "country_coverage": coverage,
+            "missing_countries": missing,
+            "force_partial": force_partial,
+        },
+    }
+
+
+async def _check_upsells(site_id: str, site: dict) -> dict:
+    """≥3 produits typés 'upsell' ou 'accessory'."""
+    count = await db.products.count_documents({
+        "site_id": site_id,
+        "$or": [
+            {"type": {"$in": ["upsell", "accessory", "addon"]}},
+            {"is_upsell": True},
+            {"role": {"$in": ["upsell", "accessory"]}},
+        ],
+    })
+    min_upsells = 3
+    completed = count >= min_upsells
+    reason = (
+        f"{count} upsell(s)/accessoire(s)"
+        if completed
+        else f"{count}/{min_upsells} upsells nécessaires · tagge 3 produits comme upsell/accessoire"
+    )
+    return {
+        "key": "upsells",
+        "label": STEP_LABELS["upsells"],
+        "completed": completed,
+        "reason": reason,
+        "counters": {"upsell_count": count, "min_required": min_upsells},
+    }
+
+
+async def _check_forecast(site_id: str, site: dict) -> dict:
+    """Forecast financier généré."""
+    fc = (site.get("design") or {}).get("financial_forecast") or {}
+    generated_at = fc.get("generated_at")
+    completed = bool(generated_at)
+    reason = (
+        f"Prévisionnel généré le {generated_at[:10]}"
+        if completed
+        else "Lance le calcul du prévisionnel 30j"
+    )
+    return {
+        "key": "forecast",
+        "label": STEP_LABELS["forecast"],
+        "completed": completed,
+        "reason": reason,
+    }
+
+
+async def _check_branding(site_id: str, site: dict) -> dict:
+    """design.published == true."""
+    design = site.get("design") or {}
+    published = bool(design.get("published"))
+    has_brand = bool((design.get("brand") or {}).get("name"))
+    has_logo = bool((design.get("brand") or {}).get("logo_url"))
+    completed = published and has_brand
+    reason = (
+        "Design publié · branding complet" if completed
+        else "Publie le design avec un nom + logo pour valider"
+    )
+    return {
+        "key": "branding",
+        "label": STEP_LABELS["branding"],
+        "completed": completed,
+        "reason": reason,
+        "counters": {"published": published, "has_brand": has_brand, "has_logo": has_logo},
+    }
+
+
+def _page_has_content(page: dict) -> bool:
+    if not page:
+        return False
+    body = page.get("body")
+    if isinstance(body, dict):
+        return bool((body.get("content") or "").strip())
+    if isinstance(body, str):
+        return bool(body.strip())
+    return False
+
+
+async def _check_pages(site_id: str, site: dict) -> dict:
+    """Pages légales (mentions, cgv, confidentialite, cookies) + 3 éditoriales
+    (about, faq, contact) toutes non-vides."""
+    pages = (site.get("design") or {}).get("pages") or {}
+    required_legal = ["mentions_legales", "cgv", "confidentialite", "cookies"]
+    required_editorial = ["about", "faq", "contact"]
+    filled_legal = [k for k in required_legal if _page_has_content(pages.get(k))]
+    filled_editorial = [k for k in required_editorial if _page_has_content(pages.get(k))]
+    missing = [
+        k for k in (required_legal + required_editorial)
+        if k not in (filled_legal + filled_editorial)
+    ]
+    completed = len(missing) == 0
+    reason = (
+        "Toutes les pages essentielles remplies"
+        if completed
+        else f"Pages manquantes : {', '.join(missing)}"
+    )
+    return {
+        "key": "pages",
+        "label": STEP_LABELS["pages"],
+        "completed": completed,
+        "reason": reason,
+        "counters": {"filled": filled_legal + filled_editorial, "missing": missing},
+    }
+
+
+async def _check_content(site_id: str, site: dict) -> dict:
+    """≥1 pillar + ≥3 satellites dans blog_posts."""
+    posts = (site.get("design") or {}).get("blog_posts") or []
+    pillars = [p for p in posts if (p.get("type") == "pillar" or p.get("role") == "pillar")]
+    satellites = [p for p in posts if (p.get("type") == "satellite" or p.get("role") == "satellite")]
+    # Fallback : si pas de type explicite, considère le 1er comme pillar
+    if not pillars and posts:
+        pillars = posts[:1]
+        satellites = posts[1:]
+    pillar_ok = len(pillars) >= 1
+    satellite_ok = len(satellites) >= 3
+    completed = pillar_ok and satellite_ok
+    reason = (
+        f"{len(pillars)} pillar(s) + {len(satellites)} satellite(s)"
+        if completed
+        else f"Requis : 1 pillar + 3 satellites · actuel : {len(pillars)} pillar / {len(satellites)} satellites"
+    )
+    return {
+        "key": "content",
+        "label": STEP_LABELS["content"],
+        "completed": completed,
+        "reason": reason,
+        "counters": {"pillars": len(pillars), "satellites": len(satellites)},
+    }
+
+
+async def _check_seo(site_id: str, site: dict) -> dict:
+    """SEO studio rempli (seo_score ≥ 70)."""
+    score = int((site.get("design") or {}).get("seo_score") or 0)
+    threshold = 70
+    completed = score >= threshold
+    reason = f"Score SEO {score}/100 (seuil {threshold})"
+    return {
+        "key": "seo",
+        "label": STEP_LABELS["seo"],
+        "completed": completed,
+        "reason": reason,
+        "counters": {"score": score, "threshold": threshold},
+    }
+
+
+async def _check_qa(site_id: str, site: dict) -> dict:
+    """Status = approved (validé admin) OU soumis à review avec score OK."""
+    status = (site.get("status") or "").lower()
+    qa = site.get("qa_audit") or {}
+    # 'approved' côté admin = étape terminale
+    if status in ("approved", "published", "live"):
+        return {
+            "key": "qa",
+            "label": STEP_LABELS["qa"],
+            "completed": True,
+            "reason": f"Site {status} par l'admin",
+        }
+    if status == "pending_review":
+        return {
+            "key": "qa",
+            "label": STEP_LABELS["qa"],
+            "completed": False,
+            "reason": "En attente de validation admin",
+        }
+    if qa.get("ready_for_submission"):
+        return {
+            "key": "qa",
+            "label": STEP_LABELS["qa"],
+            "completed": False,
+            "reason": f"QA score {qa.get('score', 0)}/100 · soumets à l'admin",
+        }
+    return {
+        "key": "qa",
+        "label": STEP_LABELS["qa"],
+        "completed": False,
+        "reason": "Lance le QA automatique pour finaliser",
+    }
+
+
+_CHECKERS = {
+    "pricing":  _check_pricing,
+    "import":   _check_import,
+    "upsells":  _check_upsells,
+    "forecast": _check_forecast,
+    "branding": _check_branding,
+    "pages":    _check_pages,
+    "content":  _check_content,
+    "seo":      _check_seo,
+    "qa":       _check_qa,
+}
+
+
+async def compute_step_statuses(site_id: str) -> list[dict]:
+    """Calcule le statut des 9 étapes pour un site.
+    Retourne la liste ordonnée [pricing, import, …, qa] avec
+    `blocked_by_previous` pour chaque étape.
+    """
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(404, "Site introuvable")
+
+    statuses: list[dict] = []
+    previous_completed = True  # première étape toujours accessible
+    for key in STEP_ORDER:
+        checker = _CHECKERS[key]
+        s = await checker(site_id, site)
+        s["order"] = STEP_ORDER.index(key) + 1
+        s["blocked_by_previous"] = not previous_completed
+        statuses.append(s)
+        previous_completed = s["completed"]
+    return statuses
+
+
+# ────────── API publique ────────── #
+
+@router.get("/sites/{site_id}/steps/status")
+async def get_steps_status(
+    site_id: str,
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Renvoie l'état auto-calculé des 9 étapes pour ce site.
+
+    Source de vérité unique pour le gating UI et les route guards. Aucune
+    donnée n'est persistée ici — tout est dérivé de la DB à chaque appel.
+    """
+    await _check_site_access(site_id, user)
+    statuses = await compute_step_statuses(site_id)
+    completed_count = sum(1 for s in statuses if s["completed"])
+    next_step = next((s["key"] for s in statuses if not s["completed"]), None)
+    return {
+        "site_id": site_id,
+        "steps": statuses,
+        "completed_count": completed_count,
+        "total_count": len(statuses),
+        "progress_pct": round((completed_count / len(statuses)) * 100),
+        "next_step": next_step,
+    }
+
+
+@router.get("/sites/{site_id}/steps/can-access/{step_key}")
+async def can_access_step(
+    site_id: str,
+    step_key: str,
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Helper pour route guards frontend. Retourne si l'étape est accessible
+    (= pas bloquée par la précédente) et la redirection conseillée sinon.
+    """
+    await _check_site_access(site_id, user)
+    if step_key not in STEP_ORDER:
+        raise HTTPException(400, f"Étape inconnue : {step_key}")
+    statuses = await compute_step_statuses(site_id)
+    idx = STEP_ORDER.index(step_key)
+    target = statuses[idx]
+    if target["blocked_by_previous"]:
+        # Redirige vers la 1re étape non-complétée
+        previous = next(
+            (s for s in statuses if not s["completed"] and s["order"] < target["order"]),
+            statuses[0],
+        )
+        return {
+            "allowed": False,
+            "reason": f"L'étape '{previous['label']}' n'est pas complétée.",
+            "redirect_to_step": previous["key"],
+            "redirect_reason": previous["reason"],
+        }
+    return {"allowed": True, "step": target}
+
+
+# ────────── Override import "couverture partielle" ────────── #
+
+@router.post("/sites/{site_id}/steps/import/force-partial")
+async def force_partial_import(
+    site_id: str,
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Accepte explicitement de passer à l'étape 3 sans couverture 100% des
+    pays. Persiste `site.import_force_partial = True`.
+    """
+    await _check_site_access(site_id, user)
+    await db.sites.update_one(
+        {"id": site_id},
+        {"$set": {"import_force_partial": True}},
+    )
+    return {"ok": True, "import_force_partial": True}
+
+
+# ────────── Compatibilité legacy : déprécier validate-step manuel ────────── #
+
+@router.post("/sites/{site_id}/journey/validate-step", deprecated=True)
+async def deprecated_validate_step(
+    site_id: str,
+    user: dict = Depends(get_current_user),
+    body: Optional[dict] = None,
+) -> dict:
+    """DEPRECATED (Chantier 1) — La validation manuelle est supprimée.
+
+    Retourne 410 Gone pour forcer le client frontend à basculer sur le nouvel
+    endpoint GET /sites/{id}/steps/status.
+    """
+    raise HTTPException(
+        status_code=410,
+        detail=(
+            "La validation manuelle des étapes est supprimée. "
+            "Les étapes sont désormais complétées automatiquement par les données "
+            "(ex: 5 produits importés, design publié, etc.). "
+            "Utilisez GET /api/sites/{site_id}/steps/status pour voir l'état."
+        ),
+    )

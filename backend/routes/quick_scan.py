@@ -418,11 +418,13 @@ def _compute_verdict(metrics: dict, insights: dict) -> dict:
 class QuickScanInput(BaseModel):
     product_or_niche: str = Field(..., min_length=3, max_length=120)
     country: str = Field("FR", min_length=2, max_length=2)
+    site_id: Optional[str] = Field(None, description="Si lancé depuis l'étape 1 d'un site cockpit")
 
 
 class MultiScanInput(BaseModel):
     product_or_niche: str = Field(..., min_length=3, max_length=120)
     countries: Optional[list[str]] = None  # if None, uses DEFAULT_MULTI_MARKETS
+    site_id: Optional[str] = Field(None, description="Si lancé depuis l'étape 1 d'un site cockpit")
 
 
 async def _run_single_scan(product: str, country: str, user_id: Optional[str]) -> dict:
@@ -672,6 +674,8 @@ async def run_quick_scan(data: QuickScanInput, user: dict = Depends(get_current_
         data.country,
         user.get("id"),
     )
+    if data.site_id:
+        result["site_id"] = data.site_id
     await db.quick_scans.insert_one(dict(result))
     return result
 
@@ -702,6 +706,7 @@ async def run_multi_market_scan(
         "countries": countries,
         "created_at": now_iso,
         "created_by": user.get("id"),
+        "site_id": data.site_id,
         "status": "running",
         "progress": {"done": 0, "total": len(countries)},
     })
@@ -711,6 +716,8 @@ async def run_multi_market_scan(
         try:
             r = await _run_single_scan(product, cc, user.get("id"))
             r["multi_group_id"] = group_id
+            if data.site_id:
+                r["site_id"] = data.site_id
             await db.quick_scans.insert_one(dict(r))
         except HTTPException as e:
             await db.quick_scans.insert_one({
@@ -719,6 +726,7 @@ async def run_multi_market_scan(
                 "product_or_niche": product,
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "created_by": user.get("id"),
+                "site_id": data.site_id,
                 "multi_group_id": group_id,
                 "verdict": "ERROR",
                 "error": e.detail,
@@ -731,6 +739,7 @@ async def run_multi_market_scan(
                 "product_or_niche": product,
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "created_by": user.get("id"),
+                "site_id": data.site_id,
                 "multi_group_id": group_id,
                 "verdict": "ERROR",
                 "error": str(e)[:200],

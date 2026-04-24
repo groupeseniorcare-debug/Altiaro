@@ -5,11 +5,13 @@ import {
   FloppyDisk, Warning, CheckCircle, Clock, CalendarBlank, Stack,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
+import { useStepGuard } from "../lib/useStepGuard";
 
 export default function SiteBlogPosts() {
   const [searchParams] = useSearchParams();
   const fromStep7 = searchParams.get("step") === "7";
   const { id: siteId } = useParams();
+  const { allowed, checking } = useStepGuard(siteId, "content");
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
@@ -194,6 +196,15 @@ export default function SiteBlogPosts() {
       return iso;
     }
   };
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center">
+        <div className="text-sm text-neutral-500">Vérification des prérequis…</div>
+      </div>
+    );
+  }
+  if (!allowed) return null;
 
   return (
     <div className="min-h-screen bg-[#FAF7F2]">

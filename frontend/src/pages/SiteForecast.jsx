@@ -6,6 +6,7 @@ import {
   LockSimple, Rocket,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
+import { useStepGuard } from "../lib/useStepGuard";
 
 const SCENARIO_META = {
   pessimistic: { color: "text-rose-700", bg: "bg-rose-50", border: "border-rose-200", accent: "#BE123C" },
@@ -30,6 +31,7 @@ const fmtPct = (n, dec = 1) => `${(Number(n) || 0).toFixed(dec)} %`;
 
 export default function SiteForecast() {
   const { id: siteId } = useParams();
+  const { allowed, checking } = useStepGuard(siteId, "forecast");
   const [forecast, setForecast] = useState(null);
   const [loading, setLoading] = useState(false);
   const [dailyBudget, setDailyBudget] = useState(30);
@@ -77,6 +79,15 @@ export default function SiteForecast() {
     if (error) { window.alert(error); return; }
     setIsValidated(true);
   };
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center">
+        <div className="text-sm text-neutral-500">Vérification des prérequis…</div>
+      </div>
+    );
+  }
+  if (!allowed) return null;
 
   return (
     <div className="min-h-screen bg-[#FAF7F2]">

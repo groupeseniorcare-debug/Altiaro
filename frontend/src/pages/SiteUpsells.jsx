@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Stack, Sparkle, ArrowClockwise, MagnifyingGlass } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
+import { useStepGuard } from "../lib/useStepGuard";
 import SourcingPanel from "../components/SourcingPanel";
 
 const MARGIN_META = {
@@ -12,6 +13,7 @@ const MARGIN_META = {
 
 export default function SiteUpsells() {
   const { id: siteId } = useParams();
+  const { allowed, checking } = useStepGuard(siteId, "upsells");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const panelRef = useRef(null);
@@ -35,6 +37,15 @@ export default function SiteUpsells() {
   const pickSuggestion = (kw) => {
     panelRef.current?.prefillAndSearch(kw);
   };
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center">
+        <div className="text-sm text-neutral-500">Vérification des prérequis…</div>
+      </div>
+    );
+  }
+  if (!allowed) return null;  // redirect déjà déclenché par le hook
 
   return (
     <div className="min-h-screen bg-[#FAF7F2]">

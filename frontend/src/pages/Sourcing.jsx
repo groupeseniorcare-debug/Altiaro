@@ -2,9 +2,20 @@ import React from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Package } from "@phosphor-icons/react";
 import SourcingPanel from "../components/SourcingPanel";
+import { useStepGuard } from "../lib/useStepGuard";
 
 export default function Sourcing() {
   const { id: siteId } = useParams();
+  const { allowed, checking } = useStepGuard(siteId, "import");
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center">
+        <div className="text-sm text-neutral-500">Vérification des prérequis…</div>
+      </div>
+    );
+  }
+  if (!allowed) return null;
 
   return (
     <div className="min-h-screen bg-[#FAF7F2]">

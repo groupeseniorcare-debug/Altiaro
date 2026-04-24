@@ -88,6 +88,7 @@ from routes import ae_deals_watcher as ae_deals_watcher_routes
 from routes import testimonials_ai as testimonials_ai_routes
 from routes import merchant as merchant_routes
 from routes import resend_domain as resend_domain_routes
+from routes import journey_gating as journey_gating_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -162,6 +163,7 @@ api.include_router(ae_deals_watcher_routes.router)
 api.include_router(testimonials_ai_routes.router)
 api.include_router(merchant_routes.router)
 api.include_router(resend_domain_routes.router)
+api.include_router(journey_gating_routes.router)
 
 
 @app.on_event("startup")
