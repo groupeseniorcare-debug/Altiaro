@@ -82,7 +82,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("conceptfactory")
 
-app = FastAPI(title="Altiaro API")
+app = FastAPI(
+    title="Altiaro API",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
+)
 api = APIRouter(prefix="/api")
 
 # Mount all routers
