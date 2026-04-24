@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Package } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 import ProductImportPanel from "../components/ProductImportPanel";
+import AeDealsPanel from "../components/AeDealsPanel";
 import { useStepGuard } from "../lib/useStepGuard";
 
 /**
@@ -67,6 +68,13 @@ export default function Sourcing() {
           nicheHint={nicheHint}
           targetCountries={targetCountries}
         />
+
+        {/* Chantier 6 — AeDealsPanel déplacé ici depuis le cockpit.
+            Les deals AliExpress pertinents pour la niche sont plus utiles
+            pendant la phase d'import que sur la page cockpit générique. */}
+        <div className="mt-10" data-testid="sourcing-ae-deals-section">
+          <AeDealsPanel siteId={siteId} />
+        </div>
       </div>
     </div>
   );
