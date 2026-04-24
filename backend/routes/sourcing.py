@@ -445,10 +445,12 @@ Languages to produce: {", ".join(langs)}
 @router.post("/sites/{site_id}/sourcing/import")
 async def import_product(site_id: str, data: ImportInput, user: dict = Depends(get_current_user)):
     await _check_site_access(site_id, user)
-    # Load site to determine target translation languages + shipping destinations
-    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "selected_countries": 1})
-    countries = (site or {}).get("selected_countries") or ["FR"]
-    target_langs = list(set(LANG_BY_COUNTRY.get((c or "").upper(), "fr") for c in countries))
+    # Chantier 5 — Les traductions produit suivent seo_countries (couverture SEO
+    # complète par défaut), pas selected_countries (ads). Les anciens sites sans
+    # seo_countries bénéficient automatiquement du fallback "tous pays supportés".
+    from seo_constants import get_seo_langs
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "selected_countries": 1, "seo_countries": 1})
+    target_langs = get_seo_langs(site or {})
     if "fr" not in target_langs:
         target_langs.append("fr")
 

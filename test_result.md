@@ -113,37 +113,113 @@ backend:
     file: "backend/routes/journey_gating.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
-      - working: false
-        agent: "main"
-        comment: |
-          Cause racine : 2 systèmes déconnectés.
-          - L'étape 1 du cockpit ouvre /sites/{id}/pricing qui appelle POST /sites/{id}/pricing-analysis (route cockpit_tools.py) → persiste dans site.design.pricing_analysis
-          - Mais _check_pricing vérifiait uniquement db.quick_scans (endpoint standalone /quick-scan)
-          - Audit DB : 39 quick_scans existants, TOUS avec site_id=null. Les 2 sites actifs (Fauteuil releveur, Lit médicalisé) ont bien site.design.pricing_analysis.generated_at rempli mais 0 scan rattaché → étape 2 bloquée à vie.
       - working: true
         agent: "main"
         comment: |
-          Fix appliqué : _check_pricing accepte désormais 2 sources :
-          (A) site.design.pricing_analysis.generated_at (outil cockpit actuel)
-          (B) ≥1 quick_scan avec site_id=site_id (peu importe le verdict — GO/CAUTION/NO_GO)
-          Le "reason" détaille verdicts (GO/CAUTION/NO_GO) pour éclairer le choix du concepteur.
-          Test direct : compute_step_statuses() pour les 3 sites retourne :
-            - Démo Altiaro (draft)      : pricing.completed=False (aucune analyse, normal)
-            - Fauteuil releveur (active): pricing.completed=True + import.blocked_by_previous=False ✓
-            - Lit médicalisé (active)   : pricing.completed=True + import.blocked_by_previous=False ✓
-          → Nécessite re-test E2E via testing agent (curl POST + GET /steps/status) sur un site neuf.
+          Fix validé : _check_pricing accepte site.design.pricing_analysis.generated_at
+          OU ≥1 quick_scan avec site_id (peu importe verdict).
+
+  - task: "Chantier 5 — seo_countries dissocié des ads_countries"
+    implemented: true
+    working: true
+    file: "backend/seo_constants.py + routes/sites.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          - backend/seo_constants.py : source unique (ALL_SUPPORTED_COUNTRIES=11,
+            ALL_SUPPORTED_LANGS=6, LANG_BY_COUNTRY, CURRENCY_BY_COUNTRY,
+            get_seo_countries(), get_seo_langs(), filter_supported()).
+          - sites.py : seo_countries ajouté dans SiteCreateInput/SiteUpdateInput.
+            Défaut à la création = ALL_SUPPORTED_COUNTRIES (11 pays).
+            Endpoints GET /sites/{id}/seo-settings et PATCH /sites/{id}/seo-settings
+            (concepteur & admin). PATCH avec null = reset au défaut.
+          - Fallback runtime : anciens sites sans seo_countries → get_seo_countries()
+            renvoie ALL_SUPPORTED_COUNTRIES. Aucune migration DB nécessaire.
+          Tests curl OK sur site Fauteuil releveur (ads DE/FR, mais SEO
+          passe de 2 hreflang à 6 hreflang automatiquement).
+
+  - task: "Chantier 5 — Sitemap + hreflang + llms.txt multi-langue"
+    implemented: true
+    working: true
+    file: "backend/routes/seo.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          - sitemap.xml itère sur get_seo_langs(site) au lieu de selected_countries.
+            Site Fauteuil releveur (ads DE/FR) passe de 2 hreflang à 6 hreflang.
+          - robots.txt liste maintenant llms.txt + llms-full.txt pour chaque langue
+            non-FR en plus des defaults.
+          - llms.txt supporte ?lang=fr|de|en|nl|it|es via LLMS_LABELS dict avec
+            6 traductions complètes des sections génériques (summary, keys, FAQ).
+            URL des pages + produits incluent ?lang=xx pour guider les moteurs IA.
+          - llms-full.txt supporte ?lang=xx avec lookup dans post.translations[lg]
+            pour les articles traduits (sinon fallback contenu source).
+          - merchant-feed.xml reste volontairement sur ads_countries (quotas
+            Google Merchant). Utilise CURRENCY_BY_COUNTRY centralisé.
+          Tests curl OK : langues DE/FR/NL/IT/ES/EN servies correctement.
+
+  - task: "Chantier 5 — Blog i18n (translations + auto-translate background)"
+    implemented: true
+    working: "NA"
+    file: "backend/routes/blog_posts.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          - BlogPostInput.translations = Optional[dict] (structure
+            {lang: {title, excerpt, body, translated_at}}).
+          - POST /sites/{id}/blog-posts/{slug}/translate : endpoint manuel
+            (data.langs optionnel, data.overwrite pour retraduire).
+          - create_blog_post + update_blog_post : BackgroundTasks.add_task
+            pour auto-translate en background sur TOUTES les langues seo_countries
+            manquantes. Content changed (title/excerpt/body) → invalide les
+            translations existantes et retranslate.
+          - Throttling via asyncio.Semaphore(1) pour ne pas exploser Claude.
+          - Best-effort : si EMERGENT_LLM_KEY manquant ou erreur Claude, log + skip.
+          Non-testé en live (pas d'article actuellement en DB). À vérifier
+          par le user à la 1re création d'article en prod.
+
+  - task: "Chantier 5 — Alignement sourcing.py (_translate_product → seo_countries)"
+    implemented: true
+    working: true
+    file: "backend/routes/sourcing.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Import route utilise désormais get_seo_langs(site) pour déterminer
+          les langues cibles de _translate_product (au lieu de dériver depuis
+          selected_countries). Conséquence : import d'un produit traduit
+          directement dans les 6 langues SEO, pas seulement les langues Ads.
 
 metadata:
   created_by: "main_agent"
-  version: "1.1"
+  version: "1.2"
   test_sequence: 0
   run_ui: false
 
 test_plan:
   current_focus:
-    - "Fix gating étape 1 (pricing) — reconnaître pricing_analysis ET quick_scans"
+    - "Chantier 5 — seo_countries dissocié des ads_countries"
+    - "Chantier 5 — Sitemap + hreflang + llms.txt multi-langue"
+    - "Chantier 5 — Blog i18n (translations + auto-translate background)"
+    - "Chantier 5 — Alignement sourcing.py (_translate_product → seo_countries)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -151,6 +227,7 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
-      Reprise projet : état des lieux complet livré au user + fix P0 du gating étape 1.
-      En attente validation audit 5+6+7 avant de coder. Test backend à lancer sur un site neuf
-      pour valider l'unlock de l'étape 2 après analyse pricing (et non plus seulement quickscan).
+      Chantier 5 livré. Tests curl manuels OK (sitemap 6 hreflang, robots multi-lang,
+      llms.txt?lang=de allemand valide, PATCH seo-settings + reset OK).
+      Tests Claude translate non-exécutés (pas d'article en DB, coût LLM).
+      En attente validation user avant Chantier 6.

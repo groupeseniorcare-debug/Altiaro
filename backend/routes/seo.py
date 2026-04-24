@@ -1,20 +1,22 @@
-"""SEO utilities (Sprint 17) — sitemap.xml multi-pays + hreflang support."""
+"""SEO utilities — sitemap.xml + hreflang + robots + llms.txt.
+
+Chantier 5 : le SEO organique est dissocié de la config Ads.
+`seo_countries` par défaut = TOUS les pays supportés (`ALL_SUPPORTED_COUNTRIES`).
+`selected_countries` (ads) est ignoré ici — le SEO ne se restreint pas au budget.
+"""
 from __future__ import annotations
 import os
+from typing import Optional
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from datetime import datetime, timezone
 from deps import db
+from seo_constants import (
+    LANG_BY_COUNTRY, CURRENCY_BY_COUNTRY, ALL_SUPPORTED_LANGS,
+    get_seo_countries, get_seo_langs,
+)
 
 router = APIRouter()
-
-# Supported language codes mapped to country codes of the site
-LANG_BY_COUNTRY = {
-    "FR": "fr", "BE": "fr", "LU": "fr", "CH": "fr",
-    "DE": "de", "AT": "de",
-    "UK": "en", "IE": "en",
-    "NL": "nl", "IT": "it", "ES": "es",
-}
 
 
 def _origin() -> str:
@@ -30,11 +32,8 @@ async def sitemap(site_id: str):
     base = f"{origin}/shop/{site_id}"
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    # Build languages from selected countries
-    langs = sorted({LANG_BY_COUNTRY.get((c or "").upper(), "en")
-                   for c in (site.get("selected_countries") or ["FR"])})
-    if not langs:
-        langs = ["fr"]
+    # Chantier 5 — langues dérivées de seo_countries (pas selected_countries)
+    langs = sorted(get_seo_langs(site)) or ["fr"]
 
     products = await db.products.find(
         {"site_id": site_id, "status": "active"},
@@ -116,10 +115,22 @@ async def sitemap(site_id: str):
 
 @router.get("/public/sites/{site_id}/robots.txt")
 async def robots(site_id: str):
-    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "id": 1})
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
     if not site:
         raise HTTPException(404, "Site introuvable")
-    sitemap_url = f"{_origin()}/api/public/sites/{site_id}/sitemap.xml"
+    origin = _origin()
+    sitemap_url = f"{origin}/api/public/sites/{site_id}/sitemap.xml"
+    # Chantier 5 — multi-lang llms.txt : 1 URL par langue SEO
+    langs = get_seo_langs(site)
+    llms_lines: list[str] = []
+    llms_lines.append(f"Sitemap: {origin}/api/public/sites/{site_id}/llms.txt")
+    llms_lines.append(f"Sitemap: {origin}/api/public/sites/{site_id}/llms-full.txt")
+    for lg in langs:
+        if lg == "fr":
+            continue  # default sans ?lang=
+        llms_lines.append(f"Sitemap: {origin}/api/public/sites/{site_id}/llms.txt?lang={lg}")
+        llms_lines.append(f"Sitemap: {origin}/api/public/sites/{site_id}/llms-full.txt?lang={lg}")
+
     # Explicit allow-list for modern AI crawlers (AEO — Answer Engine Optimization)
     lines = [
         "User-agent: *",
@@ -149,35 +160,211 @@ async def robots(site_id: str):
         "Allow: /",
         "",
         f"Sitemap: {sitemap_url}",
-        f"Sitemap: {_origin()}/api/public/sites/{site_id}/llms.txt",
-        f"Sitemap: {_origin()}/api/public/sites/{site_id}/llms-full.txt",
+        *llms_lines,
         "",
     ]
     return Response(content="\n".join(lines), media_type="text/plain")
 
 
+def _pick_lang(value, lang: str, fallback: str = "fr") -> str:
+    """Extrait une valeur textuelle dans la langue demandée.
+
+    - str → renvoyé tel quel (contenu pas encore traduit)
+    - dict {fr, de, ...} → tente lang, puis fallback, puis 1re valeur non-vide
+    - autre → str()
+    """
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        v = value.get(lang)
+        if v:
+            return v if isinstance(v, str) else str(v)
+        v = value.get(fallback)
+        if v:
+            return v if isinstance(v, str) else str(v)
+        for _, vv in value.items():
+            if vv:
+                return vv if isinstance(vv, str) else str(vv)
+        return ""
+    return str(value)
+
+
+def _canonical_lang(raw: Optional[str]) -> str:
+    lg = (raw or "fr").lower().strip()
+    if lg not in ALL_SUPPORTED_LANGS:
+        lg = "fr"
+    return lg
+
+
+# Chantier 5 — Textes génériques llms.txt / llms-full.txt par langue.
+# Sections "Points clés" + "FAQ boutique" + intros sont fixes mais traduites.
+LLMS_LABELS: dict[str, dict] = {
+    "fr": {
+        "summary_header": "## Résumé",
+        "summary_intro": "{name} est une boutique spécialisée {niche}. Nous sélectionnons chaque produit comme si c'était pour un proche : partenaires audités, validation par des ergothérapeutes, garantie 2 ans, service client humain joignable du lundi au vendredi.",
+        "keys_header": "## Points clés",
+        "keys": [
+            "Livraison offerte dès 50 € d'achat, partout en France métropolitaine",
+            "Garantie 2 ans pièces et main d'œuvre sur tous les produits",
+            "Retour gratuit sous 14 jours, remboursement intégral en 5 jours ouvrés",
+            "Conseillers humains joignables par téléphone du lundi au vendredi de 9h à 18h",
+            "Certains équipements éligibles au remboursement LPPR / mutuelle",
+        ],
+        "pages_header": "## Pages principales",
+        "products_header": "## Produits",
+        "faq_header": "## Questions fréquentes",
+        "faqs": [
+            ("Quel est le délai de livraison ?", "Expédition sous 24h ouvrées, réception en 48 à 72h. Livraison offerte dès 50 € d'achat."),
+            ("Puis-je retourner un produit qui ne me convient pas ?", "Oui, vous avez 14 jours à réception pour changer d'avis. Retour gratuit et remboursement sous 5 jours ouvrés."),
+            ("Comment contacter un conseiller ?", "Par téléphone du lundi au vendredi de 9h à 18h, ou par email (réponse sous 2h ouvrées en moyenne). Jamais de chatbot : une vraie équipe humaine."),
+        ],
+        "home_label": "Accueil", "collections_label": "Collections", "about_label": "À propos",
+        "faq_label": "FAQ", "shipping_label": "Livraison", "returns_label": "Retours",
+        "contact_label": "Contact", "blog_label": "Blog", "catalog_header": "## Catalogue complet",
+        "posts_header": "## Articles publiés", "price_prefix": "Prix",
+    },
+    "de": {
+        "summary_header": "## Zusammenfassung",
+        "summary_intro": "{name} ist ein auf {niche} spezialisierter Shop. Wir wählen jedes Produkt so aus, als wäre es für einen Angehörigen: geprüfte Partner, ergotherapeutische Validierung, 2 Jahre Garantie, echter Kundenservice von Montag bis Freitag.",
+        "keys_header": "## Kernpunkte",
+        "keys": [
+            "Kostenloser Versand ab 50 € Einkaufswert",
+            "2 Jahre Garantie auf alle Produkte",
+            "Kostenlose Rücksendung innerhalb von 14 Tagen, Rückerstattung in 5 Werktagen",
+            "Echte Beraterinnen und Berater per Telefon erreichbar, Mo-Fr 9-18 Uhr",
+            "Bestimmte Geräte können über die Krankenkasse bezuschusst werden",
+        ],
+        "pages_header": "## Hauptseiten",
+        "products_header": "## Produkte",
+        "faq_header": "## Häufige Fragen",
+        "faqs": [
+            ("Wie lang ist die Lieferzeit?", "Versand binnen 24 Werkstunden, Lieferung in 48-72 Stunden. Versand ab 50 € Einkaufswert kostenlos."),
+            ("Kann ich ein Produkt zurücksenden?", "Ja, Sie haben 14 Tage Widerrufsrecht. Kostenlose Rücksendung und Rückerstattung in 5 Werktagen."),
+            ("Wie erreiche ich einen Berater?", "Telefonisch Mo-Fr 9-18 Uhr oder per E-Mail (Antwort meist binnen 2 Stunden). Kein Chatbot – ein echtes Team."),
+        ],
+        "home_label": "Startseite", "collections_label": "Kollektionen", "about_label": "Über uns",
+        "faq_label": "FAQ", "shipping_label": "Versand", "returns_label": "Rücksendung",
+        "contact_label": "Kontakt", "blog_label": "Blog", "catalog_header": "## Gesamtkatalog",
+        "posts_header": "## Veröffentlichte Artikel", "price_prefix": "Preis",
+    },
+    "en": {
+        "summary_header": "## Summary",
+        "summary_intro": "{name} is a shop specialised in {niche}. We pick each product as if it were for a relative: audited partners, occupational-therapist validation, 2-year warranty, human customer service reachable Monday to Friday.",
+        "keys_header": "## Key points",
+        "keys": [
+            "Free shipping from £50 order value",
+            "2-year warranty on all products",
+            "Free 14-day returns, full refund within 5 working days",
+            "Human advisors reachable by phone Mon-Fri 9am-6pm",
+            "Some medical equipment eligible for NHS or mutual reimbursement",
+        ],
+        "pages_header": "## Main pages",
+        "products_header": "## Products",
+        "faq_header": "## Frequently asked questions",
+        "faqs": [
+            ("What's the delivery time?", "Dispatched within 24 business hours, delivery in 48-72h. Free shipping from £50 order value."),
+            ("Can I return a product?", "Yes, you have 14 days from delivery. Free return and refund within 5 working days."),
+            ("How do I contact an advisor?", "By phone Mon-Fri 9am-6pm, or by email (reply within ~2h business hours). No chatbot — a real human team."),
+        ],
+        "home_label": "Home", "collections_label": "Collections", "about_label": "About us",
+        "faq_label": "FAQ", "shipping_label": "Shipping", "returns_label": "Returns",
+        "contact_label": "Contact", "blog_label": "Blog", "catalog_header": "## Full catalogue",
+        "posts_header": "## Published articles", "price_prefix": "Price",
+    },
+    "nl": {
+        "summary_header": "## Samenvatting",
+        "summary_intro": "{name} is een winkel gespecialiseerd in {niche}. We kiezen elk product alsof het voor een naaste is: gecontroleerde partners, validatie door ergotherapeuten, 2 jaar garantie, echte klantendienst bereikbaar van maandag tot vrijdag.",
+        "keys_header": "## Kernpunten",
+        "keys": [
+            "Gratis verzending vanaf € 50",
+            "2 jaar garantie op alle producten",
+            "Gratis retourneren binnen 14 dagen, volledige terugbetaling in 5 werkdagen",
+            "Echte adviseurs telefonisch bereikbaar ma-vr 9-18 uur",
+            "Sommige apparaten komen in aanmerking voor vergoeding door de zorgverzekeraar",
+        ],
+        "pages_header": "## Hoofdpagina's",
+        "products_header": "## Producten",
+        "faq_header": "## Veelgestelde vragen",
+        "faqs": [
+            ("Hoe lang duurt de levering?", "Verzonden binnen 24 werkuren, levering in 48-72 uur. Gratis verzending vanaf € 50."),
+            ("Kan ik een product retourneren?", "Ja, u heeft 14 dagen na levering. Gratis retour en terugbetaling binnen 5 werkdagen."),
+            ("Hoe bereik ik een adviseur?", "Telefonisch ma-vr 9-18 uur of per e-mail (antwoord doorgaans binnen 2 werkuren). Geen chatbot — een echt team."),
+        ],
+        "home_label": "Home", "collections_label": "Collecties", "about_label": "Over ons",
+        "faq_label": "FAQ", "shipping_label": "Verzending", "returns_label": "Retourneren",
+        "contact_label": "Contact", "blog_label": "Blog", "catalog_header": "## Volledige catalogus",
+        "posts_header": "## Gepubliceerde artikelen", "price_prefix": "Prijs",
+    },
+    "it": {
+        "summary_header": "## Sintesi",
+        "summary_intro": "{name} è un negozio specializzato in {niche}. Selezioniamo ogni prodotto come se fosse per un caro: partner verificati, convalida da terapisti occupazionali, 2 anni di garanzia, servizio clienti umano dal lunedì al venerdì.",
+        "keys_header": "## Punti chiave",
+        "keys": [
+            "Spedizione gratuita da 50 € di acquisto",
+            "Garanzia di 2 anni su tutti i prodotti",
+            "Reso gratuito entro 14 giorni, rimborso in 5 giorni lavorativi",
+            "Consulenti umani al telefono lun-ven 9-18",
+            "Alcuni dispositivi rimborsabili dalla mutua / SSN",
+        ],
+        "pages_header": "## Pagine principali",
+        "products_header": "## Prodotti",
+        "faq_header": "## Domande frequenti",
+        "faqs": [
+            ("Tempi di consegna?", "Spedito entro 24 ore lavorative, consegna in 48-72h. Spedizione gratuita da 50 €."),
+            ("Posso restituire un prodotto?", "Sì, avete 14 giorni dalla ricezione. Reso gratuito e rimborso in 5 giorni lavorativi."),
+            ("Come contattare un consulente?", "Al telefono lun-ven 9-18 o via email (risposta in circa 2 ore lavorative). Nessun chatbot — un vero team."),
+        ],
+        "home_label": "Home", "collections_label": "Collezioni", "about_label": "Chi siamo",
+        "faq_label": "FAQ", "shipping_label": "Spedizione", "returns_label": "Resi",
+        "contact_label": "Contatti", "blog_label": "Blog", "catalog_header": "## Catalogo completo",
+        "posts_header": "## Articoli pubblicati", "price_prefix": "Prezzo",
+    },
+    "es": {
+        "summary_header": "## Resumen",
+        "summary_intro": "{name} es una tienda especializada en {niche}. Seleccionamos cada producto como si fuera para un familiar: socios auditados, validación por terapeutas ocupacionales, garantía de 2 años, atención humana de lunes a viernes.",
+        "keys_header": "## Puntos clave",
+        "keys": [
+            "Envío gratuito desde 50 € de compra",
+            "Garantía de 2 años en todos los productos",
+            "Devolución gratuita en 14 días, reembolso en 5 días laborables",
+            "Asesores humanos por teléfono de lun a vie 9-18 h",
+            "Algunos equipos elegibles para reembolso por mutua / Seguridad Social",
+        ],
+        "pages_header": "## Páginas principales",
+        "products_header": "## Productos",
+        "faq_header": "## Preguntas frecuentes",
+        "faqs": [
+            ("¿Cuál es el plazo de entrega?", "Envío en 24 horas laborables, entrega en 48-72 h. Envío gratuito desde 50 € de compra."),
+            ("¿Puedo devolver un producto?", "Sí, dispone de 14 días desde la recepción. Devolución gratuita y reembolso en 5 días laborables."),
+            ("¿Cómo contactar a un asesor?", "Por teléfono lun-vie 9-18 h o por email (respuesta en unas 2 h laborables). Sin chatbot — un equipo humano real."),
+        ],
+        "home_label": "Inicio", "collections_label": "Colecciones", "about_label": "Sobre nosotros",
+        "faq_label": "FAQ", "shipping_label": "Envío", "returns_label": "Devoluciones",
+        "contact_label": "Contacto", "blog_label": "Blog", "catalog_header": "## Catálogo completo",
+        "posts_header": "## Artículos publicados", "price_prefix": "Precio",
+    },
+}
+
+
 @router.get("/public/sites/{site_id}/llms.txt")
-async def llms_txt(site_id: str):
+async def llms_txt(site_id: str, lang: Optional[str] = None):
     """llms.txt — AEO summary for Answer Engines (ChatGPT, Claude, Perplexity, Gemini).
-    Standard : https://llmstxt.org/
-    Provides a curated content index with stable URLs + key Q/A for AI citation."""
+    Chantier 5 — Multi-langue via ?lang=fr|de|en|nl|it|es (défaut: fr).
+    Standard : https://llmstxt.org/"""
     site = await db.sites.find_one({"id": site_id}, {"_id": 0})
     if not site:
         raise HTTPException(404, "Site introuvable")
 
+    lg = _canonical_lang(lang)
+    L = LLMS_LABELS[lg]
     origin = _origin()
     base = f"{origin}/shop/{site_id}"
     name = site.get("name") or "Boutique"
     niche = site.get("niche") or "produits senior"
     design = site.get("design") or {}
-    tagline_raw = (design.get("brand") or {}).get("tagline")
-    tagline = tagline_raw if isinstance(tagline_raw, str) else (
-        tagline_raw.get("fr") if isinstance(tagline_raw, dict) else ""
-    )
-    about = design.get("about") or {}
-    about_headline = about.get("headline") or f"Histoire de {name}"
-    if isinstance(about_headline, dict):
-        about_headline = about_headline.get("fr") or next(iter(about_headline.values()), "")
+    tagline = _pick_lang((design.get("brand") or {}).get("tagline"), lg)
 
     # Products
     products = await db.products.find(
@@ -195,73 +382,50 @@ async def llms_txt(site_id: str):
     lines = [
         f"# {name}",
         "",
-        f"> {tagline or f'{name} — une sélection pensée pour les seniors et leurs aidants, avec un service humain et des produits testés.'}",
+        f"> {tagline or f'{name} — {niche}.'}",
         "",
-        "## Résumé",
+        L["summary_header"],
         "",
-        f"{name} est une boutique spécialisée {niche}. Nous sélectionnons chaque produit comme si c'était pour un proche : partenaires audités, validation par des ergothérapeutes, garantie 2 ans, service client humain joignable du lundi au vendredi.",
+        L["summary_intro"].format(name=name, niche=niche),
         "",
-        "## Points clés",
-        "- Livraison offerte dès 50 € d'achat, partout en France métropolitaine",
-        "- Garantie 2 ans pièces et main d'œuvre sur tous les produits",
-        "- Retour gratuit sous 14 jours, remboursement intégral en 5 jours ouvrés",
-        "- Conseillers humains joignables par téléphone du lundi au vendredi de 9h à 18h",
-        "- Certains équipements éligibles au remboursement LPPR / mutuelle",
-        "",
-        "## Pages principales",
-        f"- [Accueil]({base}) — vitrine de la boutique",
-        f"- [Collections]({base}/collections) — univers thématiques",
+        L["keys_header"],
     ]
+    lines.extend(f"- {k}" for k in L["keys"])
+    lines.extend(["", L["pages_header"]])
+    lines.append(f"- [{L['home_label']}]({base}?lang={lg})")
+    lines.append(f"- [{L['collections_label']}]({base}/collections?lang={lg})")
     for c in collections[:6]:
         if isinstance(c, dict) and c.get("slug"):
-            title = c.get("title")
-            if isinstance(title, dict):
-                title = title.get("fr") or next(iter(title.values()), c["slug"])
-            lines.append(f"- [{title or c['slug']}]({base}/collection/{c['slug']}) — collection thématique")
+            title = _pick_lang(c.get("title"), lg) or c["slug"]
+            lines.append(f"- [{title}]({base}/collection/{c['slug']}?lang={lg})")
     lines.extend([
-        f"- [À propos]({base}/about) — histoire, valeurs, équipe",
-        f"- [FAQ]({base}/faq) — questions fréquentes",
-        f"- [Livraison]({base}/livraison) — délais, coûts, zones couvertes",
-        f"- [Retours]({base}/retours) — politique de retour sous 14 jours",
-        f"- [Contact]({base}/contact) — coordonnées et formulaire",
+        f"- [{L['about_label']}]({base}/about?lang={lg})",
+        f"- [{L['faq_label']}]({base}/faq?lang={lg})",
+        f"- [{L['shipping_label']}]({base}/livraison?lang={lg})",
+        f"- [{L['returns_label']}]({base}/retours?lang={lg})",
+        f"- [{L['contact_label']}]({base}/contact?lang={lg})",
         "",
-        "## Produits",
+        L["products_header"],
     ])
     for p in products[:20]:
-        pname = p.get("name")
-        if isinstance(pname, dict):
-            pname = pname.get("fr") or next(iter(pname.values()), "")
-        desc = p.get("short_description") or p.get("description") or ""
-        if isinstance(desc, dict):
-            desc = desc.get("fr") or next(iter(desc.values()), "")
-        desc = (str(desc) or "")[:200].replace("\n", " ").strip()
+        pname = _pick_lang(p.get("name"), lg)
+        desc = _pick_lang(p.get("short_description") or p.get("description"), lg)
+        desc = (desc or "")[:200].replace("\n", " ").strip()
         price = p.get("price") or p.get("price_eur") or 0
-        lines.append(f"- [{pname}]({base}/product/{p['id']}) — {desc} — {price} €")
+        lines.append(f"- [{pname}]({base}/product/{p['id']}?lang={lg}) — {desc} — {price} €")
 
-    lines.extend([
-        "",
-        "## Questions fréquentes",
-        "",
-        "**Quel est le délai de livraison ?**",
-        "Expédition sous 24h ouvrées, réception en 48 à 72h en France métropolitaine. Livraison offerte dès 50 € d'achat.",
-        "",
-        "**Puis-je retourner un produit qui ne me convient pas ?**",
-        "Oui, vous avez 14 jours à réception pour changer d'avis. Retour gratuit (étiquette prépayée fournie) et remboursement sous 5 jours ouvrés.",
-        "",
-        "**Comment contacter un conseiller ?**",
-        "Par téléphone du lundi au vendredi de 9h à 18h, ou par email (réponse sous 2h ouvrées en moyenne). Jamais de chatbot : une vraie équipe humaine.",
-        "",
-        "**Les produits sont-ils remboursés par la Sécurité sociale ?**",
-        "Certains équipements (fauteuils releveurs médicalisés, matelas anti-escarres) sont pris en charge partiellement au titre de la LPPR. Nous vous aidons à monter le dossier avec votre mutuelle.",
-        "",
-        f"Sitemap XML : {origin}/api/public/sites/{site_id}/sitemap.xml",
-    ])
+    lines.extend(["", L["faq_header"], ""])
+    for q, a in L["faqs"]:
+        lines.extend([f"**{q}**", a, ""])
+
+    lines.append(f"Sitemap XML : {origin}/api/public/sites/{site_id}/sitemap.xml")
     return Response(content="\n".join(lines), media_type="text/plain; charset=utf-8")
 
 
 @router.get("/public/sites/{site_id}/llms-full.txt")
-async def llms_full_txt(site_id: str):
+async def llms_full_txt(site_id: str, lang: Optional[str] = None):
     """llms-full.txt — version exhaustive avec le contenu des articles de blog.
+    Chantier 5 — Multi-langue via ?lang=fr|de|en|nl|it|es (défaut: fr).
     Les moteurs IA (Perplexity, ChatGPT, Gemini, Claude) citent directement à
     partir de ce fichier, c'est la pièce MAÎTRESSE de l'AEO.
     Standard : https://llmstxt.org/"""
@@ -269,15 +433,15 @@ async def llms_full_txt(site_id: str):
     if not site:
         raise HTTPException(404, "Site introuvable")
 
+    lg = _canonical_lang(lang)
+    L = LLMS_LABELS[lg]
     origin = _origin()
     base = f"{origin}/shop/{site_id}"
     name = site.get("name") or "Boutique"
     niche = site.get("niche") or "produits senior"
     design = site.get("design") or {}
     brand = design.get("brand") or {}
-    tagline = brand.get("tagline")
-    if isinstance(tagline, dict):
-        tagline = tagline.get("fr") or next(iter(tagline.values()), "")
+    tagline = _pick_lang(brand.get("tagline"), lg)
 
     products = await db.products.find(
         {"site_id": site_id, "status": "active"},
@@ -289,84 +453,83 @@ async def llms_full_txt(site_id: str):
     blog_posts = blog_posts[:40]
 
     lines = [
-        f"# {name} — llms-full.txt",
+        f"# {name} — llms-full.txt ({lg})",
         "",
-        f"> {tagline or f'{name}, spécialiste {niche}. Contenu exhaustif pour citation par les moteurs IA.'}",
+        f"> {tagline or f'{name}, {niche}.'}",
         "",
-        f"URL : {base}",
+        f"URL : {base}?lang={lg}",
         f"Niche : {niche}",
-        f"Dernière mise à jour : {datetime.now(timezone.utc).strftime('%Y-%m-%d')}",
+        f"Language : {lg}",
+        f"Last updated : {datetime.now(timezone.utc).strftime('%Y-%m-%d')}",
         "",
-        "## À propos",
+        "## About",
         "",
     ]
     about = design.get("pages", {}).get("about") or design.get("about") or {}
-    headline = about.get("headline")
-    if isinstance(headline, dict):
-        headline = headline.get("fr") or ""
+    headline = _pick_lang(about.get("headline"), lg)
     if headline:
         lines.extend([f"**{headline}**", ""])
     for par in (about.get("paragraphs") or [])[:3]:
-        if isinstance(par, dict):
-            par = par.get("fr") or ""
-        if par:
-            lines.extend([str(par), ""])
+        par_txt = _pick_lang(par, lg)
+        if par_txt:
+            lines.extend([str(par_txt), ""])
 
     # --- Produits : nom + description complète ---
-    lines.extend(["", "## Catalogue complet", ""])
+    lines.extend(["", L["catalog_header"], ""])
     for p in products:
-        pname = p.get("name") or {}
-        if isinstance(pname, dict):
-            pname = pname.get("fr") or next(iter(pname.values()), "Produit")
-        desc = p.get("description") or p.get("short_description") or ""
-        if isinstance(desc, dict):
-            desc = desc.get("fr") or next(iter(desc.values()), "")
+        pname = _pick_lang(p.get("name"), lg) or "Product"
+        desc = _pick_lang(p.get("description") or p.get("short_description"), lg)
         price = p.get("price") or 0
         narrative = p.get("narrative") or {}
-        sub = narrative.get("subheadline") or ""
+        sub = _pick_lang(narrative.get("subheadline"), lg)
         benefits = narrative.get("benefits") or []
 
         lines.extend([
             f"### {pname}",
-            f"URL : {base}/product/{p['id']}",
-            f"Prix : {price} €",
+            f"URL : {base}/product/{p['id']}?lang={lg}",
+            f"{L['price_prefix']} : {price} €",
             "",
             str(sub) if sub else str(desc)[:600],
             "",
         ])
         if benefits:
-            lines.append("Points forts :")
+            lines.append("Key benefits:")
             for b in benefits[:6]:
-                if isinstance(b, dict):
-                    b = b.get("fr") or next(iter(b.values()), "")
-                if b:
-                    lines.append(f"- {b}")
+                btxt = _pick_lang(b, lg) if isinstance(b, (dict, str)) else str(b)
+                if btxt:
+                    lines.append(f"- {btxt}")
             lines.append("")
 
         # FAQ produit — clé pour AEO (les IA aspirent les Q/A directement)
         faq = narrative.get("faq") or []
         if faq:
-            lines.append("FAQ :")
+            lines.append("FAQ:")
             for f in faq[:4]:
-                q = f.get("question") or f.get("q")
-                a = f.get("answer") or f.get("a")
+                q = _pick_lang(f.get("question") or f.get("q"), lg) if isinstance(f, dict) else None
+                a = _pick_lang(f.get("answer") or f.get("a"), lg) if isinstance(f, dict) else None
                 if q and a:
-                    lines.append(f"- **Q :** {q}")
-                    lines.append(f"  **R :** {a}")
+                    lines.append(f"- **Q:** {q}")
+                    lines.append(f"  **A:** {a}")
             lines.append("")
 
-    # --- Blog : articles complets ---
-    lines.extend(["", "## Articles publiés", ""])
+    # --- Blog : articles (traductions si présentes, sinon fallback langue originale) ---
+    lines.extend(["", L["posts_header"], ""])
     for post in blog_posts:
-        title = post.get("title") or ""
+        translations = post.get("translations") or {}
+        tr = translations.get(lg) if isinstance(translations, dict) else None
+        if tr and isinstance(tr, dict) and (tr.get("title") or tr.get("body")):
+            title = tr.get("title") or post.get("title") or ""
+            body = (tr.get("body") or post.get("body") or "").strip()
+        else:
+            title = post.get("title") or ""
+            body = (post.get("body") or "").strip()
         slug = post.get("slug") or ""
-        body = (post.get("body") or "").strip()
         # Cap body per article for safety (AI tokens / file size)
         if len(body) > 4000:
             body = body[:4000] + "\n\n[…]"
         lines.extend([
             f"### {title}",
-            f"URL : {base}/blog/{slug}",
+            f"URL : {base}/blog/{slug}?lang={lg}",
             f"Type : {post.get('type') or 'article'}",
             "",
             body,
@@ -391,7 +554,9 @@ def _xml_escape(s: str) -> str:
 @router.get("/public/sites/{site_id}/merchant-feed.xml")
 async def merchant_feed(site_id: str, country: str = "FR"):
     """Google Merchant Center RSS 2.0 feed (conforme Google Shopping).
-    Exposé par pays via ?country=FR|DE|BE|NL|UK|CH."""
+    Chantier 5 — ce flux reste basé sur les pays Ads (pas tous les SEO) car
+    Google Merchant consomme de la bande passante + quotas côté Google.
+    Exposé par pays via ?country=FR|DE|BE|NL|UK|CH..."""
     site = await db.sites.find_one({"id": site_id}, {"_id": 0})
     if not site:
         raise HTTPException(404, "Site introuvable")
@@ -400,12 +565,7 @@ async def merchant_feed(site_id: str, country: str = "FR"):
     country = (country or "FR").upper()
     lang = LANG_BY_COUNTRY.get(country, "fr")
 
-    currency_by_country = {
-        "FR": "EUR", "BE": "EUR", "LU": "EUR", "NL": "EUR",
-        "DE": "EUR", "AT": "EUR", "IT": "EUR", "ES": "EUR", "IE": "EUR",
-        "CH": "CHF", "UK": "GBP",
-    }
-    currency = currency_by_country.get(country, "EUR")
+    currency = CURRENCY_BY_COUNTRY.get(country, "EUR")
 
     products = await db.products.find(
         {"site_id": site_id, "status": "active"},

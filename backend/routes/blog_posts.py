@@ -48,12 +48,23 @@ class BlogPostInput(BaseModel):
     read_minutes: Optional[int] = 4
     author: Optional[str] = ""
     published_at: Optional[str] = None
+    # Chantier 5 — traductions multi-langue optionnelles
+    # Structure : {"de": {"title":"...", "excerpt":"...", "body":"..."},
+    #              "en": {...}, "nl": {...}, "it": {...}, "es": {...}}
+    # La langue source n'est PAS dans ce dict (title/excerpt/body au top-level).
+    translations: Optional[dict] = None
 
 
 class AIDraftInput(BaseModel):
     keyword: str
     angle: Optional[str] = ""    # ex: "guide d'achat", "tendance", "FAQ approfondie"
     length: Optional[str] = "long"  # short | medium | long
+
+
+class TranslateInput(BaseModel):
+    """Chantier 5 — Cible optionnelle, sinon toutes les langues seo_countries manquantes."""
+    langs: Optional[List[str]] = None
+    overwrite: Optional[bool] = False  # si True, re-traduire les langues déjà présentes
 
 
 def _ensure_site(site_id: str):
@@ -70,7 +81,12 @@ async def list_blog_posts(site_id: str, user=Depends(get_current_user)):
 
 
 @router.post("/sites/{site_id}/blog-posts")
-async def create_blog_post(site_id: str, body: BlogPostInput, user=Depends(get_current_user)):
+async def create_blog_post(
+    site_id: str,
+    body: BlogPostInput,
+    background: BackgroundTasks,
+    user=Depends(get_current_user),
+):
     site = await _ensure_site(site_id)
     if not site:
         raise HTTPException(404, "Site introuvable")
@@ -86,11 +102,20 @@ async def create_blog_post(site_id: str, body: BlogPostInput, user=Depends(get_c
         {"id": site_id},
         {"$push": {"design.blog_posts": post}},
     )
+    # Chantier 5 — Auto-translate en background pour toutes les langues seo_countries
+    # manquantes. Si pas de EMERGENT_LLM_KEY → skip silencieux.
+    background.add_task(_bg_auto_translate_post, site_id, post["slug"])
     return post
 
 
 @router.patch("/sites/{site_id}/blog-posts/{slug}")
-async def update_blog_post(site_id: str, slug: str, body: BlogPostInput, user=Depends(get_current_user)):
+async def update_blog_post(
+    site_id: str,
+    slug: str,
+    body: BlogPostInput,
+    background: BackgroundTasks,
+    user=Depends(get_current_user),
+):
     site = await _ensure_site(site_id)
     if not site:
         raise HTTPException(404, "Site introuvable")
@@ -105,8 +130,16 @@ async def update_blog_post(site_id: str, slug: str, body: BlogPostInput, user=De
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
     # don't change slug via this endpoint (would break URLs)
     updates.pop("slug", None)
+    # Si le body source change, les translations existantes deviennent obsolètes
+    content_changed = any(
+        k in updates and updates[k] != found.get(k) for k in ("title", "excerpt", "body")
+    )
+    if content_changed:
+        found["translations"] = {}  # invalider, la background task va retraduire
     found.update(updates)
     await db.sites.update_one({"id": site_id}, {"$set": {"design.blog_posts": posts}})
+    if content_changed:
+        background.add_task(_bg_auto_translate_post, site_id, slug)
     return found
 
 
@@ -120,6 +153,223 @@ async def delete_blog_post(site_id: str, slug: str, user=Depends(get_current_use
         {"$pull": {"design.blog_posts": {"slug": slug}}},
     )
     return {"status": "ok"}
+
+
+# ---------------------------------------------------------------
+# Chantier 5 — Traductions multi-langue des articles blog
+# ---------------------------------------------------------------
+
+_LANG_NAMES = {
+    "fr": "French (senior-friendly, rassurant, jamais de jargon US)",
+    "de": "German (clear, precise, professional)",
+    "en": "English (UK, clean, benefit-focused)",
+    "nl": "Dutch (direct, friendly)",
+    "it": "Italian (warm, persuasive)",
+    "es": "Spanish (Spain, cordial, clear)",
+}
+
+# Chantier 5 — throttling auto-translate : 1 traduction à la fois pour éviter
+# d'exploser les quotas LiteLLM / Claude (les traductions sont fire-and-forget,
+# pas bloquantes pour le user).
+_TRANSLATE_SEMA = asyncio.Semaphore(1)
+
+
+async def _bg_auto_translate_post(site_id: str, slug: str) -> None:
+    """BackgroundTask : traduit un article dans toutes les langues seo_countries
+    manquantes. Tolérant aux erreurs (log + exit) car c'est du best-effort.
+    """
+    if not EMERGENT_LLM_KEY:
+        logger.info(f"[bg-translate] SKIP {site_id}/{slug} — no EMERGENT_LLM_KEY")
+        return
+    async with _TRANSLATE_SEMA:
+        try:
+            from seo_constants import get_seo_langs, ALL_SUPPORTED_LANGS
+            site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+            if not site:
+                return
+            posts = (site.get("design") or {}).get("blog_posts") or []
+            post = next((p for p in posts if p.get("slug") == slug), None)
+            if not post or not (post.get("body") or "").strip():
+                return
+            source_lang = (post.get("source_lang") or "fr").lower()
+            existing = post.get("translations") or {}
+            target_langs = [lg for lg in get_seo_langs(site) if lg != source_lang and lg not in existing]
+            target_langs = [lg for lg in target_langs if lg in ALL_SUPPORTED_LANGS]
+            if not target_langs:
+                return
+
+            title = post.get("title") or ""
+            excerpt = post.get("excerpt") or ""
+            body = post.get("body") or ""
+            body_trimmed = body[:12000] if len(body) > 12000 else body
+            langs_desc = ", ".join(_LANG_NAMES.get(lg, lg) for lg in target_langs)
+            system = (
+                "You are a senior e-commerce editorial translator. Output STRICT JSON "
+                "only. Preserve markdown structure (headings, lists). Never invent "
+                "facts. Adapt culturally, don't literal-translate."
+            )
+            user_prompt = f"""Translate and adapt this article from {source_lang.upper()} into: {langs_desc}.
+
+Title: {title}
+Excerpt: {excerpt}
+Body:
+{body_trimmed}
+
+Return STRICT JSON: one key per target language containing {{title, excerpt, body}}.
+Languages: {", ".join(target_langs)}"""
+            res = await _call_claude_json(system, user_prompt, timeout=180)
+            if not isinstance(res, dict):
+                logger.warning(f"[bg-translate] {site_id}/{slug} — invalid Claude payload")
+                return
+            updated = dict(existing)
+            now_iso = datetime.now(timezone.utc).isoformat()
+            translated: list[str] = []
+            for lg in target_langs:
+                block = res.get(lg) or {}
+                if isinstance(block, dict) and block.get("title") and block.get("body"):
+                    updated[lg] = {
+                        "title": str(block.get("title"))[:250],
+                        "excerpt": str(block.get("excerpt") or "")[:600],
+                        "body": str(block.get("body") or "")[:40000],
+                        "translated_at": now_iso,
+                    }
+                    translated.append(lg)
+            if not translated:
+                logger.warning(f"[bg-translate] {site_id}/{slug} — 0 langs translated")
+                return
+            # Re-fetch pour éviter les écrasements concurrents
+            fresh = await db.sites.find_one({"id": site_id}, {"_id": 0, "design.blog_posts": 1})
+            posts2 = ((fresh or {}).get("design") or {}).get("blog_posts") or []
+            for p in posts2:
+                if p.get("slug") == slug:
+                    merged = dict(p.get("translations") or {})
+                    merged.update(updated)
+                    p["translations"] = merged
+                    p["source_lang"] = source_lang
+                    break
+            await db.sites.update_one(
+                {"id": site_id},
+                {"$set": {"design.blog_posts": posts2}},
+            )
+            logger.info(f"[bg-translate] {site_id}/{slug} — translated {translated}")
+        except Exception:
+            logger.exception(f"[bg-translate] {site_id}/{slug} — unexpected error")
+
+
+@router.post("/sites/{site_id}/blog-posts/{slug}/translate")
+async def translate_blog_post(
+    site_id: str,
+    slug: str,
+    data: "TranslateInput",
+    user=Depends(get_current_user),
+):
+    """Traduit un article dans toutes les langues seo_countries manquantes
+    (ou celles explicitement demandées). Appel Claude. Persiste
+    `post.translations[lg] = {title, excerpt, body}`.
+
+    - data.langs: ["de","en"] → force ces langues (même si déjà présentes si overwrite=True)
+    - data.langs None → auto : langues seo_countries - {source_lang} - {déjà présentes, sauf overwrite}
+    """
+    from seo_constants import get_seo_langs, ALL_SUPPORTED_LANGS
+    site = await _ensure_site(site_id)
+    if not site:
+        raise HTTPException(404, "Site introuvable")
+    posts = (site.get("design") or {}).get("blog_posts") or []
+    post = next((p for p in posts if p.get("slug") == slug), None)
+    if not post:
+        raise HTTPException(404, "Article introuvable")
+
+    # Source language : on assume FR (peut devenir dynamique via post.source_lang plus tard)
+    source_lang = (post.get("source_lang") or "fr").lower()
+    existing_translations = post.get("translations") or {}
+
+    # Langues cibles
+    if data.langs:
+        target_langs = [lg.lower() for lg in data.langs if lg.lower() in ALL_SUPPORTED_LANGS]
+    else:
+        site_langs = get_seo_langs(site)
+        target_langs = [lg for lg in site_langs if lg != source_lang]
+    if not data.overwrite:
+        target_langs = [lg for lg in target_langs if not existing_translations.get(lg)]
+    if not target_langs:
+        return {"ok": True, "post_slug": slug, "translated": [], "message": "Aucune langue à traduire"}
+
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(503, "Translation service unavailable (EMERGENT_LLM_KEY missing)")
+
+    title = post.get("title") or ""
+    excerpt = post.get("excerpt") or ""
+    body = post.get("body") or ""
+    # Cap body size to respect context window
+    body_trimmed = body[:12000] if len(body) > 12000 else body
+
+    langs_desc = ", ".join(_LANG_NAMES.get(lg, lg) for lg in target_langs)
+    system = (
+        "You are a senior e-commerce editorial translator for a premium Silver-Economy "
+        "French brand. You produce fluent, culturally-adapted copy (never literal). "
+        "Preserve the original markdown/HTML structure (headings, lists, bold). "
+        "Never invent specs or claims. Output STRICT JSON only, no prose."
+    )
+    user_prompt = f"""Translate and adapt the following blog article from {source_lang.upper()} into these languages: {langs_desc}.
+
+SOURCE:
+Title: {title}
+Excerpt: {excerpt}
+Body (markdown/HTML):
+{body_trimmed}
+
+Rules:
+- Keep title < 80 chars, keyword-friendly for the target locale
+- Excerpt: 1-2 short sentences, hook-style
+- Body: preserve all headings (##, ###) and lists. Rewrite in the target language's natural style, don't literal-translate.
+- Adapt currency mentions (€ → £ for en_UK if present, CHF for Swiss content only if context implies it; keep € otherwise).
+- Remove any explicit "en France" / "French" references when translating to non-FR languages; replace with the local equivalent or remove.
+
+Return STRICT JSON with one key per target language:
+{{"de": {{"title":"...", "excerpt":"...", "body":"..."}}, "en": {{...}}, ...}}
+
+Languages to produce: {", ".join(target_langs)}
+"""
+    try:
+        res = await _call_claude_json(system, user_prompt, timeout=180)
+    except Exception:
+        logger.exception("blog translate failed")
+        raise HTTPException(502, "Translation IA failed (try again in 30s)")
+    if not isinstance(res, dict):
+        raise HTTPException(502, "Translation IA returned invalid payload")
+
+    translated_ok: list[str] = []
+    for lg in target_langs:
+        block = res.get(lg) or {}
+        if isinstance(block, dict) and block.get("title") and block.get("body"):
+            existing_translations[lg] = {
+                "title": str(block.get("title"))[:250],
+                "excerpt": str(block.get("excerpt") or "")[:600],
+                "body": str(block.get("body") or "")[:40000],
+                "translated_at": datetime.now(timezone.utc).isoformat(),
+            }
+            translated_ok.append(lg)
+
+    if not translated_ok:
+        raise HTTPException(502, "No language translated successfully")
+
+    post["translations"] = existing_translations
+    post["source_lang"] = source_lang
+    await db.sites.update_one(
+        {"id": site_id},
+        {"$set": {"design.blog_posts": posts}},
+    )
+    return {
+        "ok": True,
+        "post_slug": slug,
+        "source_lang": source_lang,
+        "translated": translated_ok,
+        "skipped": [lg for lg in target_langs if lg not in translated_ok],
+        "existing_langs": list(existing_translations.keys()),
+    }
+
+
+
 
 
 async def _call_claude_json(system: str, user: str, timeout: int = 120):
