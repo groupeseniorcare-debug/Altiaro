@@ -1,6 +1,6 @@
 # Altiaro — Mémo technique de reprise (HANDOFF)
 
-> **Dernière mise à jour : 2026-04-24**
+> **Dernière mise à jour : 2026-04-24 (cascade Phases 5 → 6 → 7 livrée)**
 >
 > Ce document est la source de vérité pour un nouvel intervenant (client, tech lead, agent IA)
 > qui se demande **ce qui marche, ce qui reste à faire, comment onboarder un concepteur**.
@@ -16,6 +16,9 @@
 | Phase 2 (Chantier 7) | Dashboard Analytics interne (`/sites/:id/analytics`, ingestion `/api/public/sites/{id}/track`, `recharts`) | ✅ Livré + testé |
 | Phase 3 | Storefront public multilingue 6 langues (FR, EN, DE, NL, IT, ES) + `LanguageSwitcher` + hreflang dynamiques | ✅ Livré + testé (3 sweeps i18n successifs) |
 | Fix bonus | Bug bloquant import AliExpress — migration `aliexpress.affiliate.productdetail.get` → `aliexpress.ds.product.get` (API Dropshipping) | ✅ Livré + testé |
+| **Phase 5** | Dashboard post-validation unifié (5 onglets Vue/Produits/Commandes/Finance/SEO + bouton `Modifier le site`) | ✅ Livré + testé 5/5 |
+| **Phase 6** | SEO/AEO agressif (9 crons auto, 4 endpoints, 4 collections, throttle Claude) | ✅ Livré + testé 4/4 |
+| **Phase 7** | Google Ads manuel (pixel natif injecté + export CSV Ads Editor + guide pas-à-pas) | ✅ Livré + testé 5/5 |
 
 ⚠️ **Working tree non-pushé sur `origin/main`** : 19+ commits locaux s'accumulent. Utiliser le bouton **"Save to Github"** d'Emergent dans la barre d'action du chat pour pusher proprement (l'agent n'a pas le droit d'exécuter `git push`).
 
@@ -30,6 +33,10 @@
 - **Dashboard Analytics interne** (`/sites/:id/analytics`) — page_view, add_to_cart, purchase, session_id, `ip_hash` (RGPD-safe), agrégations recharts sur 7/30/90 jours.
 - **Paiement Mollie** test + live (clé live présente), **Resend** (domaine `altiaro.com` vérifié, emails transactionnels), **OVH Domaines** (achat + cron auto-config DNS toutes les 5 min), **IndexNow** (submit automatique à la publication).
 - **Storefront public** : homepage éditoriale monochrome, fiche produit narrative, cart localStorage, checkout Mollie, reviews + bundles, blog cluster mensuel (pilier + 4 satellites auto-traduits Claude), SEO complet (sitemap images, Organization schema, Speakable FAQ, Article v2), **LanguageSwitcher** en header.
+- **Dashboard unifié post-validation** `/sites/:id/analytics` avec **5 onglets** (Vue d'ensemble / Produits / Commandes / Finance / SEO-AEO) + bouton `← Modifier le site` qui ramène au cockpit 9 étapes. URL-synced (`?tab=products`) pour partage de lien direct.
+- **Automatisation SEO/AEO agressive** : blog auto 3×/semaine + détection mots-clés émergents (Claude) + content refresh mensuel + maillage interne auto + alertes chute position GSC (skip si non connecté) + PAA FAQ auto sur les top produits + content gap analysis vs concurrents + sitemap re-submit on-demand (toutes 10 min) + rapport SEO hebdo consolidé.
+- **Pixel Google Ads natif** : injecté automatiquement dans les storefronts quand la config est activée par l'admin. Conversions `gtag('event','conversion', …)` envoyées sur `purchase`, en parallèle du tracker Altiaro interne.
+- **Export CSV Google Ads Editor** : kit `keywords.csv` (100 kw, 5 campagnes × 20 kw, format Editor natif) + `ads.csv` (Responsive Search Ads, 15 headlines + 4 descriptions par groupe) + `guide.md` (procédure 10 min) + feed Shopping XML. Généré via Claude fragmenté en 5 calls parallèles (~60 s).
 
 ---
 
@@ -149,7 +156,9 @@ Quand le client déploie sur son infra OVH définitive :
 
 ---
 
-## 9 — Crons APScheduler actifs (12 jobs)
+## 9 — Crons APScheduler actifs (20 jobs)
+
+### Plateforme (11 crons historiques)
 
 | Job | Fréquence |
 |---|---|
@@ -160,11 +169,24 @@ Quand le client déploie sur son infra OVH définitive :
 | `cj_tracking_sync` | Toutes les 2 h (HH:15) |
 | `opportunity_scan` | Lundi 05h UTC |
 | `dns_auto_config` | **Toutes les 5 min** |
-| `monthly_blog_cluster` | 1er du mois, 06h UTC |
 | `weekly_seo_coach` | Lundi 08h UTC |
 | `citation_tracker_weekly` | Jeudi 08h UTC |
 | `ae_deals_watch` | Mardi 06h UTC |
 | `merchant_daily_sync` | Tous les jours, 04h UTC |
+
+### Phase 6 — Automatisation SEO/AEO (9 nouveaux crons)
+
+| Job | Fréquence | Rôle |
+|---|---|---|
+| `blog_auto_weekly_batch` | **Mon/Wed/Fri 06h UTC** | 3 articles/sem/site (cap 60→1/sem) |
+| `emerging_keywords_scan` | Mon 07h UTC | 20 kw émergents/site via Claude |
+| `content_refresh_monthly` | 1er du mois 08h UTC | Rafraîchit 5 articles ≥90 j |
+| `internal_linking_weekly` | Mar 09h UTC | Maillage auto sur 10 derniers posts |
+| `gsc_position_alerts_daily` | Quot. 09h UTC | Skip si GSC non connecté |
+| `paa_faq_enrichment_weekly` | Jeu 10h UTC | +5 FAQ JSON-LD sur top 10 produits |
+| `content_gap_monthly` | 15 du mois 11h UTC | 20 gaps concurrents/site |
+| `sitemap_republish_ondemand` | **Toutes 10 min** | Ping IndexNow quand dirty |
+| `seo_weekly_report` | Dim 20h UTC | Rapport hebdo consolidé |
 
 ---
 
@@ -218,3 +240,61 @@ async def main():
 asyncio.run(main())
 "
 ```
+
+
+---
+
+## 11 — Comment utiliser Google Ads aujourd'hui (en attendant Basic Access)
+
+Tant que Google Ads Basic Access n'est pas approuvé, le concepteur pilote ses
+campagnes **à la main dans l'interface Google Ads**, tout en profitant du
+tracking natif + des assets générés par Altiaro. Workflow concret :
+
+1. **Créer la campagne dans Google Ads UI** en mode manuel (Search et/ou Shopping).
+2. **Récupérer les identifiants de conversion** : Google Ads → *Outils & Paramètres* → *Conversions* → action de conversion "Achat" → *Tag de suivi*.
+   - Conversion ID (format `AW-XXXXXXXXX`)
+   - Conversion label (ex. `abc_defGhi`)
+3. **Activer le pixel dans Altiaro** : `/admin/sites/:id/google-ads` → **Section 1**, coller les deux valeurs, cocher *Activer le pixel*, **Enregistrer**. Le storefront public injectera automatiquement `gtag.js` dans le `<head>` à partir du prochain load.
+4. **Générer l'export assets** : sur la même page, **Section 2**, choisir le type (*Search* / *Shopping* / *Les deux*) + le pays cible → *Générer l'export* (Claude ~60 s).
+5. **Télécharger les 3 fichiers** : `keywords.csv`, `ads.csv`, `guide.md` (depuis la Section 3 Historique).
+6. **Installer [Google Ads Editor](https://ads.google.com/home/tools/ads-editor/)** (gratuit) et importer `keywords.csv` puis `ads.csv` via *Compte → Importer depuis un fichier*.
+7. **Publier les campagnes** depuis Google Ads Editor (bouton *Publier* en haut à droite).
+8. **C'est tout** : le pixel Altiaro remonte automatiquement les conversions vers la campagne. Dans Google Ads, les conversions apparaîtront sous ton action "Achat" dans 24-48 h.
+
+Le guide détaillé (10 min chrono, procédure étape par étape) est généré à chaque export dans `guide.md`.
+
+---
+
+## 12 — Calendrier d'automatisation SEO (vue semaine type)
+
+Horaires en **UTC**. Les crons Phase 6 tournent automatiquement pour chaque site validé (step 9 `complete`).
+
+| Jour | Heure | Automatisation |
+|---|---|---|
+| **Lundi** | 06h | 🖊️ Blog auto — 1 article FR + 5 traductions par site |
+| **Lundi** | 07h | 🔍 Scan des mots-clés émergents (20/site/pays) |
+| **Lundi** | 08h | SEO Coach hebdo (existant) |
+| **Lundi** | matin | 📈 Rapport SEO hebdo consolidé disponible dans l'UI |
+| **Mardi** | 09h | 🔗 Maillage interne auto sur les 10 derniers posts |
+| **Mercredi** | 06h | 🖊️ Blog auto — 1 article/site |
+| **Jeudi** | 08h | Citation Tracker (existant) |
+| **Jeudi** | 10h | ❓ Enrichissement PAA / FAQ sur top 10 produits |
+| **Vendredi** | 06h | 🖊️ Blog auto — 1 article/site |
+| **Dimanche** | 20h | 📊 Rapport SEO hebdo agrégé (génère le doc pour le dashboard) |
+| **Quotidien** | 09h | ⚠️ Alerte chute position GSC (skip silencieux si GSC non connecté) |
+| **1er du mois** | 08h | ♻️ Content refresh — 5 articles ≥90 j les moins vus |
+| **15 du mois** | 11h | 🎯 Content gap analysis vs concurrents (20 gaps/site/pays) |
+| **Toutes les 10 min** | — | 🔄 Sitemap republish on-demand (ping IndexNow quand `sitemap_dirty`) |
+
+Cap anti-farm : si un site dépasse **60 articles publiés**, le blog auto passe à 1/semaine (lundi uniquement, Wed/Fri skippés).
+
+Throttle global sur les appels Claude : `asyncio.Semaphore(2)` dans `routes/seo_automation.py` → max 2 calls parallèles pour ne pas saturer `EMERGENT_LLM_KEY`.
+
+---
+
+## Fin du document
+
+Cette note de reprise couvre l'état du produit au **2026-04-24 soir**, après la
+cascade Phases 5-6-7. Pour les livraisons suivantes, ajouter une nouvelle ligne
+en §1, mettre à jour les crons en §9/§12 si besoin, et documenter les nouveaux
+bugs en §8.
