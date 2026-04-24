@@ -71,6 +71,8 @@ from routes import launch as launch_routes
 from routes import seo_coach as seo_coach_routes
 from routes import gsc as gsc_routes
 from routes import aeo as aeo_routes
+from routes import internal_linking as internal_linking_routes
+from routes import citation_tracker as citation_tracker_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -133,6 +135,8 @@ api.include_router(launch_routes.router)
 api.include_router(seo_coach_routes.router)
 api.include_router(gsc_routes.router)
 api.include_router(aeo_routes.router)
+api.include_router(internal_linking_routes.router)
+api.include_router(citation_tracker_routes.router)
 
 
 @app.on_event("startup")

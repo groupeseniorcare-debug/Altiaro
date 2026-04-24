@@ -7,6 +7,8 @@ import { api, apiCall } from "../lib/api";
 import GSCConnectCard from "./GSCConnectCard";
 import EeatHistoryPanel from "./EeatHistoryPanel";
 import AeoReadinessPanel from "./AeoReadinessPanel";
+import InternalLinkingPanel from "./InternalLinkingPanel";
+import CitationTrackerPanel from "./CitationTrackerPanel";
 
 /**
  * Widget "Pulse SEO" monochrome éditorial — affiche la performance éditoriale
@@ -176,6 +178,12 @@ export default function PulseSEOWidget({ siteId }) {
 
       {/* AEO Readiness */}
       <AeoReadinessPanel siteId={siteId} />
+
+      {/* Internal linking auto */}
+      <InternalLinkingPanel siteId={siteId} />
+
+      {/* AI Citation Tracker */}
+      <CitationTrackerPanel siteId={siteId} />
 
       {/* Google Search Console — connect / metrics band */}
       <GSCConnectCard siteId={siteId} />
