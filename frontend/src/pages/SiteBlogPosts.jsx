@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
   Plus, PencilSimple, Trash, Sparkle, ArrowLeft, X, Eye,
   FloppyDisk, Warning, CheckCircle, Clock, CalendarBlank, Stack,
@@ -7,6 +7,8 @@ import {
 import { api, apiCall } from "../lib/api";
 
 export default function SiteBlogPosts() {
+  const [searchParams] = useSearchParams();
+  const fromStep7 = searchParams.get("step") === "7";
   const { id: siteId } = useParams();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -199,6 +201,35 @@ export default function SiteBlogPosts() {
         <Link to={`/sites/${siteId}`} className="inline-flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900 mb-6" data-testid="back-to-site">
           <ArrowLeft size={14} /> Retour au cockpit
         </Link>
+
+        {/* Contextual guidance banner — Étape 7 */}
+        <div
+          data-testid="step7-guidance-banner"
+          className="mb-8 bg-white p-5 md:p-6"
+          style={{ border: "1px solid #E5E5E5", borderRadius: "4px" }}
+        >
+          <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 mb-1.5 font-medium">
+                {fromStep7 ? "Étape 7" : "Contenu éditorial"}
+              </div>
+              <div
+                className="text-[19px] md:text-[22px] text-neutral-900 leading-tight"
+                style={{ fontFamily: "'Fraunces', Georgia, serif" }}
+              >
+                Blog & contenu SEO
+              </div>
+              <p className="text-[13px] text-neutral-600 mt-1.5 leading-[1.55] max-w-2xl">
+                Le blog nourrit le référencement de votre boutique et convertit les
+                visiteurs informés en acheteurs. Deux options : <b>« Générer tout le blog »</b>
+                lance un cluster SEO (1 article pilier + 3 satellites) en 1 clic,
+                ou <b>« Rédiger 1 article »</b> pour un sujet précis.
+                Un <b>cluster mensuel</b> peut aussi être activé (plus bas) pour
+                publier automatiquement 5 articles chaque 1er du mois.
+              </p>
+            </div>
+          </div>
+        </div>
 
         <div className="flex items-end justify-between gap-4 mb-8 flex-wrap">
           <div>

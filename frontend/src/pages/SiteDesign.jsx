@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
-  ArrowLeft, PaintBrush, CheckCircle, Storefront as StoreIcon, Rocket, Sparkle, ArrowClockwise,
+  ArrowLeft, PaintBrush, CheckCircle, Storefront as StoreIcon, Rocket, Sparkle, ArrowClockwise, DotsThreeOutline,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 import BrandingContent from "../components/BrandingContent";
@@ -15,20 +15,38 @@ import CollectionsTab from "../components/site-design/CollectionsTab";
 
 export default function SiteDesign() {
   const { id: siteId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get("tab") || "identity";
+  const currentStep = searchParams.get("step"); // "5" | "6" | null
   const [design, setDesign] = useState(null);
   const [site, setSite] = useState(null);
   const [siteName, setSiteName] = useState("");
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
-  const [tab, setTab] = useState("identity");
+  const [tab, setTab] = useState(urlTab);
   const [previewKey, setPreviewKey] = useState(Date.now());
   const [previewOpen, setPreviewOpen] = useState(true);
+  const [secondaryOpen, setSecondaryOpen] = useState(false);
   // Enrich-homepage one-shot
   const [enriching, setEnriching] = useState(false);
   const [enrichToast, setEnrichToast] = useState("");
   // Wizard / launch state
   const [mode, setMode] = useState("auto"); // "wizard" | "advanced" | "auto"
   const [launchJobId, setLaunchJobId] = useState(null);
+
+  // Sync tab with URL query param (so cockpit journey links land on the right tab)
+  useEffect(() => {
+    if (urlTab && urlTab !== tab) {
+      setTab(urlTab);
+    }
+  }, [urlTab]); // eslint-disable-line
+
+  const switchTab = (k) => {
+    setTab(k);
+    const params = new URLSearchParams(searchParams);
+    params.set("tab", k);
+    setSearchParams(params, { replace: true });
+  };
 
   const reload = async () => {
     const { data } = await apiCall(() => api.get(`/sites/${siteId}/design`));
@@ -183,81 +201,14 @@ export default function SiteDesign() {
 
         <div className="mb-6 flex items-start justify-between gap-6 flex-wrap">
           <div>
-            <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-2 flex items-center gap-2">
-              <PaintBrush size={12} weight="bold" /> Étape 5 · Studio de marque
+            <div className="text-[11px] uppercase tracking-[0.25em] text-neutral-500 mb-2 flex items-center gap-2 font-medium">
+              <PaintBrush size={12} weight="bold" /> Studio de marque
             </div>
             <h1 className="text-3xl md:text-4xl font-semibold text-neutral-900" style={{ fontFamily: "'Fraunces', serif" }}>
               {siteName || "Ton site"}
             </h1>
-            <p className="text-sm text-neutral-500 mt-2 max-w-2xl">
-              Identité visuelle, navigation, collections et contenu — tout pour une boutique cohérente de bout en bout.
-            </p>
           </div>
-          <div className="flex gap-2 items-center flex-wrap">
-            {/* Template mode toggle — Monochrome (default) vs Brand palette */}
-            <div
-              className="h-11 rounded-xl p-1 flex items-center gap-0.5 border"
-              style={{ borderColor: "#E5E5E5", background: "#FAFAFA" }}
-              data-testid="template-mode-toggle"
-            >
-              {[
-                { key: "monochrome", label: "Monochrome" },
-                { key: "brand", label: "Palette" },
-              ].map((opt) => {
-                const active = (design?.template_mode || "monochrome") === opt.key;
-                return (
-                  <button
-                    key={opt.key}
-                    onClick={async () => {
-                      const { error } = await apiCall(() =>
-                        api.patch(`/sites/${siteId}/design/template-mode`, { mode: opt.key })
-                      );
-                      if (error) { window.alert(error); return; }
-                      await reload();
-                    }}
-                    data-testid={`tmpl-mode-${opt.key}`}
-                    className={`h-9 px-3 rounded-lg text-xs font-medium transition ${
-                      active
-                        ? "bg-white text-neutral-900 shadow-sm"
-                        : "text-neutral-500 hover:text-neutral-800"
-                    }`}
-                    title={opt.key === "monochrome"
-                      ? "Blanc, noir, gris · style éditorial magazine"
-                      : "Utilise les couleurs de ton identité de marque"}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              onClick={enrichHomepage}
-              disabled={enriching}
-              data-testid="ai-enrich-homepage"
-              title="Remplace les fallbacks (presse, fondateur, manifeste…) par de vraies données IA"
-              className="h-11 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:brightness-110 text-white text-sm font-medium flex items-center gap-2 shadow-md disabled:opacity-60"
-            >
-              {enriching ? <ArrowClockwise size={14} className="animate-spin" /> : <Sparkle size={14} weight="fill" />}
-              {enriching ? "Enrichissement IA…" : "✨ Enrichir la homepage"}
-            </button>
-            <button
-              onClick={generatePages}
-              disabled={pagesBusy}
-              data-testid="ai-generate-pages"
-              title="Rédige le copy IA des 5 pages statiques (À propos, Contact, Livraison, Retours, FAQ)"
-              className="h-11 px-4 rounded-xl bg-neutral-900 hover:bg-black text-white text-sm font-medium flex items-center gap-2 shadow-md disabled:opacity-60"
-            >
-              {pagesBusy ? <ArrowClockwise size={14} className="animate-spin" /> : <Sparkle size={14} weight="fill" />}
-              {pagesBusy ? "Rédaction IA…" : "Rédiger les pages (IA)"}
-            </button>
-            <button
-              onClick={() => setMode("wizard")}
-              data-testid="switch-to-wizard"
-              title="Relancer le wizard pour régénérer tout le site"
-              className="h-11 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:brightness-110 text-white text-sm font-medium flex items-center gap-2 shadow-md"
-            >
-              <Rocket size={14} weight="fill" /> Relancer le wizard
-            </button>
+          <div className="flex gap-2 items-center">
             {hasDesign && (
               <button
                 onClick={togglePublish}
@@ -280,8 +231,95 @@ export default function SiteDesign() {
             >
               <StoreIcon size={14} /> Voir storefront
             </a>
+            {/* Secondary actions menu */}
+            <div className="relative">
+              <button
+                onClick={() => setSecondaryOpen((o) => !o)}
+                data-testid="secondary-actions-btn"
+                className="h-11 w-11 rounded-xl bg-white border border-neutral-300 hover:border-neutral-900 text-neutral-700 flex items-center justify-center"
+                title="Actions avancées"
+              >
+                <DotsThreeOutline size={18} weight="bold" />
+              </button>
+              {secondaryOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setSecondaryOpen(false)} />
+                  <div
+                    data-testid="secondary-actions-menu"
+                    className="absolute right-0 top-12 z-40 w-72 bg-white border shadow-xl py-1.5"
+                    style={{ borderColor: "#E5E5E5", borderRadius: "4px" }}
+                  >
+                    <div className="px-3 py-2 text-[10px] uppercase tracking-[0.25em] text-neutral-400 font-medium">Style du template</div>
+                    {[
+                      { key: "monochrome", label: "Monochrome", desc: "Blanc, noir, gris · éditorial" },
+                      { key: "brand", label: "Palette", desc: "Couleurs de votre identité" },
+                    ].map((opt) => {
+                      const active = (design?.template_mode || "monochrome") === opt.key;
+                      return (
+                        <button
+                          key={opt.key}
+                          data-testid={`tmpl-mode-${opt.key}`}
+                          onClick={async () => {
+                            const { error } = await apiCall(() =>
+                              api.patch(`/sites/${siteId}/design/template-mode`, { mode: opt.key })
+                            );
+                            if (error) { window.alert(error); return; }
+                            setSecondaryOpen(false);
+                            await reload();
+                          }}
+                          className={`w-full text-left px-3 py-2 hover:bg-neutral-50 flex items-center justify-between gap-3 ${
+                            active ? "bg-neutral-50" : ""
+                          }`}
+                        >
+                          <div>
+                            <div className="text-[13px] font-medium text-neutral-900">{opt.label}</div>
+                            <div className="text-[11px] text-neutral-500">{opt.desc}</div>
+                          </div>
+                          {active && <CheckCircle size={14} weight="fill" className="text-neutral-900" />}
+                        </button>
+                      );
+                    })}
+                    <div className="my-1.5 border-t" style={{ borderColor: "#F0F0F0" }} />
+                    <button
+                      onClick={() => { setSecondaryOpen(false); enrichHomepage(); }}
+                      disabled={enriching}
+                      data-testid="ai-enrich-homepage"
+                      className="w-full text-left px-3 py-2 hover:bg-neutral-50 flex items-start gap-3 disabled:opacity-60"
+                    >
+                      <Sparkle size={14} weight="fill" className="text-amber-600 mt-0.5 shrink-0" />
+                      <div>
+                        <div className="text-[13px] font-medium text-neutral-900">Enrichir la homepage</div>
+                        <div className="text-[11px] text-neutral-500">Remplace les fallbacks (presse, fondateur, manifeste)</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => { setSecondaryOpen(false); setMode("wizard"); }}
+                      data-testid="switch-to-wizard"
+                      className="w-full text-left px-3 py-2 hover:bg-neutral-50 flex items-start gap-3"
+                    >
+                      <Rocket size={14} weight="fill" className="text-violet-600 mt-0.5 shrink-0" />
+                      <div>
+                        <div className="text-[13px] font-medium text-neutral-900">Relancer le wizard complet</div>
+                        <div className="text-[11px] text-neutral-500">Régénérer tout le site en 2 min</div>
+                      </div>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Contextual guidance banner based on active tab */}
+        <TabGuidanceBanner
+          tab={tab}
+          currentStep={currentStep}
+          hasDesign={hasDesign}
+          hasAbout={!!(design?.pages?.about?.body || design?.pages?.about)}
+          onGeneratePages={generatePages}
+          pagesBusy={pagesBusy}
+          onRelaunchWizard={() => setMode("wizard")}
+        />
 
         {enrichToast && (
           <div
@@ -298,7 +336,7 @@ export default function SiteDesign() {
           {TABS.map(({ key, label, Icon }) => (
             <button
               key={key}
-              onClick={() => setTab(key)}
+              onClick={() => switchTab(key)}
               data-testid={`tab-${key}`}
               className={`h-10 px-4 rounded-xl text-sm font-medium flex items-center gap-2 whitespace-nowrap transition ${
                 tab === key
@@ -342,6 +380,86 @@ export default function SiteDesign() {
             className="fixed bottom-6 right-6 z-40 h-12 px-5 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium flex items-center gap-2 shadow-xl"
           >
             <StoreIcon size={14} weight="fill" /> Aperçu live
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Contextual banner that tells the user EXACTLY what this tab is for + the
+ * single next action to take. Shown at top of each tab — removes the
+ * "j'ai 7 boutons et je comprends rien" confusion.
+ */
+function TabGuidanceBanner({ tab, currentStep, hasDesign, hasAbout, onGeneratePages, pagesBusy, onRelaunchWizard }) {
+  const plans = {
+    identity: {
+      stepLabel: currentStep === "5" ? "Étape 5" : "Onglet",
+      title: "Définissez votre identité de marque",
+      subtitle: hasDesign
+        ? "Votre marque a déjà un nom, une palette et une typo. Ajustez les détails ci-dessous — chaque champ enregistre tout seul."
+        : "Pas encore d'identité ? Cliquez \"Relancer le wizard\" pour générer nom + logo + palette + homepage en 2 min, ou remplissez les champs manuellement.",
+      cta: hasDesign ? null : { label: "⚡ Relancer le wizard IA", onClick: onRelaunchWizard, testid: "banner-relaunch-wizard" },
+    },
+    navigation: {
+      stepLabel: "Onglet",
+      title: "Menu du storefront",
+      subtitle: "Choisissez les liens du header et du footer. Vous pouvez pointer vers une collection, un produit, une page, ou une URL custom.",
+      cta: null,
+    },
+    collections: {
+      stepLabel: "Onglet",
+      title: "Rassemblez vos produits en collections",
+      subtitle: "Une collection = un univers cohérent (ex. \"Confort quotidien\", \"Mobilité\"). Sélectionnez les produits concernés et publiez.",
+      cta: null,
+    },
+    content: {
+      stepLabel: currentStep === "6" ? "Étape 6" : "Onglet",
+      title: "Rédigez les pages essentielles",
+      subtitle: hasAbout
+        ? "Les pages À propos, Contact, FAQ, Livraison et Retours sont déjà rédigées. Vous pouvez régénérer n'importe quelle section ci-dessous ou les éditer manuellement."
+        : "Aucune page statique rédigée pour le moment. Un clic sur le bouton ci-dessous et l'IA rédige les 5 pages (À propos, Contact, Livraison, Retours, FAQ) en 60-120 s, ton éditorial magazine.",
+      cta: hasAbout ? null : {
+        label: pagesBusy ? "Rédaction IA en cours…" : "✨ Rédiger les 5 pages maintenant (IA)",
+        onClick: onGeneratePages,
+        testid: "banner-generate-pages",
+        disabled: pagesBusy,
+      },
+    },
+  };
+  const plan = plans[tab] || plans.identity;
+  return (
+    <div
+      data-testid="tab-guidance-banner"
+      className="mb-6 bg-white p-5 md:p-6"
+      style={{ border: "1px solid #E5E5E5", borderRadius: "4px" }}
+    >
+      <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+        <div className="flex-1 min-w-0">
+          <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 mb-1.5 font-medium">
+            {plan.stepLabel}
+          </div>
+          <div
+            className="text-[19px] md:text-[22px] text-neutral-900 leading-tight"
+            style={{ fontFamily: "'Fraunces', Georgia, serif" }}
+          >
+            {plan.title}
+          </div>
+          <p className="text-[13px] text-neutral-600 mt-1.5 leading-[1.55] max-w-2xl">
+            {plan.subtitle}
+          </p>
+        </div>
+        {plan.cta && (
+          <button
+            onClick={plan.cta.onClick}
+            disabled={plan.cta.disabled}
+            data-testid={plan.cta.testid}
+            className="shrink-0 h-11 px-5 bg-neutral-900 hover:bg-black disabled:opacity-60 text-white text-[13px] font-semibold flex items-center gap-2 transition"
+            style={{ borderRadius: "2px" }}
+          >
+            {plan.cta.disabled && <ArrowClockwise size={14} className="animate-spin" />}
+            {plan.cta.label}
           </button>
         )}
       </div>

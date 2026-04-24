@@ -3,6 +3,26 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-24 (evening) · UX Guidance Étapes 5/6/7 (anti-confusion)
+
+Feedback user : « Étapes 5 et 6 font la même chose, Studio incompréhensible,
+7 boutons sans hiérarchie ». Refonte du flow guidé :
+
+### Navigation tabs contextuelle
+- `CockpitJourney` : étapes 5 → `?tab=identity&step=5`, étape 6 → `?tab=content&step=6`, étape 7 → `/blog-posts?step=7`.
+- `SiteDesign` lit `?tab=X` et pré-sélectionne l'onglet correspondant, la tab navigation met à jour l'URL (deep-linkable, back/forward OK).
+
+### Banner de guidance par tab (nouveau composant `TabGuidanceBanner`)
+- Chaque onglet affiche un **encart en haut** avec : eyebrow "Étape X / Onglet", titre Fraunces, explication claire, **un seul CTA** si pertinent (vs 7 boutons avant).
+- Adaptatif : si `hasDesign` / `hasAbout` déjà remplis → message "tout est prêt, ajustez si besoin". Sinon → CTA direct "Relancer le wizard" ou "Rédiger les 5 pages (IA)".
+
+### Header simplifié du Studio
+- **Avant** : 7 boutons (Monochrome/Palette toggle + Enrichir homepage + Rédiger pages + Relancer wizard + Publier + Storefront).
+- **Après** : 3 boutons essentiels (Publier, Voir storefront, ⋯) + menu déroulant `secondary-actions-menu` pour les actions avancées (Style monochrome/palette, Enrichir homepage, Relancer wizard).
+
+### Step 7 banner sur SiteBlogPosts
+- Encart Fraunces expliquant les 3 options (générer tout le blog / rédiger 1 article / cluster mensuel auto) → plus de confusion « à quoi servent ces boutons ».
+
 ## 2026-04-24 · Citation Tracker auto + AliExpress Weekly Deals Watcher
 
 ### Citation Tracker Scheduler (P2 → livré)

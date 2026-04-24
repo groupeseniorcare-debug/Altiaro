@@ -149,7 +149,7 @@ export default function CockpitJourney({ site, onRefresh }) {
       locked: isLocked("branding"),
       ready: readyBranding,
       cta: hasBrand && hasLogo ? "Branding configuré" : "Générer mon site (IA)",
-      to: `/sites/${site.id}/design`,
+      to: `/sites/${site.id}/design?tab=identity&step=5`,
     },
     {
       key: "pages",
@@ -161,7 +161,7 @@ export default function CockpitJourney({ site, onRefresh }) {
       locked: isLocked("pages"),
       ready: readyPages,
       cta: hasAbout ? "Pages remplies" : "Compléter les pages",
-      to: `/sites/${site.id}/design`,
+      to: `/sites/${site.id}/design?tab=content&step=6`,
     },
     {
       key: "content",
@@ -173,7 +173,7 @@ export default function CockpitJourney({ site, onRefresh }) {
       locked: isLocked("content"),
       ready: readyContent,
       cta: blogCount > 0 ? `${blogCount} article${blogCount > 1 ? "s" : ""} publié${blogCount > 1 ? "s" : ""}` : "Générer les articles",
-      to: `/sites/${site.id}/blog-posts`,
+      to: `/sites/${site.id}/blog-posts?step=7`,
     },
     {
       key: "seo",
