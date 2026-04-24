@@ -11,6 +11,15 @@ from dotenv import load_dotenv
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
+# Google OAuth scope relaxation.
+# Quand on enchaîne plusieurs OAuth Google (Ads puis Merchant puis GSC),
+# Google retourne dans le token les scopes précédemment accordés en plus du
+# scope demandé (comportement de include_granted_scopes=true). La lib
+# google-auth-oauthlib refuse sinon l'échange avec "Scope has changed".
+# Ce flag relax oauthlib pour tolérer le sur-ensemble de scopes.
+# DOIT être posé AVANT l'import de google_auth_oauthlib / oauthlib.
+os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
+
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, APIRouter

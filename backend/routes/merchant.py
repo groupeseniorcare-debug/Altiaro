@@ -539,6 +539,7 @@ async def oauth_callback(
         return RedirectResponse(url=f"{target_err}&reason=config_missing", status_code=302)
     # Retrieve PKCE code_verifier saved at oauth_start. Required by Google since
     # Flow.authorization_url() auto-generates a code_challenge.
+    saved_verifier = None
     try:
         state_doc = await db.platform_settings.find_one(
             {"key": "merchant_oauth_state"}, {"_id": 0}
@@ -546,12 +547,18 @@ async def oauth_callback(
         saved_verifier = state_doc.get("code_verifier")
         if saved_verifier:
             flow.code_verifier = saved_verifier
+        logger.info(
+            f"[merchant] callback: code={bool(code)} state={state} "
+            f"state_doc_present={bool(state_doc)} "
+            f"code_verifier_loaded={bool(saved_verifier)} "
+            f"flow.redirect_uri={flow.redirect_uri}"
+        )
     except Exception:
-        saved_verifier = None
+        logger.exception("[merchant] failed to load code_verifier from DB")
     try:
         flow.fetch_token(code=code)
     except Exception as e:
-        logger.warning(f"[merchant] oauth token exchange failed: {e}")
+        logger.exception(f"[merchant] oauth token exchange failed: {e}")
         return RedirectResponse(url=f"{target_err}&reason=token_exchange", status_code=302)
 
     creds = flow.credentials
@@ -573,7 +580,15 @@ async def oauth_callback(
         }},
         upsert=True,
     )
-    logger.info("[merchant] oauth_callback success — refresh_token persisted")
+    # Cleanup OAuth state (anti-replay + idempotence)
+    try:
+        await db.platform_settings.delete_one({"key": "merchant_oauth_state"})
+    except Exception:
+        pass
+    logger.info(
+        f"[merchant] oauth_callback success — refresh_token persisted · "
+        f"granted_scopes={list(creds.scopes or SCOPES)}"
+    )
     return RedirectResponse(url=target_ok, status_code=302)
 
 
