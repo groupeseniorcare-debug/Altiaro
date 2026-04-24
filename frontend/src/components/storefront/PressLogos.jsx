@@ -1,11 +1,12 @@
 import React from "react";
 import { designAccents } from "./storefrontUtils";
+import { t } from "../../lib/i18n";
 
 /**
  * PressLogos — MONOCHROME horizontal ribbon. White canvas with a thin top
  * and bottom hairline. Press names are rendered in italic serif, grayscale.
  */
-export default function PressLogos({ mentions, design }) {
+export default function PressLogos({ mentions, design, lang = "fr" }) {
   const { primary, divider, textMuted, fontHeading } = designAccents(design);
   const list = (mentions && mentions.length) ? mentions : [
     { name: "Le Figaro" }, { name: "Les Échos" }, { name: "Maison & Travaux" },
@@ -24,7 +25,7 @@ export default function PressLogos({ mentions, design }) {
           className="text-center text-[10px] uppercase tracking-[0.5em] mb-8"
           style={{ color: textMuted }}
         >
-          — Ils parlent de nous —
+          — {t(lang, "press_eyebrow")} —
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-8 gap-y-8 md:gap-y-6 items-center">
           {list.slice(0, 6).map((m, i) => (

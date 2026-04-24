@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { Star, CaretDown } from "@phosphor-icons/react";
 import { designAccents } from "./storefrontUtils";
+import { t } from "../../lib/i18n";
 
 /**
  * Product reviews — monochrome editorial. Summary card grey, review list
  * with hairline dividers, "Achat vérifié" chip on neutral tones.
  */
-export default function ProductReviews({ product, design }) {
+export default function ProductReviews({ product, design, lang = "fr" }) {
   const [sort, setSort] = useState("recent");
   const { primary, accent, divider, textMuted, textFaint, fontHeading } = designAccents(design);
 
@@ -62,7 +63,7 @@ export default function ProductReviews({ product, design }) {
             {[...Array(5)].map((_, i) => <Star key={i} size={17} weight="fill" />)}
           </div>
           <div className="text-[13px] mb-7" style={{ color: textMuted }}>
-            Basé sur <span className="font-semibold" style={{ color: primary }}>{ratingMeta.count}</span> avis vérifiés
+            Basé sur <span className="font-semibold" style={{ color: primary }}>{ratingMeta.count}</span> {t(lang, "testimonials_verified_reviews")}
           </div>
           <div className="space-y-2.5">
             {dist.map((d) => (

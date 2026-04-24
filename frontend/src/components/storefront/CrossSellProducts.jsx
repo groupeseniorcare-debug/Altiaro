@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import axios from "axios";
 import { ArrowRight, ShoppingBagOpen, Star } from "@phosphor-icons/react";
-import { pickLang } from "../../lib/i18n";
+import { pickLang, t } from "../../lib/i18n";
 import { BACKEND_URL, designAccents, formatPrice } from "./storefrontUtils";
 
 /**
@@ -47,7 +47,7 @@ export default function CrossSellProducts({ currentProduct, lang = "fr", design 
           </h2>
         </div>
         <Link to={`/shop/${siteId}`} className="text-sm inline-flex items-center gap-1.5 hover:gap-2.5 transition-all" style={{ color: primary }}>
-          Voir toute la boutique <ArrowRight size={14} weight="bold" />
+          {t(lang, "collections_see_all")} <ArrowRight size={14} weight="bold" />
         </Link>
       </div>
 

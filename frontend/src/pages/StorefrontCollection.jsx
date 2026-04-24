@@ -41,7 +41,7 @@ export function StorefrontCollections() {
       />
       <section className="max-w-7xl mx-auto px-6 md:px-10 py-16 md:py-20" data-testid="collections-index">
         <div className="mb-12">
-          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-3">Nos univers</div>
+          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-3">{t(lang, "collections_eyebrow")}</div>
           <h1 className="text-4xl md:text-6xl" style={{ fontFamily: `${fontHeading}, serif`, color: "#1C1917" }}>
             Explorer par collection
           </h1>
@@ -406,7 +406,7 @@ export function StorefrontCollection() {
               to={`/shop/${siteId}`}
               className="inline-flex items-center gap-2 h-11 px-5 rounded-full bg-neutral-900 text-white text-sm font-medium"
             >
-              Voir toute la boutique <ArrowRight size={14} weight="bold" />
+              {t(lang, "collections_see_all")} <ArrowRight size={14} weight="bold" />
             </Link>
           </div>
         ) : (

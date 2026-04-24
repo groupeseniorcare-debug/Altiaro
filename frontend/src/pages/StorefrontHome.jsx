@@ -240,7 +240,7 @@ function renderHomepageSections({ design, site, siteId, products, loading, lang 
     const inner = (() => {
       switch (s.key) {
         case "press_logos":
-          return <PressLogos mentions={design?.press_mentions} design={design} />;
+          return <PressLogos mentions={design?.press_mentions} design={design} lang={lang} />;
         case "manifesto":
           return <Manifesto design={design} lang={lang} />;
         case "brand_process":

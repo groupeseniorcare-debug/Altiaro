@@ -42,17 +42,17 @@ export default function NewsletterCTA({ design, lang = "fr" }) {
             <div className="flex items-center gap-3 mb-5">
               <span className="h-px w-10" style={{ background: primary }} />
               <span className="text-[11px] uppercase tracking-[0.4em]" style={{ color: primary }}>
-                Newsletter
+                {t(lang, "newsletter_eyebrow")}
               </span>
             </div>
             <h2
               className="text-[32px] md:text-[42px] leading-[1.05] tracking-[-0.02em]"
               style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
             >
-              Nos conseils dans<br />votre boîte mail.
+              {t(lang, "newsletter_cta_heading_line1")}<br />{t(lang, "newsletter_cta_heading_line2")}
             </h2>
             <p className="mt-5 text-[14px] max-w-md" style={{ color: textMuted }}>
-              Chaque mois, nos guides pratiques, nos nouveautés et des offres exclusives. Une seule newsletter par mois, promis.
+              {t(lang, "newsletter_cta_body")}
             </p>
           </div>
           <div>
@@ -63,7 +63,7 @@ export default function NewsletterCTA({ design, lang = "fr" }) {
                 data-testid="newsletter-success"
               >
                 <CheckCircle size={20} weight="fill" style={{ color: "#047857" }} />
-                <span className="text-[14px]">Merci ! Vous recevrez notre prochaine newsletter dans quelques jours.</span>
+                <span className="text-[14px]">{t(lang, "newsletter_cta_success")}</span>
               </div>
             ) : (
               <form onSubmit={submit} className="flex flex-col gap-3">

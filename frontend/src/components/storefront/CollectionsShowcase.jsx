@@ -2,7 +2,7 @@ import React from "react";
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight } from "@phosphor-icons/react";
-import { pickLang } from "../../lib/i18n";
+import { pickLang, t } from "../../lib/i18n";
 import { designAccents } from "./storefrontUtils";
 
 /**
@@ -15,11 +15,11 @@ export default function CollectionsShowcase({ collections, lang = "fr", design }
   const { primary, accent, divider, textMuted, textFaint, fontHeading } = designAccents(design);
 
   const list = collections?.length ? collections : [
-    { slug: "mobilite", title: "Mobilité & confort", description: "Fauteuils releveurs, déambulateurs, aides à la marche.",
+    { slug: "mobilite", title: t(lang, "collections_fallback_1_title"), description: t(lang, "collections_fallback_1_desc"),
       image: "https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=900&auto=format&fit=crop" },
-    { slug: "sommeil", title: "Sommeil & récupération", description: "Matelas médicaux, lits électriques, linge adapté.",
+    { slug: "sommeil", title: t(lang, "collections_fallback_2_title"), description: t(lang, "collections_fallback_2_desc"),
       image: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=900&auto=format&fit=crop" },
-    { slug: "quotidien", title: "Quotidien serein", description: "Alarmes, éclairages, ustensiles ergonomiques.",
+    { slug: "quotidien", title: t(lang, "collections_fallback_3_title"), description: t(lang, "collections_fallback_3_desc"),
       image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=900&auto=format&fit=crop" },
   ];
 
@@ -32,14 +32,14 @@ export default function CollectionsShowcase({ collections, lang = "fr", design }
             <div className="flex items-center gap-3 mb-5">
               <span className="h-px w-10" style={{ background: primary }} />
               <span className="text-[11px] uppercase tracking-[0.4em]" style={{ color: primary }}>
-                Nos univers
+                {t(lang, "collections_eyebrow")}
               </span>
             </div>
             <h2
               className="text-[40px] md:text-[56px] lg:text-[64px] leading-[1.02] tracking-[-0.02em]"
               style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
             >
-              Explorer par<br />collection.
+              {t(lang, "collections_heading_line1")}<br />{t(lang, "collections_heading_line2")}
             </h2>
           </div>
           <Link
@@ -48,7 +48,7 @@ export default function CollectionsShowcase({ collections, lang = "fr", design }
             className="relative inline-flex items-center gap-2 text-[13px] font-medium tracking-wide after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-px after:bg-current after:opacity-30 hover:after:opacity-100 after:transition-opacity"
             style={{ color: primary }}
           >
-            Voir toute la boutique <ArrowRight size={13} weight="bold" />
+            {t(lang, "collections_see_all")} <ArrowRight size={13} weight="bold" />
           </Link>
         </div>
 
@@ -90,7 +90,7 @@ export default function CollectionsShowcase({ collections, lang = "fr", design }
                       className="absolute top-5 left-5 text-[10px] uppercase tracking-[0.32em] px-2.5 py-1 bg-white"
                       style={{ color: primary, borderRadius: "2px" }}
                     >
-                      Collection {String(i + 1).padStart(2, "0")}
+                      {t(lang, "hero_collection")} {String(i + 1).padStart(2, "0")}
                     </div>
                   </div>
                   {/* Text lives BELOW the image, with a thin divider */}

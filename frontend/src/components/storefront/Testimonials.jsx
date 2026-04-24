@@ -1,6 +1,7 @@
 import React from "react";
 import { Star } from "@phosphor-icons/react";
 import { designAccents } from "./storefrontUtils";
+import { t } from "../../lib/i18n";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
 
@@ -133,14 +134,14 @@ export function Testimonials({ design, lang }) {
             <div className="flex items-center gap-3 mb-5">
               <span className="h-px w-10" style={{ background: primary }} />
               <span className="text-[11px] uppercase tracking-[0.4em]" style={{ color: primary }}>
-                Témoignages
+                {t(lang, "testimonials_eyebrow")}
               </span>
             </div>
             <h2
               className="text-[40px] md:text-[56px] lg:text-[64px] leading-[1.02] tracking-[-0.02em]"
               style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
             >
-              Ils en parlent<br />mieux que nous.
+              {t(lang, "testimonials_heading_line1")}<br />{t(lang, "testimonials_heading_line2")}
             </h2>
           </div>
           <div className="flex items-center gap-2 text-neutral-500">
@@ -148,7 +149,7 @@ export function Testimonials({ design, lang }) {
               {[...Array(5)].map((_, i) => <Star key={i} size={14} weight="fill" />)}
             </div>
             <span className="text-[13px] font-semibold" style={{ color: primary }}>4.8/5</span>
-            <span className="text-[13px]">· 2 143 avis vérifiés</span>
+            <span className="text-[13px]">· 2 143 {t(lang, "testimonials_verified_reviews")}</span>
           </div>
         </div>
       </div>

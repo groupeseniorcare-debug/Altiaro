@@ -470,7 +470,7 @@ export function StorefrontProduct() {
           <UsageSteps steps={p.narrative?.seo?.usage_steps} productName={pickLang(p.name, lang)} design={design} />
           <ProductFAQ faq={p.narrative?.faq} design={design} />
           <PeopleAlsoAsk items={p.narrative?.seo?.people_also_ask} design={design} />
-          <ProductReviews product={p} design={design} />
+          <ProductReviews product={p} design={design} lang={lang} />
           <RelatedQueries queries={p.narrative?.seo?.related_queries} design={design} />
           <UpsellsRecommendations
             mode="product"

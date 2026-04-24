@@ -2,33 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { ShieldCheck, HandsClapping, Leaf, Tree } from "@phosphor-icons/react";
 import { designAccents } from "./storefrontUtils";
-
-const DEFAULT_STEPS = [
-  {
-    icon: "Leaf",
-    kicker: "01 · Sélection",
-    title: "Matières nobles, sans compromis",
-    body: "Chaque tissu, chaque bois est validé par notre équipe avant la moindre production. Nous refusons les matières issues de filières opaques.",
-  },
-  {
-    icon: "HandsClapping",
-    kicker: "02 · Fabrication",
-    title: "Ateliers européens, savoir-faire préservé",
-    body: "Nos partenaires sont installés en France, Italie, Portugal. Des ateliers qui ont du sens — certifiés sur les conditions de travail et l'origine des matériaux.",
-  },
-  {
-    icon: "ShieldCheck",
-    kicker: "03 · Contrôle",
-    title: "4 niveaux de contrôle qualité",
-    body: "Chaque pièce est testée avant expédition : conformité, résistance, confort, finitions. Si elle ne passe pas, elle repart en atelier — pas chez vous.",
-  },
-  {
-    icon: "Tree",
-    kicker: "04 · Logistique",
-    title: "Livraison maîtrisée, zéro surprise",
-    body: "Expédition depuis notre entrepôt en Île-de-France, emballage 100% recyclable, installation à domicile sur les produits volumineux.",
-  },
-];
+import { t } from "../../lib/i18n";
 
 const ICONS = { Leaf, HandsClapping, ShieldCheck, Tree };
 
@@ -39,8 +13,14 @@ const ICONS = { Leaf, HandsClapping, ShieldCheck, Tree };
  */
 export default function BrandProcess({ design, lang = "fr" }) {
   const { primary, accent, textMuted, fontHeading } = designAccents(design);
+  const defaultSteps = [
+    { icon: "Leaf",          kicker: `01 · ${t(lang, "process_step_1_kicker")}`, title: t(lang, "process_step_1_title"), body: t(lang, "process_step_1_body") },
+    { icon: "HandsClapping", kicker: `02 · ${t(lang, "process_step_2_kicker")}`, title: t(lang, "process_step_2_title"), body: t(lang, "process_step_2_body") },
+    { icon: "ShieldCheck",   kicker: `03 · ${t(lang, "process_step_3_kicker")}`, title: t(lang, "process_step_3_title"), body: t(lang, "process_step_3_body") },
+    { icon: "Tree",          kicker: `04 · ${t(lang, "process_step_4_kicker")}`, title: t(lang, "process_step_4_title"), body: t(lang, "process_step_4_body") },
+  ];
   const steps = (design?.brand_process && design.brand_process.length === 4)
-    ? design.brand_process : DEFAULT_STEPS;
+    ? design.brand_process : defaultSteps;
 
   return (
     <section
@@ -54,18 +34,17 @@ export default function BrandProcess({ design, lang = "fr" }) {
             <div className="flex items-center gap-3 mb-5">
               <span className="h-px w-10" style={{ background: primary }} />
               <span className="text-[11px] uppercase tracking-[0.4em]" style={{ color: primary }}>
-                Notre fabrication
+                {t(lang, "process_eyebrow")}
               </span>
             </div>
             <h2
               className="text-[40px] md:text-[56px] lg:text-[64px] leading-[1.02] tracking-[-0.02em]"
               style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
             >
-              De la sélection<br />à votre porte.
+              {t(lang, "process_heading_line1")}<br />{t(lang, "process_heading_line2")}
             </h2>
             <p className="text-[15px] mt-6 max-w-lg leading-relaxed" style={{ color: textMuted }}>
-              Nous contrôlons chaque étape — sélection des matières, fabrication, qualité, logistique.
-              Pas de sous-traitance opaque, pas de raccourci.
+              {t(lang, "process_subtitle")}
             </p>
           </div>
         </div>

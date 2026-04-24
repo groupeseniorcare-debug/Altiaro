@@ -177,7 +177,7 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
   const footerLinks = (Array.isArray(configuredFooter) && configuredFooter.length
     ? configuredFooter
     : [
-        { label: "CGV",                            href: `${shopRoot}/cgv` },
+        { label: t(lang, "footer_terms"),          href: `${shopRoot}/cgv` },
         { label: t(lang, "footer_legal_notice"),   href: `${shopRoot}/mentions` },
         { label: t(lang, "footer_privacy"),        href: `${shopRoot}/confidentialite` },
       ]
@@ -573,10 +573,10 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
       >
         <div className="max-w-7xl mx-auto px-6 py-10 grid grid-cols-2 md:grid-cols-4 gap-6">
           {[
-            { Icon: Truck,       title: t(lang, "trust_free_shipping"),  sub: { fr: "Partout en Europe", en: "Throughout Europe", de: "In ganz Europa", nl: "In heel Europa", it: "In tutta Europa", es: "Por toda Europa" }[lang] || "" },
-            { Icon: ShieldCheck, title: t(lang, "trust_secure_payment"), sub: "CB, PayPal, Virement" },
+            { Icon: Truck,       title: t(lang, "trust_free_shipping"),  sub: t(lang, "footer_reassurance_shipping_sub") },
+            { Icon: ShieldCheck, title: t(lang, "trust_secure_payment"), sub: t(lang, "footer_reassurance_payment_sub") },
             { Icon: Phone,       title: t(lang, "trust_human_service"),  sub: t(lang, "support_seniors") },
-            { Icon: CreditCard,  title: t(lang, "trust_returns_14d"),    sub: { fr: "Satisfait ou remboursé", en: "Satisfied or refunded", de: "Zufrieden oder Geld zurück", nl: "Tevreden of geld terug", it: "Soddisfatti o rimborsati", es: "Satisfecho o reembolsado" }[lang] || "" },
+            { Icon: CreditCard,  title: t(lang, "trust_returns_14d"),    sub: t(lang, "footer_reassurance_returns_sub") },
           ].map((b, i) => (
             <div
               key={i}
@@ -752,7 +752,7 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
                 <FooterCol
                   title={t(lang, "footer_col_legal")}
                   items={footerLinks.length > 0 ? footerLinks : [
-                    { label: "CGV",                           href: `${shopRoot}/cgv` },
+                    { label: t(lang, "footer_terms"),         href: `${shopRoot}/cgv` },
                     { label: t(lang, "footer_legal_notice"),  href: `${shopRoot}/mentions` },
                     { label: t(lang, "footer_privacy"),       href: `${shopRoot}/confidentialite` },
                     { label: t(lang, "footer_cookies"),       href: `${shopRoot}/cookies` },

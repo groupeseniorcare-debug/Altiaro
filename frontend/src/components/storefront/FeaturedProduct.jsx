@@ -90,7 +90,7 @@ export default function FeaturedProduct({ products, design, lang = "fr" }) {
                 ))}
               </div>
               <div className="text-sm text-neutral-600">
-                <span className="font-semibold">4.9</span> · 847 avis vérifiés
+                <span className="font-semibold">4.9</span> · 847 {t(lang, "testimonials_verified_reviews")}
               </div>
             </div>
 
@@ -144,7 +144,7 @@ export default function FeaturedProduct({ products, design, lang = "fr" }) {
                 to={`/shop/${siteId}`}
                 className="inline-flex items-center justify-center gap-2 h-14 px-7 rounded-full border border-neutral-300 hover:bg-white font-medium text-[15px] transition text-neutral-900"
               >
-                Voir toute la boutique
+                {t(lang, "collections_see_all")}
               </Link>
             </div>
           </div>
