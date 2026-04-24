@@ -3,6 +3,49 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+## 2026-04-24 (late night) · Hero image IA + testimonials bg-mode + logo footer définitif
+
+### Hero image IA par site (endpoint dédié)
+- **Nouveau `POST /api/sites/{id}/design/generate-hero-image`** dans
+  `routes/design.py` utilise Nano Banana pour générer une image lifestyle
+  3:2 éditoriale (senior français utilisant le produit de la niche dans
+  un intérieur lumineux, lumière matinale douce, composition magazine).
+- Helper `_nano_banana_hero_image()` miroir de `_nano_banana_logo()`.
+- Persiste dans `design.hero.image` → automatiquement repris par le footer.
+- Test e2e : 20 s pour générer + persister le hero Soléa.
+
+### Logo footer — robustesse définitive
+Retour user : "le logo dans le footer c'est pas bon".
+Root cause : `brightness-0 invert` cassait les logos déjà sur fond clair ou
+déjà blancs. Fix radical :
+- **On affiche TOUJOURS le nom de marque en Fraunces blanc** dans le footer,
+  jamais l'image logo uploadée.
+- Rationale : le logo uploadé peut être transparent sombre (devient
+  invisible sur overlay sombre) ou blanc pur (invert le rendrait noir).
+  Le texte Fraunces est universel, toujours lisible, et fidèle au style
+  éditorial magazine du storefront.
+- Commentaire inline dans le code pour éviter toute régression future.
+
+### Testimonials AI — mode background fire-and-forget
+Problème : Cloudflare proxy timeout = 60 s. Pipeline complet (Claude +
+6 portraits Nano Banana) = 90-120 s → client voyait 502/timeout alors
+que le job continuait côté serveur.
+- Refactor `generate_testimonials()` : retourne `status:started` en <1 s,
+  lance `asyncio.create_task(_run_generation_bg(...))`.
+- Nouveau tracking : `design.testimonials.ai_status` = running | done |
+  failed + `ai_with_images` count.
+- Polling `GET /testimonials` → monitor `ai_status`.
+- Test e2e Soléa : 6 textes + 6 portraits Nano Banana générés en **40 s**
+  (concurrence Semaphore(2) sur images).
+
+### Résultat visuel
+- Reviews marquee Soléa : 6 cards montrant de VRAIS seniors français
+  utilisant des fauteuils releveurs dans leurs salons. Chaque texte
+  mentionne des détails concrets ("tissu gris anthracite", "mécanisme
+  silencieux", "mon père qui vit seul").
+- Footer : bg image = hero Soléa (dame assise dans fauteuil, salon
+  lumineux) + overlay sombre + logo "Soléa" Fraunces blanc.
+
 ## 2026-04-24 (night) · Testimonials IA niche-adaptés + footer premium avec image site
 
 ### Reassurance cards restaurées (style gris pré-Chutex)

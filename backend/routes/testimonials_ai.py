@@ -130,6 +130,74 @@ class GenerateInput(BaseModel):
     skip_images: bool = False  # if true, only generate texts (faster, cheaper)
 
 
+async def _run_generation_bg(site_id: str, site: dict, body: GenerateInput):
+    """Run Claude + Nano Banana in background so the HTTP call returns fast
+    (avoids the 60 s proxy timeout). Status is polled via GET endpoint."""
+    try:
+        products = await db.products.find(
+            {"site_id": site_id, "status": "active"},
+            {"_id": 0, "name": 1, "category": 1},
+        ).limit(10).to_list(10)
+
+        await db.sites.update_one(
+            {"id": site_id},
+            {"$set": {"design.testimonials.ai_status": "running", "design.testimonials.ai_started_at": datetime.now(timezone.utc).isoformat()}},
+        )
+
+        testimonials = await _generate_testimonial_texts(site, products, count=body.count)
+        if not testimonials:
+            await db.sites.update_one(
+                {"id": site_id},
+                {"$set": {"design.testimonials.ai_status": "failed", "design.testimonials.ai_error": "textes LLM indisponibles"}},
+            )
+            return
+
+        sem = asyncio.Semaphore(2)
+
+        async def _gen_img(prompt: str):
+            async with sem:
+                return await _nano_banana_portrait(prompt, site_id)
+
+        if body.skip_images:
+            image_urls = [None] * len(testimonials)
+        else:
+            tasks = [asyncio.create_task(_gen_img(t.get("image_prompt") or "")) for t in testimonials]
+            image_urls = []
+            for task in tasks:
+                try:
+                    image_urls.append(await task)
+                except Exception:
+                    image_urls.append(None)
+
+        final = []
+        for t, img_url in zip(testimonials, image_urls):
+            final.append({
+                "name": t.get("name") or "",
+                "role": t.get("role") or "",
+                "location": t.get("location") or "",
+                "rating": int(t.get("rating") or 5),
+                "text": t.get("text") or "",
+                "image": img_url,
+                "ai_generated": True,
+            })
+
+        await db.sites.update_one(
+            {"id": site_id},
+            {"$set": {
+                "design.testimonials.items": final,
+                "design.testimonials.ai_status": "done",
+                "design.testimonials.ai_generated_at": datetime.now(timezone.utc).isoformat(),
+                "design.testimonials.ai_with_images": sum(1 for i in image_urls if i),
+            }},
+        )
+    except Exception:
+        logger.exception("[testimonials_ai] bg job crashed")
+        await db.sites.update_one(
+            {"id": site_id},
+            {"$set": {"design.testimonials.ai_status": "failed", "design.testimonials.ai_error": "exception"}},
+        )
+
+
 @router.post("/sites/{site_id}/testimonials/ai-generate")
 async def generate_testimonials(site_id: str, body: GenerateInput, user=Depends(get_current_user)):
     site = await db.sites.find_one({"id": site_id}, {"_id": 0})
@@ -145,71 +213,12 @@ async def generate_testimonials(site_id: str, body: GenerateInput, user=Depends(
             "count": len(existing.get("items") or []),
         }
 
-    products = await db.products.find(
-        {"site_id": site_id, "status": "active"},
-        {"_id": 0, "name": 1, "category": 1},
-    ).limit(10).to_list(10)
-
-    testimonials = await _generate_testimonial_texts(site, products, count=body.count)
-    if not testimonials:
-        raise HTTPException(502, "Impossible de générer les textes (budget LLM ?). Réessaye dans quelques minutes.")
-
-    # Génère les images en parallèle (limit concurrent Nano calls to 2)
-    sem = asyncio.Semaphore(2)
-
-    async def _gen_img(prompt: str) -> str | None:
-        async with sem:
-            return await _nano_banana_portrait(prompt, site_id)
-
-    image_tasks = []
-    if not body.skip_images:
-        for t in testimonials:
-            p = t.get("image_prompt") or ""
-            if not p:
-                image_tasks.append(None)
-            else:
-                image_tasks.append(asyncio.create_task(_gen_img(p)))
-
-        # Wait for all
-        image_urls = []
-        for task in image_tasks:
-            if task is None:
-                image_urls.append(None)
-            else:
-                try:
-                    image_urls.append(await task)
-                except Exception:
-                    image_urls.append(None)
-    else:
-        image_urls = [None] * len(testimonials)
-
-    # Build final items
-    final = []
-    for t, img_url in zip(testimonials, image_urls):
-        final.append({
-            "name": t.get("name") or "",
-            "role": t.get("role") or "",
-            "location": t.get("location") or "",
-            "rating": int(t.get("rating") or 5),
-            "text": t.get("text") or "",
-            "image": img_url,
-            "ai_generated": True,
-        })
-
-    # Persist
-    await db.sites.update_one(
-        {"id": site_id},
-        {"$set": {
-            "design.testimonials.items": final,
-            "design.testimonials.ai_generated_at": datetime.now(timezone.utc).isoformat(),
-        }},
-    )
-
+    # Fire-and-forget background task — returns immediately
+    asyncio.create_task(_run_generation_bg(site_id, site, body))
     return {
-        "status": "done",
-        "count": len(final),
-        "with_images": sum(1 for i in image_urls if i),
-        "items": final,
+        "status": "started",
+        "message": "Génération lancée en arrière-plan. Polle GET /testimonials pour suivre le statut (ai_status: running → done).",
+        "estimated_duration_s": 150 if not body.skip_images else 20,
     }
 
 

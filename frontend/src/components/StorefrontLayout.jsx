@@ -622,23 +622,16 @@ export default function StorefrontLayout({ children, lang, setLang, site, design
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-16 lg:gap-20">
             {/* Newsletter + Logo */}
             <div>
-              {/* Brand logo */}
-              <div className="mb-8" data-testid="footer-brand-logo">
-                {logoUrl ? (
-                  <img
-                    src={logoUrl}
-                    alt={logoText}
-                    className="h-10 w-auto brightness-0 invert"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div
-                    className="text-[26px] font-semibold text-white"
-                    style={{ fontFamily: `"${fontHeading}", serif` }}
-                  >
-                    {logoText}
-                  </div>
-                )}
+              {/* Brand logo — Fraunces text in white for guaranteed legibility on dark overlay.
+                  The uploaded image logo is NOT used here because it may be dark on
+                  transparent background (would be invisible) or already white (would
+                  clash). Fraunces text always works. */}
+              <div
+                className="mb-8 text-[26px] md:text-[30px] font-semibold text-white leading-none"
+                style={{ fontFamily: `"${fontHeading}", serif` }}
+                data-testid="footer-brand-logo"
+              >
+                {logoText}
               </div>
 
               <h2

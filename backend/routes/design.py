@@ -269,6 +269,70 @@ async def _nano_banana_logo(prompt: str, site_id: str) -> Optional[str]:
         return None
 
 
+async def _nano_banana_hero_image(prompt: str, site_id: str) -> Optional[str]:
+    """Génère une image hero lifestyle 3:2 via Nano Banana."""
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"hero-{site_id}-{uuid.uuid4().hex[:6]}",
+                       system_message="You create premium lifestyle photography for Silver Economy D2C e-commerce brands.")
+        chat.with_model("gemini", NANO_BANANA_MODEL).with_params(modalities=["image", "text"])
+        full_prompt = (
+            f"Editorial lifestyle photography, 3:2 landscape format, premium magazine quality, "
+            f"warm morning natural light, soft shadows, shallow depth of field. "
+            f"{prompt}. "
+            f"Tasteful French interior, editorial composition, dignity, documentary style. "
+            f"No text, no logo, no watermark."
+        )
+        _, images = await asyncio.wait_for(
+            chat.send_message_multimodal_response(UserMessage(text=full_prompt)),
+            timeout=120,
+        )
+        if not images:
+            return None
+        img = images[0]
+        data = base64.b64decode(img["data"])
+        heroes_dir = UPLOAD_DIR / "heroes"
+        heroes_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"hero_{site_id}_{uuid.uuid4().hex[:8]}.png"
+        path = heroes_dir / filename
+        path.write_bytes(data)
+        return f"/api/uploads/heroes/{filename}"
+    except asyncio.TimeoutError:
+        logger.warning(f"Nano Banana hero timeout for site {site_id}")
+        return None
+    except Exception:
+        logger.exception("Nano Banana hero generation failed")
+        return None
+
+
+@router.post("/sites/{site_id}/design/generate-hero-image")
+async def generate_hero_image(site_id: str, data: RegenInput, user: dict = Depends(get_current_user)):
+    """Génère une image hero (lifestyle 3:2) via Nano Banana, adaptée à la
+    niche. L'URL est sauvegardée dans `design.hero.image` + utilisée
+    automatiquement comme bg du footer."""
+    await _check_site_access(site_id, user)
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(status_code=404, detail="Site introuvable")
+    niche = site.get("niche") or "produits Silver Economy"
+    design = site.get("design") or {}
+    brand_name = ((design.get("brand") or {}).get("name")) or site.get("name") or "la marque"
+    prompt = data.tweak or (
+        f"A bright, airy French living room with a senior person comfortably using "
+        f"a {niche} product. Warm natural morning light coming from a large window, "
+        f"wooden floor, simple elegant decor, serene atmosphere. Brand : {brand_name}."
+    )
+    url = await _nano_banana_hero_image(prompt, site_id)
+    if not url:
+        raise HTTPException(status_code=502, detail="Génération hero image échouée, réessaye.")
+    design_hero = design.get("hero") or {}
+    design_hero["image"] = url
+    design["hero"] = design_hero
+    design["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.sites.update_one({"id": site_id}, {"$set": {"design": design}})
+    return {"ok": True, "hero_image": url}
+
+
 def _slugify(s: str) -> str:
     s = re.sub(r"[^a-zA-Z0-9]+", "-", s or "").strip("-").lower()
     return s or "boutique"
