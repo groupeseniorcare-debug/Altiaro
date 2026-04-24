@@ -602,7 +602,10 @@ async def import_product(site_id: str, data: ImportInput, user: dict = Depends(g
         # NOTE: the CJ freight endpoint requires full address (province+city) to return
         # real results — country-only calls return empty even for products that DO ship.
         # We mark everything as "unknown" for now; Concepteur verifies on CJ listing page.
-        for cc in countries[:6]:
+        # FIX — la variable globale `countries` n'était pas définie (F821) : on lit les
+        # pays depuis le site déjà chargé ligne 534. Fallback FR si rien n'est défini.
+        cc_list = (site or {}).get("selected_countries") or (site or {}).get("seo_countries") or ["FR"]
+        for cc in cc_list[:6]:
             shipping_by_country[cc.upper()] = {"available": None, "note": "À vérifier sur CJ"}
 
     # Strip HTML from CJ description
@@ -891,6 +894,26 @@ async def import_by_url(site_id: str, data: ImportUrlInput, user: dict = Depends
     await require_step(site_id, "pricing")
     provider, product_id = _parse_provider_url(data.url)
 
+    # Wrapper défensif global : toute exception imprévue est loggée avec stack
+    # complète + retournée au client avec un détail parlant (empêche les 500
+    # nus "erreur serveur" côté UI).
+    try:
+        return await _import_by_url_inner(site_id, data, user, provider, product_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(
+            "[sourcing] import_by_url failed — site=%s provider=%s pid=%s url=%s",
+            site_id, provider, product_id, data.url,
+        )
+        raise HTTPException(
+            500,
+            f"Import {provider.upper()} en erreur : {type(e).__name__} — {str(e)[:180]}. "
+            f"Réessaie dans quelques secondes ou contacte le support.",
+        )
+
+
+async def _import_by_url_inner(site_id: str, data: "ImportUrlInput", user: dict, provider: str, product_id: str):
     # Load product meta from the provider
     title = ""
     image = ""

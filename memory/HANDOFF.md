@@ -95,21 +95,43 @@ Quand Google répond "Basic Access approved" :
 
 ## 7 — Config DNS OVH `sites.altiaro.com`
 
-Étapes dans OVH Manager :
+✅ **Déjà configuré automatiquement via l'API OVH** le **2026-04-24** par le script
+`/app/backend/scripts/setup_platform_dns.py`.
 
+Le record A `sites.altiaro.com → 104.18.11.243` (TTL 300, id OVH `5411414550`)
+a été créé et la zone `altiaro.com` a été refresh. Vérification :
+
+```bash
+dig sites.altiaro.com +short     # → 104.18.11.243 (après 1-5 min de propag)
+getent hosts sites.altiaro.com   # → 104.18.11.243
+```
+
+### En cas de changement d'IP prod
+
+Quand le client déploie sur son infra OVH définitive :
+
+1. Mettre à jour `PLATFORM_SITE_IP=<nouvelle_ip>` dans `/app/backend/.env`.
+2. Supprimer l'ancien record `sites` dans OVH Manager (le script ne remplace pas
+   un record existant qui pointe ailleurs — c'est un garde-fou volontaire).
+3. Re-lancer :
+   ```bash
+   cd /app/backend && python -m scripts.setup_platform_dns
+   ```
+4. Le script vérifie la zone, crée le nouveau record et refresh — output clair
+   si succès / échec (code de sortie 0 si OK, ≠0 sinon).
+
+### Le script en bref (ce qu'il fait automatiquement)
+1. Vérifie que `altiaro.com` est bien dans le compte OVH (`GET /domain/zone`).
+2. Liste les records A existants sur `sites.altiaro.com`.
+3. Si déjà OK → `✓ Rien à faire` (idempotent).
+4. Si record existe mais pointe ailleurs → `⚠` + stop (garde-fou).
+5. Sinon crée le record A + refresh zone.
+
+### Procédure manuelle (fallback si l'API OVH est down)
 1. Se connecter à [https://www.ovh.com/manager/](https://www.ovh.com/manager/).
-2. Sélectionner le domaine **`altiaro.com`** dans la liste.
-3. Onglet **"Zone DNS"** → cliquer **"Ajouter une entrée"**.
-4. Paramètres :
-   - **Type** : `A`
-   - **Sous-domaine** : `sites`
-   - **Cible** : `104.18.11.243` (valeur actuelle de `PLATFORM_SITE_IP`)
-   - **TTL** : `300` (5 min, pratique pour itérer tant qu'on n'est pas en prod)
-5. Valider → attendre ~5 min pour la propagation.
-6. Tester : `dig sites.altiaro.com +short` doit retourner `104.18.11.243`.
-7. Ensuite, quand un concepteur achète un domaine custom via OVH depuis le cockpit, le cron `dns_auto_config` (toutes les 5 min) créera automatiquement un CNAME `www.{domain_custom} → sites.altiaro.com` et enverra un email "🌍 domain is live".
-
-⚠️ **En production**, remplacer `104.18.11.243` par **l'IP réelle du serveur prod** (le preview Emergent actuel n'est pas stable pour le trafic client).
+2. Domaine `altiaro.com` → **Zone DNS** → "Ajouter une entrée".
+3. Type `A` / Sous-domaine `sites` / Cible `104.18.11.243` / TTL `300`.
+4. Valider → "Actualiser la zone".
 
 ---
 
