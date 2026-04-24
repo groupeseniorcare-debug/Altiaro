@@ -1,10 +1,14 @@
-# Concept Factory — PRD (Product Requirements Document)
+# Altiaro — PRD (Product Requirements Document)
 
+> **Dernière mise à jour : 2026-04-24**
+>
 > Document **statique** : problem statement, personas, exigences core.
-> L'historique des livrables est dans **CHANGELOG.md**, le backlog dans **ROADMAP.md**.
+> L'historique des livrables est dans **CHANGELOG.md**, le backlog dans **ROADMAP.md**,
+> et l'état opérationnel de reprise dans **HANDOFF.md**.
 
 ## Problem statement original
-SaaS multi-tenant d'e-commerce 100% custom (pas de Shopify) dédié à la **Silver Economy** (60+ et aidants) sur 6 marchés EU : 🇫🇷 FR · 🇩🇪 DE · 🇨🇭 CH · 🇧🇪 BE+LU · 🇬🇧 UK · 🇳🇱 NL.
+SaaS multi-tenant d'e-commerce 100% custom (pas de Shopify) dédié à la **Silver Economy** (60+ et aidants).
+Couverture : **11 pays EU** (🇫🇷 FR · 🇧🇪 BE · 🇱🇺 LU · 🇩🇪 DE · 🇦🇹 AT · 🇳🇱 NL · 🇮🇹 IT · 🇪🇸 ES · 🇵🇹 PT · 🇮🇪 IE · 🇫🇮 FI) × **6 langues** (FR, EN, DE, NL, IT, ES).
 
 - **Admin** gère Google Ads centralement, finances globales, commandes côté fournisseurs.
 - **Concepteurs** montent sites, choisissent produits, traitent SAV et remboursements.
@@ -13,15 +17,16 @@ SaaS multi-tenant d'e-commerce 100% custom (pas de Shopify) dédié à la **Silv
 ## User personas
 - **Admin (fondateur)** : voit tout, crée sites + users, gère commandes + finances globales, pilote les Ads, a accès au Dashboard Empire cross-pays.
 - **Concepteur (opérateur)** : voit UNIQUEMENT ses sites, gère son catalogue, duplique ses sites, scale cross-pays, génère Ads Copy, traite SAV.
-- **Client final** (public, non authentifié) : achète sur `/shop/{id}` ou `https://custom.domain` en FR/EN/DE/NL sans créer de compte.
+- **Client final** (public, non authentifié) : achète sur `/shop/{id}` ou `https://custom.domain` dans l'une des **6 langues** (FR, EN, DE, NL, IT, ES) sans créer de compte.
 
 ## Architecture technique
-- **Stack** : FastAPI (18+ routers modulaires) + MongoDB motor async + React 18 + Tailwind + Phosphor icons + Framer Motion + recharts
+- **Stack** : FastAPI (60 routers modulaires, 307 endpoints) + MongoDB motor async + React 19 + Tailwind + Phosphor icons + Framer Motion + recharts
 - **Auth** : JWT httpOnly cookies, bcrypt, brute force 15min, admin seeded via .env
-- **LLM** : Emergent LLM Key (Claude Sonnet 4.5) via `emergentintegrations` pour Niche Analyzer, Ads Copy, Mega-Block Execute, AI Copilot
-- **Site Factory** : catalogue produits i18n FR/EN/DE/NL par site + storefront `/shop/{id}` + cart localStorage + checkout → commande
-- **Multi-domain** : chaque site peut brancher un domaine custom (CNAME + vérification DNS)
-- **Structure backend** : `server.py` (~140 lignes orchestrateur) + `deps.py` + `seed_prompts.py` + `routes/{auth,users,sites,steps,products,orders,public_shop,niches,dashboard,meta,uploads,search,analyzer,ads_copy,duplicate,domain,scale,empire,blocks_execute,copilot}.py`
+- **LLM** : Emergent LLM Key (Claude Sonnet 4.5) via `emergentintegrations` pour Niche Analyzer, Ads Copy, Mega-Block Execute, AI Copilot, traduction blog multi-langues, AEO FAQ, Citation Tracker
+- **Site Factory** : catalogue produits i18n 6 langues par site + storefront `/shop/{id}` + cart localStorage + checkout → commande
+- **Storefront i18n** : `LanguageSwitcher` dans le header, détection langue via `localStorage`, balises `<html lang>` dynamiques, `hreflang` multi-pays, sitemap + `llms.txt` multi-langues
+- **Multi-domain** : chaque site peut brancher un domaine custom (CNAME → `sites.altiaro.com` + vérification DNS + cron auto-config toutes les 5 min)
+- **Structure backend** : `server.py` (~140 lignes orchestrateur) + `deps.py` + `seo_constants.py` (source de vérité 11 pays / 6 langues) + 60 fichiers de routes dans `routes/` (voir OpenAPI sur `/api/docs`)
 - **Data scope strict** : tout est scoped par `site_id` et filtré par `operator_id` côté Concepteur.
 
 ## Blocks logiques (depuis avril 2026 — refonte Altiaro)
@@ -50,7 +55,7 @@ Les 50 étapes du playbook sont regroupées en **8 blocs thématiques ordonnés*
 | 8 | Users CRUD admin | ✅ |
 | 9 | Niche Engine 20×6 | ✅ |
 | 10 | Catalogue produits i18n | ✅ |
-| 11 | Storefront public multilingue | ✅ |
+| 11 | Storefront public multilingue (FR/EN/DE/NL/IT/ES) | ✅ |
 | 12 | Cart + Checkout + Orders | ✅ |
 | 13 | Admin Ops Center | ✅ |
 | 14 | Refactor monolithic → 18+ routers | ✅ |
@@ -59,7 +64,7 @@ Les 50 étapes du playbook sont regroupées en **8 blocs thématiques ordonnés*
 | 17 | Blocks refactor (50→4 blocs logiques) | ✅ |
 | 18 | Site Duplication | ✅ |
 | 19 | Multi-domain management (CNAME + DNS verify) | ✅ |
-| 20 | Scale 6 pays (1 clic → N clones localisés) | ✅ |
+| 20 | Scale 11 pays EU (1 clic → N clones localisés) | ✅ |
 | 21 | Dashboard Empire (KPIs cross-pays) | ✅ |
 | 22 | Mega-Block Execute (4 mega-prompts) | ✅ |
 | 23 | AI Copilot conversationnel (function calling) | ✅ |
@@ -67,7 +72,7 @@ Les 50 étapes du playbook sont regroupées en **8 blocs thématiques ordonnés*
 | 25 | Facturation Concepteurs (CB mandate + IBAN + cron) | ✅ |
 | 26 | **Virements Admin = 50% × marge brute HT** (par Concepteur, 1er/15) | ✅ |
 | 27 | `cost_price_ht` tracké sur produits + snapshot à la commande | ✅ |
-| 28 | TVA multi-pays auto (FR 20 / DE 19 / BE·NL 21 / UK 20 / CH 7.7) | ✅ |
+| 28 | TVA multi-pays auto (11 pays EU — FR 20 / BE 21 / LU 17 / DE 19 / AT 20 / NL 21 / IT 22 / ES 21 / PT 23 / IE 23 / FI 25.5) | ✅ |
 | 29 | **Sourcing CJ Dropshipping + AliExpress Affiliate (search + import 1-clic)** | ✅ |
 | 30 | **Wizard 10 étapes guidées avec auto-détection d'avancement** | ✅ |
 | 31 | **SEO avancé (sitemap hreflang, robots, Merchant Feed RSS, Schema.org, OG, canonical)** | ✅ |
@@ -81,7 +86,7 @@ Les 50 étapes du playbook sont regroupées en **8 blocs thématiques ordonnés*
 | 39 | **Storefront splitté en composants** (`components/storefront/{Hero,Benefits,ProductGrid,Testimonials,FAQSection,FinalCTA,NarrativeProduct}.jsx` + `storefrontUtils.js`) | ✅ |
 | 40 | **Emails Resend domaine acheté / échec OVH** (envoyés au Concepteur post-webhook Mollie) | ✅ |
 | 41 | **Scan Express Go/No-Go** (Claude + Google Keyword Planner → verdict en 30s sur prix, volume, concurrence, rentabilité Ads) | ✅ |
-| 42 | **Scan multi-marché parallèle** (6 pays UE : FR/DE/BE/NL/CH/IT) + page "Lancer un site" qui fusionne scan + sélection marchés + création via `/sites/new` | ✅ |
+| 42 | **Scan multi-marché parallèle** (11 pays EU : FR/BE/LU/DE/AT/NL/IT/ES/PT/IE/FI) + page "Lancer un site" qui fusionne scan + sélection marchés + création via `/sites/new` | ✅ |
 | 43 | **Seuil concurrence 66 → 75** + règle soft "GO avec réserve" quand concurrence > 75 mais autres critères OK | ✅ |
 | 44 | **Menu Concepteur restructuré** : Dashboard / Sites / Lancer un site / Finance / Compte | ✅ |
 | 45 | **Dashboard Concepteur v2** — KPIs globaux (CA, commandes, part Concepteur reçue, retours) + next events (prochain versement Mollie / prochain prélèvement Ads) + setup banner (CB + IBAN manquants) + liste sites + empty state | ✅ |
@@ -108,10 +113,12 @@ Les 50 étapes du playbook sont regroupées en **8 blocs thématiques ordonnés*
 
 ## Règles critiques
 - Pas de Shopify — tout custom React/FastAPI.
-- FR par défaut, mais tout prêt pour EN/DE/NL.
+- Multi-langue natif : 6 langues au choix du concepteur (FR, EN, DE, NL, IT, ES), FR par défaut.
+- Séparation `seo_countries` (≤ 11 pays EU) vs `ads_countries` (pays où le concepteur achète des Ads Google) — voir `backend/seo_constants.py`.
 - Cookies httpOnly uniquement pour le JWT.
 - Ne jamais supprimer `<html translate="no">` dans index.html (bug Mac Chrome auto-translate crash React).
 - Emergent LLM Key via playbook, jamais en direct.
+- API AliExpress = `aliexpress.ds.product.get` (Dropshipping), **pas** l'API Affiliate (permissions insuffisantes pour cette app).
 
 ## Credentials de test
 Voir `/app/memory/test_credentials.md`.
