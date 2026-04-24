@@ -6,8 +6,7 @@ import Dashboard from "./pages/Dashboard";
 import Sites from "./pages/Sites";
 import NewSite from "./pages/NewSite";
 import SiteDetail from "./pages/SiteDetail";
-import Validations from "./pages/Validations";
-import Finances from "./pages/Finance";
+import Finance from "./pages/Finance";
 import Users from "./pages/Users";
 import NicheEngine from "./pages/Analyzer";
 import NicheAnalysisDetail from "./pages/NicheAnalysisDetail";
@@ -324,8 +323,6 @@ function App() {
           <Route path="/shop/:siteId/mentions" element={<StorefrontMentions />} />
           <Route path="/shop/:siteId/confidentialite" element={<StorefrontConfidentialite />} />
           <Route path="/shop/:siteId/cookies" element={<StorefrontCookies />} />
-          <Route path="/shop/:siteId/livraison" element={<StorefrontLivraison />} />
-          <Route path="/shop/:siteId/retours" element={<StorefrontRetours />} />
           <Route path="/shop/:siteId/mediation" element={<StorefrontMediation />} />
           <Route
             path="/scan"
@@ -337,11 +334,7 @@ function App() {
           />
           <Route
             path="/validations"
-            element={
-              <ProtectedRoute adminOnly>
-                <Validations />
-              </ProtectedRoute>
-            }
+            element={<Navigate to="/admin/review" replace />}
           />
           <Route
             path="/orders"
@@ -395,7 +388,7 @@ function App() {
             path="/finances"
             element={
               <ProtectedRoute>
-                <Finances />
+                <Finance />
               </ProtectedRoute>
             }
           />

@@ -40,7 +40,9 @@ export default function SiteBranding() {
     setLoading(false);
   };
 
-  useEffect(() => { reload(); /* eslint-disable-next-line */ }, [siteId]);
+  // `reload` est stable dans la portée de ce composant et dépend uniquement de siteId.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { reload(); }, [siteId]);
 
   const togglePublish = async () => {
     setPublishing(true);

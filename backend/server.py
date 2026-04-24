@@ -37,7 +37,7 @@ from routes import storefront_search as storefront_search_routes
 from routes import analyzer as analyzer_routes
 from routes import ads_copy as ads_copy_routes
 from routes import duplicate as duplicate_routes
-from routes import domain as domain_routes
+from routes import site_domain as domain_routes
 from routes import scale as scale_routes
 from routes import empire as empire_routes
 from routes import blocks_execute as blocks_execute_routes
@@ -51,7 +51,7 @@ from routes import wizard as wizard_routes
 from routes import google_ads as google_ads_routes
 from routes import opportunity as opportunity_routes
 from routes import emails as emails_routes
-from routes import domains as domains_routes
+from routes import ovh_domains as domains_routes
 from routes import quick_scan as quick_scan_routes
 from routes import concepteur_cockpit as concepteur_cockpit_routes
 from routes import platform as platform_routes
@@ -581,7 +581,7 @@ async def try_auto_configure_dns() -> dict:
             continue
         try:
             import asyncio as _aio
-            from routes.domains import _client, PLATFORM_IP
+            from routes.ovh_domains import _client, PLATFORM_IP
             import ovh
             if not PLATFORM_IP:
                 break

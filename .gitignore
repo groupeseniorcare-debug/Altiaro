@@ -186,3 +186,8 @@ credentials.json
 *.pem
 *.key
 .credentials
+
+
+# Allow .env.example files (templates for developers, no secrets)
+!.env.example
+!**/.env.example

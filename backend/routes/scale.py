@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 
 from deps import db, get_current_user, _site_with_progress, _check_site_access
 from seed_prompts import get_seed_steps_for_site
-from routes.domain import _normalize_domain, _is_valid_hostname
+from routes.site_domain import _normalize_domain, _is_valid_hostname
 from routes.ads_copy import _generate_and_persist, COUNTRY_LOCALES
 
 
