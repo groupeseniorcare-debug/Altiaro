@@ -820,8 +820,14 @@ function FooterCol({ title, items }) {
   );
 }
 
-export async function fetchPublicSite(siteId) {
-  const { data } = await axios.get(`${BACKEND_URL}/api/public/sites/${siteId}`);
+export async function fetchPublicSite(identifier) {
+  // Phase 4 fix-up : l'identifier peut être soit un UUID, soit un slug humain
+  // (ex: `demo-altiaro`). On route vers le bon endpoint backend.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const path = UUID_RE.test(identifier)
+    ? `/api/public/sites/${identifier}`
+    : `/api/public/sites/by-slug/${encodeURIComponent(identifier)}`;
+  const { data } = await axios.get(`${BACKEND_URL}${path}`);
   return data;
 }
 

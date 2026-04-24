@@ -14,6 +14,37 @@ from tax_utils import site_vat_rate, compute_order_ht
 router = APIRouter(prefix="/public")
 
 
+@router.get("/sites/by-slug/{slug}")
+async def public_site_by_slug(slug: str):
+    """Résout un site par son `slug` humain-lisible (ex: `demo-altiaro`).
+
+    Utilisé par le storefront React quand l'URL contient un slug au lieu d'un UUID.
+    Retourne le même format que `GET /public/sites/{site_id}` — en particulier
+    le champ `id` (UUID canonique) que le frontend utilise ensuite pour les
+    endpoints dérivés (`/products`, `/design`, etc.).
+
+    NB : cette route doit être déclarée AVANT `/sites/{site_id}` pour que FastAPI
+    ne capture pas `by-slug` comme valeur de `site_id`.
+    """
+    site = await db.sites.find_one({"slug": slug}, {"_id": 0})
+    if not site:
+        raise HTTPException(status_code=404, detail="Site introuvable")
+    niche = None
+    if site.get("niche_slug"):
+        niche = await db.niches.find_one(
+            {"slug": site["niche_slug"]},
+            {"_id": 0, "name": 1, "emoji": 1, "tagline": 1, "category": 1}
+        )
+    return {
+        "id": site["id"],
+        "slug": site.get("slug"),
+        "name": site["name"],
+        "niche": site.get("niche", ""),
+        "domain": site.get("domain", ""),
+        "niche_data": niche,
+    }
+
+
 @router.get("/sites/{site_id}")
 async def public_site(site_id: str):
     site = await db.sites.find_one({"id": site_id}, {"_id": 0})
@@ -27,6 +58,7 @@ async def public_site(site_id: str):
         )
     return {
         "id": site["id"],
+        "slug": site.get("slug"),
         "name": site["name"],
         "niche": site.get("niche", ""),
         "domain": site.get("domain", ""),

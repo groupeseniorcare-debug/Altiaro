@@ -31,23 +31,38 @@ export function buildHreflangs(site, path) {
 }
 
 export function useSiteAndLang() {
-  const { siteId } = useParams();
+  const { siteId: urlSiteId } = useParams();
   const [site, setSite] = useState(null);
   const [design, setDesign] = useState(null);
-  const storageKey = `cf_lang_${siteId}`;
+  const storageKey = `cf_lang_${urlSiteId}`;
   const [lang, setLangState] = useState(() => localStorage.getItem(storageKey) || "fr");
   const setLang = (l) => {
     localStorage.setItem(storageKey, l);
     setLangState(l);
   };
+  // Phase 4 fix-up : l'URL peut contenir un UUID ou un slug humain (ex: `demo-altiaro`).
+  // `fetchPublicSite` route vers le bon endpoint backend. On récupère ensuite
+  // l'`id` canonique (UUID) dans la réponse et on l'utilise pour tous les
+  // endpoints dérivés (`/design`, `/products`, etc.).
   useEffect(() => {
-    fetchPublicSite(siteId).then(setSite).catch(() => setSite({ error: true }));
-    axios
-      .get(`${BACKEND_URL}/api/public/sites/${siteId}/design`)
-      .then(({ data }) => setDesign(data?.published ? data.design : null))
-      .catch(() => setDesign(null));
-  }, [siteId]);
-  return { siteId, site, design, lang, setLang };
+    let cancelled = false;
+    fetchPublicSite(urlSiteId)
+      .then((data) => {
+        if (cancelled) return;
+        setSite(data);
+        const resolvedId = data?.id || urlSiteId;
+        axios
+          .get(`${BACKEND_URL}/api/public/sites/${resolvedId}/design`)
+          .then(({ data: design }) => !cancelled && setDesign(design?.published ? design.design : null))
+          .catch(() => !cancelled && setDesign(null));
+      })
+      .catch(() => !cancelled && setSite({ error: true }));
+    return () => { cancelled = true; };
+  }, [urlSiteId]);
+  // `siteId` exposé = UUID canonique (pour les API calls). `urlSlug` = valeur
+  // utilisateur dans l'URL (pour construire des liens canonicals user-friendly).
+  const resolvedId = site?.id || urlSiteId;
+  return { siteId: resolvedId, urlSlug: urlSiteId, site, design, lang, setLang };
 }
 
 export function designText(design, path, lang) {
