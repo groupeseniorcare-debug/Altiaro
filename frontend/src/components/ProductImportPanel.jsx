@@ -1,10 +1,15 @@
 import React, { useEffect, useState, useCallback, useRef, useImperativeHandle, forwardRef } from "react";
 import {
   MagnifyingGlass, LinkSimple, CheckCircle, XCircle, Warning, Globe,
-  Info, ArrowClockwise, Package, Stack, X as XIcon,
+  Info, ArrowClockwise, Package, Stack, X as XIcon, Trash, ArrowSquareOut,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { api, apiCall } from "../lib/api";
+import { getProductSourceUrl, getProviderLabel, getProviderBadgeClasses } from "../lib/productSource";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 /**
  * ProductImportPanel — Chantier 2 & 4 (Altiaro).
@@ -30,21 +35,50 @@ import { api, apiCall } from "../lib/api";
 const FLAG_BY_CODE = {
   FR: "🇫🇷", DE: "🇩🇪", UK: "🇬🇧", GB: "🇬🇧", BE: "🇧🇪",
   NL: "🇳🇱", CH: "🇨🇭", IT: "🇮🇹", ES: "🇪🇸", LU: "🇱🇺",
+  AT: "🇦🇹", IE: "🇮🇪", PT: "🇵🇹", FI: "🇫🇮",
 };
 
 const COUNTRY_NAME = {
   FR: "France", DE: "Allemagne", UK: "Royaume-Uni", GB: "Royaume-Uni",
   BE: "Belgique", NL: "Pays-Bas", CH: "Suisse", IT: "Italie", ES: "Espagne",
+  LU: "Luxembourg", AT: "Autriche", IE: "Irlande", PT: "Portugal", FI: "Finlande",
 };
 
+// Codes ISO valides supportés par l'app — tout autre code est filtré silencieusement
+// du tableau de couverture pays côté UI (ex: "BL" qui est probablement une faute
+// de saisie pour "BE" remontée dans plusieurs sites historiques).
+const VALID_COUNTRY_CODES = new Set(Object.keys(COUNTRY_NAME));
+
+// Aliases : un produit livré dans GB couvre aussi UK, et vice-versa.
+const COUNTRY_ALIASES = { UK: "GB", GB: "UK" };
+
 const flag = (cc) => FLAG_BY_CODE[cc?.toUpperCase()] || cc;
+
+/** Vrai ssi le produit est livré dans `cc` (ou son alias). */
+function isShippedTo(shipCountries, cc) {
+  if (!cc) return false;
+  const upper = cc.toUpperCase();
+  if (shipCountries.includes(upper)) return true;
+  const alias = COUNTRY_ALIASES[upper];
+  if (alias && shipCountries.includes(alias)) return true;
+  return false;
+}
 
 export default function ProductImportPanel({
   siteId,
   variant = "main",
   nicheHint = "",
-  targetCountries = [],
+  targetCountries: rawTargetCountries = [],
 }) {
+  // Filtre les codes pays invalides (ex: "BL" qui n'est pas dans VALID_COUNTRY_CODES).
+  // Le tableau Couverture pays ne tente plus de match sur un code inexistant —
+  // évite le faux négatif "non livrable" sur un code mal saisi par le concepteur.
+  const targetCountries = (rawTargetCountries || [])
+    .map((c) => String(c || "").toUpperCase())
+    .filter((c) => VALID_COUNTRY_CODES.has(c));
+  const invalidTargetCodes = (rawTargetCountries || [])
+    .map((c) => String(c || "").toUpperCase())
+    .filter((c) => c && !VALID_COUNTRY_CODES.has(c));
   const isUpsell = variant === "upsell";
   const [products, setProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
@@ -163,18 +197,30 @@ export default function ProductImportPanel({
   const cjUrl = `https://cjdropshipping.com/search.html?searchType=1&keywords=${encodeURIComponent(searchTerm)}`;
 
   // --- Coverage aggregation for the whole catalog ---
+  // Distingue 3 statuts par pays :
+  //   - covered : ≥1 produit a explicitement déclaré shipping_countries incluant le pays
+  //   - unknown : ≥1 produit sans shipping_countries renseigné (faux positif évité)
+  //   - missing : aucun produit ne couvre ce pays
   const coverageByCountry = React.useMemo(() => {
     const map = {};
-    for (const cc of targetCountries) map[cc] = 0;
+    for (const cc of targetCountries) map[cc] = { covered: 0, unknown: 0 };
     for (const p of products) {
-      for (const cc of (p.shipping_countries || [])) {
-        if (map[cc] !== undefined) map[cc] += 1;
+      const ship = (p.shipping_countries || []).map((c) => String(c).toUpperCase());
+      const hasData = ship.length > 0;
+      for (const cc of targetCountries) {
+        if (!hasData) {
+          map[cc].unknown += 1;
+          continue;
+        }
+        if (isShippedTo(ship, cc)) map[cc].covered += 1;
       }
     }
     return map;
   }, [products, targetCountries]);
 
-  const missingCountries = targetCountries.filter((cc) => coverageByCountry[cc] === 0);
+  const missingCountries = targetCountries.filter(
+    (cc) => coverageByCountry[cc]?.covered === 0 && coverageByCountry[cc]?.unknown === 0
+  );
 
   return (
     <div className="space-y-6" data-testid={`product-import-${variant}`}>
@@ -312,6 +358,16 @@ export default function ProductImportPanel({
 
       {/* 4. Tableau produits avec couverture pays */}
       <div className="bg-white border border-neutral-200 rounded-xl p-5">
+        {invalidTargetCodes.length > 0 && (
+          <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-2">
+            <Warning size={16} weight="duotone" className="text-amber-700 flex-shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-900 leading-relaxed">
+              <span className="font-semibold">Code(s) pays invalide(s) détecté(s) :</span>{" "}
+              <span className="font-mono">{invalidTargetCodes.join(", ")}</span>.{" "}
+              Corrige-les dans <em>Paramètres du site &gt; Pays cibles</em> (ex: <code>BL</code> n'existe pas, c'est probablement <code>BE</code> Belgique).
+            </div>
+          </div>
+        )}
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-semibold text-neutral-900 flex items-center gap-2">
             {isUpsell ? <Stack size={16} weight="duotone" /> : <Package size={16} weight="duotone" />}
@@ -319,22 +375,35 @@ export default function ProductImportPanel({
             <span className="text-xs text-neutral-500 font-normal">({products.length})</span>
           </h3>
           {!isUpsell && targetCountries.length > 0 && (
-            <div className="flex items-center gap-2 text-xs text-neutral-600">
+            <div className="flex items-center gap-2 text-xs text-neutral-600 flex-wrap">
               <Globe size={14} />
               Couverture :
-              {targetCountries.map((cc) => (
-                <span
-                  key={cc}
-                  title={`${COUNTRY_NAME[cc] || cc} : ${coverageByCountry[cc]} produits livrables`}
-                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded ${
-                    coverageByCountry[cc] > 0
-                      ? "bg-emerald-50 text-emerald-800"
-                      : "bg-rose-50 text-rose-800"
-                  }`}
-                >
-                  {flag(cc)} {coverageByCountry[cc] > 0 ? `✅ ${coverageByCountry[cc]}` : "❌ 0"}
-                </span>
-              ))}
+              {targetCountries.map((cc) => {
+                const cov = coverageByCountry[cc] || { covered: 0, unknown: 0 };
+                const status = cov.covered > 0 ? "ok" : (cov.unknown > 0 ? "unknown" : "missing");
+                const cls = status === "ok"
+                  ? "bg-emerald-50 text-emerald-800"
+                  : status === "unknown"
+                    ? "bg-amber-50 text-amber-800"
+                    : "bg-rose-50 text-rose-800";
+                const icon = status === "ok" ? "✅" : status === "unknown" ? "⚠" : "❌";
+                const label = status === "ok"
+                  ? `${cov.covered}`
+                  : status === "unknown"
+                    ? `${cov.unknown} à vérifier`
+                    : "0";
+                const titleTxt = status === "ok"
+                  ? `${COUNTRY_NAME[cc] || cc} : ${cov.covered} produit(s) livrable(s)`
+                  : status === "unknown"
+                    ? `${COUNTRY_NAME[cc] || cc} : ${cov.unknown} produit(s) sans info livraison — à vérifier sur la fiche fournisseur`
+                    : `${COUNTRY_NAME[cc] || cc} : aucun produit ne couvre ce pays`;
+                return (
+                  <span key={cc} title={titleTxt}
+                        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded ${cls}`}>
+                    {flag(cc)} {icon} {label}
+                  </span>
+                );
+              })}
             </div>
           )}
         </div>
@@ -346,7 +415,13 @@ export default function ProductImportPanel({
                       : "Aucun produit pour l'instant. Colle une URL ci-dessus ou recherche chez AE/CJ."}
           </div>
         ) : (
-          <ProductsTable products={products} targetCountries={targetCountries} variant={variant} />
+          <ProductsTable
+            products={products}
+            targetCountries={targetCountries}
+            variant={variant}
+            siteId={siteId}
+            onDeleted={loadProducts}
+          />
         )}
       </div>
 
@@ -520,7 +595,24 @@ function Stat({ label, value, tone = "neutral" }) {
 }
 
 // ─── ProductsTable ───────────────────────────────────
-function ProductsTable({ products, targetCountries, variant }) {
+function ProductsTable({ products, targetCountries, variant, siteId, onDeleted }) {
+  const [confirmDelete, setConfirmDelete] = useState(null); // product object or null
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    const { error } = await apiCall(() => api.delete(`/sites/${siteId}/products/${confirmDelete.id}`));
+    setDeleting(false);
+    setConfirmDelete(null);
+    if (error) {
+      toast.error("Suppression impossible", { description: error });
+      return;
+    }
+    toast.success("Produit supprimé");
+    onDeleted?.();
+  };
+
   return (
     <div className="overflow-x-auto -mx-5">
       <table className="w-full text-sm">
@@ -533,11 +625,16 @@ function ProductsTable({ products, targetCountries, variant }) {
               <th className="text-left px-3 py-2 font-medium">Couverture pays</th>
             )}
             <th className="text-left px-3 py-2 font-medium">Source</th>
+            <th className="text-right px-5 py-2 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
           {products.map((p) => {
-            const shipCountries = (p.shipping_countries || []).map((c) => c.toUpperCase());
+            const shipCountries = (p.shipping_countries || []).map((c) => String(c).toUpperCase());
+            const hasShipData = shipCountries.length > 0;
+            const sourceUrl = getProductSourceUrl(p.source);
+            const providerLabel = getProviderLabel(p.source);
+            const providerBadgeCls = getProviderBadgeClasses(p.source);
             return (
               <tr key={p.id} className="border-b border-neutral-100 hover:bg-neutral-50">
                 <td className="px-5 py-2">
@@ -561,31 +658,99 @@ function ProductsTable({ products, targetCountries, variant }) {
                 </td>
                 {targetCountries.length > 0 && (
                   <td className="px-3 py-2">
-                    <div className="flex items-center gap-1">
-                      {targetCountries.map((cc) => {
-                        const ok = shipCountries.includes(cc);
-                        return (
-                          <span
-                            key={cc}
-                            title={`${COUNTRY_NAME[cc] || cc} : ${ok ? "livrable" : "non livrable"}`}
-                            className={`text-xs ${ok ? "text-emerald-700" : "text-rose-600"}`}
-                          >
-                            {flag(cc)}{ok ? "✅" : "❌"}
-                          </span>
-                        );
-                      })}
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {!hasShipData ? (
+                        <span
+                          className="inline-flex items-center gap-1 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded"
+                          title="Couverture livraison non renseignée par le fournisseur — vérifier sur la fiche d'origine"
+                        >
+                          <Warning size={11} weight="fill" /> Couverture à vérifier
+                        </span>
+                      ) : (
+                        targetCountries.map((cc) => {
+                          const ok = isShippedTo(shipCountries, cc);
+                          return (
+                            <span
+                              key={cc}
+                              title={`${COUNTRY_NAME[cc] || cc} : ${ok ? "livrable" : "non livrable"}`}
+                              className={`text-xs ${ok ? "text-emerald-700" : "text-rose-600"}`}
+                            >
+                              {flag(cc)}{ok ? "✅" : "❌"}
+                            </span>
+                          );
+                        })
+                      )}
                     </div>
                   </td>
                 )}
-                <td className="px-3 py-2 text-xs text-neutral-500">
-                  {p.provider || p.source || (p.source_url?.includes("aliexpress") ? "AE" :
-                   p.source_url?.includes("cjdrop") ? "CJ" : "—")}
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2 whitespace-nowrap">
+                    {providerLabel ? (
+                      <span
+                        data-testid={`product-provider-badge-${p.id}`}
+                        className={`inline-flex items-center text-[11px] font-medium px-1.5 py-0.5 rounded border ${providerBadgeCls}`}
+                      >
+                        {providerLabel}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-neutral-400">—</span>
+                    )}
+                    {sourceUrl && (
+                      <a
+                        href={sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Voir la fiche d'origine sur le fournisseur"
+                        data-testid={`view-source-${p.id}`}
+                        className="text-neutral-400 hover:text-neutral-900 transition"
+                      >
+                        <ArrowSquareOut size={14} weight="bold" />
+                      </a>
+                    )}
+                  </div>
+                </td>
+                <td className="px-5 py-2 text-right">
+                  <button
+                    onClick={() => setConfirmDelete(p)}
+                    title="Supprimer ce produit"
+                    data-testid={`delete-product-${p.id}`}
+                    className="inline-flex items-center justify-center w-8 h-8 rounded-md text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                  >
+                    <Trash size={15} weight="duotone" />
+                  </button>
                 </td>
               </tr>
             );
           })}
         </tbody>
       </table>
+
+      <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && !deleting && setConfirmDelete(null)}>
+        <AlertDialogContent data-testid="confirm-delete-product-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce produit ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDelete && (
+                <>
+                  Tu vas supprimer <strong>« {confirmDelete.name?.fr || confirmDelete.name || confirmDelete.title || "ce produit"} »</strong> du catalogue.
+                  Cette action est immédiate et retire le produit de la vitrine, du sitemap et des index Google.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              data-testid="confirm-delete-product"
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+            >
+              {deleting ? "Suppression…" : "Oui, supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

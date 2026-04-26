@@ -92,6 +92,7 @@ from routes import journey_gating as journey_gating_routes
 from routes import analytics as analytics_routes
 from routes import seo_automation as seo_automation_routes
 from routes import google_ads_manual as google_ads_manual_routes
+from routes import upsells_ai as upsells_ai_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -170,6 +171,7 @@ api.include_router(journey_gating_routes.router)
 api.include_router(analytics_routes.router)
 api.include_router(seo_automation_routes.router)
 api.include_router(google_ads_manual_routes.router)
+api.include_router(upsells_ai_routes.router)
 
 
 @app.on_event("startup")
@@ -558,6 +560,9 @@ async def startup():
         # Indexes Phase 7 (idempotent)
         from routes.google_ads_manual import ensure_gads_manual_indexes
         await ensure_gads_manual_indexes()
+        # Indexes Phase 8 — Upsells AI suggestions (idempotent)
+        from routes.upsells_ai import ensure_indexes as ensure_upsells_ai_indexes
+        await ensure_upsells_ai_indexes()
 
         async def _wrap_cron(fn, name: str):
             logger.info(f"[scheduler] {name} start")

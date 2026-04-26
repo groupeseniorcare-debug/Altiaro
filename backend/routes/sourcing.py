@@ -989,11 +989,25 @@ async def _import_by_url_inner(site_id: str, data: "ImportUrlInput", user: dict,
     # Sinon, on déduit depuis les pays cibles du site (hypothèse safe : le check
     # effectué au preview s'applique au moment de l'import).
     try:
-        product_id_new = (result or {}).get("id") or (result or {}).get("product_id")
+        # `import_product` retourne {"ok": True, "product": {...}} — il faut
+        # bien lire result["product"]["id"] et pas result["id"] (sinon le
+        # patch n'est jamais appliqué et `shipping_countries` reste vide en
+        # DB → le frontend affiche tous les pays en "non livrable").
+        product_doc = (result or {}).get("product") or {}
+        product_id_new = product_doc.get("id") or (result or {}).get("id") or (result or {}).get("product_id")
         if product_id_new:
             patch: dict = {}
             if data.shipping_countries is not None:
                 patch["shipping_countries"] = [c.upper() for c in data.shipping_countries]
+            else:
+                # Fallback : si le frontend n'a pas passé shipping_countries
+                # (preview AE indisponible, etc.), on prend les selected_countries
+                # du site comme couverture par défaut. Plus optimiste mais évite
+                # un faux négatif total côté UI.
+                site = await db.sites.find_one({"id": site_id}, {"_id": 0, "selected_countries": 1})
+                cc_list = (site or {}).get("selected_countries") or []
+                if cc_list:
+                    patch["shipping_countries"] = [str(c).upper() for c in cc_list]
             if data.product_type:
                 patch["type"] = data.product_type
                 if data.product_type in ("upsell", "accessory"):
@@ -1004,6 +1018,10 @@ async def _import_by_url_inner(site_id: str, data: "ImportUrlInput", user: dict,
                     {"id": product_id_new, "site_id": site_id},
                     {"$set": patch},
                 )
+                # Re-merge le patch dans le doc retourné pour que l'UI reflète
+                # immédiatement la couverture sans avoir à refetch.
+                if isinstance(result, dict) and isinstance(result.get("product"), dict):
+                    result["product"].update(patch)
     except Exception:
         logger.exception("[sourcing] post-import enrich failed (non-blocking)")
 
