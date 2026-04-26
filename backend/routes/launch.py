@@ -25,7 +25,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -706,12 +706,33 @@ async def launch_site_auto(
     if not site:
         raise HTTPException(404, "Site introuvable")
 
-    # Anti-concurrence
+    # Anti-concurrence — mais auto-libère les jobs zombie (running + non-updated
+    # depuis > 3 min). Cas typique : restart backend pendant un job, l'écran
+    # LaunchProgress du user reste stuck à X%, le user re-clique → on ne le
+    # bloque pas en 409 froid, on libère silencieusement et on relance.
+    three_min_ago = (datetime.now(timezone.utc) - timedelta(minutes=3)).isoformat()
+    await db.launch_jobs.update_many(
+        {
+            "site_id": site_id,
+            "status": "running",
+            "updated_at": {"$lt": three_min_ago},
+        },
+        {"$set": {
+            "status": "failed",
+            "error": "stale > 3min — auto-killed (relance)",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
     running = await db.launch_jobs.find_one(
-        {"site_id": site_id, "status": "running"}, {"_id": 0, "id": 1}
+        {"site_id": site_id, "status": "running"}, {"_id": 0, "id": 1, "progress_pct": 1}
     )
     if running:
-        raise HTTPException(409, "Une génération est déjà en cours pour ce site.")
+        raise HTTPException(
+            409,
+            f"Une génération est déjà en cours pour ce site "
+            f"(job {running['id'][:8]}…, progression {running.get('progress_pct', 0)}%). "
+            f"Patiente quelques secondes ou rafraîchis la page.",
+        )
 
     # Charge le contexte (niche + 5 produits actifs)
     products_sample = await db.products.find(
@@ -786,4 +807,26 @@ async def launch_site_auto(
         "status":     "running",
         "auto_brand": parsed,  # le user voit ce que Claude a choisi
     }
+
+
+@router.post("/sites/{site_id}/design/launch-jobs/{job_id}/abort")
+async def abort_launch_job(
+    site_id: str,
+    job_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Marque manuellement un job 'running' comme 'failed' pour libérer le
+    verrou anti-concurrence. Utilisé par le bouton "Annuler et relancer" du
+    LaunchProgress quand le job est figé > 90s.
+    """
+    await _check_site_access(site_id, user)
+    res = await db.launch_jobs.update_one(
+        {"id": job_id, "site_id": site_id, "status": "running"},
+        {"$set": {
+            "status":     "failed",
+            "error":      "Annulé par l'utilisateur via LaunchProgress",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    return {"ok": True, "matched": res.matched_count, "modified": res.modified_count}
 

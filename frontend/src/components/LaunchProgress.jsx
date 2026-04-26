@@ -1,12 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Rocket, CheckCircle, ArrowClockwise, XCircle, Sparkle } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 
 const POLL_INTERVAL_MS = 2500;
+const STALE_THRESHOLD_MS = 90 * 1000;  // 90s sans changement → on propose la relance
 
-export default function LaunchProgress({ siteId, jobId, onDone, onFailed }) {
+export default function LaunchProgress({ siteId, jobId, onDone, onFailed, onAbort }) {
   const [job, setJob] = useState(null);
   const [history, setHistory] = useState([]); // list of labels we've seen
+  const [stale, setStale] = useState(false);
+  const lastChangeRef = useRef({ pct: -1, ts: Date.now() });
 
   useEffect(() => {
     let cancelled = false;
@@ -19,6 +22,17 @@ export default function LaunchProgress({ siteId, jobId, onDone, onFailed }) {
       if (cancelled) return;
       if (!data) return;
       setJob(data);
+      const pct = data.progress_pct || 0;
+      // Detect stale state : same pct for > 90s while still "running"
+      if (pct !== lastChangeRef.current.pct) {
+        lastChangeRef.current = { pct, ts: Date.now() };
+        setStale(false);
+      } else if (
+        data.status === "running" &&
+        Date.now() - lastChangeRef.current.ts > STALE_THRESHOLD_MS
+      ) {
+        setStale(true);
+      }
       if (data.current_label && !history.includes(data.current_label)) {
         setHistory((prev) => [...prev, data.current_label]);
       }
@@ -124,8 +138,29 @@ export default function LaunchProgress({ siteId, jobId, onDone, onFailed }) {
           </div>
         )}
 
+        {/* Stale warning : pas de progrès depuis 90s pendant que running */}
+        {status === "running" && stale && (
+          <div
+            className="mt-6 p-4 rounded-xl bg-amber-500/15 border border-amber-400/40 text-sm text-amber-100"
+            data-testid="launch-stale-warning"
+          >
+            <div className="font-medium mb-1">⏱️ La progression semble figée</div>
+            <div className="text-xs text-amber-200/80 mb-3">
+              Aucun changement depuis 90 secondes. Le job a peut-être été interrompu côté serveur.
+              Tu peux annuler et relancer une génération propre.
+            </div>
+            <button
+              onClick={() => onAbort?.()}
+              data-testid="launch-abort-and-retry"
+              className="h-9 px-4 rounded-lg bg-white text-amber-900 text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-amber-50"
+            >
+              <ArrowClockwise size={12} weight="bold" /> Annuler et relancer
+            </button>
+          </div>
+        )}
+
         {/* Loading hint */}
-        {status === "running" && (
+        {status === "running" && !stale && (
           <div className="mt-6 text-center text-xs text-violet-300/70">
             ⏱️ Temps estimé : 3-10 min selon le catalogue. Ne ferme pas cette page.
           </div>

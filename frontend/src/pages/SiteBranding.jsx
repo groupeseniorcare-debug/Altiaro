@@ -131,6 +131,16 @@ export default function SiteBranding() {
         siteId={siteId}
         jobId={launchJobId}
         onDone={() => { setLaunchJobId(null); reload(); }}
+        onAbort={async () => {
+          // Marque le job courant comme failed côté DB pour libérer le verrou,
+          // puis relance immédiatement une génération auto. Si l'API est indispo,
+          // on retombe simplement sur le hero 2-options.
+          setLaunchJobId(null);
+          await apiCall(() => api.post(
+            `/sites/${siteId}/design/launch-jobs/${launchJobId}/abort`
+          ));
+          await launchAuto();
+        }}
       />
     );
   }
