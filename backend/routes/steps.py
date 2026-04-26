@@ -156,37 +156,26 @@ async def reject_step(step_id: str, data: StepRejectInput, admin: dict = Depends
 
 
 async def _execute_step_background(step_id: str, prompt_text: str, provider: str, model: str) -> None:
-    """Runs Claude in background, writes result back to step document. Never raises."""
+    """Runs Claude (or other provider) in background, writes result back to
+    step document. Never raises.
+
+    Phase 0 — utilise `safe_llm_text` (retry expo + circuit breaker) pour
+    tous les providers supportés (anthropic / openai / gemini).
+    """
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from services.llm_resilience import safe_llm_text, LLMUnavailableError  # noqa: F401
         system_msg = (
             "Tu es un expert e-commerce, SEO, copywriting et ops. Tu réponds en français. "
             "Tu fournis des livrables concrets, structurés, prêts à l'emploi. "
             "Tu utilises des tableaux markdown, des listes, et des exemples chiffrés quand pertinent."
         )
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
+
+        ai_text = await safe_llm_text(
+            provider, model, system_msg, prompt_text,
             session_id=f"step-{step_id}",
-            system_message=system_msg,
-        ).with_model(provider, model)
-        message = UserMessage(text=prompt_text)
-        last_exc = None
-        ai_text = None
-        for attempt in range(2):
-            try:
-                response = await asyncio.wait_for(chat.send_message(message), timeout=180)
-                ai_text = response if isinstance(response, str) else str(response)
-                break
-            except Exception as e:
-                last_exc = e
-                err_low = str(e).lower()
-                if attempt == 0 and any(s in err_low for s in ("502", "503", "504", "bad gateway", "timeout", "overloaded", "rate limit")):
-                    logger.warning(f"[bg-exec] transient error, retrying once: {str(e)[:150]}")
-                    await asyncio.sleep(2)
-                    continue
-                raise
-        if ai_text is None and last_exc is not None:
-            raise last_exc
+            timeout=180,
+            request_id=f"step-{step_id[:8]}",
+        )
 
         now = datetime.now(timezone.utc).isoformat()
         await db.steps.update_one(
@@ -206,10 +195,10 @@ async def _execute_step_background(step_id: str, prompt_text: str, provider: str
         err_str = str(e)
         if "budget" in err_str.lower():
             msg = "Budget Emergent LLM Key épuisé. Rechargez depuis Profile → Universal Key → Add Balance."
-        elif any(s in err_str.lower() for s in ("502", "503", "504", "overloaded", "bad gateway")):
-            msg = "Claude est momentanément surchargé. Cliquez à nouveau sur Exécuter — c'est passager."
+        elif "LLMUnavailableError" in e.__class__.__name__ or any(s in err_str.lower() for s in ("502", "503", "504", "overloaded", "bad gateway")):
+            msg = "IA momentanément surchargée (proxy upstream KO). Le système retente automatiquement — réessayez dans 1-2 minutes."
         elif "timeout" in err_str.lower():
-            msg = "Timeout : Claude n'a pas répondu dans les 3 minutes. Réessayez."
+            msg = "Timeout : l'IA n'a pas répondu dans les 3 minutes. Réessayez."
         else:
             msg = f"Erreur IA : {err_str[:250]}"
         try:

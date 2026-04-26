@@ -56,25 +56,32 @@ def _slug(s: str) -> str:
 
 
 async def _claude_json(system: str, user: str, session_id: str, timeout: int = 120) -> dict:
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=session_id, system_message=system)\
-        .with_model("anthropic", "claude-sonnet-4-5-20250929")
+    """Phase 0 — délègue à `safe_claude_json` (retry expo + circuit breaker).
+
+    Garde la signature historique pour ne pas casser les appelants. Si le
+    wrapper renvoie un JSON parse error (ValueError), on tente le fallback
+    "première { et dernière }" pour préserver l'ancien comportement le plus
+    indulgent possible.
+    """
+    from services.llm_resilience import safe_claude_json, safe_claude_text, LLMUnavailableError
     try:
-        raw = await asyncio.wait_for(chat.send_message(UserMessage(text=user)), timeout=timeout)
-    except asyncio.TimeoutError:
-        raise RuntimeError(f"LLM timeout after {timeout}s")
-    raw = _strip(raw if isinstance(raw, str) else str(raw))
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        # Last-chance extract: find first { and last }
-        i, j = raw.find("{"), raw.rfind("}")
+        return await safe_claude_json(system, user, session_id=session_id, timeout=timeout)
+    except ValueError:
+        # JSON malformed — try the legacy fallback (find first {, last })
+        try:
+            raw = await safe_claude_text(system, user, session_id=session_id, timeout=timeout)
+        except LLMUnavailableError as e:
+            raise RuntimeError(f"LLM indisponible (analyzer): {e.last_error or e}") from e
+        cleaned = _strip(raw)
+        i, j = cleaned.find("{"), cleaned.rfind("}")
         if i != -1 and j != -1:
             try:
-                return json.loads(raw[i:j + 1])
+                return json.loads(cleaned[i:j + 1])
             except Exception:
                 pass
-        raise RuntimeError(f"Invalid JSON from LLM: {raw[:300]}")
+        raise RuntimeError(f"Invalid JSON from LLM: {cleaned[:300]}")
+    except LLMUnavailableError as e:
+        raise RuntimeError(f"LLM indisponible (analyzer): {e.last_error or e}") from e
 
 
 # ================== PROMPTS ================== #

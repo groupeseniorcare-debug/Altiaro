@@ -43,39 +43,32 @@ _claude_semaphore = asyncio.Semaphore(2)
 
 async def _claude_call(system: str, user: str, timeout: int = 120) -> Optional[dict]:
     """Appel Claude throttlé (2 en parallèle max au niveau module).
-    Retourne dict JSON parsé ou None si échec (jamais raise)."""
+    Retourne dict JSON parsé ou None si échec (jamais raise).
+
+    Phase 0 — délègue à `safe_claude_json` (retry expo + circuit breaker).
+    Conserve le sémaphore module (anti-saturation proxy lors des crons batch).
+    """
     if not EMERGENT_LLM_KEY:
         return None
 
+    from services.llm_resilience import safe_claude_json, LLMUnavailableError
     async with _claude_semaphore:
         t0 = time.time()
         try:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage
-            chat = (
-                LlmChat(
-                    api_key=EMERGENT_LLM_KEY,
-                    session_id=f"seoauto-{uuid.uuid4().hex[:8]}",
-                    system_message=system,
-                )
-                .with_model("anthropic", "claude-sonnet-4-5-20250929")
+            parsed = await safe_claude_json(
+                system, user,
+                session_id=f"seoauto-{uuid.uuid4().hex[:8]}",
+                timeout=timeout,
             )
-            raw = await asyncio.wait_for(
-                chat.send_message(UserMessage(text=user)), timeout=timeout
-            )
-            text = raw if isinstance(raw, str) else str(raw)
-            # strip code fences
-            t = text.strip()
-            if t.startswith("```"):
-                t = re.sub(r"^```(?:json)?\s*", "", t)
-                t = re.sub(r"\s*```$", "", t)
-            parsed = json.loads(t)
             duration = time.time() - t0
-            # Tokens estimate : 4 chars/token — rough heuristic
-            tokens = (len(system) + len(user) + len(text)) // 4
+            tokens = (len(system) + len(user)) // 4
             logger.info(
-                f"[seoauto/claude] OK {duration:.1f}s ~{tokens}tok system={len(system)}c user={len(user)}c out={len(text)}c"
+                f"[seoauto/claude] OK {duration:.1f}s ~{tokens}tok system={len(system)}c user={len(user)}c"
             )
             return parsed
+        except (LLMUnavailableError, ValueError) as e:
+            logger.warning(f"[seoauto/claude] FAIL in {time.time()-t0:.1f}s (resilience): {str(e)[:200]}")
+            return None
         except Exception as e:
             logger.warning(f"[seoauto/claude] FAIL in {time.time()-t0:.1f}s : {str(e)[:200]}")
             return None

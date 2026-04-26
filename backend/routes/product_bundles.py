@@ -42,21 +42,19 @@ def _pick_text(val, lang: str = "fr") -> str:
 
 
 async def _call_claude_json(system: str, user: str, timeout: int = 90) -> Optional[dict]:
+    """Phase 0 — délègue à `safe_claude_json` (retry expo + circuit breaker)."""
     if not EMERGENT_LLM_KEY:
         return None
+    from services.llm_resilience import safe_claude_json, LLMUnavailableError
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = (
-            LlmChat(
-                api_key=EMERGENT_LLM_KEY,
-                session_id=f"bundles-{uuid.uuid4().hex[:8]}",
-                system_message=system,
-            )
-            .with_model("anthropic", "claude-sonnet-4-5-20250929")
+        return await safe_claude_json(
+            system, user,
+            session_id=f"bundles-{uuid.uuid4().hex[:8]}",
+            timeout=timeout,
         )
-        raw = await asyncio.wait_for(chat.send_message(UserMessage(text=user)), timeout=timeout)
-        text = raw if isinstance(raw, str) else str(raw)
-        return json.loads(_strip_json_fence(text))
+    except (LLMUnavailableError, ValueError) as e:
+        logger.warning(f"[bundles] LLM call returned None: {e}")
+        return None
     except Exception:
         logger.exception("Bundles Claude call failed")
         return None

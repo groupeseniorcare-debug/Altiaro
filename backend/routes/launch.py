@@ -470,7 +470,12 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
             ("about",       "Page À propos éditoriale",          46),
             ("contact",     "Page Contact",                      52),
         ]
-        fake_user = {"id": user_id, "role": "concepteur"}
+        # Phase 0.5 fix — Le launch s'exécute en mode "service" (background) et doit
+        # pouvoir orchestrer les routes internes même quand l'admin lance un site dont
+        # il n'est pas operator_id. On utilise le rôle 'admin' pour by-pass l'ACL des
+        # sous-routes (le check d'ACL initial sur /launch-auto a déjà été passé par
+        # l'opérateur ou l'admin légitime au moment du POST).
+        fake_user = {"id": user_id, "role": "admin"}
         budget_exhausted = False
 
         async def _check_budget_health() -> bool:
@@ -716,7 +721,7 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                             pimg_routes.generate_product_image(
                                 product_id=p["id"],
                                 data=pimg_routes.GenProductImgInput(style=style, tweak="", replace_main=False),
-                                user={"id": user_id, "role": "concepteur"},
+                                user={"id": user_id, "role": "admin"},
                             ),
                             timeout=120,
                         )
@@ -747,7 +752,7 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                                         style="in_use" if sec_idx == 0 else "closeup",
                                         tweak="",
                                     ),
-                                    user={"id": user_id, "role": "concepteur"},
+                                    user={"id": user_id, "role": "admin"},
                                 ),
                                 timeout=120,
                             )

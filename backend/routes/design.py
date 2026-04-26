@@ -179,90 +179,88 @@ def _strip(text: str) -> str:
 
 
 async def _claude_json(system: str, user: str, session_id: str, timeout: int = 180) -> dict:
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    last_err: Optional[Exception] = None
-    # Simple retry (up to 3 tries) on transient upstream failures (502, 503, 504).
-    for attempt in range(3):
-        chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"{session_id}-{attempt}", system_message=system)\
-            .with_model("anthropic", "claude-sonnet-4-5-20250929")
+    """Phase 0 — délègue à `safe_claude_json` (retry expo + circuit breaker).
+
+    Conserve la signature historique (utilisée à 9+ endroits dans design.py).
+    Préserve le flag platform_health pour budget_exhausted (utilisé par la
+    bannière du cockpit).
+    """
+    from services.llm_resilience import safe_claude_json, LLMUnavailableError
+    try:
+        data = await safe_claude_json(system, user, session_id=session_id, timeout=timeout)
+        # Success → auto-clear any stale budget_exhausted flag
         try:
-            raw = await asyncio.wait_for(chat.send_message(UserMessage(text=user)), timeout=timeout)
-            payload = _strip(raw if isinstance(raw, str) else str(raw))
+            await db.platform_health.update_one(
+                {"key": "llm"},
+                {"$set": {"key": "llm", "status": "ok",
+                          "last_success_at": datetime.now(timezone.utc).isoformat()}},
+                upsert=True,
+            )
+        except Exception:
+            pass
+        return data
+    except ValueError as e:
+        # JSON parse error — non-retryable
+        logger.error(f"Design Claude returned invalid JSON: {e}")
+        raise HTTPException(status_code=502, detail=f"L'IA a retourné un JSON invalide : {str(e)[:160]}")
+    except LLMUnavailableError as e:
+        logger.warning(f"[design] LLM unavailable after retries: {e.last_error}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"IA temporairement indisponible (proxy upstream KO, breaker={e.provider}). "
+                   "Réessayez dans 1-3 min — le système retentera automatiquement.",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        msg = str(e)
+        if "Budget has been exceeded" in msg or ("budget" in msg.lower() and "exceeded" in msg.lower()):
             try:
-                data = json.loads(payload)
-                # Success → auto-clear any stale budget_exhausted flag
-                try:
-                    await db.platform_health.update_one(
-                        {"key": "llm"},
-                        {"$set": {"key": "llm", "status": "ok",
-                                  "last_success_at": datetime.now(timezone.utc).isoformat()}},
-                        upsert=True,
-                    )
-                except Exception:
-                    pass
-                return data
-            except json.JSONDecodeError as e:
-                logger.error(f"Design prompt returned invalid JSON (try {attempt+1}): {e}\n{payload[:400]}")
-                last_err = e
-                await asyncio.sleep(2)
-                continue
-        except asyncio.TimeoutError:
-            raise HTTPException(status_code=504, detail="L'IA a mis trop de temps à répondre. Réessaye.")
-        except Exception as e:
-            msg = str(e)
-            logger.warning(f"Claude design call failed (try {attempt+1}/3) : {msg[:200]}")
-            last_err = e
-            # Emergent LLM Key budget exhausted → clear actionable message, no retry
-            if "Budget has been exceeded" in msg or "budget" in msg.lower() and "exceeded" in msg.lower():
-                try:
-                    await db.platform_health.update_one(
-                        {"key": "llm"},
-                        {"$set": {"key": "llm", "status": "budget_exhausted",
-                                  "last_error_at": datetime.now(timezone.utc).isoformat()}},
-                        upsert=True,
-                    )
-                except Exception:
-                    pass
-                raise HTTPException(
-                    status_code=402,
-                    detail="Budget Emergent LLM Key épuisé. Recharge la clé depuis Profile → Universal Key → Add Balance.",
+                await db.platform_health.update_one(
+                    {"key": "llm"},
+                    {"$set": {"key": "llm", "status": "budget_exhausted",
+                              "last_error_at": datetime.now(timezone.utc).isoformat()}},
+                    upsert=True,
                 )
-            # Retry only on transient gateway errors
-            if any(code in msg for code in ("502", "503", "504", "BadGateway", "ServiceUnavailable")):
-                await asyncio.sleep(2 + attempt)
-                continue
-            raise HTTPException(status_code=502, detail=f"IA indisponible : {msg[:180]}")
-    raise HTTPException(status_code=502, detail=f"IA indisponible après 3 tentatives : {str(last_err)[:180]}")
+            except Exception:
+                pass
+            raise HTTPException(
+                status_code=402,
+                detail="Budget Emergent LLM Key épuisé. Recharge la clé depuis Profile → Universal Key → Add Balance.",
+            )
+        logger.warning(f"[design] Claude unexpected error: {msg[:200]}")
+        raise HTTPException(status_code=502, detail=f"IA indisponible : {msg[:180]}")
 
 
 async def _nano_banana_logo(prompt: str, site_id: str) -> Optional[str]:
-    """Génère un logo via Gemini Nano Banana et renvoie l'URL publique."""
+    """Génère un logo via Gemini Nano Banana et renvoie l'URL publique.
+
+    Phase 0 — délègue à `safe_nano_banana_bytes` (retry expo + circuit breaker).
+    """
+    from services.llm_resilience import safe_nano_banana_bytes, LLMUnavailableError
+    full_prompt = (
+        f"Minimalist vector logo icon (no text, no letters), 512x512, flat design, "
+        f"centered, cream background (#FDFBF7), {prompt}. "
+        f"Clean, friendly, professional. Senior-friendly e-commerce brand."
+    )
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"logo-{site_id}-{uuid.uuid4().hex[:6]}",
-                       system_message="You create minimal vector logos for e-commerce stores.")
-        chat.with_model("gemini", NANO_BANANA_MODEL).with_params(modalities=["image", "text"])
-        full_prompt = (
-            f"Minimalist vector logo icon (no text, no letters), 512x512, flat design, "
-            f"centered, cream background (#FDFBF7), {prompt}. "
-            f"Clean, friendly, professional. Senior-friendly e-commerce brand."
-        )
-        _, images = await asyncio.wait_for(
-            chat.send_message_multimodal_response(UserMessage(text=full_prompt)),
+        data = await safe_nano_banana_bytes(
+            full_prompt,
+            system="You create minimal vector logos for e-commerce stores.",
+            session_id=f"logo-{site_id}-{uuid.uuid4().hex[:6]}",
             timeout=90,
+            request_id=f"logo-{site_id[:8]}",
         )
-        if not images:
+        if not data:
             return None
-        img = images[0]
-        data = base64.b64decode(img["data"])
         logos_dir = UPLOAD_DIR / "logos"
         logos_dir.mkdir(parents=True, exist_ok=True)
         filename = f"logo_{site_id}_{uuid.uuid4().hex[:8]}.png"
         path = logos_dir / filename
         path.write_bytes(data)
         return f"/api/uploads/logos/{filename}"
-    except asyncio.TimeoutError:
-        logger.warning(f"Nano Banana timeout for site {site_id}")
+    except LLMUnavailableError as e:
+        logger.warning(f"[design] Nano Banana logo unavailable: {e.last_error}")
         return None
     except Exception:
         logger.exception("Nano Banana logo generation failed")
@@ -270,35 +268,36 @@ async def _nano_banana_logo(prompt: str, site_id: str) -> Optional[str]:
 
 
 async def _nano_banana_hero_image(prompt: str, site_id: str) -> Optional[str]:
-    """Génère une image hero lifestyle 3:2 via Nano Banana."""
+    """Génère une image hero lifestyle 3:2 via Nano Banana.
+
+    Phase 0 — délègue à `safe_nano_banana_bytes` (retry expo + circuit breaker).
+    """
+    from services.llm_resilience import safe_nano_banana_bytes, LLMUnavailableError
+    full_prompt = (
+        f"Editorial lifestyle photography, 3:2 landscape format, premium magazine quality, "
+        f"warm morning natural light, soft shadows, shallow depth of field. "
+        f"{prompt}. "
+        f"Tasteful French interior, editorial composition, dignity, documentary style. "
+        f"No text, no logo, no watermark."
+    )
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"hero-{site_id}-{uuid.uuid4().hex[:6]}",
-                       system_message="You create premium lifestyle photography for Silver Economy D2C e-commerce brands.")
-        chat.with_model("gemini", NANO_BANANA_MODEL).with_params(modalities=["image", "text"])
-        full_prompt = (
-            f"Editorial lifestyle photography, 3:2 landscape format, premium magazine quality, "
-            f"warm morning natural light, soft shadows, shallow depth of field. "
-            f"{prompt}. "
-            f"Tasteful French interior, editorial composition, dignity, documentary style. "
-            f"No text, no logo, no watermark."
-        )
-        _, images = await asyncio.wait_for(
-            chat.send_message_multimodal_response(UserMessage(text=full_prompt)),
+        data = await safe_nano_banana_bytes(
+            full_prompt,
+            system="You create premium lifestyle photography for Silver Economy D2C e-commerce brands.",
+            session_id=f"hero-{site_id}-{uuid.uuid4().hex[:6]}",
             timeout=120,
+            request_id=f"hero-{site_id[:8]}",
         )
-        if not images:
+        if not data:
             return None
-        img = images[0]
-        data = base64.b64decode(img["data"])
         heroes_dir = UPLOAD_DIR / "heroes"
         heroes_dir.mkdir(parents=True, exist_ok=True)
         filename = f"hero_{site_id}_{uuid.uuid4().hex[:8]}.png"
         path = heroes_dir / filename
         path.write_bytes(data)
         return f"/api/uploads/heroes/{filename}"
-    except asyncio.TimeoutError:
-        logger.warning(f"Nano Banana hero timeout for site {site_id}")
+    except LLMUnavailableError as e:
+        logger.warning(f"[design] Nano Banana hero unavailable: {e.last_error}")
         return None
     except Exception:
         logger.exception("Nano Banana hero generation failed")
@@ -1002,14 +1001,20 @@ async def ai_field(site_id: str, body: AiFieldInput, user: dict = Depends(get_cu
                 await db.sites.update_one({"id": site_id}, {"$set": patch})
             return {"ok": True, "field": body.field, "value": data, "rationale": data.get("rationale")}
         else:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage  # type: ignore
-            chat = LlmChat(
-                api_key=os.environ.get("EMERGENT_LLM_KEY", ""),
-                session_id=session,
-                system_message=system,
-            ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-            raw = await chat.send_message(UserMessage(text=prompt))
-            txt = str(raw).strip().strip('"').strip("'").strip()
+            from services.llm_resilience import safe_claude_text, LLMUnavailableError  # type: ignore
+            try:
+                raw = await safe_claude_text(
+                    system, prompt,
+                    session_id=session,
+                    timeout=90,
+                )
+            except LLMUnavailableError as e:
+                logger.warning(f"[ai-field] LLM unavailable: {e.last_error}")
+                raise HTTPException(
+                    status_code=503,
+                    detail="IA temporairement indisponible (proxy upstream KO). Réessaye dans quelques minutes.",
+                )
+            txt = str(raw or "").strip().strip('"').strip("'").strip()
             # Sanitize plain-text brand fields (name/tagline/voice/story) — strip markdown,
             # preambles, quotes. Claude sometimes returns a full explanation with bold tokens
             # and markdown headings despite the "reply with only the final text" instruction.

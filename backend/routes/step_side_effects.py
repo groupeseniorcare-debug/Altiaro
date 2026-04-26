@@ -51,26 +51,23 @@ def _strip_json_fence(text: str) -> str:
 
 
 async def _call_claude(system: str, user: str) -> Optional[dict]:
-    """Single-shot Claude call returning a dict (or None on failure)."""
+    """Phase 0 — délègue à `safe_claude_json` (retry expo + circuit breaker).
+
+    Préserve l'API : retourne dict ou None si LLM down / JSON invalide /
+    no key. Les appelants gèrent déjà le cas None.
+    """
     if not EMERGENT_LLM_KEY:
         logger.warning("No EMERGENT_LLM_KEY, side-effect extraction skipped")
         return None
+    from services.llm_resilience import safe_claude_json, LLMUnavailableError
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = (
-            LlmChat(
-                api_key=EMERGENT_LLM_KEY,
-                session_id=f"side-effect-{uuid.uuid4().hex[:8]}",
-                system_message=system,
-            )
-            .with_model("anthropic", "claude-sonnet-4-5-20250929")
+        return await safe_claude_json(
+            system, user,
+            session_id=f"side-effect-{uuid.uuid4().hex[:8]}",
+            timeout=90,
         )
-        raw = await asyncio.wait_for(chat.send_message(UserMessage(text=user)), timeout=90)
-        raw_text = raw if isinstance(raw, str) else str(raw)
-        stripped = _strip_json_fence(raw_text)
-        return json.loads(stripped)
-    except (asyncio.TimeoutError, json.JSONDecodeError) as e:
-        logger.error(f"Side-effect Claude call failed : {e}")
+    except (LLMUnavailableError, ValueError) as e:
+        logger.warning(f"[step_side_effects] LLM unavailable / invalid JSON: {e}")
         return None
     except Exception:
         logger.exception("Side-effect Claude unexpected error")

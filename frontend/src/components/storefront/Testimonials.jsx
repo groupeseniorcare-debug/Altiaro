@@ -114,12 +114,32 @@ function ReviewCard({ item, lang }) {
 
 export function Testimonials({ design, lang }) {
   const { primary, fontHeading } = designAccents(design);
-  const items = design?.testimonials?.items || design?.testimonials;
-  const hasReal = Array.isArray(items) && items.length > 0;
+  // Phase 0.5 — priorité au contenu premium généré par le pipeline étape 5
+  // (`design.testimonials_premium`, list of {name, city, age, text, image, rating}).
+  // Fallback ordre : (1) testimonials_premium, (2) testimonials.items legacy,
+  // (3) testimonials array brut, (4) DEFAULT mockés Unsplash (FR uniquement).
+  const premium = design?.testimonials_premium;
+  const legacy = design?.testimonials?.items || design?.testimonials;
+  const hasPremium = Array.isArray(premium) && premium.length > 0;
+  const hasLegacy = !hasPremium && Array.isArray(legacy) && legacy.length > 0;
+  const hasReal = hasPremium || hasLegacy;
   // Fallback testimonials are FR-only (mock names + quotes). Skip section
   // if storefront lang is not FR and no real testimonials exist in DB.
   if (!hasReal && (lang || "fr") !== "fr") return null;
-  const list = hasReal ? items : DEFAULT;
+  // Map premium items to the same shape expected by ReviewCard
+  // (ReviewCard already accepts { name, role|location, text, image, rating }).
+  const list = hasPremium
+    ? premium.map((p) => ({
+        name: p.name || "",
+        location: p.city || p.location || (p.age ? `${p.age} ans` : ""),
+        role: p.city && p.age ? `${p.city} · ${p.age} ans` : (p.role || p.location || ""),
+        rating: p.rating || 5,
+        image: p.image || p.avatar || p.photo,
+        text: p.text || p.quote || "",
+      }))
+    : hasLegacy
+      ? legacy
+      : DEFAULT;
   // Duplicate once so marquee loops seamlessly
   const doubled = [...list, ...list];
 

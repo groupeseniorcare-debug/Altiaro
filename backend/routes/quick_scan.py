@@ -169,34 +169,28 @@ def _strip_json(raw: str) -> str:
 
 
 async def _claude_analysis(product: str, country_name: str, country_code: str = "FR") -> dict:
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    """Phase 0 — délègue à `safe_claude_json` (retry expo + circuit breaker)."""
+    from services.llm_resilience import safe_claude_json, LLMUnavailableError
     user_prompt = _USER_TEMPLATE.format(
         product=product, country_name=country_name, country_code=country_code
     )
-    chat = (
-        LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"quickscan-{uuid.uuid4().hex[:8]}",
-            system_message=_SYSTEM_PROMPT,
-        )
-        .with_model("anthropic", "claude-sonnet-4-5-20250929")
-    )
     try:
-        raw = await asyncio.wait_for(
-            chat.send_message(UserMessage(text=user_prompt)),
+        return await safe_claude_json(
+            _SYSTEM_PROMPT, user_prompt,
+            session_id=f"quickscan-{uuid.uuid4().hex[:8]}",
             timeout=45,
         )
-    except asyncio.TimeoutError:
-        raise HTTPException(504, "L'IA a mis trop de temps. Réessaye.")
+    except ValueError as e:
+        logger.error(f"QuickScan bad JSON: {e}")
+        raise HTTPException(502, "IA a retourné un format invalide, réessaye.")
+    except LLMUnavailableError as e:
+        logger.warning(f"[quick_scan] LLM unavailable: {e.last_error}")
+        raise HTTPException(503, "IA temporairement indisponible (proxy upstream KO). Réessaye dans quelques minutes.")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Claude quickscan call failed")
         raise HTTPException(502, f"IA indisponible : {str(e)[:180]}")
-    raw_text = raw if isinstance(raw, str) else str(raw)
-    try:
-        return json.loads(_strip_json(raw_text))
-    except json.JSONDecodeError:
-        logger.error(f"QuickScan bad JSON: {raw_text[:400]}")
-        raise HTTPException(502, "IA a retourné un format invalide, réessaye.")
 
 
 # ============== GOOGLE ADS : volumes réels ============== #

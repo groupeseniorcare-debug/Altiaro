@@ -21,25 +21,36 @@ LLM_PROBE_COOLDOWN = timedelta(seconds=60)
 
 async def _probe_llm_budget() -> bool:
     """Fast, cheap Claude call (1-2 tokens). Returns True if the LLM answers
-    without a budget error — meaning the Universal Key has credits again."""
+    without a budget error — meaning the Universal Key has credits again.
+
+    Phase 0 — délègue à `safe_claude_text` (retry + circuit breaker). Si le
+    breaker est OPEN, on retourne False directement (pas de probe inutile).
+    """
     try:
         import os
         key = os.environ.get("EMERGENT_LLM_KEY", "")
         if not key:
             return False
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = LlmChat(
-            api_key=key,
-            session_id=f"probe-{datetime.now(timezone.utc).timestamp()}",
-            system_message="Reply with the single word OK.",
-        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-        raw = await asyncio.wait_for(chat.send_message(UserMessage(text="ping")), timeout=15)
-        return bool(raw)
+        from services.llm_resilience import safe_claude_text, LLMUnavailableError
+        try:
+            raw = await safe_claude_text(
+                "Reply with the single word OK.",
+                "ping",
+                session_id=f"probe-{datetime.now(timezone.utc).timestamp()}",
+                timeout=15,
+            )
+            return bool(raw)
+        except LLMUnavailableError:
+            # breaker OPEN or retries exhausted — flag stays bad
+            return False
+        except ValueError:
+            # JSON parse error doesn't apply here (text), but defensive
+            return False
     except Exception as e:
         msg = str(e)
         if "Budget has been exceeded" in msg or ("budget" in msg.lower() and "exceeded" in msg.lower()):
             return False
-        # Transient errors (timeout, 5xx) → don't flip the flag, stay pessimistic.
+        # Transient errors → don't flip the flag, stay pessimistic.
         logger.warning(f"[llm-probe] transient error, keeping flag: {msg[:120]}")
         return False
 

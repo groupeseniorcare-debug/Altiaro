@@ -1,6 +1,6 @@
 # Altiaro — PRD (Product Requirements Document)
 
-> **Dernière mise à jour : 2026-04-24**
+> **Dernière mise à jour : 2026-04-26**
 >
 > Document **statique** : problem statement, personas, exigences core.
 > L'historique des livrables est dans **CHANGELOG.md**, le backlog dans **ROADMAP.md**,
@@ -110,6 +110,10 @@ Les 50 étapes du playbook sont regroupées en **8 blocs thématiques ordonnés*
 | 63 | **AI Citation Tracker** (panel Claude mesure taux de citation par les IA, sparkline historique, détail par question) | ✅ |
 | 64 | **Citation Tracker scheduler** (APScheduler jeudi 08:00 UTC, opt-out `citation_auto_enabled`, gestion budget LLM) | ✅ |
 | 65 | **AliExpress Weekly Deals Watcher** (APScheduler mardi 06:00 UTC, détection price drop ≥20 % + ≥500 cmd, UI cockpit avec import/dismiss) | ✅ |
+| 66 | **Phase 0 — Résilience LLM (Circuit Breaker + Retry expo)** : module `services/llm_resilience.py` (419 lignes), wrappers `safe_claude_text/json` + `safe_nano_banana_bytes` + `safe_llm_text` (multi-provider) + endpoint `/api/admin/llm-health`, breakers per provider (claude, nano_banana), 3 retries (2s/8s/32s + jitter) sur 502/503/504/timeout/429, OPEN après 5 échecs consécutifs, reprise auto via cron `auto_resume_failed_jobs` toutes les 5 min, endpoint `/launch-jobs/{id}/resume` avec mode `only_degraded`, persistance `degraded_steps[]` sur `launch_jobs`, statut `completed_with_degraded`. 6 tests pytest verts. | ✅ |
+| 67 | **Phase 0.5 — Migration LLM complète** (drop-in replacement de 19 routes restantes : analyzer, ads_copy, blocks_execute, blog_posts, cockpit_tools, copilot, design × 4 sites internes, google_ads_manual, platform, product_bundles, product_images, product_narrative, quick_scan, seo_automation, seo_studio, sourcing, step_side_effects, steps, testimonials_ai). `grep LlmChat( backend/routes/` = **0**. Tous les appels Claude/Nano Banana sont désormais protégés par retry + circuit breaker. | ✅ |
+| 68 | **Phase 0.5 — UI LaunchProgress** : pill santé LLM (vert/orange/rouge selon `claude.state` + `recent_failures_60s`, poll 30s), liste FR-friendly des `degraded_steps[]` avec raisons, bouton "Relancer uniquement les étapes dégradées" (POST `/resume?only_degraded=true`), bouton "Reprendre la génération" (failed-resumable), bouton "Continuer vers la boutique" (completed_with_degraded), data-testids complets. Support debug `?launch_job_id=` en URL. | ✅ |
+| 69 | **Phase 1 — Storefront ↔ contenu premium** : `Testimonials.jsx` lit `design.testimonials_premium` en priorité (3 portraits IA), `StorefrontPages.jsx` lit `design.cms_pages.{about,contact}` avec rendu markdown via `MarkdownLite`, fallback intelligent vers `pages.*` puis hardcoded. Bug `availableLangs is not defined` corrigé (préexistant, plantait toutes les pages CMS). Bug Hero `[object Object]` corrigé via garde dict multilingue dans `sanitizeBrandText`. Bug 403 launch.py corrigé (admin lance un site dont il n'est pas operator_id). | ✅ |
 
 ## Règles critiques
 - Pas de Shopify — tout custom React/FastAPI.
@@ -118,6 +122,7 @@ Les 50 étapes du playbook sont regroupées en **8 blocs thématiques ordonnés*
 - Cookies httpOnly uniquement pour le JWT.
 - Ne jamais supprimer `<html translate="no">` dans index.html (bug Mac Chrome auto-translate crash React).
 - Emergent LLM Key via playbook, jamais en direct.
+- **TOUS les appels Claude/Nano Banana DOIVENT passer par `services/llm_resilience.py`** (`safe_claude_text/json`, `safe_llm_text`, `safe_nano_banana_bytes`). Plus jamais de `LlmChat(...)` direct dans `routes/` — la résilience (retry expo + circuit breaker) ne s'applique sinon pas.
 - API AliExpress = `aliexpress.ds.product.get` (Dropshipping), **pas** l'API Affiliate (permissions insuffisantes pour cette app).
 
 ## Credentials de test

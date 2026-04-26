@@ -82,33 +82,29 @@ def _validate_conversion_id(cid: str) -> str:
 
 
 async def _claude_call(system: str, user: str, timeout: int = 150) -> Optional[dict]:
+    """Phase 0 — délègue à `safe_claude_json` (retry + circuit breaker).
+
+    Conserve le sémaphore global (concurrence Claude limitée à ce module pour
+    ne pas saturer le proxy lors d'un export massif).
+    """
     if not EMERGENT_LLM_KEY:
         return None
+    from services.llm_resilience import safe_claude_json, LLMUnavailableError
     async with _claude_semaphore:
         t0 = time.time()
         try:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage
-            chat = (
-                LlmChat(
-                    api_key=EMERGENT_LLM_KEY,
-                    session_id=f"gads-export-{uuid.uuid4().hex[:8]}",
-                    system_message=system,
-                )
-                .with_model("anthropic", "claude-sonnet-4-5-20250929")
+            parsed = await safe_claude_json(
+                system, user,
+                session_id=f"gads-export-{uuid.uuid4().hex[:8]}",
+                timeout=timeout,
             )
-            raw = await asyncio.wait_for(
-                chat.send_message(UserMessage(text=user)), timeout=timeout
-            )
-            text = raw if isinstance(raw, str) else str(raw)
-            t = text.strip()
-            if t.startswith("```"):
-                t = re.sub(r"^```(?:json)?\s*", "", t)
-                t = re.sub(r"\s*```$", "", t)
-            parsed = json.loads(t)
             duration = time.time() - t0
-            tokens = (len(system) + len(user) + len(text)) // 4
+            tokens = (len(system) + len(user)) // 4
             logger.info(f"[gads-export/claude] OK {duration:.1f}s ~{tokens}tok")
             return parsed
+        except (LLMUnavailableError, ValueError) as e:
+            logger.warning(f"[gads-export/claude] FAIL in {time.time()-t0:.1f}s (resilience): {str(e)[:200]}")
+            return None
         except Exception as e:
             logger.warning(f"[gads-export/claude] FAIL in {time.time()-t0:.1f}s : {str(e)[:200]}")
             return None

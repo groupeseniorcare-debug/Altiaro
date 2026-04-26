@@ -161,28 +161,28 @@ async def _translate_keyword_fr_to_en(keyword: str) -> Optional[str]:
     if not EMERGENT_LLM_KEY:
         return None
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"kw-trans-{uuid.uuid4().hex[:6]}",
-            system_message=(
-                "You translate French e-commerce search keywords to English for "
-                "dropshipping catalog search (CJ / AliExpress). "
-                "Output ONLY the English product type in 1-2 words (no adjectives, no filler). "
-                "Examples: "
-                "'fauteuil releveur' → 'lift chair' | "
-                "'pilulier électronique' → 'pill dispenser' | "
-                "'déambulateur' → 'walker' | "
-                "'loupe grossissante' → 'magnifier' | "
-                "'canne de marche' → 'walking cane'. "
-                "No punctuation, no quotes, lowercase."
-            ),
-        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-        raw = await asyncio.wait_for(
-            chat.send_message(UserMessage(text=f"Translate: {keyword}")),
-            timeout=10,
-        )
-        en = (raw if isinstance(raw, str) else str(raw)).strip().strip('"').strip("'").lower()
+        from services.llm_resilience import safe_claude_text, LLMUnavailableError
+        try:
+            raw = await safe_claude_text(
+                (
+                    "You translate French e-commerce search keywords to English for "
+                    "dropshipping catalog search (CJ / AliExpress). "
+                    "Output ONLY the English product type in 1-2 words (no adjectives, no filler). "
+                    "Examples: "
+                    "'fauteuil releveur' → 'lift chair' | "
+                    "'pilulier électronique' → 'pill dispenser' | "
+                    "'déambulateur' → 'walker' | "
+                    "'loupe grossissante' → 'magnifier' | "
+                    "'canne de marche' → 'walking cane'. "
+                    "No punctuation, no quotes, lowercase."
+                ),
+                f"Translate: {keyword}",
+                session_id=f"kw-trans-{uuid.uuid4().hex[:6]}",
+                timeout=10,
+            )
+        except LLMUnavailableError:
+            return None
+        en = (raw or "").strip().strip('"').strip("'").lower()
         # Basic sanity check
         if 0 < len(en) < 100 and not en.startswith("i "):
             return en

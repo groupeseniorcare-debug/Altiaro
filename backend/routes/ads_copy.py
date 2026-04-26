@@ -137,29 +137,22 @@ def _validate_and_sanitize(data: dict) -> dict:
 
 
 async def _ask_claude(prompt: str, session_id: str) -> dict:
+    """Phase 0 — délègue à `safe_claude_json` (retry expo + circuit breaker).
+
+    Préserve les codes HTTP historiques attendus par le frontend (502/504/402)
+    en convertissant les exceptions du wrapper.
+    """
+    from services.llm_resilience import safe_claude_json, LLMUnavailableError
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = (
-            LlmChat(
-                api_key=EMERGENT_LLM_KEY,
-                session_id=session_id,
-                system_message=ADS_SYSTEM_PROMPT,
-            )
-            .with_model("anthropic", "claude-sonnet-4-5-20250929")
+        return await safe_claude_json(
+            ADS_SYSTEM_PROMPT, prompt, session_id=session_id, timeout=90,
         )
-        response = await asyncio.wait_for(
-            chat.send_message(UserMessage(text=prompt)),
-            timeout=90
-        )
-        raw = response if isinstance(response, str) else str(response)
-        raw = _strip_json_fence(raw)
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError as e:
-            logger.error(f"Ads LLM returned invalid JSON: {e}\n{raw[:500]}")
-            raise HTTPException(status_code=502, detail="L'IA a retourné un format invalide. Réessayez.")
-    except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="La génération prend trop de temps (>90s). Réessayez.")
+    except ValueError as e:
+        logger.error(f"Ads LLM returned invalid JSON: {e}")
+        raise HTTPException(status_code=502, detail="L'IA a retourné un format invalide. Réessayez.")
+    except LLMUnavailableError as e:
+        logger.warning(f"[ads_copy] LLM unavailable: {e.last_error}")
+        raise HTTPException(status_code=503, detail="IA temporairement indisponible (proxy upstream). Réessayez dans quelques minutes.")
     except HTTPException:
         raise
     except Exception as e:
@@ -167,7 +160,7 @@ async def _ask_claude(prompt: str, session_id: str) -> dict:
         if "Budget has been exceeded" in err or "budget" in err.lower():
             raise HTTPException(
                 status_code=402,
-                detail="Budget LLM épuisé. Profile → Universal Key → Add Balance."
+                detail="Budget LLM épuisé. Profile → Universal Key → Add Balance.",
             )
         logger.exception("Ads LLM call failed")
         raise HTTPException(status_code=500, detail=f"Erreur IA : {err[:200]}")

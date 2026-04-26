@@ -294,22 +294,22 @@ def _describe_output(block_id: str) -> list:
 
 
 async def _call_claude(system: str, user: str, session_id: str, model: str) -> dict:
+    """Phase 0 — délègue à `safe_claude_json` (retry + circuit breaker).
+
+    Préserve la signature historique : peut prendre n'importe quel modèle
+    Anthropic via le wrapper.
+    """
+    from services.llm_resilience import safe_claude_json, LLMUnavailableError
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = (
-            LlmChat(api_key=EMERGENT_LLM_KEY, session_id=session_id, system_message=system)
-            .with_model("anthropic", model)
+        return await safe_claude_json(
+            system, user, session_id=session_id, model=model, timeout=180,
         )
-        response = await asyncio.wait_for(chat.send_message(UserMessage(text=user)), timeout=180)
-        raw = response if isinstance(response, str) else str(response)
-        raw = _strip_json_fence(raw)
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError as e:
-            logger.error(f"Block mega-prompt returned invalid JSON: {e}\n{raw[:500]}")
-            raise HTTPException(status_code=502, detail="L'IA a retourné un format invalide. Réessayez.")
-    except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="La génération prend trop de temps (>180s). Réessayez.")
+    except ValueError as e:
+        logger.error(f"Block mega-prompt returned invalid JSON: {e}")
+        raise HTTPException(status_code=502, detail="L'IA a retourné un format invalide. Réessayez.")
+    except LLMUnavailableError as e:
+        logger.warning(f"[blocks_execute] LLM unavailable: {e.last_error}")
+        raise HTTPException(status_code=503, detail="IA temporairement indisponible (proxy upstream). Réessayez dans quelques minutes.")
     except HTTPException:
         raise
     except Exception as e:

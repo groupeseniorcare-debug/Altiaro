@@ -29,20 +29,23 @@ def _strip_json_fence(text: str) -> str:
 
 
 async def _claude_json(system: str, user: str, timeout: int = 60) -> Optional[dict]:
+    """Phase 0 — délègue à `safe_claude_json` (retry expo + circuit breaker).
+
+    Préserve l'API existante : retourne `None` si l'IA est indisponible ou
+    que le JSON est mal formé (les appelants peuvent déjà gérer le cas None).
+    """
     if not EMERGENT_LLM_KEY:
         return None
+    from services.llm_resilience import safe_claude_json, LLMUnavailableError
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = (
-            LlmChat(
-                api_key=EMERGENT_LLM_KEY,
-                session_id=f"cockpit-{uuid.uuid4().hex[:8]}",
-                system_message=system,
-            )
-            .with_model("anthropic", "claude-sonnet-4-5-20250929")
+        return await safe_claude_json(
+            system, user,
+            session_id=f"cockpit-{uuid.uuid4().hex[:8]}",
+            timeout=timeout,
         )
-        raw = await asyncio.wait_for(chat.send_message(UserMessage(text=user)), timeout=timeout)
-        return json.loads(_strip_json_fence(raw if isinstance(raw, str) else str(raw)))
+    except (LLMUnavailableError, ValueError) as e:
+        logger.warning(f"[cockpit] LLM call returned None: {e}")
+        return None
     except Exception:
         logger.exception("Claude cockpit tool failed")
         return None

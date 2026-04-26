@@ -49,28 +49,32 @@ def _pick_text(val) -> str:
 
 
 async def _nano_banana_portrait(prompt: str, site_id: str) -> str | None:
+    """Phase 0 — délègue à `safe_nano_banana_bytes` (retry expo + circuit breaker).
+
+    Garde la sémantique historique : retourne URL ou None (jamais raise vers
+    l'appelant). Si le breaker Nano Banana est OPEN, on renvoie None et la
+    pipeline marquera l'étape comme dégradée.
+    """
     if not EMERGENT_LLM_KEY:
         return None
+    from services.llm_resilience import safe_nano_banana_bytes, LLMUnavailableError
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
+        data = await safe_nano_banana_bytes(
+            prompt,
+            system="You generate candid, documentary-style photography for a Silver Economy D2C brand.",
             session_id=f"testi-{site_id}-{uuid.uuid4().hex[:6]}",
-            system_message="You generate candid, documentary-style photography for a Silver Economy D2C brand.",
-        )
-        chat.with_model("gemini", NANO_BANANA_MODEL).with_params(modalities=["image", "text"])
-        _, images = await asyncio.wait_for(
-            chat.send_message_multimodal_response(UserMessage(text=prompt)),
             timeout=90,
+            request_id=f"testi-{site_id[:8]}",
         )
-        if not images:
+        if not data:
             return None
-        img = images[0]
-        data = base64.b64decode(img["data"])
         filename = f"t_{site_id}_{uuid.uuid4().hex[:8]}.png"
         path = TESTI_IMG_DIR / filename
         path.write_bytes(data)
         return f"/api/uploads/testimonials_ai/{filename}"
+    except LLMUnavailableError as e:
+        logger.warning(f"[testimonials_ai] Nano Banana unavailable: {e.last_error}")
+        return None
     except Exception:
         logger.exception("[testimonials_ai] nano banana failed")
         return None

@@ -11,6 +11,15 @@ const PREAMBLE_RE = /^\s*(?:voici|proposition(?:s)?\s+de\s+\w+|suggestion(?:s)?(
 
 export function sanitizeBrandText(raw, maxLen = 80) {
   if (!raw) return "";
+  // Defensive : if a legacy site stored a multilingual dict (e.g. {fr: "...", en: "..."})
+  // in `brand.tagline` or `brand.name`, `String({...})` would yield "[object Object]"
+  // which leaks into the Hero. Pick the most likely string variant first.
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    const candidate = raw.fr || raw.FR || raw.en || raw.EN
+      || Object.values(raw).find((v) => typeof v === "string");
+    raw = typeof candidate === "string" ? candidate : "";
+  }
+  if (typeof raw !== "string") return "";
   let text = String(raw).trim();
   const bold = text.match(/\*\*([^*\n]{1,80})\*\*/);
   if (bold) {

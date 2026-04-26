@@ -61,25 +61,25 @@ STYLE_PRESETS = {
 
 
 async def _generate_one(prompt: str, site_id: str, product_id: str) -> Optional[str]:
-    """Call Nano Banana and write the PNG to disk. Returns public URL or None."""
+    """Call Nano Banana and write the PNG to disk. Returns public URL or None.
+
+    Phase 0 — utilise `safe_nano_banana_bytes` (retry expo + circuit breaker
+    sur 'nano_banana'). Si le breaker est OPEN ou les retries échouent, on
+    raise LLMUnavailableError → traduit en 503 pour l'UI.
+    """
     if not EMERGENT_LLM_KEY:
         raise HTTPException(400, "EMERGENT_LLM_KEY absente")
+    from services.llm_resilience import safe_nano_banana_bytes, LLMUnavailableError
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
+        data = await safe_nano_banana_bytes(
+            prompt,
+            system="You generate premium product photography for a Silver Economy D2C brand.",
             session_id=f"pimg-{product_id}-{uuid.uuid4().hex[:6]}",
-            system_message="You generate premium product photography for a Silver Economy D2C brand.",
-        )
-        chat.with_model("gemini", NANO_BANANA_MODEL).with_params(modalities=["image", "text"])
-        _, images = await asyncio.wait_for(
-            chat.send_message_multimodal_response(UserMessage(text=prompt)),
             timeout=120,
+            request_id=f"pimg-{product_id[:8]}",
         )
-        if not images:
+        if not data:
             return None
-        img = images[0]
-        data = base64.b64decode(img["data"])
         filename = f"p_{product_id}_{uuid.uuid4().hex[:8]}.png"
         path = PRODUCT_IMG_DIR / filename
         path.write_bytes(data)
@@ -94,9 +94,9 @@ async def _generate_one(prompt: str, site_id: str, product_id: str) -> Optional[
         except Exception:
             pass
         return f"/api/uploads/products_ai/{filename}"
-    except asyncio.TimeoutError:
-        logger.warning(f"[nano-product] timeout for product {product_id}")
-        raise HTTPException(504, "La génération a dépassé 2 min. Réessaye.")
+    except LLMUnavailableError as e:
+        logger.warning(f"[nano-product] LLM down for {product_id}: {e.last_error}")
+        raise HTTPException(503, "Génération image indisponible (proxy upstream KO). Réessayez dans quelques minutes.")
     except HTTPException:
         raise
     except Exception as e:

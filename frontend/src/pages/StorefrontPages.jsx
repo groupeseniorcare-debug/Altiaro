@@ -28,7 +28,13 @@ function useSiteDesign() {
       .then(({ data }) => setDesign(data?.published ? data.design : null))
       .catch(() => setDesign(null));
   }, [siteId]);
-  return { siteId, site, design: design || {}, lang, setLang };
+  // Phase 0.5 — `availableLangs` was referenced inside StorefrontLayout but never
+  // defined here ⇒ ReferenceError that crashed every CMS page (about/contact/legal/…).
+  // Default to FR + any extra language the operator activated on this site.
+  const availableLangs = (site?.selected_languages && site.selected_languages.length)
+    ? site.selected_languages
+    : ["fr"];
+  return { siteId, site, design: design || {}, lang, setLang, availableLangs };
 }
 
 function pickText(node, lang) {
@@ -86,14 +92,24 @@ function PageHero({ eyebrow, title, subtitle, design }) {
  * ABOUT — /about
  * ========================================================= */
 export function StorefrontAbout() {
-  const { site, design, lang, setLang } = useSiteDesign();
+  const { site, design, lang, setLang, availableLangs } = useSiteDesign();
   const fontHeading = design?.brand?.font_heading || "Fraunces";
   const primary = design?.brand?.primary_color || "#B84B31";
-  const aiPage = design?.pages?.about || {};
 
-  const headline = aiPage.headline
+  // Phase 0.5 — priorité au contenu premium généré par le pipeline étape 5
+  // (`design.cms_pages.about` = {title, subtitle, body_md, highlights:[{title,body}]}).
+  // Fallback : `design.pages.about` (ancien format split paragraphs), puis fallback hardcodé.
+  const cmsAbout = design?.cms_pages?.about;
+  const aiPage = design?.pages?.about || {};
+  const hasCms = !!(cmsAbout && (cmsAbout.body_md || cmsAbout.title));
+
+  const headline = (hasCms && cmsAbout.title)
+    || aiPage.headline
     || pickText(design?.about?.headline, lang)
     || `L'histoire de ${site?.name || "notre boutique"}`;
+  const subtitle = (hasCms && cmsAbout.subtitle)
+    || `${site?.name || "Notre maison"} — pour que bien vieillir soit simple et digne.`;
+
   const aiParagraphs = Array.isArray(aiPage.paragraphs) ? aiPage.paragraphs.filter(Boolean) : [];
   const paragraphs = (design?.about?.paragraphs || []).map((p) => pickText(p, lang)).filter(Boolean);
   const fallbackParagraphs = [
@@ -103,15 +119,23 @@ export function StorefrontAbout() {
   ];
   const displayParagraphs = aiParagraphs.length ? aiParagraphs : (paragraphs.length > 0 ? paragraphs : fallbackParagraphs);
 
+  // Highlights from CMS premium (3 cards)
+  const cmsHighlights = (hasCms && Array.isArray(cmsAbout.highlights))
+    ? cmsAbout.highlights.filter((h) => h && h.title)
+    : [];
+
   const aiValues = Array.isArray(aiPage.values) ? aiPage.values.filter((v) => v && v.title) : [];
-  const pillars = aiValues.length ? aiValues.map((v) => ({
-    icon: Heart, title: v.title, desc: v.description || "",
-  })) : [
-    { icon: Heart, title: "Bienveillance", desc: "Chaque produit est pensé pour préserver dignité, confort et autonomie." },
-    { icon: ShieldCheck, title: "Exigence", desc: "Audits fournisseurs, tests ergothérapeutes, garantie 2 ans sur tout." },
-    { icon: HandHeart, title: "Accompagnement", desc: "Un conseiller humain Lun–Ven 9h–18h, installation possible à domicile." },
-    { icon: Leaf, title: "Responsabilité", desc: "Circuits courts privilégiés, emballages réduits, logistique optimisée." },
-  ];
+  // Map CMS highlights to the "pillars" structure if present, otherwise fall back to aiPage.values then to hardcoded defaults.
+  const pillars = cmsHighlights.length
+    ? cmsHighlights.map((h) => ({ icon: Heart, title: h.title, desc: h.body || "" }))
+    : (aiValues.length ? aiValues.map((v) => ({
+        icon: Heart, title: v.title, desc: v.description || "",
+      })) : [
+        { icon: Heart, title: "Bienveillance", desc: "Chaque produit est pensé pour préserver dignité, confort et autonomie." },
+        { icon: ShieldCheck, title: "Exigence", desc: "Audits fournisseurs, tests ergothérapeutes, garantie 2 ans sur tout." },
+        { icon: HandHeart, title: "Accompagnement", desc: "Un conseiller humain Lun–Ven 9h–18h, installation possible à domicile." },
+        { icon: Leaf, title: "Responsabilité", desc: "Circuits courts privilégiés, emballages réduits, logistique optimisée." },
+      ]);
 
   return (
     <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
@@ -119,12 +143,14 @@ export function StorefrontAbout() {
       <PageHero
         eyebrow="À propos"
         title={headline}
-        subtitle={`${site?.name || "Notre maison"} — pour que bien vieillir soit simple et digne.`}
+        subtitle={subtitle}
         design={design}
       />
 
       <article className="max-w-3xl mx-auto px-6 md:px-10 py-16 md:py-20 space-y-6 text-[17px] leading-relaxed text-neutral-700" data-testid="page-about">
-        {displayParagraphs.map((p, i) => <p key={i}>{p}</p>)}
+        {hasCms && cmsAbout.body_md
+          ? <MarkdownLite md={cmsAbout.body_md} />
+          : displayParagraphs.map((p, i) => <p key={i}>{p}</p>)}
       </article>
 
       <section className="max-w-6xl mx-auto px-6 md:px-10 pb-20">
@@ -169,7 +195,7 @@ export function StorefrontAbout() {
  * CONTACT — /contact
  * ========================================================= */
 export function StorefrontContact() {
-  const { siteId, site, design, lang, setLang } = useSiteDesign();
+  const { siteId, site, design, lang, setLang, availableLangs } = useSiteDesign();
   const fontHeading = design?.brand?.font_heading || "Fraunces";
   const primary = design?.brand?.primary_color || "#B84B31";
   const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "" });
@@ -177,11 +203,29 @@ export function StorefrontContact() {
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
   const contact = design?.contact || {};
+  // Phase 0.5 — priorité au contenu premium généré par le pipeline étape 5
+  // (`design.cms_pages.contact` = {title, subtitle, intro_md, phone_label, phone_hours,
+  // email_label, promise}). Fallback : `design.pages.contact` (ancien aiPage) puis hardcodé.
+  const cmsContact = design?.cms_pages?.contact;
   const aiPage = design?.pages?.contact || {};
+  const hasCms = !!(cmsContact && (cmsContact.intro_md || cmsContact.title));
+
   const contactEmail = contact.support_email || contact.email || "bonjour@boutique.fr";
   const contactPhone = contact.support_phone || contact.phone || "01 23 45 67 89";
-  const contactHours = pickText(contact.support_hours, lang) || contact.hours || "Lun–Ven · 9h–18h";
+  const contactHours = (hasCms && cmsContact.phone_hours)
+    || pickText(contact.support_hours, lang)
+    || contact.hours
+    || "Lun–Ven · 9h–18h";
   const contactAddress = contact.address || "";
+  const phoneLabel = (hasCms && cmsContact.phone_label) || "Par téléphone";
+  const emailLabel = (hasCms && cmsContact.email_label) || "Par email";
+  const emailPromise = (hasCms && cmsContact.promise)
+    || "Réponse sous 2h ouvrées en moyenne.";
+
+  const heroTitle = (hasCms && cmsContact.title) || aiPage.headline || "On vous écoute.";
+  const heroSubtitle = (hasCms && cmsContact.subtitle)
+    || aiPage.intro
+    || "Une question, un conseil produit, un devis, un problème avec votre commande ? Nous vous répondons en moyenne sous 2h ouvrées.";
 
   const submit = async (e) => {
     e.preventDefault();
@@ -201,10 +245,17 @@ export function StorefrontContact() {
       <SEOHead title={`Contact · ${site?.name || ""}`} description="Contactez notre équipe par email, téléphone ou via le formulaire." />
       <PageHero
         eyebrow="Contact"
-        title={aiPage.headline || "On vous écoute."}
-        subtitle={aiPage.intro || "Une question, un conseil produit, un devis, un problème avec votre commande ? Nous vous répondons en moyenne sous 2h ouvrées."}
+        title={heroTitle}
+        subtitle={heroSubtitle}
         design={design}
       />
+
+      {/* Premium intro markdown (only when CMS premium provided one) */}
+      {hasCms && cmsContact.intro_md && (
+        <section className="max-w-3xl mx-auto px-6 md:px-10 pt-12 md:pt-16 text-[16px] leading-relaxed text-neutral-700">
+          <MarkdownLite md={cmsContact.intro_md} />
+        </section>
+      )}
 
       <section className="max-w-6xl mx-auto px-6 md:px-10 py-16 md:py-20 grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-12 lg:gap-20" data-testid="page-contact">
         {/* Infos */}
@@ -214,12 +265,12 @@ export function StorefrontContact() {
               <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: `${primary}14`, color: primary }}>
                 <EnvelopeSimple size={22} weight="duotone" />
               </div>
-              <h3 className="text-lg font-semibold">Par email</h3>
+              <h3 className="text-lg font-semibold">{emailLabel}</h3>
             </div>
             <a href={`mailto:${contactEmail}`} className="text-[17px] font-medium hover:underline" style={{ color: primary }} data-testid="contact-info-email">
               {contactEmail}
             </a>
-            <div className="text-sm text-neutral-500 mt-1">Réponse sous 2h ouvrées en moyenne.</div>
+            <div className="text-sm text-neutral-500 mt-1">{emailPromise}</div>
           </div>
 
           <div>
@@ -227,7 +278,7 @@ export function StorefrontContact() {
               <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: `${primary}14`, color: primary }}>
                 <Phone size={22} weight="duotone" />
               </div>
-              <h3 className="text-lg font-semibold">Par téléphone</h3>
+              <h3 className="text-lg font-semibold">{phoneLabel}</h3>
             </div>
             <a href={`tel:${contactPhone.replace(/\s/g, "")}`} className="text-[17px] font-medium hover:underline" style={{ color: primary }} data-testid="contact-info-phone">
               {contactPhone}
@@ -330,7 +381,7 @@ function Input({ label, value, onChange, type = "text", required, testId }) {
  * LIVRAISON — /livraison
  * ========================================================= */
 export function StorefrontLivraison() {
-  const { site, design, lang, setLang } = useSiteDesign();
+  const { site, design, lang, setLang, availableLangs } = useSiteDesign();
   const fontHeading = design?.brand?.font_heading || "Fraunces";
   const primary = design?.brand?.primary_color || "#B84B31";
   const aiPage = design?.pages?.livraison || {};
@@ -431,7 +482,7 @@ export function StorefrontLivraison() {
  * RETOURS — /retours
  * ========================================================= */
 export function StorefrontRetours() {
-  const { site, design, lang, setLang } = useSiteDesign();
+  const { site, design, lang, setLang, availableLangs } = useSiteDesign();
   const fontHeading = design?.brand?.font_heading || "Fraunces";
   const primary = design?.brand?.primary_color || "#B84B31";
   const aiPage = design?.pages?.retours || {};
@@ -513,7 +564,7 @@ export function StorefrontRetours() {
  * FAQ page (kept as route target, minimal)
  * ========================================================= */
 export function StorefrontFAQ() {
-  const { site, design, lang, setLang } = useSiteDesign();
+  const { site, design, lang, setLang, availableLangs } = useSiteDesign();
   const font = design?.brand?.font_heading || "Fraunces";
   const aiPage = design?.pages?.faq || {};
   const aiItems = Array.isArray(aiPage.items) ? aiPage.items.filter((f) => f && f.question) : [];
@@ -554,7 +605,7 @@ export function StorefrontFAQ() {
  * Legal pages (CGV / Mentions / Confidentialité)
  * ========================================================= */
 function LegalPage({ kind, title }) {
-  const { site, design, lang, setLang } = useSiteDesign();
+  const { site, design, lang, setLang, availableLangs } = useSiteDesign();
   const page = design?.legal_pages?.[kind];
   return (
     <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>

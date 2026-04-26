@@ -385,47 +385,39 @@ Languages to produce: {", ".join(target_langs)}
 
 
 async def _call_claude_json(system: str, user: str, timeout: int = 120):
+    """Phase 0 — délègue à `safe_claude_json` (retry expo + circuit breaker).
+
+    Le wrapper applique déjà : 3 retries exponentiels (2s/8s/32s + jitter)
+    sur 502/503/504/timeout/429, et OPEN le circuit après 5 échecs consécutifs.
+    Préserve les comportements historiques : retourne `None` si LLM down ou
+    parse error, et persiste `platform_health.llm = budget_exhausted` si Claude
+    a renvoyé un message de budget épuisé.
+    """
     if not EMERGENT_LLM_KEY:
         return None
-    # Two attempts with a short backoff — BadGateway (502) from the LiteLLM
-    # proxy is transient and a single retry usually succeeds.
-    last_err = None
-    for attempt in range(2):
-        try:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage
-            chat = (
-                LlmChat(
-                    api_key=EMERGENT_LLM_KEY,
-                    session_id=f"blog-{uuid.uuid4().hex[:8]}",
-                    system_message=system,
+    from services.llm_resilience import safe_claude_json, LLMUnavailableError
+    try:
+        return await safe_claude_json(system, user, session_id=f"blog-{uuid.uuid4().hex[:8]}", timeout=timeout)
+    except LLMUnavailableError as e:
+        logger.warning(f"[blog-claude] LLM unavailable after retries: {e.last_error}")
+        return None
+    except ValueError as e:
+        logger.warning(f"[blog-claude] JSON parse failed: {e}")
+        return None
+    except Exception as e:
+        msg = str(e)
+        if "Budget has been exceeded" in msg or ("budget" in msg.lower() and "exceeded" in msg.lower()):
+            try:
+                await db.platform_health.update_one(
+                    {"key": "llm"},
+                    {"$set": {"key": "llm", "status": "budget_exhausted",
+                              "last_error_at": datetime.now(timezone.utc).isoformat()}},
+                    upsert=True,
                 )
-                .with_model("anthropic", "claude-sonnet-4-5-20250929")
-            )
-            raw = await asyncio.wait_for(chat.send_message(UserMessage(text=user)), timeout=timeout)
-            text = raw if isinstance(raw, str) else str(raw)
-            return json.loads(_strip_json_fence(text))
-        except Exception as e:
-            last_err = e
-            msg = str(e)
-            if "Budget has been exceeded" in msg or ("budget" in msg.lower() and "exceeded" in msg.lower()):
-                try:
-                    await db.platform_health.update_one(
-                        {"key": "llm"},
-                        {"$set": {"key": "llm", "status": "budget_exhausted",
-                                  "last_error_at": datetime.now(timezone.utc).isoformat()}},
-                        upsert=True,
-                    )
-                except Exception:
-                    pass
-                break  # Budget = no point retrying
-            # Transient upstream 502/503 → retry once
-            if attempt == 0 and ("502" in msg or "503" in msg or "Bad Gateway" in msg or "Internal" in msg):
-                logger.warning(f"[blog-claude] transient {msg[:100]} — retrying in 3s")
-                await asyncio.sleep(3)
-                continue
-            break
-    logger.exception(f"Blog Claude call failed after retries: {last_err}")
-    return None
+            except Exception:
+                pass
+        logger.exception(f"Blog Claude call failed: {msg[:200]}")
+        return None
 
 
 @router.post("/sites/{site_id}/blog-posts/ai-draft")

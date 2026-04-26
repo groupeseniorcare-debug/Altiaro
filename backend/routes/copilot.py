@@ -358,23 +358,28 @@ def _extract_first_json(text: str) -> Optional[dict]:
 
 
 async def _call_claude(system: str, history: List[dict], session_id: str) -> str:
-    """Send full history + fresh user turn, get raw text back."""
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    # We feed all prior turns as "initial_messages" + send the latest user message
+    """Send full history + fresh user turn, get raw text back.
+
+    Phase 0 — délègue à `safe_claude_text` (retry expo + circuit breaker)
+    avec support `initial_messages` pour la conversation multi-tour ReAct.
+    """
+    from services.llm_resilience import safe_claude_text, LLMUnavailableError
     if not history:
         raise ValueError("history must not be empty")
     *prior, latest = history
     initial = [{"role": m["role"], "content": m["content"]} for m in prior]
-    chat = (
-        LlmChat(api_key=EMERGENT_LLM_KEY, session_id=session_id,
-                system_message=system, initial_messages=initial)
-        .with_model("anthropic", "claude-sonnet-4-5-20250929")
-    )
-    msg = UserMessage(text=latest["content"])
     try:
-        resp = await asyncio.wait_for(chat.send_message(msg), timeout=60)
-    except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="Le Copilot met trop de temps à répondre. Réessayez.")
+        resp = await safe_claude_text(
+            system, latest["content"],
+            session_id=session_id,
+            timeout=60,
+            initial_messages=initial or None,
+        )
+    except LLMUnavailableError as e:
+        logger.warning(f"[copilot] LLM unavailable: {e.last_error}")
+        raise HTTPException(status_code=503, detail="Le Copilot est temporairement indisponible (proxy upstream KO). Réessaye dans quelques minutes.")
+    except HTTPException:
+        raise
     except Exception as e:
         err = str(e)
         if "Budget has been exceeded" in err or "budget" in err.lower():

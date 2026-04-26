@@ -1,15 +1,25 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Rocket, CheckCircle, ArrowClockwise, XCircle, Sparkle } from "@phosphor-icons/react";
+import { Rocket, CheckCircle, ArrowClockwise, XCircle, Sparkle, Warning, Heartbeat } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 
 const POLL_INTERVAL_MS = 2500;
 const STALE_THRESHOLD_MS = 90 * 1000;  // 90s sans changement → on propose la relance
 
+/**
+ * LaunchProgress — UI pleine page du job de génération de site.
+ *
+ * Phase 0 (résilience LLM) : affiche
+ *   - une pill de santé LLM (poll /api/platform/llm-health, vert/orange/rouge)
+ *   - les sous-étapes "dégradées" (témoignages, CMS pages…) en orange
+ *   - un bouton "Reprendre" si le job est failed + resumable
+ *   - un bouton "Relancer les étapes dégradées" si completed_with_degraded
+ */
 export default function LaunchProgress({ siteId, jobId, onDone, onFailed, onAbort }) {
   const [job, setJob] = useState(null);
   const [history, setHistory] = useState([]); // list of labels we've seen
   const [stale, setStale] = useState(false);
   const lastChangeRef = useRef({ pct: -1, ts: Date.now() });
+  const [resuming, setResuming] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,8 +48,15 @@ export default function LaunchProgress({ siteId, jobId, onDone, onFailed, onAbor
       }
       if (data.status === "completed") {
         timer = setTimeout(() => !cancelled && onDone?.(), 1200);
+      } else if (data.status === "completed_with_degraded") {
+        // Don't auto-close — user must see degraded steps and choose to retry or accept.
+        // (no onDone here, the user clicks "Continuer" via the explicit button below)
       } else if (data.status === "failed") {
-        timer = setTimeout(() => !cancelled && onFailed?.(data.error), 1200);
+        // For RESUMABLE failures, we keep the screen open so user can click Resume.
+        // For non-resumable, we exit after 1.2s.
+        if (!data.resumable) {
+          timer = setTimeout(() => !cancelled && onFailed?.(data.error), 1200);
+        }
       } else {
         timer = setTimeout(tick, POLL_INTERVAL_MS);
       }
@@ -72,26 +89,88 @@ export default function LaunchProgress({ siteId, jobId, onDone, onFailed, onAbor
     return () => { cancelled = true; };
   }, []);
 
+  // Triggers the resume endpoint — re-runs the job from the last checkpoint.
+  // The polling above will pick up the new "running" state automatically.
   const handleResume = async () => {
-    if (!job?.id) return;
-    const { error } = await apiCall(() =>
-      api.post(`/sites/${siteId}/design/launch-jobs/${job.id}/resume`)
-    );
-    if (error) { window.alert(`Reprise impossible : ${error}`); return; }
-    // Le polling va reprendre automatiquement (le status revient à 'running').
+    if (!job?.id || resuming) return;
+    setResuming(true);
+    try {
+      const { error } = await apiCall(() =>
+        api.post(`/sites/${siteId}/design/launch-jobs/${job.id}/resume`)
+      );
+      if (error) {
+        window.alert(`Reprise impossible : ${error}`);
+      } else {
+        // Reset stale + history so the next poll cycle starts fresh
+        lastChangeRef.current = { pct: -1, ts: Date.now() };
+        setStale(false);
+      }
+    } finally {
+      setResuming(false);
+    }
   };
+
+  // Compute the LLM health pill label/color
+  const llmPill = (() => {
+    const overall = llmHealth?.overall;
+    const claudeState = llmHealth?.breakers?.claude?.state;
+    const recent60 = llmHealth?.breakers?.claude?.recent_failures_60s || 0;
+    if (!llmHealth) return null;
+    if (claudeState === "OPEN" || overall === "down") {
+      return { label: "LLM en panne — reprise auto active", color: "bg-red-500/25 border-red-400/50 text-red-100" };
+    }
+    if (claudeState === "HALF_OPEN" || overall === "degraded" || recent60 >= 3) {
+      return { label: `LLM ralenti (${recent60} retries 60s)`, color: "bg-amber-500/25 border-amber-400/50 text-amber-100" };
+    }
+    return { label: "LLM OK", color: "bg-emerald-500/25 border-emerald-400/50 text-emerald-100" };
+  })();
+
+  // Friendly French label per degraded step key
+  const degradedLabel = (key) => ({
+    testimonials_premium: "Témoignages premium (3 portraits IA)",
+    cms_pages: "Pages éditoriales À propos / Contact",
+    "content-hero": "Hero homepage",
+    "content-benefits": "Bénéfices & réassurance",
+    "content-testimonials": "Témoignages homepage",
+    "content-faq": "FAQ optimisée",
+    "content-about": "Page À propos",
+    "content-contact": "Page Contact",
+    navigation: "Mega menu navigation",
+    "hero-image": "Image hero IA (Nano Banana)",
+    collections: "Collections IA",
+  }[key] || key);
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-gradient-to-br from-neutral-950 via-violet-950 to-indigo-950 text-white flex items-center justify-center p-6"
+      className="fixed inset-0 z-[100] bg-gradient-to-br from-neutral-950 via-violet-950 to-indigo-950 text-white flex items-center justify-center p-6 overflow-y-auto"
       data-testid="launch-progress"
     >
       <div className="max-w-xl w-full">
+        {/* Top row : LLM health pill (left) + Job ID (right) */}
+        <div className="flex items-center justify-between mb-4 gap-3">
+          {llmPill ? (
+            <div
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium border ${llmPill.color}`}
+              data-testid="launch-llm-health-pill"
+            >
+              <Heartbeat size={11} weight="fill" />
+              {llmPill.label}
+            </div>
+          ) : <div />}
+          {job?.id && (
+            <div className="text-[10px] uppercase tracking-widest text-violet-300/60 font-mono">
+              job {job.id.slice(0, 8)}
+            </div>
+          )}
+        </div>
+
         {/* Icon */}
         <div className="flex items-center justify-center mb-8">
           <div className="w-20 h-20 rounded-2xl bg-white/10 backdrop-blur-xl flex items-center justify-center shadow-2xl">
             {status === "completed" ? (
               <CheckCircle size={40} weight="fill" className="text-emerald-400" />
+            ) : completedWithDegraded ? (
+              <Warning size={40} weight="fill" className="text-amber-400" />
             ) : status === "failed" ? (
               <XCircle size={40} weight="fill" className="text-red-400" />
             ) : (
@@ -104,11 +183,13 @@ export default function LaunchProgress({ siteId, jobId, onDone, onFailed, onAbor
         <div className="text-center mb-2">
           <div className="text-[11px] uppercase tracking-[0.3em] text-violet-300 mb-2">
             {status === "completed" ? "Génération terminée"
+              : completedWithDegraded ? `Génération réussie · ${degradedSteps.length} étape${degradedSteps.length > 1 ? "s" : ""} en mode standard`
               : status === "failed" ? "Erreur de génération"
               : "Génération en cours"}
           </div>
           <h1 className="text-3xl md:text-4xl font-semibold leading-tight">
             {status === "completed" ? "Ta boutique est prête."
+              : completedWithDegraded ? "Ta boutique est en ligne."
               : status === "failed" ? "Quelque chose s'est mal passé."
               : "L'IA façonne ton site sur-mesure"}
           </h1>
@@ -124,6 +205,7 @@ export default function LaunchProgress({ siteId, jobId, onDone, onFailed, onAbor
             <div
               className={`h-full transition-all duration-500 ${
                 status === "failed" ? "bg-red-400"
+                : completedWithDegraded ? "bg-amber-400"
                 : status === "completed" ? "bg-emerald-400"
                 : "bg-gradient-to-r from-violet-400 via-fuchsia-400 to-indigo-400"
               }`}
@@ -141,7 +223,7 @@ export default function LaunchProgress({ siteId, jobId, onDone, onFailed, onAbor
             <ul className="space-y-1.5 text-sm text-violet-100">
               {history.map((h, i) => (
                 <li key={i} className="flex items-center gap-2">
-                  {i < history.length - 1 || status === "completed" ? (
+                  {i < history.length - 1 || status === "completed" || completedWithDegraded ? (
                     <CheckCircle size={14} weight="fill" className="text-emerald-400 shrink-0" />
                   ) : (
                     <Sparkle size={14} className="text-fuchsia-300 animate-pulse shrink-0" />
@@ -153,13 +235,82 @@ export default function LaunchProgress({ siteId, jobId, onDone, onFailed, onAbor
           </div>
         )}
 
+        {/* Degraded steps list (visible whenever we have any, especially when completed_with_degraded) */}
+        {degradedSteps.length > 0 && (
+          <div
+            className="mt-6 p-4 rounded-xl bg-amber-500/10 border border-amber-400/40 text-sm"
+            data-testid="launch-degraded-steps-list"
+          >
+            <div className="flex items-center gap-2 text-amber-100 font-medium mb-2">
+              <Warning size={16} weight="fill" />
+              {degradedSteps.length} sous-étape{degradedSteps.length > 1 ? "s" : ""} en mode standard
+            </div>
+            <ul className="space-y-1.5 text-xs text-amber-200/90 mb-3">
+              {degradedSteps.map((d, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-300 mt-1.5 shrink-0" />
+                  <span>
+                    <strong className="text-amber-100">{degradedLabel(d.step)}</strong>
+                    <span className="text-amber-200/70"> — {d.reason || "raison inconnue"}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {(completedWithDegraded || isResumable) && (
+              <button
+                onClick={handleResume}
+                disabled={resuming}
+                data-testid="launch-resume-degraded-button"
+                className="h-9 px-4 rounded-lg bg-amber-100 text-amber-900 text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ArrowClockwise size={12} weight="bold" />
+                {resuming ? "Reprise en cours…" : "Relancer uniquement les étapes dégradées"}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Continue button when completed_with_degraded but user wants to ship anyway */}
+        {completedWithDegraded && (
+          <div className="mt-4 flex justify-center">
+            <button
+              onClick={() => onDone?.()}
+              data-testid="launch-continue-with-degraded"
+              className="h-10 px-5 rounded-lg bg-white text-violet-900 text-sm font-semibold hover:bg-violet-50"
+            >
+              Continuer vers la boutique
+            </button>
+          </div>
+        )}
+
         {/* Error */}
         {status === "failed" && (
           <div className="mt-6 p-4 rounded-xl bg-red-500/20 border border-red-400/40 text-sm text-red-100">
             <strong className="font-semibold">Détail :</strong> {job?.error || "Erreur inconnue."}
             <div className="mt-2 text-xs text-red-200/80">
-              Tu peux relancer depuis le Wizard ou passer en mode avancé pour corriger manuellement.
+              {isResumable
+                ? "Le système peut reprendre la génération à partir du dernier point d'avancement, sans tout regénérer."
+                : "Tu peux relancer depuis le Wizard ou passer en mode avancé pour corriger manuellement."}
             </div>
+            {isResumable && (
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={handleResume}
+                  disabled={resuming}
+                  data-testid="launch-resume-button"
+                  className="h-9 px-4 rounded-lg bg-emerald-100 text-emerald-900 text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ArrowClockwise size={12} weight="bold" />
+                  {resuming ? "Reprise en cours…" : "Reprendre la génération"}
+                </button>
+                <button
+                  onClick={() => onFailed?.(job?.error)}
+                  className="h-9 px-4 rounded-lg bg-white/10 text-red-100 text-xs font-medium inline-flex items-center gap-1.5 hover:bg-white/20"
+                >
+                  Abandonner
+                </button>
+              </div>
+            )}
           </div>
         )}
 

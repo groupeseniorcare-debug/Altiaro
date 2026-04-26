@@ -44,46 +44,42 @@ def _pick_text(val, lang: str = "fr") -> str:
 
 
 async def _call_claude_json(system: str, user: str, timeout: int = 90) -> tuple[Optional[dict], Optional[str]]:
-    """Returns (result, error_code).
-    error_code values: 'no_key' | 'budget_exceeded' | 'timeout' | 'invalid_json' | 'upstream' | None (success)"""
+    """Phase 0 — délègue à `safe_claude_json`. Conserve l'API tuple(result, error_code).
+
+    error_code values: 'no_key' | 'budget_exceeded' | 'timeout' | 'invalid_json'
+                     | 'upstream' | 'llm_unavailable' | None (success)
+    """
     if not EMERGENT_LLM_KEY:
         logger.warning("No EMERGENT_LLM_KEY — narrative enrichment skipped")
         return None, "no_key"
+    from services.llm_resilience import safe_claude_json, LLMUnavailableError
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = (
-            LlmChat(
-                api_key=EMERGENT_LLM_KEY,
-                session_id=f"narrative-{uuid.uuid4().hex[:8]}",
-                system_message=system,
-            )
-            .with_model("anthropic", "claude-sonnet-4-5-20250929")
+        result = await safe_claude_json(
+            system, user,
+            session_id=f"narrative-{uuid.uuid4().hex[:8]}",
+            timeout=timeout,
         )
-        raw = await asyncio.wait_for(chat.send_message(UserMessage(text=user)), timeout=timeout)
-        text = raw if isinstance(raw, str) else str(raw)
+        # Success → auto-clear any stale budget_exhausted flag
         try:
-            result = json.loads(_strip_json_fence(text))
-            # Success → auto-clear any stale budget_exhausted flag
-            try:
-                await db.platform_health.update_one(
-                    {"key": "llm"},
-                    {"$set": {"key": "llm", "status": "ok",
-                              "last_success_at": datetime.now(timezone.utc).isoformat()}},
-                    upsert=True,
-                )
-            except Exception:
-                pass
-            return result, None
-        except json.JSONDecodeError:
-            logger.error(f"Narrative Claude returned invalid JSON: {text[:300]}")
-            return None, "invalid_json"
-    except asyncio.TimeoutError:
-        return None, "timeout"
+            await db.platform_health.update_one(
+                {"key": "llm"},
+                {"$set": {"key": "llm", "status": "ok",
+                          "last_success_at": datetime.now(timezone.utc).isoformat()}},
+                upsert=True,
+            )
+        except Exception:
+            pass
+        return result, None
+    except ValueError:
+        logger.error("Narrative Claude returned invalid JSON")
+        return None, "invalid_json"
+    except LLMUnavailableError as e:
+        logger.warning(f"[narrative] LLM unavailable after retries: {e.last_error}")
+        return None, "llm_unavailable"
     except Exception as e:
         msg = str(e)
         if "Budget has been exceeded" in msg or ("budget" in msg.lower() and "exceeded" in msg.lower()):
             logger.warning("Narrative Claude: LLM budget exhausted")
-            # Record a platform-level health flag for the UI banner
             try:
                 await db.platform_health.update_one(
                     {"key": "llm"},

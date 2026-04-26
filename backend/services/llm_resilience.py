@@ -280,6 +280,41 @@ def _strip_json_fence(text: str) -> str:
     return JSON_FENCE_RE.sub("", (text or "").strip()).strip()
 
 
+async def safe_llm_text(
+    provider: str,
+    model: str,
+    system: str,
+    user: str,
+    *,
+    session_id: Optional[str] = None,
+    timeout: float = 90.0,
+    request_id: Optional[str] = None,
+) -> str:
+    """Generic single-shot LLM call (any provider supported by emergentintegrations).
+
+    Like `safe_claude_text` but lets the caller pick the provider/model. Useful
+    for `routes/steps.py` where the user can choose between Anthropic/OpenAI/Gemini.
+    The breaker is keyed on the provider name (`claude` for `anthropic`, else
+    the provider name itself).
+    """
+    if not EMERGENT_LLM_KEY:
+        raise LLMUnavailableError("EMERGENT_LLM_KEY missing", provider=provider)
+    sid = session_id or f"safe-{uuid.uuid4().hex[:8]}"
+
+    async def _do() -> str:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = (
+            LlmChat(api_key=EMERGENT_LLM_KEY, session_id=sid, system_message=system)
+            .with_model(provider, model)
+        )
+        raw = await chat.send_message(UserMessage(text=user))
+        return raw if isinstance(raw, str) else str(raw)
+
+    breaker_name = "claude" if provider == "anthropic" else provider
+    return await safe_llm_call(_do, provider=breaker_name,
+                               request_id=request_id, timeout=timeout)
+
+
 async def safe_claude_text(
     system: str,
     user: str,
@@ -288,11 +323,15 @@ async def safe_claude_text(
     session_id: Optional[str] = None,
     timeout: float = 90.0,
     request_id: Optional[str] = None,
+    initial_messages: Optional[list] = None,
 ) -> str:
     """Send a single-shot user message to Claude with full resilience.
 
     Returns the raw text reply (no parsing). Raises LLMUnavailableError on
     persistent upstream failure.
+
+    `initial_messages` (optional) — list of {"role": "user"|"assistant",
+    "content": "..."} for multi-turn conversations (used by the Copilot).
     """
     if not EMERGENT_LLM_KEY:
         raise LLMUnavailableError("EMERGENT_LLM_KEY missing", provider="claude")
@@ -301,10 +340,10 @@ async def safe_claude_text(
     async def _do() -> str:
         # Local import = avoid hard dep on emergentintegrations at module load
         from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = (
-            LlmChat(api_key=EMERGENT_LLM_KEY, session_id=sid, system_message=system)
-            .with_model("anthropic", model)
-        )
+        kwargs = {"api_key": EMERGENT_LLM_KEY, "session_id": sid, "system_message": system}
+        if initial_messages:
+            kwargs["initial_messages"] = initial_messages
+        chat = LlmChat(**kwargs).with_model("anthropic", model)
         raw = await chat.send_message(UserMessage(text=user))
         return raw if isinstance(raw, str) else str(raw)
 
@@ -335,6 +374,49 @@ async def safe_claude_json(
     except json.JSONDecodeError as e:
         logger.warning(f"[claude-json] parse failed: {cleaned[:200]}")
         raise ValueError(f"Réponse Claude mal formée (JSON invalid): {e}") from e
+
+
+async def safe_nano_banana_bytes(
+    prompt: str,
+    *,
+    system: str = "",
+    session_id: Optional[str] = None,
+    timeout: float = 120.0,
+    request_id: Optional[str] = None,
+) -> Optional[bytes]:
+    """Generate an image with Nano Banana (gemini-3.1-flash-image-preview)
+    and return the **raw decoded bytes** (typically PNG/JPEG). The caller
+    is responsible for persisting the file (e.g. into uploads/).
+
+    Returns None if the model returned no image data (degraded path —
+    happens occasionally even on successful HTTP). Raises LLMUnavailableError
+    on persistent upstream failure (502/503/504/timeout × 4 retries).
+
+    Used by routes/product_images.py and routes/testimonials_ai.py to keep
+    `LlmChat(...)` import out of `routes/` (Phase 0 audit).
+    """
+    NANO_MODEL = "gemini-3.1-flash-image-preview"
+    if not EMERGENT_LLM_KEY:
+        raise LLMUnavailableError("EMERGENT_LLM_KEY missing", provider="nano_banana")
+    sid = session_id or f"banana-{uuid.uuid4().hex[:8]}"
+
+    async def _do() -> Optional[bytes]:
+        import base64 as _b64
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=sid,
+                       system_message=system or "")
+        chat.with_model("gemini", NANO_MODEL).with_params(modalities=["image", "text"])
+        _, images = await chat.send_message_multimodal_response(UserMessage(text=prompt))
+        if not images:
+            return None
+        first = images[0]
+        # The integrations layer returns either {data: <base64>} or {url: ...}
+        if isinstance(first, dict) and first.get("data"):
+            return _b64.b64decode(first["data"])
+        return None
+
+    return await safe_llm_call(_do, provider="nano_banana",
+                               request_id=request_id, timeout=timeout)
 
 
 async def safe_nano_banana(

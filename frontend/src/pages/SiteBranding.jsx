@@ -46,7 +46,11 @@ export default function SiteBranding() {
   const [previewKey, setPreviewKey] = useState(Date.now());
   const [previewOpen, setPreviewOpen] = useState(true);
   const [mode, setMode] = useState("auto");
-  const [launchJobId, setLaunchJobId] = useState(null);
+  // Phase 0.5 — debug: allow forcing the LaunchProgress view via URL (?launch_job_id=...)
+  // Useful to inspect "completed_with_degraded" / "failed-resumable" UI states without
+  // waiting for a real 15-min generation. Cleared as soon as the user closes the modal.
+  const initialJobId = searchParams.get("launch_job_id") || null;
+  const [launchJobId, setLaunchJobId] = useState(initialJobId);
 
   // Sync tab <-> URL. Keep ?step=5 if present (cockpit deep link).
   const switchBrandingTab = (next) => {

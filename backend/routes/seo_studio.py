@@ -215,8 +215,11 @@ class BulkOptimizeInput(BaseModel):
 async def _bulk_optimize_job(site_id: str, force: bool):
     """Runs in background — calls Claude per product to fill narrative.seo
     + generate alt-texts for images.  Skips products that already have SEO.
+
+    Phase 0 — utilise `safe_claude_text` (retry expo + circuit breaker). Mode
+    dégradé : un produit qui échoue n'arrête pas le batch.
     """
-    from emergentintegrations.llm.chat import LlmChat, UserMessage  # type: ignore
+    from services.llm_resilience import safe_claude_text, LLMUnavailableError
     key = os.environ.get("EMERGENT_LLM_KEY")
     if not key:
         logger.error("[seo-bulk] EMERGENT_LLM_KEY missing")
@@ -232,20 +235,17 @@ async def _bulk_optimize_job(site_id: str, force: bool):
         q["$or"] = [{"narrative": None}, {"narrative.seo": {"$exists": False}}]
     cursor = db.products.find(q, {"_id": 0})
 
+    system_msg = (
+        "Tu es un expert SEO/AEO pour e-commerce. Pour chaque produit, tu produis "
+        "un JSON strict sans commentaire avec : seo_title (≤60 car), meta_description "
+        "(≤155 car, inclut un CTA), keywords (5 long-tail FR, mix transactionnel + "
+        "informationnel), alt_texts (array, 1 par image, ≤125 car, décrit la scène et "
+        "inclut un keyword secondaire), faq (3 questions/réponses courtes pour AEO). "
+        f"Ton de marque : {voice}. Marque : {brand_name}."
+    )
+
     async for p in cursor:
         try:
-            chat = LlmChat(
-                api_key=key,
-                session_id=f"seo-bulk-{site_id}-{p['id']}",
-                system_message=(
-                    "Tu es un expert SEO/AEO pour e-commerce. Pour chaque produit, tu produis "
-                    "un JSON strict sans commentaire avec : seo_title (≤60 car), meta_description "
-                    "(≤155 car, inclut un CTA), keywords (5 long-tail FR, mix transactionnel + "
-                    "informationnel), alt_texts (array, 1 par image, ≤125 car, décrit la scène et "
-                    "inclut un keyword secondaire), faq (3 questions/réponses courtes pour AEO). "
-                    f"Ton de marque : {voice}. Marque : {brand_name}."
-                ),
-            ).with_model("anthropic", "claude-sonnet-4-5-20250929").with_max_tokens(1500)
             name = _name_fr(p)
             desc = _desc_fr(p) or ""
             nb_images = len(p.get("images") or [])
@@ -258,12 +258,23 @@ async def _bulk_optimize_job(site_id: str, force: bool):
                 f'"alt_texts":[{alt_placeholders}],'
                 '"faq":[{"question":"...","answer":"..."},{"question":"...","answer":"..."},{"question":"...","answer":"..."}]}'
             )
-            msg = UserMessage(text=prompt)
-            raw = await chat.send_message(msg)
-            txt = str(raw).strip()
+            try:
+                txt = await safe_claude_text(
+                    system_msg, prompt,
+                    session_id=f"seo-bulk-{site_id}-{p['id']}",
+                    timeout=120,
+                )
+            except LLMUnavailableError as e:
+                logger.warning(f"[seo-bulk] LLM down for {p['id']}: {e.last_error} — skip product")
+                continue
+            txt = (txt or "").strip()
             if txt.startswith("```"):
                 txt = re.sub(r"^```(?:json)?\n?", "", txt).rstrip("` \n")
-            data = json.loads(txt)
+            try:
+                data = json.loads(txt)
+            except json.JSONDecodeError:
+                logger.warning(f"[seo-bulk] invalid JSON for {p['id']} — skip")
+                continue
 
             # Persist into narrative.seo + update image alt-texts
             narrative = p.get("narrative") or {}
