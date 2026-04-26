@@ -95,9 +95,9 @@ export default function SiteBranding() {
   if (mode === "wizard") {
     return (
       <BrandWizard
-        siteId={siteId}
-        onLaunch={(jobId) => { setLaunchJobId(jobId); setMode("auto"); }}
-        onCancel={() => setMode("auto")}
+        site={site}
+        onLaunched={(jobId) => { setLaunchJobId(jobId); setMode("auto"); }}
+        onExit={() => setMode("auto")}
       />
     );
   }

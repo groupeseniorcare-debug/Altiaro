@@ -60,6 +60,17 @@ export default function NextStepCTA({ siteId, currentKey }) {
 
   useEffect(() => { if (siteId) load(); }, [siteId, load]);
 
+  // Refresh quand un produit est importé / supprimé / suggestion adoptée etc.
+  // Un autre composant (ex: ProductImportPanel) émet l'event après mutation,
+  // ce qui bascule l'étape de "pending" → "complétée" en temps réel sans
+  // exiger un reload page.
+  useEffect(() => {
+    if (!siteId) return;
+    const handler = () => load();
+    window.addEventListener("cf_steps_changed", handler);
+    return () => window.removeEventListener("cf_steps_changed", handler);
+  }, [siteId, load]);
+
   if (loading || !status) return null;
 
   const steps = status.steps || [];

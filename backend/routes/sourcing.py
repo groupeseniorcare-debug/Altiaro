@@ -300,7 +300,78 @@ async def _ae_ds_product_detail(product_id: str, site_id: Optional[str] = None) 
         "cost_usd": cost_usd,
         "sku": sku,
         "currency": currency,
+        # Brut SKU list — chaque entrée = 1 variante AE (color/size/etc.)
+        # Conservée intégralement pour permettre au pipeline d'import de mapper
+        # correctement les variantes vers le doc Mongo (sourcing.py _import_by_url_inner).
+        "skus_raw": skus if isinstance(skus, list) else [],
     }
+
+
+def _map_ae_skus_to_variants(skus_raw: list, usd_to_eur: float | None = None, max_variants: int = 30) -> list[dict]:
+    """Map les SKUs AliExpress (ae_item_sku_info_d_t_o) vers la structure
+    `variants[]` standard utilisée dans `db.products`.
+
+    Format AE source (par SKU) :
+        {
+          "sku_id": "1276...", "sku_code": "...", "sku_attr": "200000182:193;14:200000537",
+          "offer_sale_price": "529.99", "sku_price": "549.99",
+          "sku_available_stock": "12", "sku_image": "https://...",
+          "ae_sku_property_dtos": {"ae_sku_property_d_t_o": [
+              {"property_value_definition_name": "Gris foncé", "sku_property_value": "GRAY"},
+              {"property_value_definition_name": "L",          "sku_property_value": "L"}
+          ]}
+        }
+
+    Cible (1 entrée = 1 variante storefront) :
+        {vid, sku, name, image, sell_price_usd, sell_price_eur, stock, properties}
+    """
+    out: list[dict] = []
+    for sku in (skus_raw or [])[:max_variants]:
+        if not isinstance(sku, dict):
+            continue
+        # Extraire les labels lisibles (ex: ["Gris foncé", "L"])
+        prop_wrap = sku.get("ae_sku_property_dtos") or {}
+        if isinstance(prop_wrap, dict):
+            prop_list = prop_wrap.get("ae_sku_property_d_t_o") or []
+        else:
+            prop_list = prop_wrap if isinstance(prop_wrap, list) else []
+        attr_labels: list[str] = []
+        for attr in prop_list if isinstance(prop_list, list) else []:
+            if not isinstance(attr, dict):
+                continue
+            value = (
+                attr.get("property_value_definition_name")
+                or attr.get("sku_property_value")
+                or attr.get("property_value")
+                or ""
+            )
+            if value:
+                attr_labels.append(str(value).strip())
+
+        try:
+            sell_usd = float(sku.get("offer_sale_price") or sku.get("sku_price") or 0)
+        except (TypeError, ValueError):
+            sell_usd = 0.0
+        sell_eur = round(sell_usd * usd_to_eur, 2) if (usd_to_eur and sell_usd) else None
+        try:
+            stock = int(sku.get("sku_available_stock") or 0)
+        except (TypeError, ValueError):
+            stock = 0
+
+        vid = str(sku.get("sku_id") or sku.get("id") or "")
+        if not vid:
+            continue
+        out.append({
+            "vid": vid,
+            "sku": str(sku.get("sku_code") or vid),
+            "name": " / ".join(attr_labels) or "Variante",
+            "image": (sku.get("sku_image") or "").strip() or None,
+            "sell_price_usd": round(sell_usd, 2),
+            "sell_price_eur": sell_eur,
+            "stock": stock,
+            "properties": attr_labels,  # ex: ["Gris foncé", "L"]
+        })
+    return out
 
 
 async def _ae_search(keyword: str, page: int = 1, size: int = 20, country: str = "FR") -> list:
@@ -607,6 +678,45 @@ async def import_product(site_id: str, data: ImportInput, user: dict = Depends(g
         cc_list = (site or {}).get("selected_countries") or (site or {}).get("seo_countries") or ["FR"]
         for cc in cc_list[:6]:
             shipping_by_country[cc.upper()] = {"available": None, "note": "À vérifier sur CJ"}
+
+    elif data.provider == "aliexpress" and data.product_id:
+        # Branche AE — récupère le détail SKU pour peupler `variants[]`.
+        # On (re)appelle `_ae_ds_product_detail` ; l'API AE Dropshipping est
+        # cheap (≤1.5s typique) et dédoublonner cet appel avec le preview
+        # nécessiterait un cache transverse — pas la peine pour 5-10 imports/site.
+        try:
+            ae_detail = await _ae_ds_product_detail(data.product_id, site_id=site_id)
+        except Exception:
+            logger.exception("[sourcing-ae-import] _ae_ds_product_detail failed (non-blocking)")
+            ae_detail = None
+
+        if ae_detail:
+            # Taux USD→EUR depuis le preview frontend (data.cost_eur / data.cost_usd
+            # si présents dans le payload), sinon estimation 0.92 pour les variantes.
+            usd_to_eur = None
+            try:
+                if getattr(data, "cost_eur", None) and ae_detail.get("cost_usd"):
+                    cost_eur_v = float(data.cost_eur)
+                    cost_usd_v = float(ae_detail.get("cost_usd") or 0)
+                    if cost_usd_v > 0:
+                        usd_to_eur = cost_eur_v / cost_usd_v
+            except (TypeError, ValueError):
+                pass
+            if not usd_to_eur:
+                usd_to_eur = 0.92  # fallback safe — réajusté ensuite par cron FX
+
+            variants = _map_ae_skus_to_variants(
+                ae_detail.get("skus_raw") or [],
+                usd_to_eur=usd_to_eur,
+                max_variants=30,
+            )
+            # Suggested sell price : moyenne des variantes (en USD)
+            try:
+                ae_prices = [v["sell_price_usd"] for v in variants if v.get("sell_price_usd")]
+                if ae_prices:
+                    suggested_sell_price_usd = round(sum(ae_prices) / len(ae_prices), 2)
+            except Exception:
+                pass
 
     # Strip HTML from CJ description
     if raw_desc:

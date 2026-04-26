@@ -29,7 +29,11 @@ const FONT_PAIRS = [
 ];
 
 export default function BrandWizard({ site, onLaunched, onExit }) {
-  const siteId = site.id;
+  // Garde anti-crash : la page parente peut monter ce composant avant que
+  // le fetch site soit résolu. On affiche un placeholder tant que la prop
+  // n'est pas hydratée — sinon l'accès à site.id en JS lève "site is undefined"
+  // (cf. crash étape 5 du 26 avr.).
+  const siteId = site?.id;
   const [step, setStep] = useState(0);
   const [brandName, setBrandName] = useState(site?.design?.brand?.logo_text || site?.name || "");
   const [tagline, setTagline] = useState(site?.design?.brand?.tagline || "");
@@ -49,6 +53,7 @@ export default function BrandWizard({ site, onLaunched, onExit }) {
   const [llmStatus, setLlmStatus] = useState("ok"); // "ok" | "budget_exhausted" | "checking"
 
   useEffect(() => {
+    if (!siteId) return;
     apiCall(() => api.get(`/sites/${siteId}/products`)).then(({ data }) => {
       if (Array.isArray(data)) setProductsCount(data.filter((p) => p.status !== "deleted").length);
     });
@@ -58,6 +63,14 @@ export default function BrandWizard({ site, onLaunched, onExit }) {
       if (data?.status) setLlmStatus(data.status);
     });
   }, [siteId]);
+
+  if (!site || !siteId) {
+    return (
+      <div className="p-8 text-center text-neutral-500" data-testid="brand-wizard-loading">
+        Chargement de l'identité de marque…
+      </div>
+    );
+  }
 
   const fetchSuggestions = async () => {
     setSuggestError("");

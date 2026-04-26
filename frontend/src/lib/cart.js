@@ -20,19 +20,27 @@ function writeCart(siteId, items) {
 
 export function addToCart(siteId, product, lang = "fr", quantity = 1, opts = {}) {
   const items = readCart(siteId);
-  const existing = items.find((i) => i.product_id === product.id);
+  const variant = opts.variant || null;
+  const variantId = variant?.vid || variant?.sku || null;
+  // L'item est unique par couple (product_id, variant_id) — 2 variantes du même
+  // produit sont 2 lignes panier distinctes.
+  const existing = items.find((i) =>
+    i.product_id === product.id && (i.variant_id || null) === variantId
+  );
   const name =
     typeof product.name === "string"
       ? product.name
       : product.name?.[lang] || product.name?.fr || "";
   const discountPct = Math.max(0, Math.min(Number(opts.discount_pct || 0), 50));
-  const basePrice = Number(product.price) || 0;
+  // Prix de base = prix variante (si fournie via opts.variant_price), sinon prix produit
+  const basePrice = Number(opts.variant_price ?? product.price) || 0;
   const effectivePrice = discountPct > 0
     ? Math.round(basePrice * (1 - discountPct / 100) * 100) / 100
     : basePrice;
+  // Image : si variante a une image dédiée, on la prend
+  const image = variant?.image || product.images?.[0] || null;
   if (existing) {
     existing.quantity += quantity;
-    // Keep best discount between previous and new
     if (discountPct > (existing.upsell_discount_pct || 0)) {
       existing.upsell_discount_pct = discountPct;
       existing.original_price = basePrice;
@@ -41,13 +49,17 @@ export function addToCart(siteId, product, lang = "fr", quantity = 1, opts = {})
   } else {
     items.push({
       product_id: product.id,
-      name,
+      name: variant?.name ? `${name} — ${variant.name}` : name,
       price: effectivePrice,
       original_price: basePrice,
       upsell_discount_pct: discountPct,
       quantity,
       currency: product.currency || "EUR",
-      image: product.images?.[0] || null,
+      image,
+      // Variant metadata (null si produit sans variantes — back-compat)
+      variant_id: variantId,
+      variant_sku: variant?.sku || null,
+      variant_name: variant?.name || null,
     });
   }
   writeCart(siteId, items);
