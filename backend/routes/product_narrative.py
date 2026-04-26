@@ -283,7 +283,8 @@ RÈGLES DURES :
         ][:6],
         "seo": seo,
         "enriched_at": datetime.now(timezone.utc).isoformat(),
-        "enriched_model": "claude-sonnet-4-5-20250929",
+        # Bloc 1 — passé à standard (Haiku 4.5) pour réduire coût × N produits
+        "enriched_model": "claude-haiku-4-5-20251001",
     }
 
     await db.products.update_one(

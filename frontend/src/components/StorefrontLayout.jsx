@@ -7,6 +7,7 @@ import { readCart, cartTotals } from "../lib/cart";
 import { getCustomer } from "../lib/customerAuth";
 import CartDrawer from "./CartDrawer";
 import StorefrontTracking from "./storefront/StorefrontTracking";
+import CookieConsentBanner from "./storefront/CookieConsentBanner";
 import { sanitizeBrandText } from "../lib/brandText";
 import {
   ShoppingBag, Phone, ShieldCheck, Truck, MagnifyingGlass, User,
@@ -205,6 +206,7 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
       <link rel="dns-prefetch" href="https://cf.cjdropshipping.com" />
 
       <StorefrontTracking site={site} />
+      <CookieConsentBanner siteId={site?.id} />
 
       {/* ================= TRUST BAR ================= */}
       <div className="text-white text-[12px] tracking-[0.01em]" style={{ background: textCol }}>

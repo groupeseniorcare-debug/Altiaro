@@ -24,7 +24,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel, EmailStr, Field
 
 from deps import db, get_current_user, _check_site_access, EMERGENT_LLM_KEY, UPLOAD_DIR
@@ -178,16 +178,27 @@ def _strip(text: str) -> str:
     return JSON_FENCE.sub("", text).strip()
 
 
-async def _claude_json(system: str, user: str, session_id: str, timeout: int = 180) -> dict:
+async def _claude_json(
+    system: str, user: str, session_id: str,
+    timeout: int = 180, quality_tier: str = "standard",
+) -> dict:
     """Phase 0 — délègue à `safe_claude_json` (retry expo + circuit breaker).
 
     Conserve la signature historique (utilisée à 9+ endroits dans design.py).
     Préserve le flag platform_health pour budget_exhausted (utilisé par la
     bannière du cockpit).
+
+    Bloc 1 sous-chantier 1a — `quality_tier` propagé. Default "standard"
+    (Haiku 4.5, ~3× moins cher). Use `quality_tier="premium"` (Sonnet 4.5)
+    pour brand identity (nom/tagline/voice) et SEO core uniquement.
     """
     from services.llm_resilience import safe_claude_json, LLMUnavailableError
     try:
-        data = await safe_claude_json(system, user, session_id=session_id, timeout=timeout)
+        data = await safe_claude_json(
+            system, user,
+            quality_tier=quality_tier,
+            session_id=session_id, timeout=timeout,
+        )
         # Success → auto-clear any stale budget_exhausted flag
         try:
             await db.platform_health.update_one(
@@ -446,7 +457,8 @@ async def generate_design(site_id: str, data: GenerateInput, user: dict = Depend
     async def _run():
         try:
             session = f"design-{site_id}-{uuid.uuid4().hex[:6]}"
-            design = await _claude_json(SYSTEM, user_prompt, session)
+            # Bloc 1 — endpoint legacy brand+sections. Premium pour qualité DNA.
+            design = await _claude_json(SYSTEM, user_prompt, session, quality_tier="premium")
             if data.with_logo:
                 logo_prompt = design.get("brand", {}).get("logo_style_prompt") or \
                     f"{site.get('niche')} brand, warm colors"
@@ -655,6 +667,44 @@ async def public_contact(site_id: str, data: ContactInput):
     await db.leads.insert_one(dict(doc))
     doc.pop("_id", None)
     return {"ok": True, "lead_id": doc["id"]}
+
+
+# Bloc 1 sous-chantier 3 — RGPD audit log
+class ConsentInput(BaseModel):
+    essentiels: bool = True
+    analytics: bool = False
+    marketing: bool = False
+    personnalisation: bool = False
+    decided_at: Optional[str] = None
+    version: int = 1
+
+
+@router.post("/public/sites/{site_id}/consent")
+async def public_consent(site_id: str, data: ConsentInput, request: Request):
+    """RGPD audit log — every consent decision is persisted server-side so
+    we can prove (in case of CNIL audit) that we honored the user's choice.
+    No PII is collected (we don't even store IP — just a hashed visitor token
+    via the existing analytics flow if the user ever buys something).
+    """
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "id": 1})
+    if not site:
+        raise HTTPException(status_code=404, detail="Site introuvable")
+    # Truncate user-agent for sanity
+    ua = (request.headers.get("user-agent") or "")[:200]
+    doc = {
+        "id": str(uuid.uuid4()),
+        "site_id": site_id,
+        "essentiels": True,    # always true regardless of input (locked)
+        "analytics": bool(data.analytics),
+        "marketing": bool(data.marketing),
+        "personnalisation": bool(data.personnalisation),
+        "version": int(data.version or 1),
+        "user_agent": ua,
+        "decided_at": data.decided_at or datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.consent_logs.insert_one(dict(doc))
+    return {"ok": True}
 
 
 @router.get("/sites/{site_id}/leads")
@@ -980,9 +1030,12 @@ async def ai_field(site_id: str, body: AiFieldInput, user: dict = Depends(get_cu
         + ("Réponds UNIQUEMENT avec le JSON demandé, sans commentaire." if want_json else "Réponds avec uniquement le texte final, rien d'autre.")
     )
     session = f"ai-field-{body.field}-{site_id}-{uuid.uuid4().hex[:6]}"
+    # Bloc 1 — brand identity field regeneration (name/tagline/voice/story/
+    # palette/font_pair) → quality_tier="premium" : ce sont des éléments de
+    # DNA réutilisés partout, qualité non négociable.
     try:
         if want_json:
-            data = await _claude_json(system, prompt, session, timeout=60)
+            data = await _claude_json(system, prompt, session, timeout=60, quality_tier="premium")
             # persist depending on field
             patch = {}
             if body.field == "palette":
@@ -1005,6 +1058,7 @@ async def ai_field(site_id: str, body: AiFieldInput, user: dict = Depends(get_cu
             try:
                 raw = await safe_claude_text(
                     system, prompt,
+                    quality_tier="premium",  # Bloc 1 — brand DNA, qualité non négociable
                     session_id=session,
                     timeout=90,
                 )

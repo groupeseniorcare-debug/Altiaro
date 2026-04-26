@@ -38,7 +38,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Dict, Optional
 
 logger = logging.getLogger("altiaro.llm_resilience")
 
@@ -49,6 +49,25 @@ JITTER_PCT = 0.25                         # ±25% sur chaque délai
 CIRCUIT_FAILURE_THRESHOLD = 5             # 5 échecs consécutifs ouvrent le breaker
 CIRCUIT_OPEN_DURATION_S = 5 * 60          # 5 min en OPEN avant HALF_OPEN
 SLIDING_WINDOW_S = 60                     # fenêtre glissante pour le compteur
+
+# ─── Cost-tier model mapping (Phase 1) ───────────────────────────────────
+# Bloc 1 sous-chantier 1a — pour réduire le coût d'un launch-auto premium
+# de ~$19 à ~$5-8, on bascule par défaut sur Haiku (≈3× moins cher) pour
+# tous les usages copywriting / éditorial / blog / témoignages texte.
+# Les usages "premium" (brand identity, mission, voice, SEO core) gardent
+# Sonnet 4.5.
+ANTHROPIC_MODEL_PREMIUM = "claude-sonnet-4-5-20250929"
+ANTHROPIC_MODEL_STANDARD = "claude-haiku-4-5-20251001"
+
+def _resolve_anthropic_model(model: Optional[str], quality_tier: Optional[str]) -> str:
+    """Pick the right Anthropic model id from `quality_tier` or explicit `model`.
+    Explicit `model` wins. `quality_tier` only mapping if model is None."""
+    if model:
+        return model
+    if quality_tier == "premium":
+        return ANTHROPIC_MODEL_PREMIUM
+    # Default = standard (Haiku) — applies when caller passes nothing
+    return ANTHROPIC_MODEL_STANDARD
 
 # Exceptions HTTP-like qui DOIVENT être retryées
 RETRYABLE_KEYWORDS = (
@@ -243,6 +262,12 @@ async def safe_llm_call(
         except (asyncio.TimeoutError, Exception) as e:  # noqa: BLE001
             last_err = e
             err_cls = e.__class__.__name__
+            # Bloc 1 sous-chantier 2 — sniff budget snapshot from any exception
+            # message so /admin/llm-budget always has fresh data.
+            try:
+                _maybe_record_budget_snapshot(str(e))
+            except Exception:
+                pass
             if not _is_retryable(e) or attempt >= max_attempts - 1:
                 breaker.record_failure(f"{err_cls}: {str(e)[:120]}")
                 logger.warning(
@@ -319,7 +344,8 @@ async def safe_claude_text(
     system: str,
     user: str,
     *,
-    model: str = "claude-sonnet-4-5-20250929",
+    model: Optional[str] = None,
+    quality_tier: str = "standard",
     session_id: Optional[str] = None,
     timeout: float = 90.0,
     request_id: Optional[str] = None,
@@ -330,12 +356,20 @@ async def safe_claude_text(
     Returns the raw text reply (no parsing). Raises LLMUnavailableError on
     persistent upstream failure.
 
+    `quality_tier` (default "standard") :
+      - "standard" → claude-haiku-4-5-20251001 (≈3× moins cher, suffisant pour
+        copywriting éditorial, blog drafts, témoignages texte, narrative)
+      - "premium"  → claude-sonnet-4-5-20250929 (réservé brand identity,
+        mission/voice, SEO core, keyword strategy critiques)
+    Explicit `model` overrides `quality_tier`.
+
     `initial_messages` (optional) — list of {"role": "user"|"assistant",
     "content": "..."} for multi-turn conversations (used by the Copilot).
     """
     if not EMERGENT_LLM_KEY:
         raise LLMUnavailableError("EMERGENT_LLM_KEY missing", provider="claude")
     sid = session_id or f"safe-{uuid.uuid4().hex[:8]}"
+    resolved_model = _resolve_anthropic_model(model, quality_tier)
 
     async def _do() -> str:
         # Local import = avoid hard dep on emergentintegrations at module load
@@ -343,7 +377,7 @@ async def safe_claude_text(
         kwargs = {"api_key": EMERGENT_LLM_KEY, "session_id": sid, "system_message": system}
         if initial_messages:
             kwargs["initial_messages"] = initial_messages
-        chat = LlmChat(**kwargs).with_model("anthropic", model)
+        chat = LlmChat(**kwargs).with_model("anthropic", resolved_model)
         raw = await chat.send_message(UserMessage(text=user))
         return raw if isinstance(raw, str) else str(raw)
 
@@ -354,7 +388,8 @@ async def safe_claude_json(
     system: str,
     user: str,
     *,
-    model: str = "claude-sonnet-4-5-20250929",
+    model: Optional[str] = None,
+    quality_tier: str = "standard",
     session_id: Optional[str] = None,
     timeout: float = 90.0,
     request_id: Optional[str] = None,
@@ -363,10 +398,14 @@ async def safe_claude_json(
 
     JSON parse errors are NOT retried (it's an application-level concern :
     Claude returned text, the prompt is wrong). They bubble up as ValueError.
+
+    `quality_tier` defaults to "standard" (Haiku) — see safe_claude_text.
+    Pass `quality_tier="premium"` to escalate to Sonnet for brand identity
+    or critical SEO copy.
     """
     text = await safe_claude_text(
-        system, user, model=model, session_id=session_id,
-        timeout=timeout, request_id=request_id,
+        system, user, model=model, quality_tier=quality_tier,
+        session_id=session_id, timeout=timeout, request_id=request_id,
     )
     cleaned = _strip_json_fence(text)
     try:
@@ -498,3 +537,125 @@ def reset_breakers_for_tests() -> None:
         br.last_error = None
         br.recent_failures = []
         br.transitions = []
+
+
+
+# ─── Budget tracking (Bloc 1 sous-chantier 2) ────────────────────────────
+# Émettre un drapeau rouge AVANT que le budget Emergent LLM Key explose,
+# pour que l'admin recharge à temps. On parse les messages d'erreur LiteLLM
+# qui ressemblent à : "Budget has been exceeded! Current cost: 19.13, Max
+# budget: 19.001" et on persiste un snapshot dans la collection
+# `platform_health` (clé "llm_budget"). L'endpoint /admin/llm-budget lit ce
+# document.
+_BUDGET_REGEX = re.compile(
+    r"Current cost:\s*([0-9]+\.?[0-9]*)\s*,\s*Max budget:\s*([0-9]+\.?[0-9]*)",
+    re.IGNORECASE,
+)
+_LAST_BUDGET_SNAPSHOT: Dict[str, Any] = {
+    "used_usd": None,
+    "max_usd": None,
+    "captured_at": None,
+}
+
+
+def _maybe_record_budget_snapshot(error_message: str) -> None:
+    """Best-effort parse of LiteLLM budget error messages → in-memory cache.
+    Persistance MongoDB séparée via `_persist_budget_snapshot()` (async, lazy)."""
+    if not error_message:
+        return
+    m = _BUDGET_REGEX.search(error_message)
+    if not m:
+        return
+    try:
+        used = float(m.group(1))
+        cap = float(m.group(2))
+    except (ValueError, IndexError):
+        return
+    _LAST_BUDGET_SNAPSHOT.update({
+        "used_usd": used,
+        "max_usd": cap,
+        "captured_at": datetime.now(timezone.utc).isoformat(),
+    })
+    # Fire-and-forget persistence (best effort, doesn't block the call path)
+    try:
+        loop = asyncio.get_event_loop()
+        loop.create_task(_persist_budget_snapshot(used, cap))
+    except RuntimeError:
+        pass  # No running loop (test env) — in-memory snapshot is enough
+
+
+async def _persist_budget_snapshot(used: float, cap: float) -> None:
+    """Store the last budget snapshot in MongoDB (`platform_health.llm_budget`).
+    Survives server restart."""
+    try:
+        from deps import db  # local import to avoid circular at module load
+        await db.platform_health.update_one(
+            {"key": "llm_budget"},
+            {"$set": {
+                "key": "llm_budget",
+                "used_usd": used,
+                "max_usd": cap,
+                "pct": round((used / cap) * 100, 2) if cap > 0 else None,
+                "captured_at": datetime.now(timezone.utc).isoformat(),
+                "alert_level": "critical" if cap > 0 and used / cap >= 0.95
+                              else "warning" if cap > 0 and used / cap >= 0.80
+                              else "ok",
+            }},
+            upsert=True,
+        )
+    except Exception:
+        logger.exception("[llm-budget] persistence failed (non-blocking)")
+
+
+async def get_llm_budget_estimate() -> Dict[str, Any]:
+    """Return a JSON-serializable budget snapshot for `/admin/llm-budget`.
+
+    Reads first from MongoDB (`platform_health.llm_budget`), falls back to the
+    in-memory snapshot, falls back to "unknown" if no error has been captured
+    yet (i.e. budget is still healthy, never raised an exception).
+    """
+    snapshot: Dict[str, Any] = {
+        "used_usd": None,
+        "max_usd": None,
+        "pct": None,
+        "captured_at": None,
+        "alert_level": "unknown",
+        "days_remaining_in_month": None,
+    }
+    # Days remaining in the current month
+    now = datetime.now(timezone.utc)
+    if now.month == 12:
+        next_month = now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        next_month = now.replace(month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    snapshot["days_remaining_in_month"] = max(0, (next_month - now).days)
+
+    try:
+        from deps import db
+        doc = await db.platform_health.find_one({"key": "llm_budget"}, {"_id": 0})
+        if doc and doc.get("max_usd"):
+            snapshot.update({
+                "used_usd":     doc.get("used_usd"),
+                "max_usd":      doc.get("max_usd"),
+                "pct":          doc.get("pct"),
+                "captured_at":  doc.get("captured_at"),
+                "alert_level":  doc.get("alert_level") or "unknown",
+            })
+            return snapshot
+    except Exception:
+        pass
+
+    # Fallback : in-memory snapshot (server lifetime only)
+    if _LAST_BUDGET_SNAPSHOT.get("max_usd"):
+        used = _LAST_BUDGET_SNAPSHOT["used_usd"]
+        cap = _LAST_BUDGET_SNAPSHOT["max_usd"]
+        snapshot.update({
+            "used_usd":   used,
+            "max_usd":    cap,
+            "pct":        round((used / cap) * 100, 2) if cap and cap > 0 else None,
+            "captured_at": _LAST_BUDGET_SNAPSHOT.get("captured_at"),
+            "alert_level": "critical" if cap and used / cap >= 0.95
+                          else "warning" if cap and used / cap >= 0.80
+                          else "ok",
+        })
+    return snapshot

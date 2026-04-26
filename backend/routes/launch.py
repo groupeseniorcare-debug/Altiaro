@@ -412,35 +412,46 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
         )
 
         # 2) Logo premium horizontal (Nano Banana) ------------------------
+        # Bloc 1 — sous-chantier 1c+1d :
+        #   1c) skip si logo déjà présent (sauf overwrite=true)
+        #   1d) routage propre vers /uploads/logos/ via design._nano_banana_logo
         await _advance(job_id, "logo", "Logo premium horizontal (Nano Banana)", 12)
-        try:
-            _logo_name = _clean_name or brand_patch.get("logo_text") or site.get("name") or "Maison"
-            logo_prompt = (
-                f"Ultra-premium horizontal wordmark logo for a luxury French brand named "
-                f"« {_logo_name} ». "
-                "Editorial typography only (elegant light serif with subtle ligatures), "
-                "DEEP BLACK text (#0A0A0A) on a PURE WHITE background (#FFFFFF), no cream, no ivory, no off-white. "
-                "The background must be 100% white so it blends invisibly into a white website header. "
-                "Extremely refined kerning, tagline optional below in small caps. Aspect ratio 16:5 (horizontal, "
-                "wider than tall), with generous white margins on all sides. Absolutely NO icon, NO symbol, "
-                "NO flourish, NO framed box, NO colored background — pure typography only. "
-                "Museum-quality, think Hermès / Aesop / Loro Piana. High resolution, extremely sharp, "
-                "antialiased edges."
-            )
-            url = await asyncio.wait_for(
-                pimg_routes._generate_one(logo_prompt, site_id, f"logo-{site_id[:8]}"),
-                timeout=150,
-            )
-            if url:
-                await db.sites.update_one(
-                    {"id": site_id},
-                    {"$set": {"design.brand.logo_url": url,
-                              "design.updated_at": datetime.now(timezone.utc).isoformat()}},
+        existing_logo = ((await db.sites.find_one({"id": site_id}, {"_id":0, "design.brand.logo_url":1})) or {}).get("design", {}).get("brand", {}).get("logo_url")
+        if existing_logo and not overwrite:
+            logger.info(f"[launch] logo already exists ({existing_logo[:60]}…), skipped")
+        else:
+            try:
+                _logo_name = _clean_name or brand_patch.get("logo_text") or site.get("name") or "Maison"
+                logo_prompt = (
+                    f"Ultra-premium horizontal wordmark logo for a luxury French brand named "
+                    f"« {_logo_name} ». "
+                    "Editorial typography only (elegant light serif with subtle ligatures), "
+                    "DEEP BLACK text (#0A0A0A) on a PURE WHITE background (#FFFFFF), no cream, no ivory, no off-white. "
+                    "The background must be 100% white so it blends invisibly into a white website header. "
+                    "Extremely refined kerning, tagline optional below in small caps. Aspect ratio 16:5 (horizontal, "
+                    "wider than tall), with generous white margins on all sides. Absolutely NO icon, NO symbol, "
+                    "NO flourish, NO framed box, NO colored background — pure typography only. "
+                    "Museum-quality, think Hermès / Aesop / Loro Piana. High resolution, extremely sharp, "
+                    "antialiased edges."
                 )
-        except asyncio.TimeoutError:
-            logger.warning("[launch] logo timed out")
-        except Exception as e:
-            logger.warning(f"[launch] logo skipped: {str(e)[:120]}")
+                # Bloc 1 fix bug #1d : utiliser le helper dédié design._nano_banana_logo
+                # qui écrit dans /uploads/logos/. Avant on utilisait product_images._generate_one
+                # avec product_id="logo-{site_id[:8]}" → écrivait des fichiers parasites
+                # `p_logo-XXX_*.png` dans /uploads/products_ai/.
+                url = await asyncio.wait_for(
+                    design_routes._nano_banana_logo(logo_prompt, site_id),
+                    timeout=150,
+                )
+                if url:
+                    await db.sites.update_one(
+                        {"id": site_id},
+                        {"$set": {"design.brand.logo_url": url,
+                                  "design.updated_at": datetime.now(timezone.utc).isoformat()}},
+                    )
+            except asyncio.TimeoutError:
+                logger.warning("[launch] logo timed out")
+            except Exception as e:
+                logger.warning(f"[launch] logo skipped: {str(e)[:120]}")
 
         # 3) Homepage sections — apply fixed template ---------------------
         await _advance(job_id, "template", "Template homepage fixe", 18)
@@ -535,7 +546,11 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
 
         # 5bis) Hero image IA (Nano Banana lifestyle 3:2) ------------------
         await _advance(job_id, "hero-image", "Image hero IA (lifestyle)", 54)
-        if not budget_exhausted:
+        # Bloc 1 sous-chantier 1c — skip si déjà présent
+        existing_hero = ((await db.sites.find_one({"id": site_id}, {"_id": 0, "design.hero_image": 1})) or {}).get("design", {}).get("hero_image")
+        if existing_hero and not overwrite:
+            logger.info(f"[launch] hero-image already exists ({str(existing_hero)[:60]}…), skipped")
+        elif not budget_exhausted:
             try:
                 await asyncio.wait_for(
                     design_routes.generate_hero_image(
@@ -703,16 +718,20 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                 )
                 generated = p.get("generated_images") or []
                 existing_ai_count = len(generated)
-                # Phase B.2 — 5 images IA premium par produit (lifestyle, studio
-                # 3/4, gros-plan matière, détail technique, mise en situation)
-                target_ai_count = 5
+                # Bloc 1 sous-chantier 1b — 3 images IA premium par produit par défaut
+                # (lifestyle, studio, closeup). Avant : 5 (incluait detail + in_use).
+                # Économie : -40% coût Nano Banana par produit.
+                # Le mode "Tout boost premium" (`boost_premium=true` dans wizard) bascule à 5.
+                boost_premium = bool(wizard.get("boost_premium") or wizard.get("premium_5_images"))
+                target_ai_count = 5 if boost_premium else 3
+                full_preset_order = ["lifestyle", "studio", "closeup", "detail", "in_use"]
                 styles_to_gen = []
-                if overwrite or existing_ai_count < target_ai_count:
-                    needed = max(0, target_ai_count - existing_ai_count) if not overwrite else target_ai_count
-                    # 5 styles distincts couvrant les angles requis (lifestyle, studio, macro,
-                    # detail, in_use). Si l'enum sous-jacent n'accepte pas certains styles,
-                    # le helper retombe sur "studio" silencieusement (try/except déjà en place).
-                    styles_to_gen = ["lifestyle", "studio", "closeup", "detail", "in_use"][:needed]
+                # Bloc 1 sous-chantier 1c — skip si déjà target atteint (sauf overwrite)
+                if not overwrite and existing_ai_count >= target_ai_count:
+                    logger.info(f"[launch] product {p['id'][:8]} already has {existing_ai_count}≥{target_ai_count} AI images, skipped")
+                elif overwrite or existing_ai_count < target_ai_count:
+                    needed = target_ai_count if overwrite else max(0, target_ai_count - existing_ai_count)
+                    styles_to_gen = full_preset_order[:needed]
                 for style in styles_to_gen:
                     if budget_exhausted:
                         break
@@ -769,16 +788,26 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
         # ── Phase C — Cohérence storefront enrichie ─────────────────────
         # Témoignages premium fictifs + portraits Nano Banana + pages CMS
         # (À propos / Contact) générées avec le narrative_angle.
+        # Bloc 1 sous-chantier 1c — skip si déjà présents (sauf overwrite).
+        fresh_design = ((await db.sites.find_one({"id": site_id}, {"_id": 0, "design.testimonials_premium": 1, "design.cms_pages": 1})) or {}).get("design") or {}
+        existing_tp = fresh_design.get("testimonials_premium") or []
+        existing_cms = fresh_design.get("cms_pages") or {}
         try:
             await _advance(job_id, "testimonials", "Témoignages clients (3 portraits IA)…", 95)
-            await _generate_premium_testimonials(site_id, wizard, budget_exhausted, job_id=job_id)
+            if not overwrite and isinstance(existing_tp, list) and len(existing_tp) >= 3:
+                logger.info(f"[launch] testimonials_premium already populated ({len(existing_tp)} items), skipped")
+            else:
+                await _generate_premium_testimonials(site_id, wizard, budget_exhausted, job_id=job_id)
         except Exception as e:
             logger.exception("[launch] premium_testimonials failed (non-blocking)")
             await _mark_degraded(job_id, "testimonials_premium", str(e)[:200])
 
         try:
             await _advance(job_id, "cms-pages", "Pages À propos / Contact éditoriales…", 97)
-            await _generate_premium_cms_pages(site_id, wizard, job_id=job_id)
+            if not overwrite and existing_cms.get("about") and existing_cms.get("contact"):
+                logger.info("[launch] cms_pages already populated (about+contact), skipped")
+            else:
+                await _generate_premium_cms_pages(site_id, wizard, job_id=job_id)
         except Exception as e:
             logger.exception("[launch] cms_pages failed (non-blocking)")
             await _mark_degraded(job_id, "cms_pages", str(e)[:200])
@@ -967,7 +996,11 @@ Règles strictes :
 Réponds UNIQUEMENT avec le JSON, sans rien autour."""
 
     try:
-        parsed = await safe_claude_json(system_msg, user_prompt, timeout=90)
+        # Bloc 1 — brand identity → quality_tier="premium" (Sonnet 4.5).
+        # Coût ↑ mais c'est le DNA propagé dans tout le site, qualité non
+        # négociable. Le reste du pipeline (témoignages, blog, narrative)
+        # peut tomber sur Haiku par défaut.
+        parsed = await safe_claude_json(system_msg, user_prompt, timeout=90, quality_tier="premium")
     except LLMUnavailableError as e:
         # 502 to UI : the upstream is OPEN — user should retry later
         raise HTTPException(

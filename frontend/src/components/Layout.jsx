@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { api, apiCall } from "../lib/api";
 import CommandPalette from "./CommandPalette";
 import CommandMenu from "./CommandMenu";
 import CopilotFab from "./CopilotFab";  // Unused — Copilot désactivé
@@ -22,7 +23,56 @@ import {
   GoogleLogo,
   Fire,
   Plugs,
+  Lightning,
 } from "@phosphor-icons/react";
+
+/**
+ * Bloc 1 sous-chantier 2 — pastille budget LLM (admin only).
+ * Lit /api/admin/llm-budget toutes les 5 min. Affiche état :
+ *   - vert "OK"        si pct < 80% ou unknown
+ *   - orange "≥80%"    si warning
+ *   - rouge "≥95%"     si critical
+ */
+function LLMBudgetPill() {
+  const [snap, setSnap] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      const { data } = await apiCall(() => api.get(`/admin/llm-budget`));
+      if (!cancelled && data) setSnap(data);
+      if (!cancelled) setTimeout(tick, 5 * 60 * 1000);  // 5 min
+    };
+    tick();
+    return () => { cancelled = true; };
+  }, []);
+  if (!snap) return null;
+  const lvl = snap.alert_level;
+  const pct = snap.pct;
+  const styles = {
+    critical: { dot: "bg-red-500", border: "border-red-200", bg: "bg-red-50", txt: "text-red-700" },
+    warning:  { dot: "bg-amber-500", border: "border-amber-200", bg: "bg-amber-50", txt: "text-amber-700" },
+    ok:       { dot: "bg-emerald-500", border: "border-emerald-200", bg: "bg-emerald-50", txt: "text-emerald-700" },
+    unknown:  { dot: "bg-neutral-400", border: "border-neutral-200", bg: "bg-neutral-50", txt: "text-neutral-600" },
+  };
+  const s = styles[lvl] || styles.unknown;
+  const labelText = lvl === "unknown"
+    ? "Budget IA · OK"
+    : `Budget IA · ${pct?.toFixed(0)}%`;
+  const tooltip = lvl === "unknown"
+    ? "Aucune erreur de budget capturée. Le système est sain."
+    : `${snap.used_usd}$ utilisés sur ${snap.max_usd}$. ${snap.days_remaining_in_month}j restants ce mois.`;
+  return (
+    <div
+      data-testid="sidebar-llm-budget-pill"
+      className={`flex items-center gap-2 px-2.5 py-1.5 mb-2 rounded-md border ${s.border} ${s.bg} ${s.txt} text-[11px] font-medium`}
+      title={tooltip}
+    >
+      <Lightning size={11} weight="fill" className={s.dot.replace("bg-", "text-")} />
+      <span className="flex-1 truncate">{labelText}</span>
+      <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+    </div>
+  );
+}
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
@@ -126,6 +176,7 @@ export default function Layout({ children }) {
         </nav>
 
         <div className="p-3 border-t border-neutral-200">
+          {isAdmin && <LLMBudgetPill />}
           <div className="flex items-center gap-3 px-2 py-2">
             <div className="w-8 h-8 rounded-md bg-neutral-100 text-neutral-700 flex items-center justify-center font-semibold text-xs border border-neutral-200">
               {user?.name?.[0]?.toUpperCase() || "?"}

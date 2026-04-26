@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 
 /**
@@ -81,9 +81,38 @@ export default function StorefrontTracking({ site }) {
   const params = useParams();
   const lastPathRef = useRef(null);
 
-  // ---- 1. gtag bootstrap (inchangé) ---- //
+  // Bloc 1 sous-chantier 3 — RGPD consent gate.
+  // We refuse to load gtag/Google Ads pixel until the user has actively
+  // accepted the "marketing" category through <CookieConsentBanner>.
+  // localStorage key is the source of truth ; the banner also dispatches a
+  // window event "altiaro:consent-updated" so this component re-evaluates
+  // without a full page reload.
+  const [marketingConsent, setMarketingConsent] = useState(() => {
+    try {
+      const raw = localStorage.getItem("altiaro_consent_v1");
+      if (!raw) return false;
+      return Boolean(JSON.parse(raw)?.marketing);
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    const onUpdate = () => {
+      try {
+        const raw = localStorage.getItem("altiaro_consent_v1");
+        setMarketingConsent(Boolean(raw && JSON.parse(raw)?.marketing));
+      } catch {
+        setMarketingConsent(false);
+      }
+    };
+    window.addEventListener("altiaro:consent-updated", onUpdate);
+    return () => window.removeEventListener("altiaro:consent-updated", onUpdate);
+  }, []);
+
+  // ---- 1. gtag bootstrap (consent-gated) ---- //
   useEffect(() => {
     if (window.__altiaroTrackingLoaded) return;
+    if (!marketingConsent) return;  // ⚠️ no-op until user opts in
     window.__altiaroTrackingLoaded = true;
 
     window.dataLayer = window.dataLayer || [];
