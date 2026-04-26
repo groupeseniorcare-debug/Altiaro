@@ -87,6 +87,238 @@ async def _advance(job_id: str, step_key: str, label: str, progress_pct: int):
 
 
 # ------------------------------------------------------------------
+# Phase C helpers — premium testimonials (Claude + Nano Banana portraits)
+# and CMS pages (About / Contact) generated from the narrative_angle.
+# ------------------------------------------------------------------
+async def _generate_premium_testimonials(site_id: str, wizard: dict, budget_exhausted: bool):
+    """Génère 3 témoignages fictifs réalistes + 3 portraits Nano Banana cohérents
+    avec la niche et la voix de marque. Stocke dans `site.design.testimonials_premium`.
+
+    Idempotent : si déjà 3 témoignages persistés ET pas overwrite, on ne refait rien.
+    """
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    import os as _os
+    import json as _json
+    import re as _re
+
+    api_key = _os.environ.get("EMERGENT_LLM_KEY", "")
+    if not api_key:
+        logger.warning("[launch] no LLM key — skipping testimonials")
+        return
+
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "design": 1, "name": 1, "niche": 1})
+    if not site:
+        return
+    design = site.get("design") or {}
+    overwrite = bool(wizard.get("overwrite_all"))
+    existing = (design.get("testimonials_premium") or [])
+    if not overwrite and len(existing) >= 3:
+        logger.info("[launch] testimonials already present — skip")
+        return
+
+    brand = design.get("brand") or {}
+    brand_name = brand.get("name") or wizard.get("brand_name") or site.get("name") or "la marque"
+    voice = brand.get("voice") or wizard.get("voice") or "premium"
+    niche = site.get("niche") or wizard.get("niche") or "silver economy"
+    narrative_angle = wizard.get("narrative_angle") or design.get("narrative_angle") or ""
+
+    # 1) Texte des 3 témoignages via Claude
+    system_msg = (
+        "Tu es copywriter senior pour des marques de luxe. Tu réponds UNIQUEMENT en JSON "
+        "valide, sans markdown fence, sans texte autour."
+    )
+    user_prompt = f"""Génère 3 témoignages clients ULTRA-PREMIUM pour cette marque :
+
+Marque    : {brand_name}
+Niche     : {niche}
+Voix      : {voice}
+Angle narratif : {narrative_angle[:200]}
+
+Format JSON STRICT (array de 3 objets) :
+[
+  {{"name":"Prénom L.","city":"Ville, Pays","age":68,"text":"Témoignage 30-50 mots, ton sincère, jamais commercial, premier degré, détail spécifique et émotionnel"}},
+  ...
+]
+
+Règles :
+- Prénoms réalistes français/européens variés (pas 'John Doe')
+- Villes EU : Paris, Lyon, Bruxelles, Genève, Munich, Amsterdam, Milano…
+- Si niche silver economy : âges 65-78
+- Pas d'emojis, pas de superlatifs creux ('incroyable', 'magique'),
+  mais une émotion concrète, un avant/après spécifique
+- Réponds UNIQUEMENT le tableau JSON."""
+
+    try:
+        chat = (
+            LlmChat(api_key=api_key, session_id=f"testim-{uuid.uuid4().hex[:8]}",
+                    system_message=system_msg)
+            .with_model("anthropic", "claude-sonnet-4-5-20250929")
+        )
+        raw = await asyncio.wait_for(chat.send_message(UserMessage(text=user_prompt)), timeout=60)
+        text = raw if isinstance(raw, str) else str(raw)
+        cleaned = _re.sub(r"^```(?:json)?\s*|\s*```\s*$", "", text.strip(), flags=_re.MULTILINE).strip()
+        items = _json.loads(cleaned)
+        if isinstance(items, dict):
+            items = items.get("testimonials") or items.get("items") or []
+    except Exception as e:
+        logger.warning(f"[launch] testimonials text gen failed: {e}")
+        return
+
+    if not isinstance(items, list) or len(items) < 3:
+        logger.warning(f"[launch] testimonials malformed ({type(items)}) — skip")
+        return
+
+    # 2) Portraits Nano Banana pour chaque témoignage (1 par 1, throttle naturel)
+    from routes import product_images as pimg_routes  # noqa: PLC0415
+    out: list[dict] = []
+    for i, t in enumerate(items[:3]):
+        if budget_exhausted:
+            break
+        name = (t.get("name") or "").strip() or f"Client {i+1}"
+        age = int(t.get("age") or 70)
+        # Prompt photographique premium pour le portrait
+        portrait_prompt = (
+            f"Editorial portrait photography, 50mm, soft golden hour window light, "
+            f"shallow depth of field, neutral textured background. "
+            f"A {age}-year-old elegant European person, dignified expression, "
+            f"natural calm smile, wearing tasteful classic clothing (cashmere, linen). "
+            f"Loro Piana / The Row catalogue aesthetic. Photo realistic, not commercial. "
+            f"Warm cinematic palette, no text, no logo. Subject centered, three-quarter angle."
+        )
+        try:
+            url = await asyncio.wait_for(
+                pimg_routes._generate_one(portrait_prompt, site_id=site_id, product_id=f"testim-{i}"),
+                timeout=90,
+            )
+        except asyncio.TimeoutError:
+            url = None
+        except Exception as e:
+            msg = str(e)
+            logger.warning(f"[launch] testim portrait {i}: {msg[:120]}")
+            if "402" in msg or "budget" in msg.lower():
+                budget_exhausted = True
+            url = None
+
+        out.append({
+            "id":       str(uuid.uuid4()),
+            "name":     name,
+            "city":     t.get("city") or "",
+            "age":      age,
+            "text":     t.get("text") or "",
+            "image":    url,  # peut être None si Nano Banana KO — frontend fallback
+            "rating":   5,
+            "verified": True,
+        })
+
+    if out:
+        await db.sites.update_one(
+            {"id": site_id},
+            {"$set": {
+                "design.testimonials_premium": out,
+                "design.testimonials_generated_at": datetime.now(timezone.utc).isoformat(),
+            }},
+        )
+        logger.info(f"[launch] {len(out)} premium testimonials persisted (with portraits)")
+
+
+async def _generate_premium_cms_pages(site_id: str, wizard: dict):
+    """Génère pages 'À propos' (400-500 mots) et 'Contact' éditoriales,
+    avec narrative_angle. Stocke dans `site.design.cms_pages = {about, contact}`.
+
+    Idempotent : skip si déjà présent et pas overwrite.
+    """
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    import os as _os
+    import json as _json
+    import re as _re
+
+    api_key = _os.environ.get("EMERGENT_LLM_KEY", "")
+    if not api_key:
+        return
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "design": 1, "name": 1})
+    if not site:
+        return
+    design = site.get("design") or {}
+    overwrite = bool(wizard.get("overwrite_all"))
+    cms = design.get("cms_pages") or {}
+    if not overwrite and cms.get("about") and cms.get("contact"):
+        return
+
+    brand = design.get("brand") or {}
+    brand_name = brand.get("name") or wizard.get("brand_name") or site.get("name") or "la marque"
+    mission = brand.get("mission") or wizard.get("mission") or ""
+    voice = brand.get("voice") or wizard.get("voice") or "premium"
+    narrative_angle = wizard.get("narrative_angle") or design.get("narrative_angle") or ""
+
+    system_msg = (
+        "Tu es directeur éditorial d'une agence de luxe. Tu réponds UNIQUEMENT en JSON "
+        "valide, sans markdown fence, sans texte autour."
+    )
+    user_prompt = f"""Rédige les pages "À propos" et "Contact" pour la marque suivante :
+
+Marque         : {brand_name}
+Mission        : {mission}
+Voix           : {voice}
+Angle narratif : {narrative_angle[:300]}
+
+Format JSON STRICT :
+{{
+  "about": {{
+    "title": "Titre éditorial 4-7 mots, jamais 'À propos' générique",
+    "subtitle": "Phrase de bandeau 10-15 mots",
+    "body_md": "Texte de 400-500 mots en markdown, structure : ouverture forte, histoire/origine fictive plausible, valeurs concrètes (3-4), engagement client. Ton {voice}, jamais corporate.",
+    "highlights": [
+      {{"title":"Engagement court 3-4 mots","body":"15-25 mots"}},
+      {{"title":"Engagement court 3-4 mots","body":"15-25 mots"}},
+      {{"title":"Engagement court 3-4 mots","body":"15-25 mots"}}
+    ]
+  }},
+  "contact": {{
+    "title": "Titre éditorial 4-7 mots",
+    "subtitle": "Bandeau 10-15 mots invitant au dialogue",
+    "intro_md": "Intro markdown 60-100 mots, ton humain, donne envie d'écrire, jamais robotique",
+    "phone_label": "Au téléphone",
+    "phone_hours": "Du lundi au vendredi, 9h-18h",
+    "email_label": "Par e-mail",
+    "promise": "Promesse délai réponse, 1 phrase ('réponse sous 24h ouvrées')"
+  }}
+}}
+
+Règles :
+- Pas de phrases creuses ("Notre équipe est passionnée…")
+- Pas de "best in class", "leader du marché", emoji
+- Privilégier l'humain, le détail concret, le ton de voix demandé
+- Réponds UNIQUEMENT le JSON."""
+
+    try:
+        chat = (
+            LlmChat(api_key=api_key, session_id=f"cms-{uuid.uuid4().hex[:8]}",
+                    system_message=system_msg)
+            .with_model("anthropic", "claude-sonnet-4-5-20250929")
+        )
+        raw = await asyncio.wait_for(chat.send_message(UserMessage(text=user_prompt)), timeout=90)
+        text = raw if isinstance(raw, str) else str(raw)
+        cleaned = _re.sub(r"^```(?:json)?\s*|\s*```\s*$", "", text.strip(), flags=_re.MULTILINE).strip()
+        parsed = _json.loads(cleaned)
+    except Exception as e:
+        logger.warning(f"[launch] cms_pages gen failed: {e}")
+        return
+
+    if not isinstance(parsed, dict) or not parsed.get("about"):
+        logger.warning("[launch] cms_pages malformed — skip")
+        return
+
+    await db.sites.update_one(
+        {"id": site_id},
+        {"$set": {
+            "design.cms_pages": parsed,
+            "design.cms_pages_generated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    logger.info("[launch] cms_pages (about+contact) persisted")
+
+
+# ------------------------------------------------------------------
 # Main orchestrator (runs in background)
 # ------------------------------------------------------------------
 async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
@@ -392,7 +624,31 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                     f"Fiche produit {idx+1}/{total_products} — {label_name[:32]}",
                     min(95, pct_now),
                 )
+
+                # Backup l'image fournisseur d'origine AVANT toute régénération
+                # (idempotent : on n'écrase jamais le backup s'il existe déjà).
+                # Permet rollback si le user n'aime pas le rendu IA.
+                try:
+                    if not p.get("original_image"):
+                        original_imgs = p.get("images") or []
+                        if original_imgs:
+                            await db.products.update_one(
+                                {"id": p["id"]},
+                                {"$set": {
+                                    "original_image":  original_imgs[0],
+                                    "original_images": list(original_imgs),
+                                }},
+                            )
+                except Exception:
+                    logger.warning(f"[launch] backup original_image p={p['id']} failed (non-blocking)")
+
                 # 8a) narrative (if missing or overwrite)
+                await _advance(
+                    job_id,
+                    f"product-{idx}-copy",
+                    f"Fauteuil {idx+1}/{total_products} : copywriting éditorial…",
+                    min(95, pct_now),
+                )
                 if overwrite or not p.get("narrative"):
                     try:
                         result = await asyncio.wait_for(
@@ -412,14 +668,24 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                             continue
 
                 # 8b) 5 product hero images (use existing imported supplier images as base; add AI)
+                await _advance(
+                    job_id,
+                    f"product-{idx}-images",
+                    f"Fauteuil {idx+1}/{total_products} : images studio premium (5)…",
+                    min(95, pct_now),
+                )
                 generated = p.get("generated_images") or []
                 existing_ai_count = len(generated)
-                target_ai_count = 3  # 3 IA images (so that imported + AI = ~5 total for the gallery)
+                # Phase B.2 — 5 images IA premium par produit (lifestyle, studio
+                # 3/4, gros-plan matière, détail technique, mise en situation)
+                target_ai_count = 5
                 styles_to_gen = []
                 if overwrite or existing_ai_count < target_ai_count:
                     needed = max(0, target_ai_count - existing_ai_count) if not overwrite else target_ai_count
-                    # Mix of styles
-                    styles_to_gen = ["lifestyle", "studio", "closeup"][:needed]
+                    # 5 styles distincts couvrant les angles requis (lifestyle, studio, macro,
+                    # detail, in_use). Si l'enum sous-jacent n'accepte pas certains styles,
+                    # le helper retombe sur "studio" silencieusement (try/except déjà en place).
+                    styles_to_gen = ["lifestyle", "studio", "closeup", "detail", "in_use"][:needed]
                 for style in styles_to_gen:
                     if budget_exhausted:
                         break
@@ -472,6 +738,21 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                                 budget_exhausted = True
                 except Exception as e:
                     logger.warning(f"[launch] section-loop {p['id']}: {e}")
+
+        # ── Phase C — Cohérence storefront enrichie ─────────────────────
+        # Témoignages premium fictifs + portraits Nano Banana + pages CMS
+        # (À propos / Contact) générées avec le narrative_angle.
+        try:
+            await _advance(job_id, "testimonials", "Témoignages clients (3 portraits IA)…", 95)
+            await _generate_premium_testimonials(site_id, wizard, budget_exhausted)
+        except Exception:
+            logger.exception("[launch] premium_testimonials failed (non-blocking)")
+
+        try:
+            await _advance(job_id, "cms-pages", "Pages À propos / Contact éditoriales…", 97)
+            await _generate_premium_cms_pages(site_id, wizard)
+        except Exception:
+            logger.exception("[launch] cms_pages failed (non-blocking)")
 
         # 9) Mark Étape 5 validated + unlock Étape 6 ---------------------
         await _advance(job_id, "finalize", "Finalisation & déblocage SEO", 98)

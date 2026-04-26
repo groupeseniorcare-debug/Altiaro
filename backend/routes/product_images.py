@@ -51,6 +51,12 @@ STYLE_PRESETS = {
         "beautifully lit home, natural smile, dignity, warm cinematic palette, "
         "editorial documentary style, no staged feel."
     ),
+    "detail": (
+        "Premium catalogue detail shot focusing on a single functional element "
+        "of the product (mechanism, finishing, stitching, articulation). "
+        "Soft directional studio light, dark moody background, ultra-sharp macro. "
+        "Loro Piana lookbook aesthetic. Materials and craftsmanship as the hero."
+    ),
 }
 
 
