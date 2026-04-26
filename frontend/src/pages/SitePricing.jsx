@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, CurrencyEur, Sparkle, ArrowClockwise, Info } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
+import NextStepCTA from "../components/NextStepCTA";
 
 export default function SitePricing() {
   const { id: siteId } = useParams();
@@ -125,6 +126,8 @@ export default function SitePricing() {
             <div className="text-sm text-neutral-500">Clique sur « Lancer l'analyse IA » — 30 à 60 secondes.</div>
           </div>
         ) : null}
+
+        <NextStepCTA siteId={siteId} currentKey="pricing" />
       </div>
     </div>
   );

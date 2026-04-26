@@ -3,6 +3,7 @@ import {
   MagnifyingGlass, LinkSimple, CheckCircle, XCircle, Warning, Globe,
   Info, ArrowClockwise, Package, Stack, X as XIcon,
 } from "@phosphor-icons/react";
+import { toast } from "sonner";
 import { api, apiCall } from "../lib/api";
 
 /**
@@ -131,16 +132,25 @@ export default function ProductImportPanel({
         .filter(([, v]) => v?.available)
         .map(([cc]) => cc),
     };
-    const { data, error, rawDetail } = await apiCall(() =>
+    const { error, rawDetail } = await apiCall(() =>
       api.post(`/sites/${siteId}/sourcing/import-by-url`, payload)
     );
     setImporting(false);
     if (error) {
       const detail = rawDetail?.detail;
-      window.alert(typeof detail === "string" ? detail :
-        (detail?.message || error || "Import échoué."));
+      const msg = typeof detail === "string"
+        ? detail
+        : (detail?.message || error || "Import échoué.");
+      toast.error("Import impossible", {
+        description: msg,
+        duration: 8000,
+      });
       return;
     }
+    toast.success("Produit importé ✨", {
+      description: "Traductions multi-langues générées en arrière-plan.",
+      duration: 4000,
+    });
     setPreview(null);
     setUrl("");
     await loadProducts();

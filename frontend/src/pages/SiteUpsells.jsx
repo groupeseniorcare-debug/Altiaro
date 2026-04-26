@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Stack } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 import ProductImportPanel from "../components/ProductImportPanel";
+import NextStepCTA from "../components/NextStepCTA";
 import { useStepGuard } from "../lib/useStepGuard";
 
 /**
@@ -67,6 +68,8 @@ export default function SiteUpsells() {
           nicheHint={nicheHint}
           targetCountries={targetCountries}
         />
+
+        <NextStepCTA siteId={siteId} currentKey="upsells" />
       </div>
     </div>
   );

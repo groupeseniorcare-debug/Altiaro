@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, CheckCircle, Storefront as StoreIcon, Rocket, Palette } from "@phosphor-icons/react";
+import NextStepCTA from "../components/NextStepCTA";
 import { api, apiCall } from "../lib/api";
 import IdentityTab from "../components/site-design/IdentityTab";
 import LivePreview from "../components/site-design/LivePreview";
@@ -356,6 +357,8 @@ export default function SiteBranding() {
             <SiteDesignAdvanced embedded={true} />
           </div>
         )}
+
+        <NextStepCTA siteId={siteId} currentKey="branding" />
       </div>
     </div>
   );

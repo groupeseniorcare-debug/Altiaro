@@ -7,6 +7,7 @@ import {
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 import SeoStudioPanel from "../components/SeoStudioPanel";
+import NextStepCTA from "../components/NextStepCTA";
 
 const DIMENSION_ORDER = ["catalog", "content", "structure", "trust", "aeo", "freshness"];
 
@@ -283,6 +284,8 @@ export default function SiteSEO() {
         </div>
           </>
         )}
+
+        <NextStepCTA siteId={siteId} currentKey="seo" />
       </div>
     </div>
   );

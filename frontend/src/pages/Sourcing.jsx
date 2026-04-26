@@ -4,6 +4,7 @@ import { ArrowLeft, Package } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 import ProductImportPanel from "../components/ProductImportPanel";
 import AeDealsPanel from "../components/AeDealsPanel";
+import NextStepCTA from "../components/NextStepCTA";
 import { useStepGuard } from "../lib/useStepGuard";
 
 /**
@@ -75,6 +76,8 @@ export default function Sourcing() {
         <div className="mt-10" data-testid="sourcing-ae-deals-section">
           <AeDealsPanel siteId={siteId} />
         </div>
+
+        <NextStepCTA siteId={siteId} currentKey="import" />
       </div>
     </div>
   );

@@ -72,6 +72,7 @@ import {
   StorefrontRetours,
   StorefrontMediation,
 } from "./pages/StorefrontPages";
+import { Toaster } from "./components/ui/sonner";
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user } = useAuth();
@@ -444,6 +445,7 @@ function App() {
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <Toaster richColors closeButton position="top-right" />
       </BrowserRouter>
     </AuthProvider>
   );

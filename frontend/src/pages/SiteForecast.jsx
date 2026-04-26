@@ -6,6 +6,7 @@ import {
   LockSimple, Rocket,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
+import NextStepCTA from "../components/NextStepCTA";
 import { useStepGuard } from "../lib/useStepGuard";
 
 const SCENARIO_META = {
@@ -507,6 +508,8 @@ export default function SiteForecast() {
             )}
           </div>
         )}
+
+        <NextStepCTA siteId={siteId} currentKey="forecast" />
       </div>
     </div>
   );

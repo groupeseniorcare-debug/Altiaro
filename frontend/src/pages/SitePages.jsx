@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight, CheckCircle, Sparkle, ArrowClockwise, FileText, BookOpen, Phone, Scales, Truck, ArrowUUpLeft, Question } from "@phosphor-icons/react";
+import NextStepCTA from "../components/NextStepCTA";
 import { api, apiCall } from "../lib/api";
 import {
   AboutEditor,
@@ -230,6 +231,8 @@ export default function SitePages() {
             </Link>
           </div>
         </div>
+
+        <NextStepCTA siteId={siteId} currentKey="pages" />
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import {
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 import { useStepGuard } from "../lib/useStepGuard";
+import NextStepCTA from "../components/NextStepCTA";
 
 export default function SiteBlogPosts() {
   const [searchParams] = useSearchParams();
@@ -559,6 +560,9 @@ export default function SiteBlogPosts() {
           </div>
         </div>
       )}
+      <div className="max-w-7xl mx-auto px-6 md:px-10 pb-10">
+        <NextStepCTA siteId={siteId} currentKey="content" />
+      </div>
     </div>
   );
 }
