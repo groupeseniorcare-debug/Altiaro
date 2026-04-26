@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Stack } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 import ProductImportPanel from "../components/ProductImportPanel";
+import UpsellSuggestionsPanel from "../components/UpsellSuggestionsPanel";
 import NextStepCTA from "../components/NextStepCTA";
 import { useStepGuard } from "../lib/useStepGuard";
 
@@ -16,12 +17,17 @@ export default function SiteUpsells() {
   const { id: siteId } = useParams();
   const { allowed, checking } = useStepGuard(siteId, "upsells");
   const [site, setSite] = useState(null);
+  const [productsCount, setProductsCount] = useState(0);
 
   useEffect(() => {
     if (!siteId) return;
     (async () => {
       const { data } = await apiCall(() => api.get(`/sites/${siteId}`));
       if (data) setSite(data);
+      const { data: prods } = await apiCall(() => api.get(`/sites/${siteId}/products`));
+      if (Array.isArray(prods)) {
+        setProductsCount(prods.filter((p) => p.status !== "deleted").length);
+      }
     })();
   }, [siteId]);
 
@@ -68,6 +74,10 @@ export default function SiteUpsells() {
           nicheHint={nicheHint}
           targetCountries={targetCountries}
         />
+
+        <div className="mt-8">
+          <UpsellSuggestionsPanel siteId={siteId} productsCount={productsCount} />
+        </div>
 
         <NextStepCTA siteId={siteId} currentKey="upsells" />
       </div>

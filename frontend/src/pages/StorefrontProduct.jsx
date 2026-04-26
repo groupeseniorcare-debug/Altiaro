@@ -40,6 +40,7 @@ import DeliveryEstimate from "../components/storefront/DeliveryEstimate";
 import ProductBundle from "../components/storefront/ProductBundle";
 import PaymentOptions from "../components/storefront/PaymentOptions";
 import MobileStickyBuy from "../components/storefront/MobileStickyBuy";
+import VariantPicker from "../components/storefront/VariantPicker";
 import ProductEditorialMosaic from "../components/storefront/ProductEditorialMosaic";
 import {
   PeopleAlsoAsk,
@@ -57,6 +58,8 @@ export function StorefrontProduct() {
   const [loading, setLoading] = useState(true);
   const [added, setAdded] = useState(false);
   const [qty, setQty] = useState(1);
+  // Variante sélectionnée par défaut = 1ʳᵉ avec stock > 0, sinon 1ʳᵉ tout court.
+  const [selectedVariant, setSelectedVariant] = useState(null);
 
   const { fontHeading } = designAccents(design);
 
@@ -65,14 +68,47 @@ export function StorefrontProduct() {
       .get(`${BACKEND_URL}/api/public/sites/${siteId}/products/${productId}`)
       .then(({ data }) => {
         setP(data);
+        // Initialise selectedVariant si le produit a des variantes (>1 cas non dégénéré)
+        const vs = Array.isArray(data?.variants) ? data.variants : [];
+        if (vs.length > 1) {
+          const firstInStock = vs.find((v) => (v.stock ?? 1) > 0) || vs[0];
+          setSelectedVariant(firstInStock || null);
+        }
         try { window.altiaroTrack?.viewItem?.(data, lang); } catch (_) { /* noop */ }
       })
       .catch(() => setP(null))
       .finally(() => setLoading(false));
   }, [siteId, productId, lang]);
 
+  // --- Calcul prix / image / disponibilité en tenant compte de la variante ---
+  // Markup ratio = price / cost_price_ht (les 2 sont en EUR HT côté doc).
+  // Si la variante a un sell_price_eur (cost variant), on applique le même
+  // ratio pour rester cohérent avec la stratégie de marge.
+  const variantAdjustedPrice = (() => {
+    if (!p || !selectedVariant?.sell_price_eur) return p?.price;
+    const baseCost = Number(p.cost_price_ht || 0);
+    const basePrice = Number(p.price || 0);
+    if (!baseCost || !basePrice) return basePrice;
+    const ratio = basePrice / baseCost;
+    return Math.round(selectedVariant.sell_price_eur * ratio * 100) / 100;
+  })();
+  const variantImages = (() => {
+    if (!p) return [];
+    const generated = (p.generated_images || []).map((g) => g.url).filter(Boolean);
+    const baseImgs = [...generated, ...(p.images || [])];
+    if (selectedVariant?.image && !baseImgs.includes(selectedVariant.image)) {
+      // Insère l'image variante en première position
+      return [selectedVariant.image, ...baseImgs];
+    }
+    return baseImgs;
+  })();
+  const isVariantOutOfStock = selectedVariant?.stock === 0;
+
   const handleAdd = () => {
-    addToCart(siteId, p, lang, qty);
+    addToCart(siteId, p, lang, qty, {
+      variant: selectedVariant || null,
+      variant_price: selectedVariant ? variantAdjustedPrice : undefined,
+    });
     try { window.altiaroTrack?.addToCart?.(p, qty, lang); } catch (_) { /* noop */ }
     setAdded(true);
     window.dispatchEvent(new Event("cf_cart_open"));
@@ -259,10 +295,7 @@ export function StorefrontProduct() {
 
           <div className="grid grid-cols-1 md:grid-cols-[1.1fr_1fr] gap-8 lg:gap-16 mb-24 md:mb-32 items-start">
             <ProductGallery
-              images={[
-                ...((p.generated_images || []).map((g) => g.url).filter(Boolean)),
-                ...(p.images || []),
-              ]}
+              images={variantImages}
               name={pickLang(p.name, lang)}
               design={design}
             />
@@ -309,9 +342,9 @@ export function StorefrontProduct() {
                 data-testid="product-price"
               >
                 <span className="text-[40px] md:text-[48px] font-semibold tabular-nums leading-none" style={{ color: "#0A0A0A" }}>
-                  {formatPrice(p.price, p.currency, lang)}
+                  {formatPrice(variantAdjustedPrice ?? p.price, p.currency, lang)}
                 </span>
-                {p.compare_at_price && p.compare_at_price > p.price && (
+                {p.compare_at_price && p.compare_at_price > (variantAdjustedPrice ?? p.price) && (
                   <>
                     <span className="text-[18px] line-through tabular-nums" style={{ color: "#A3A3A3" }}>
                       {formatPrice(p.compare_at_price, p.currency, lang)}
@@ -320,7 +353,7 @@ export function StorefrontProduct() {
                       className="text-white text-[11px] font-semibold px-2.5 py-1 tracking-tight"
                       style={{ background: "#0A0A0A", borderRadius: "2px" }}
                     >
-                      −{Math.round((1 - p.price / p.compare_at_price) * 100)}%
+                      −{Math.round((1 - (variantAdjustedPrice ?? p.price) / p.compare_at_price) * 100)}%
                     </span>
                   </>
                 )}
@@ -328,6 +361,18 @@ export function StorefrontProduct() {
               <div className="text-[11px] uppercase tracking-[0.25em]" style={{ color: "#737373" }}>
                 TVA incluse · {t(lang, "delivery_free_short")}
               </div>
+
+              {/* Sélecteur de variantes (couleur / taille) — affiché uniquement si > 1 variante */}
+              {p.variants?.length > 1 && (
+                <div className="mt-8" data-testid="product-variant-picker-section">
+                  <VariantPicker
+                    variants={p.variants}
+                    selected={selectedVariant}
+                    onSelect={setSelectedVariant}
+                    lang={lang}
+                  />
+                </div>
+              )}
 
               {(() => {
                 const highlights = (p.narrative?.benefits || p.highlights || [])
@@ -400,11 +445,14 @@ export function StorefrontProduct() {
 
                 <button
                   onClick={handleAdd}
+                  disabled={isVariantOutOfStock}
                   data-testid="add-to-cart"
-                  className="flex-1 h-14 font-semibold text-[14px] tracking-wide transition-all active:scale-[0.98] text-white flex items-center justify-center gap-2"
+                  className="flex-1 h-14 font-semibold text-[14px] tracking-wide transition-all active:scale-[0.98] text-white flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ background: added ? "#047857" : "#0A0A0A", borderRadius: "2px" }}
                 >
-                  {added ? (
+                  {isVariantOutOfStock ? (
+                    <>{t(lang, "out_of_stock") || "Indisponible"}</>
+                  ) : added ? (
                     <>
                       <CheckCircle size={16} weight="fill" /> {t(lang, "added_to_cart")}
                     </>

@@ -189,6 +189,9 @@ export default function ProductImportPanel({
     setUrl("");
     await loadProducts();
     if (!isUpsell) await loadForcePartial();
+    // Notifie les composants gating-aware (NextStepCTA) que l'état des étapes
+    // peut avoir changé.
+    try { window.dispatchEvent(new Event("cf_steps_changed")); } catch (_) { /* noop */ }
   };
 
   // --- External search links ---
@@ -611,6 +614,7 @@ function ProductsTable({ products, targetCountries, variant, siteId, onDeleted }
     }
     toast.success("Produit supprimé");
     onDeleted?.();
+    try { window.dispatchEvent(new Event("cf_steps_changed")); } catch (_) { /* noop */ }
   };
 
   return (
