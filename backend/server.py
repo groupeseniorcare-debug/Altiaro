@@ -93,6 +93,7 @@ from routes import analytics as analytics_routes
 from routes import seo_automation as seo_automation_routes
 from routes import google_ads_manual as google_ads_manual_routes
 from routes import upsells_ai as upsells_ai_routes
+from routes import admin_llm_health as admin_llm_health_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -172,6 +173,8 @@ api.include_router(analytics_routes.router)
 api.include_router(seo_automation_routes.router)
 api.include_router(google_ads_manual_routes.router)
 api.include_router(upsells_ai_routes.router)
+api.include_router(admin_llm_health_routes.router)
+api.include_router(admin_llm_health_routes.public_router)
 
 
 @app.on_event("startup")
@@ -520,6 +523,23 @@ async def startup():
             _scheduled_cj_tracking_sync,
             CronTrigger(hour="*/2", minute=15),
             id="cj_tracking_sync", replace_existing=True, misfire_grace_time=1800,
+        )
+
+        # Every 5 min — auto-resume des launch_jobs failed+resumable=true
+        # (Phase 0 résilience LLM). Tente une seule reprise par job dans
+        # les 30 min qui suivent l'échec, et seulement si le breaker Claude
+        # est revenu CLOSED ou HALF_OPEN.
+        async def _scheduled_auto_resume_launch_jobs():
+            try:
+                from routes.launch import auto_resume_failed_jobs
+                await auto_resume_failed_jobs()
+            except Exception:
+                logger.exception("[scheduler] auto_resume_launch_jobs failed")
+
+        scheduler.add_job(
+            _scheduled_auto_resume_launch_jobs,
+            CronTrigger(minute="*/5"),
+            id="auto_resume_launch_jobs", replace_existing=True, misfire_grace_time=120,
         )
 
         # Monday 05:00 UTC — Scan opportunités Google (détection spikes)

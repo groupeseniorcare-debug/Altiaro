@@ -55,6 +55,31 @@ export default function LaunchProgress({ siteId, jobId, onDone, onFailed, onAbor
   const pct = Math.max(1, Math.min(100, job?.progress_pct || 1));
   const status = job?.status || "running";
   const label = job?.current_label || "Démarrage de l'orchestration…";
+  const degradedSteps = job?.degraded_steps || [];
+  const isResumable = job?.resumable === true;
+  const completedWithDegraded = status === "completed_with_degraded";
+
+  // LLM health pill (polling toutes les 30s en parallèle)
+  const [llmHealth, setLlmHealth] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      const { data } = await apiCall(() => api.get(`/platform/llm-health`));
+      if (!cancelled && data) setLlmHealth(data);
+      if (!cancelled) setTimeout(poll, 30000);
+    };
+    poll();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleResume = async () => {
+    if (!job?.id) return;
+    const { error } = await apiCall(() =>
+      api.post(`/sites/${siteId}/design/launch-jobs/${job.id}/resume`)
+    );
+    if (error) { window.alert(`Reprise impossible : ${error}`); return; }
+    // Le polling va reprendre automatiquement (le status revient à 'running').
+  };
 
   return (
     <div

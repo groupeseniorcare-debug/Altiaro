@@ -23,6 +23,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from deps import _check_site_access, db, get_current_user
+from services.llm_resilience import (
+    safe_claude_json,
+    LLMUnavailableError,
+)
 
 logger = logging.getLogger("altiaro.upsells_ai")
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
@@ -62,38 +66,17 @@ class StatusUpdate(BaseModel):
 # ─── Helpers ─────────────────────────────────────────────────────────────
 
 async def _call_claude_json(system: str, user: str, timeout: int = 120):
-    if not EMERGENT_LLM_KEY:
-        return None, "missing_llm_key"
-    last_err = None
-    for attempt in range(2):
-        try:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage
-            async with _LLM_SEM:
-                chat = (
-                    LlmChat(
-                        api_key=EMERGENT_LLM_KEY,
-                        session_id=f"upsells-{uuid.uuid4().hex[:8]}",
-                        system_message=system,
-                    )
-                    .with_model("anthropic", "claude-sonnet-4-5-20250929")
-                )
-                raw = await asyncio.wait_for(
-                    chat.send_message(UserMessage(text=user)), timeout=timeout
-                )
-            text = raw if isinstance(raw, str) else str(raw)
-            return json.loads(_strip_json_fence(text)), None
-        except Exception as e:
-            last_err = e
-            msg = str(e)
-            if "Budget has been exceeded" in msg:
-                break
-            if attempt == 0 and ("502" in msg or "503" in msg or "Bad Gateway" in msg):
-                logger.warning(f"[upsells-claude] transient {msg[:120]} — retry in 3s")
-                await asyncio.sleep(3)
-                continue
-            break
-    logger.exception(f"[upsells-claude] failed after retries: {last_err}")
-    return None, str(last_err) if last_err else "unknown"
+    """Wrapper de compat — utilise désormais le module de résilience central
+    (retry + circuit breaker)."""
+    try:
+        data = await safe_claude_json(system, user, timeout=timeout)
+        return data, None
+    except LLMUnavailableError as e:
+        return None, f"breaker {e.provider} ({e.last_error or 'OPEN'})"
+    except ValueError as e:
+        return None, f"json_parse: {e}"
+    except Exception as e:
+        return None, str(e)[:200]
 
 
 def _normalize_suggestion(raw: dict) -> Optional[dict]:

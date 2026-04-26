@@ -33,6 +33,10 @@ from pydantic import BaseModel, Field
 
 from deps import db, get_current_user, _check_site_access
 from routes.design import _sanitize_brand_text
+from services.llm_resilience import (
+    safe_claude_json,
+    LLMUnavailableError,
+)
 
 logger = logging.getLogger("conceptfactory.launch")
 router = APIRouter()
@@ -80,32 +84,62 @@ async def _update_job(job_id: str, patch: dict):
 
 async def _advance(job_id: str, step_key: str, label: str, progress_pct: int):
     await _update_job(job_id, {
-        "current_step": step_key,
+        "current_step":  step_key,
         "current_label": label,
-        "progress_pct": progress_pct,
+        "progress_pct":  progress_pct,
     })
+    # Append to checkpoints (idempotent — $addToSet sur un dict ne marche pas,
+    # on push avec test d'unicité côté key)
+    await db.launch_jobs.update_one(
+        {"id": job_id, "checkpoints.step": {"$ne": step_key}},
+        {"$push": {"checkpoints": {
+            "step":         step_key,
+            "label":        label,
+            "progress_pct": progress_pct,
+            "ts":           datetime.now(timezone.utc).isoformat(),
+        }}},
+    )
+
+
+async def _mark_degraded(job_id: str, step_key: str, reason: str):
+    """Marque une sous-étape comme dégradée (LLM down, budget, parse, etc.)
+    pour qu'elle soit affichée en orange dans le LaunchProgress et puisse être
+    relancée à part."""
+    await db.launch_jobs.update_one(
+        {"id": job_id, "degraded_steps.step": {"$ne": step_key}},
+        {"$push": {"degraded_steps": {
+            "step":   step_key,
+            "reason": (reason or "")[:200],
+            "ts":     datetime.now(timezone.utc).isoformat(),
+        }}},
+    )
+    logger.warning(f"[launch:{job_id}] step={step_key} → DEGRADED ({reason})")
+
+
+async def _mark_failed_resumable(job_id: str, step_key: str, reason: str):
+    """Marque le job en `failed` mais avec `resumable=true` + `failed_step` →
+    permet la reprise via POST /launch-jobs/{id}/resume sans regénérer ce qui
+    a déjà été fait."""
+    await _update_job(job_id, {
+        "status":      "failed",
+        "resumable":   True,
+        "failed_step": step_key,
+        "error":       (reason or "")[:300],
+        "failed_at":   datetime.now(timezone.utc).isoformat(),
+    })
+    logger.error(f"[launch:{job_id}] FAILED (resumable) at {step_key}: {reason}")
 
 
 # ------------------------------------------------------------------
 # Phase C helpers — premium testimonials (Claude + Nano Banana portraits)
 # and CMS pages (About / Contact) generated from the narrative_angle.
 # ------------------------------------------------------------------
-async def _generate_premium_testimonials(site_id: str, wizard: dict, budget_exhausted: bool):
+async def _generate_premium_testimonials(site_id: str, wizard: dict, budget_exhausted: bool, *, job_id: Optional[str] = None):
     """Génère 3 témoignages fictifs réalistes + 3 portraits Nano Banana cohérents
     avec la niche et la voix de marque. Stocke dans `site.design.testimonials_premium`.
 
     Idempotent : si déjà 3 témoignages persistés ET pas overwrite, on ne refait rien.
     """
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    import os as _os
-    import json as _json
-    import re as _re
-
-    api_key = _os.environ.get("EMERGENT_LLM_KEY", "")
-    if not api_key:
-        logger.warning("[launch] no LLM key — skipping testimonials")
-        return
-
     site = await db.sites.find_one({"id": site_id}, {"_id": 0, "design": 1, "name": 1, "niche": 1})
     if not site:
         return
@@ -122,7 +156,7 @@ async def _generate_premium_testimonials(site_id: str, wizard: dict, budget_exha
     niche = site.get("niche") or wizard.get("niche") or "silver economy"
     narrative_angle = wizard.get("narrative_angle") or design.get("narrative_angle") or ""
 
-    # 1) Texte des 3 témoignages via Claude
+    # 1) Texte des 3 témoignages via Claude (résilience auto via safe_claude_json)
     system_msg = (
         "Tu es copywriter senior pour des marques de luxe. Tu réponds UNIQUEMENT en JSON "
         "valide, sans markdown fence, sans texte autour."
@@ -149,21 +183,19 @@ Règles :
 - Réponds UNIQUEMENT le tableau JSON."""
 
     try:
-        chat = (
-            LlmChat(api_key=api_key, session_id=f"testim-{uuid.uuid4().hex[:8]}",
-                    system_message=system_msg)
-            .with_model("anthropic", "claude-sonnet-4-5-20250929")
-        )
-        raw = await asyncio.wait_for(chat.send_message(UserMessage(text=user_prompt)), timeout=60)
-        text = raw if isinstance(raw, str) else str(raw)
-        cleaned = _re.sub(r"^```(?:json)?\s*|\s*```\s*$", "", text.strip(), flags=_re.MULTILINE).strip()
-        items = _json.loads(cleaned)
-        if isinstance(items, dict):
-            items = items.get("testimonials") or items.get("items") or []
-    except Exception as e:
-        logger.warning(f"[launch] testimonials text gen failed: {e}")
+        items = await safe_claude_json(system_msg, user_prompt, timeout=60)
+    except LLMUnavailableError as e:
+        logger.warning(f"[launch] testimonials degraded — LLM unavailable: {e.last_error}")
+        if job_id:
+            await _mark_degraded(job_id, "testimonials_premium", f"LLM down: {e.last_error}")
         return
-
+    except ValueError as e:
+        logger.warning(f"[launch] testimonials JSON parse failed: {e}")
+        if job_id:
+            await _mark_degraded(job_id, "testimonials_premium", f"JSON parse: {e}")
+        return
+    if isinstance(items, dict):
+        items = items.get("testimonials") or items.get("items") or []
     if not isinstance(items, list) or len(items) < 3:
         logger.warning(f"[launch] testimonials malformed ({type(items)}) — skip")
         return
@@ -176,7 +208,6 @@ Règles :
             break
         name = (t.get("name") or "").strip() or f"Client {i+1}"
         age = int(t.get("age") or 70)
-        # Prompt photographique premium pour le portrait
         portrait_prompt = (
             f"Editorial portrait photography, 50mm, soft golden hour window light, "
             f"shallow depth of field, neutral textured background. "
@@ -190,7 +221,7 @@ Règles :
                 pimg_routes._generate_one(portrait_prompt, site_id=site_id, product_id=f"testim-{i}"),
                 timeout=90,
             )
-        except asyncio.TimeoutError:
+        except (asyncio.TimeoutError, LLMUnavailableError):
             url = None
         except Exception as e:
             msg = str(e)
@@ -205,7 +236,7 @@ Règles :
             "city":     t.get("city") or "",
             "age":      age,
             "text":     t.get("text") or "",
-            "image":    url,  # peut être None si Nano Banana KO — frontend fallback
+            "image":    url,
             "rating":   5,
             "verified": True,
         })
@@ -221,20 +252,12 @@ Règles :
         logger.info(f"[launch] {len(out)} premium testimonials persisted (with portraits)")
 
 
-async def _generate_premium_cms_pages(site_id: str, wizard: dict):
+async def _generate_premium_cms_pages(site_id: str, wizard: dict, *, job_id: Optional[str] = None):
     """Génère pages 'À propos' (400-500 mots) et 'Contact' éditoriales,
     avec narrative_angle. Stocke dans `site.design.cms_pages = {about, contact}`.
 
     Idempotent : skip si déjà présent et pas overwrite.
     """
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    import os as _os
-    import json as _json
-    import re as _re
-
-    api_key = _os.environ.get("EMERGENT_LLM_KEY", "")
-    if not api_key:
-        return
     site = await db.sites.find_one({"id": site_id}, {"_id": 0, "design": 1, "name": 1})
     if not site:
         return
@@ -291,17 +314,16 @@ Règles :
 - Réponds UNIQUEMENT le JSON."""
 
     try:
-        chat = (
-            LlmChat(api_key=api_key, session_id=f"cms-{uuid.uuid4().hex[:8]}",
-                    system_message=system_msg)
-            .with_model("anthropic", "claude-sonnet-4-5-20250929")
-        )
-        raw = await asyncio.wait_for(chat.send_message(UserMessage(text=user_prompt)), timeout=90)
-        text = raw if isinstance(raw, str) else str(raw)
-        cleaned = _re.sub(r"^```(?:json)?\s*|\s*```\s*$", "", text.strip(), flags=_re.MULTILINE).strip()
-        parsed = _json.loads(cleaned)
-    except Exception as e:
-        logger.warning(f"[launch] cms_pages gen failed: {e}")
+        parsed = await safe_claude_json(system_msg, user_prompt, timeout=90)
+    except LLMUnavailableError as e:
+        logger.warning(f"[launch] cms_pages degraded — LLM unavailable: {e.last_error}")
+        if job_id:
+            await _mark_degraded(job_id, "cms_pages", f"LLM down: {e.last_error}")
+        return
+    except ValueError as e:
+        logger.warning(f"[launch] cms_pages JSON parse failed: {e}")
+        if job_id:
+            await _mark_degraded(job_id, "cms_pages", f"JSON parse: {e}")
         return
 
     if not isinstance(parsed, dict) or not parsed.get("about"):
@@ -744,15 +766,17 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
         # (À propos / Contact) générées avec le narrative_angle.
         try:
             await _advance(job_id, "testimonials", "Témoignages clients (3 portraits IA)…", 95)
-            await _generate_premium_testimonials(site_id, wizard, budget_exhausted)
-        except Exception:
+            await _generate_premium_testimonials(site_id, wizard, budget_exhausted, job_id=job_id)
+        except Exception as e:
             logger.exception("[launch] premium_testimonials failed (non-blocking)")
+            await _mark_degraded(job_id, "testimonials_premium", str(e)[:200])
 
         try:
             await _advance(job_id, "cms-pages", "Pages À propos / Contact éditoriales…", 97)
-            await _generate_premium_cms_pages(site_id, wizard)
-        except Exception:
+            await _generate_premium_cms_pages(site_id, wizard, job_id=job_id)
+        except Exception as e:
             logger.exception("[launch] cms_pages failed (non-blocking)")
+            await _mark_degraded(job_id, "cms_pages", str(e)[:200])
 
         # 9) Mark Étape 5 validated + unlock Étape 6 ---------------------
         await _advance(job_id, "finalize", "Finalisation & déblocage SEO", 98)
@@ -765,18 +789,37 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
         except Exception:
             pass
 
+        # Si des étapes sont en mode dégradé → status final
+        # `completed_with_degraded` (le frontend pourra afficher un récap +
+        # bouton "Relancer uniquement les étapes dégradées").
+        final_doc = await db.launch_jobs.find_one({"id": job_id}, {"_id": 0, "degraded_steps": 1})
+        degraded = (final_doc or {}).get("degraded_steps") or []
+        final_status = "completed_with_degraded" if degraded else "completed"
+
         await _update_job(job_id, {
-            "status": "completed",
-            "progress_pct": 100,
-            "current_label": "Site généré !",
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "status":        final_status,
+            "progress_pct":  100,
+            "current_label": "Site généré !" + (f" ({len(degraded)} étape(s) en mode standard)" if degraded else ""),
+            "completed_at":  datetime.now(timezone.utc).isoformat(),
         })
 
+    except LLMUnavailableError as e:
+        # LLM down → marquer le job comme `failed` MAIS resumable depuis la
+        # dernière sous-étape connue (le checkpoint le plus récent).
+        logger.warning(f"[launch] job {job_id} interrupted by LLM outage: {e.last_error}")
+        last_cp = await db.launch_jobs.find_one(
+            {"id": job_id}, {"_id": 0, "current_step": 1}
+        )
+        await _mark_failed_resumable(
+            job_id,
+            (last_cp or {}).get("current_step") or "unknown",
+            f"LLM upstream down ({e.provider}): {e.last_error}",
+        )
     except Exception as e:
         logger.exception(f"[launch] job {job_id} failed")
         await _update_job(job_id, {
-            "status": "failed",
-            "error": str(e)[:300],
+            "status":       "failed",
+            "error":        str(e)[:300],
             "completed_at": datetime.now(timezone.utc).isoformat(),
         })
 
@@ -869,10 +912,6 @@ async def _claude_brand_autoprefill(site_name: str, niche: str, products_titles:
     font_pair, hero_concept, narrative_angle. Lève HTTPException(502) si Claude
     indispo ou JSON invalide.
     """
-    api_key = _os.environ.get("EMERGENT_LLM_KEY", "")
-    if not api_key:
-        raise HTTPException(502, "EMERGENT_LLM_KEY manquant")
-
     products_block = "\n".join(f"- « {t} »" for t in products_titles[:5] if t) or "(catalogue vide)"
     system_msg = (
         "Tu es directeur artistique senior d'agence de luxe (Apple, Hermès, Aesop, Dyson, "
@@ -923,30 +962,15 @@ Règles strictes :
 Réponds UNIQUEMENT avec le JSON, sans rien autour."""
 
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = (
-            LlmChat(
-                api_key=api_key,
-                session_id=f"brand-auto-{uuid.uuid4().hex[:8]}",
-                system_message=system_msg,
-            )
-            .with_model("anthropic", "claude-sonnet-4-5-20250929")
+        parsed = await safe_claude_json(system_msg, user_prompt, timeout=90)
+    except LLMUnavailableError as e:
+        # 502 to UI : the upstream is OPEN — user should retry later
+        raise HTTPException(
+            502,
+            f"IA indisponible (proxy upstream KO). Le breaker est {e.provider}={e.last_error or 'OPEN'}. "
+            f"Réessaie dans quelques minutes ou lance la version manuelle."
         )
-        raw = await asyncio.wait_for(
-            chat.send_message(UserMessage(text=user_prompt)), timeout=90
-        )
-    except asyncio.TimeoutError:
-        raise HTTPException(504, "Génération IA trop longue (timeout 90s)")
-    except Exception as e:
-        logger.exception(f"[launch-auto] claude call failed: {e}")
-        raise HTTPException(502, f"IA indisponible : {str(e)[:120]}")
-
-    text = raw if isinstance(raw, str) else str(raw)
-    cleaned = _JSON_FENCE.sub("", text.strip()).strip()
-    try:
-        parsed = _json.loads(cleaned)
-    except _json.JSONDecodeError as e:
-        logger.warning(f"[launch-auto] invalid JSON from Claude: {cleaned[:200]}")
+    except ValueError as e:
         raise HTTPException(502, f"Réponse IA mal formée : {e}")
 
     # Validation minimale
@@ -1110,4 +1134,107 @@ async def abort_launch_job(
         }},
     )
     return {"ok": True, "matched": res.matched_count, "modified": res.modified_count}
+
+
+@router.post("/sites/{site_id}/design/launch-jobs/{job_id}/resume", tags=["launch-resilience"])
+async def resume_launch_job(
+    site_id: str,
+    job_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Reprend un job tombé en `failed` (ou `completed_with_degraded`) à partir
+    de son dernier checkpoint, sans regénérer ce qui est déjà fait.
+
+    - Refuse si le circuit breaker est OPEN (l'utilisateur doit attendre)
+    - Refuse si le job n'est pas resumable (job pas connu, status=running, etc.)
+    - Sinon : remet le job en `running`, conserve `checkpoints` et `degraded_steps`,
+      et relance `_run_launch` qui sait skipper les étapes déjà réalisées
+      grâce à ses tests d'idempotence (`if not p.get("narrative")`, etc.).
+    """
+    from services.llm_resilience import get_llm_health
+    await _check_site_access(site_id, user)
+
+    health = get_llm_health()
+    claude_state = health["breakers"].get("claude", {}).get("state", "?")
+    if claude_state == "OPEN":
+        raise HTTPException(
+            503,
+            "Le proxy Claude est en panne (circuit breaker OPEN). "
+            "Réessaie dans quelques minutes — le système retentera automatiquement."
+        )
+
+    job = await db.launch_jobs.find_one({"id": job_id, "site_id": site_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(404, "Job introuvable")
+    if job.get("status") == "running":
+        raise HTTPException(409, "Le job est déjà en cours")
+    if not job.get("resumable") and not job.get("degraded_steps"):
+        raise HTTPException(
+            400,
+            "Ce job n'est pas reprenable (terminé sans erreur ou erreur applicative non récupérable). "
+            "Lance une nouvelle génération."
+        )
+
+    # Reset state for resume
+    await db.launch_jobs.update_one(
+        {"id": job_id},
+        {"$set": {
+            "status":         "running",
+            "resumed_at":     datetime.now(timezone.utc).isoformat(),
+            "resume_count":   (job.get("resume_count") or 0) + 1,
+            "error":          None,
+            "current_label":  "Reprise du job…",
+        }},
+    )
+
+    wizard = job.get("wizard") or {}
+    asyncio.create_task(_run_launch(job_id, site_id, user["id"], wizard))
+    return {
+        "ok":             True,
+        "job_id":         job_id,
+        "resumed":        True,
+        "resume_count":   (job.get("resume_count") or 0) + 1,
+        "previous_step":  job.get("failed_step") or job.get("current_step"),
+        "degraded_steps": job.get("degraded_steps") or [],
+    }
+
+
+async def auto_resume_failed_jobs():
+    """Cron 5 min — repère les jobs `failed + resumable=true + auto_resume!=false`
+    qui ont échoué dans les 30 dernières minutes ET dont le breaker Claude est
+    revenu CLOSED/HALF_OPEN. Tente une reprise auto **une seule fois** par job.
+    """
+    from services.llm_resilience import get_llm_health
+    health = get_llm_health()
+    claude_state = health["breakers"].get("claude", {}).get("state", "?")
+    if claude_state == "OPEN":
+        logger.info("[auto-resume] Claude breaker OPEN — skip cycle")
+        return
+
+    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+    cursor = db.launch_jobs.find({
+        "status":           "failed",
+        "resumable":        True,
+        "failed_at":        {"$gte": cutoff},
+        "auto_resume":      {"$ne": False},
+        "auto_resumed_at":  {"$exists": False},   # 1× max
+    }, {"_id": 0, "id": 1, "site_id": 1, "user_id": 1, "wizard": 1})
+    async for job in cursor:
+        try:
+            await db.launch_jobs.update_one(
+                {"id": job["id"]},
+                {"$set": {
+                    "status":          "running",
+                    "auto_resumed_at": datetime.now(timezone.utc).isoformat(),
+                    "current_label":   "Reprise automatique…",
+                    "error":           None,
+                }},
+            )
+            asyncio.create_task(_run_launch(
+                job["id"], job["site_id"], job.get("user_id") or "auto",
+                job.get("wizard") or {},
+            ))
+            logger.info(f"[auto-resume] kicked job={job['id'][:8]} site={job['site_id'][:8]}")
+        except Exception:
+            logger.exception(f"[auto-resume] failed for job={job.get('id')}")
 
