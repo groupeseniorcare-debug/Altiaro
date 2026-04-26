@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, CheckCircle, Storefront as StoreIcon, Rocket, Palette } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, CheckCircle, Storefront as StoreIcon, Rocket, Palette, Sparkle, MagicWand } from "@phosphor-icons/react";
+import { toast } from "sonner";
 import NextStepCTA from "../components/NextStepCTA";
 import { api, apiCall } from "../lib/api";
 import IdentityTab from "../components/site-design/IdentityTab";
@@ -81,6 +82,29 @@ export default function SiteBranding() {
     await reload();
   };
 
+  // ── Mode Auto-pilot : 1 clic full IA ultra premium ────────────────────
+  const [launching, setLaunching] = useState(false);
+  const launchAuto = async () => {
+    setLaunching(true);
+    const { data, error } = await apiCall(
+      () => api.post(`/sites/${siteId}/design/launch-auto`),
+      { timeout: 120000 }
+    );
+    setLaunching(false);
+    if (error) {
+      toast.error("Génération impossible", { description: error });
+      return;
+    }
+    if (data?.job_id) {
+      const ab = data.auto_brand || {};
+      toast.success(`✨ Identité « ${ab.brand_name || "premium"} » créée`, {
+        description: ab.tagline || "Génération du site en cours…",
+        duration: 6000,
+      });
+      setLaunchJobId(data.job_id);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center">
@@ -108,6 +132,112 @@ export default function SiteBranding() {
         jobId={launchJobId}
         onDone={() => { setLaunchJobId(null); reload(); }}
       />
+    );
+  }
+
+  // ── First-run hero : 2 options claires (Auto IA ⭐ vs Wizard manuel) ──
+  // Affiché tant qu'aucun design n'existe. Une fois généré, on bascule sur
+  // le layout d'édition normal (essentiel/avancé).
+  if (!hasDesign) {
+    return (
+      <div className="min-h-screen bg-[#FAFAFA]">
+        <div className="max-w-4xl mx-auto px-6 md:px-10 py-12">
+          <Link
+            to={`/sites/${siteId}`}
+            className="inline-flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900 mb-8"
+            data-testid="back-to-cockpit"
+          >
+            <ArrowLeft size={14} /> Retour au cockpit
+          </Link>
+
+          <div className="text-center mb-10">
+            <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 mb-2 font-medium">
+              Étape 5 — Identité & design
+            </div>
+            <h1 className="text-3xl md:text-4xl text-neutral-900" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
+              Donne vie à ta marque
+            </h1>
+            <p className="text-sm text-neutral-600 mt-3 max-w-xl mx-auto">
+              Identité de marque, palette, typographie, hero, sections — tout
+              en un seul clic, ou personnalisable étape par étape.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {/* Option A — HERO Auto IA */}
+            <button
+              onClick={launchAuto}
+              disabled={launching}
+              data-testid="launch-design-auto"
+              className="group w-full bg-gradient-to-br from-neutral-900 via-neutral-900 to-neutral-800 text-white p-7 md:p-8 rounded-2xl text-left shadow-xl hover:shadow-2xl hover:scale-[1.005] transition-all disabled:opacity-70 disabled:cursor-progress relative overflow-hidden"
+            >
+              {/* Subtle gold gradient overlay */}
+              <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-gradient-to-br from-amber-500/20 to-transparent blur-3xl pointer-events-none" />
+              <div className="relative flex items-start gap-5">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400/30 to-amber-200/10 border border-amber-300/30 flex items-center justify-center flex-shrink-0">
+                  {launching
+                    ? <Sparkle size={26} weight="fill" className="text-amber-200 animate-pulse" />
+                    : <MagicWand size={26} weight="duotone" className="text-amber-200" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] uppercase tracking-[0.2em] text-amber-200 font-semibold">
+                      Recommandé · Aucune configuration
+                    </span>
+                  </div>
+                  <div className="text-2xl md:text-[28px] font-light mt-2 mb-2.5 leading-tight" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
+                    {launching ? "Génération en cours…" : "Tout générer en automatique"}
+                  </div>
+                  <div className="text-[13px] text-white/75 leading-relaxed max-w-xl">
+                    L'IA crée TOUT pour toi : nom de marque, identité, couleurs,
+                    typographies, hero, sections — en se basant sur ton catalogue
+                    actuel. Style&nbsp;: <strong className="text-white">Ultra-premium</strong> par défaut.
+                  </div>
+                  <div className="mt-4 flex items-center gap-3 text-[11px] text-white/50 flex-wrap">
+                    <span className="inline-flex items-center gap-1"><Sparkle size={11} weight="fill" /> 1 clic</span>
+                    <span>·</span>
+                    <span>Pas de formulaire</span>
+                    <span>·</span>
+                    <span>Prêt en ~60 secondes</span>
+                  </div>
+                </div>
+                <ArrowRight
+                  size={22}
+                  weight="bold"
+                  className="text-white/30 group-hover:text-white group-hover:translate-x-1 transition-all flex-shrink-0 mt-2"
+                />
+              </div>
+            </button>
+
+            {/* Option B — Wizard manuel (secondaire) */}
+            <button
+              onClick={() => setMode("wizard")}
+              data-testid="launch-design-wizard"
+              disabled={launching}
+              className="w-full border border-neutral-200 bg-white p-5 rounded-xl text-left hover:border-neutral-900 hover:bg-neutral-50 transition disabled:opacity-50"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-neutral-100 flex items-center justify-center flex-shrink-0">
+                  <Palette size={18} weight="duotone" className="text-neutral-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-neutral-900">
+                    Personnaliser manuellement
+                  </div>
+                  <div className="text-[12px] text-neutral-500 mt-0.5">
+                    Mode avancé — tu choisis nom, baseline, mission, mood, palette, typographie pas à pas.
+                  </div>
+                </div>
+                <ArrowRight size={14} className="text-neutral-300 flex-shrink-0" />
+              </div>
+            </button>
+          </div>
+
+          <div className="mt-8 text-center text-[11px] text-neutral-400">
+            Tu pourras retoucher tous les détails après la génération.
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -152,12 +282,14 @@ export default function SiteBranding() {
                   </span>
                 ) : (
                   <button
-                    onClick={() => setMode("wizard")}
-                    data-testid="relaunch-wizard"
-                    className="h-10 px-4 bg-neutral-900 hover:bg-black text-white text-[13px] font-semibold flex items-center gap-2"
+                    onClick={launchAuto}
+                    disabled={launching}
+                    data-testid="relaunch-auto"
+                    className="h-10 px-4 bg-neutral-900 hover:bg-black text-white text-[13px] font-semibold flex items-center gap-2 disabled:opacity-60"
                     style={{ borderRadius: "2px" }}
                   >
-                    <Rocket size={14} weight="fill" /> Générer mon site (IA)
+                    <MagicWand size={14} weight="fill" />
+                    {launching ? "Génération…" : "Générer mon site (IA auto)"}
                   </button>
                 )}
                 <Link

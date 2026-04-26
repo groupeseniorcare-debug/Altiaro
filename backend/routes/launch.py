@@ -556,3 +556,234 @@ async def launch_status(
     if not doc:
         return {"status": "idle"}
     return doc
+
+
+# ------------------------------------------------------------------
+# Auto-pilot endpoint : 1 click, full premium identity via Claude
+# ------------------------------------------------------------------
+import json as _json  # local alias to keep imports tight
+import os as _os
+import re as _re
+
+_JSON_FENCE = _re.compile(r"^```(?:json)?\s*|\s*```\s*$", _re.MULTILINE)
+
+
+def _pick_text_simple(value):
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        for k in ("fr", "en", "de", "es", "it", "nl"):
+            if isinstance(value.get(k), str) and value[k].strip():
+                return value[k]
+        for v in value.values():
+            if isinstance(v, str) and v.strip():
+                return v
+    return ""
+
+
+async def _claude_brand_autoprefill(site_name: str, niche: str, products_titles: list[str]) -> dict:
+    """Demande à Claude de générer une identité de marque ultra-premium complète.
+
+    Retourne un dict avec brand_name, tagline, mission, voice, mood, palette,
+    font_pair, hero_concept, narrative_angle. Lève HTTPException(502) si Claude
+    indispo ou JSON invalide.
+    """
+    api_key = _os.environ.get("EMERGENT_LLM_KEY", "")
+    if not api_key:
+        raise HTTPException(502, "EMERGENT_LLM_KEY manquant")
+
+    products_block = "\n".join(f"- « {t} »" for t in products_titles[:5] if t) or "(catalogue vide)"
+    system_msg = (
+        "Tu es directeur artistique senior d'agence de luxe (Apple, Hermès, Aesop, Dyson, "
+        "Loro Piana). Tu réponds UNIQUEMENT en JSON valide, sans texte avant/après, sans "
+        "markdown fence."
+    )
+    user_prompt = f"""Crée l'identité de marque ULTRA-PREMIUM pour cette boutique e-commerce.
+
+Contexte :
+- Nom du site : {site_name or "(non défini)"}
+- Niche : {niche}
+- Produits du catalogue :
+{products_block}
+
+Génère un JSON STRICT avec exactement ces clés :
+{{
+  "brand_name": "Nom de marque court et mémorable, 1-3 mots, élégant, jamais 'Pro'/'Plus'/'Shop'/'Store'",
+  "tagline": "Phrase d'accroche premium, 6-10 mots, jamais 'Le meilleur choix'",
+  "mission": "Mission de marque inspirante, 25-40 mots, orientée valeur humaine",
+  "voice": "premium",
+  "mood": "luxury_minimal",
+  "palette": {{
+    "primary": "#hexcode (couleur signature, raffinée, jamais cliché)",
+    "accent": "#hexcode (accent subtil pour CTAs)",
+    "background": "#hexcode (off-white ou ivoire chaud, jamais #ffffff pur)",
+    "text": "#hexcode (anthracite ou sépia profond, jamais #000000 pur)",
+    "rationale": "1 phrase justifiant les choix"
+  }},
+  "font_pair": {{
+    "heading": "Cormorant Garamond",
+    "body": "Inter",
+    "rationale": "1 phrase justifiant l'association"
+  }},
+  "hero_concept": "Description du hero en 25-40 mots — photo lifestyle éditoriale, jamais stock photo générique",
+  "narrative_angle": "Angle éditorial unique de la marque en 2 phrases"
+}}
+
+Règles strictes :
+- voice ∈ {{"premium","warm","expert","minimal"}} (uniquement)
+- mood ∈ {{"luxury_minimal","warm_premium","editorial","scandinavian"}} (uniquement)
+- heading ∈ {{"Cormorant Garamond","Playfair Display","DM Serif Display","Fraunces"}}
+- body    ∈ {{"Inter","Manrope","DM Sans","Nunito Sans"}}
+- Pas de néon, pas de couleurs criardes
+- Pour silver economy : tons profonds, terreux, ivoires, anthracites
+- Tagline jamais générique
+- Mission orientée valeur humaine, pas commerciale
+
+Réponds UNIQUEMENT avec le JSON, sans rien autour."""
+
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = (
+            LlmChat(
+                api_key=api_key,
+                session_id=f"brand-auto-{uuid.uuid4().hex[:8]}",
+                system_message=system_msg,
+            )
+            .with_model("anthropic", "claude-sonnet-4-5-20250929")
+        )
+        raw = await asyncio.wait_for(
+            chat.send_message(UserMessage(text=user_prompt)), timeout=90
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(504, "Génération IA trop longue (timeout 90s)")
+    except Exception as e:
+        logger.exception(f"[launch-auto] claude call failed: {e}")
+        raise HTTPException(502, f"IA indisponible : {str(e)[:120]}")
+
+    text = raw if isinstance(raw, str) else str(raw)
+    cleaned = _JSON_FENCE.sub("", text.strip()).strip()
+    try:
+        parsed = _json.loads(cleaned)
+    except _json.JSONDecodeError as e:
+        logger.warning(f"[launch-auto] invalid JSON from Claude: {cleaned[:200]}")
+        raise HTTPException(502, f"Réponse IA mal formée : {e}")
+
+    # Validation minimale
+    required = ["brand_name", "tagline", "mission", "voice", "mood", "palette", "font_pair"]
+    missing = [k for k in required if k not in parsed]
+    if missing:
+        raise HTTPException(502, f"Champs IA manquants : {missing}")
+
+    # Coercion soft sur les valeurs autorisées
+    if parsed["voice"] not in ("premium", "warm", "expert", "minimal"):
+        parsed["voice"] = "premium"
+    if parsed["mood"] not in ("luxury_minimal", "warm_premium", "editorial", "scandinavian"):
+        parsed["mood"] = "luxury_minimal"
+    if not isinstance(parsed["palette"], dict):
+        parsed["palette"] = {"primary": "#1A1A1A", "accent": "#A87B5C",
+                             "background": "#FAF7F2", "text": "#2A2A2A"}
+    if not isinstance(parsed["font_pair"], dict):
+        parsed["font_pair"] = {"heading": "Cormorant Garamond", "body": "Inter"}
+
+    return parsed
+
+
+@router.post("/sites/{site_id}/design/launch-auto", status_code=201)
+async def launch_site_auto(
+    site_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """One-click full auto generation — Claude pré-remplit toute l'identité de
+    marque en mode ultra-premium puis lance le job de design existant.
+
+    Le user n'a aucun champ à remplir : on charge le contexte (niche + produits),
+    on demande à Claude une identité complète, on la passe au pipeline `_run_launch`
+    classique (réutilisé tel quel — flag `premium_mode=True` propagé via le doc job).
+    """
+    await _check_site_access(site_id, user)
+
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(404, "Site introuvable")
+
+    # Anti-concurrence
+    running = await db.launch_jobs.find_one(
+        {"site_id": site_id, "status": "running"}, {"_id": 0, "id": 1}
+    )
+    if running:
+        raise HTTPException(409, "Une génération est déjà en cours pour ce site.")
+
+    # Charge le contexte (niche + 5 produits actifs)
+    products_sample = await db.products.find(
+        {"site_id": site_id, "status": "active"}, {"_id": 0, "name": 1, "title": 1},
+    ).limit(5).to_list(5)
+    products_titles = []
+    for p in products_sample:
+        t = _pick_text_simple(p.get("title")) or _pick_text_simple(p.get("name"))
+        if t:
+            products_titles.append(t[:120])
+
+    niche = (
+        site.get("niche") or site.get("niche_label") or site.get("category")
+        or "premium e-commerce"
+    )
+    site_name = site.get("name") or ""
+
+    # 1) Demande à Claude l'identité complète
+    parsed = await _claude_brand_autoprefill(site_name, niche, products_titles)
+
+    # 2) Construit le payload Wizard equivalent (réutilise WizardInput pour
+    #    rester compatible avec _run_launch sans modifier ce dernier).
+    wizard_payload = {
+        "brand_name":      _sanitize_brand_text(parsed["brand_name"]),
+        "tagline":         parsed["tagline"],
+        "mission":         parsed["mission"],
+        "voice":           parsed["voice"],
+        "mood":            "Éditorial",  # mapping vers les 4 valeurs internes connues
+        "palette_choice":  parsed["palette"],
+        "font_pair":       parsed["font_pair"],
+        "homepage_preset": "default_template",
+        "overwrite_all":   True,
+        "logo_style":      "horizontal_premium",
+        # Hints supplémentaires pour _run_launch (ignorés s'il ne les lit pas
+        # — pas de breaking change)
+        "hero_concept":    parsed.get("hero_concept", ""),
+        "narrative_angle": parsed.get("narrative_angle", ""),
+        "premium_mode":    True,
+    }
+
+    # Mapping mood Claude → mood interne
+    mood_map = {
+        "luxury_minimal": "Minimaliste",
+        "warm_premium":   "Chaleureux",
+        "editorial":      "Éditorial",
+        "scandinavian":   "Moderne",
+    }
+    wizard_payload["mood"] = mood_map.get(parsed["mood"], "Éditorial")
+
+    # 3) Spawn le job (même infra que /design/launch)
+    job_id = str(uuid.uuid4())
+    await db.launch_jobs.insert_one({
+        "id":              job_id,
+        "site_id":         site_id,
+        "user_id":         user["id"],
+        "status":          "running",
+        "progress_pct":    0,
+        "current_step":    "start",
+        "current_label":   "Conception de l'identité de marque…",
+        "wizard":          wizard_payload,
+        "auto_mode":       True,
+        "premium_mode":    True,
+        "auto_brand":      parsed,  # exposé au frontend pour affichage live
+        "created_at":      datetime.now(timezone.utc).isoformat(),
+    })
+
+    asyncio.create_task(_run_launch(job_id, site_id, user["id"], wizard_payload))
+
+    return {
+        "ok":         True,
+        "job_id":     job_id,
+        "status":     "running",
+        "auto_brand": parsed,  # le user voit ce que Claude a choisi
+    }
+
