@@ -330,6 +330,21 @@ Règles :
         logger.warning("[launch] cms_pages malformed — skip")
         return
 
+    # ────────────────────────────────────────────────────────────────────
+    # Bloc 3 — Brand-prefix sur les H1 (about + contact) pour le SEO.
+    # Le H1 d'une page corporate doit idéalement contenir le nom de marque
+    # (signal SEO fort + cohérence éditoriale). Claude génère parfois un
+    # titre "pur éditorial" qui n'inclut pas le brand → on préfixe ici.
+    # Idempotent : si Claude a déjà mis le brand dans le titre, on ne
+    # préfixe pas (évite "Altea — Altea, l'art …").
+    # ────────────────────────────────────────────────────────────────────
+    for slug in ("about", "contact"):
+        page = parsed.get(slug)
+        if isinstance(page, dict):
+            original_title = (page.get("title") or "").strip()
+            if original_title and brand_name and brand_name.lower() not in original_title.lower():
+                page["title"] = f"{brand_name} — {original_title}"
+
     await db.sites.update_one(
         {"id": site_id},
         {"$set": {
