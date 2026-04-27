@@ -253,19 +253,18 @@ export function StorefrontProduct() {
               { "@type": "ListItem", position: p.category ? 4 : 3, name: pickLang(p.name, lang), item: `${window.location.origin}/shop/${siteId}/product/${p.id}` },
             ].filter(Boolean),
           },
-          (p.faq_product?.length || p.narrative?.faq?.length || p.narrative?.seo?.people_also_ask?.length) ? {
-            "@context": "https://schema.org",
-            "@type": "FAQPage",
-            mainEntity: [
-              ...(p.faq_product || []),
-              ...(p.narrative?.faq || []),
-              ...(p.narrative?.seo?.people_also_ask || []),
-            ].slice(0, 12).map((f) => ({
-              "@type": "Question",
-              name: f.question,
-              acceptedAnswer: { "@type": "Answer", text: f.answer },
-            })),
-          } : null,
+          (() => {
+            const faqList = (p.faq_product?.length ? p.faq_product : (p.narrative?.faq || [])).slice(0, 8);
+            return faqList.length ? {
+              "@context": "https://schema.org",
+              "@type": "FAQPage",
+              mainEntity: faqList.map((f) => ({
+                "@type": "Question",
+                name: f.question,
+                acceptedAnswer: { "@type": "Answer", text: f.answer },
+              })),
+            } : null;
+          })(),
           (p.how_to_steps?.length >= 3) ? {
             "@context": "https://schema.org",
             "@type": "HowTo",
@@ -596,26 +595,15 @@ export function StorefrontProduct() {
               sélectionnée n'a pas ce style → masqué proprement. */}
           <WideLifestyleBanner product={p} productName={pickLang(p.name, lang)} design={design} />
 
-          {/* Phase 2.3 (Lot I A) — Editorial mosaic & narrative sections passent
-              désormais par le pool `getProductGalleryForColor()` qui :
-                1. Privilégie la variante couleur sélectionnée
-                2. Filtre les images `qa_passed === false` (cf productImage.js)
-                3. Tombe en fallback sur image fournisseur AE plutôt que sur
-                   une mauvaise image IA. */}
-          <ProductEditorialMosaic
-            images={getProductGalleryForColor(p, selectedColorSlug)}
-            styledImages={(selectedColorSlug && p.generated_images_by_variant?.[selectedColorSlug]) || p.generated_images || []}
-            productName={pickLang(p.name, lang)}
-            design={design}
-            product={p}
-          />
+          {/* Phase 2.4 — Sections éditoriales horizontales SUPPRIMÉES sur
+              décision user 2026-04-27 :
+              ❌ <ProductEditorialMosaic> ("La preuve en détail" + 3 blocs)
+              ❌ <NarrativeSections> (3 sections narratives image+texte)
+              Raison : redondance avec USPs + HowTo + WideLifestyle, et
+              alourdissement visuel de la page. La pipeline `launch.py` continue
+              de générer `p.narrative.sections` (utilisé par les pages CMS) mais
+              ces composants ne sont plus rendus sur la page produit. */}
 
-          <NarrativeSections
-            sections={p.narrative?.sections}
-            design={design}
-            productImages={getProductGalleryForColor(p, selectedColorSlug)}
-            product={p}
-          />
           <TechSpecs specs={p.narrative?.tech_specs} design={design} />
 
           {/* Phase 2.3 (Lot I I12) — FAQ produit unique : priorité au champ
@@ -623,8 +611,30 @@ export function StorefrontProduct() {
               questions livraison/retours/garantie). Fallback legacy
               `p.narrative?.faq` si pas encore généré. La FAQ générique
               livraison/retours/SAV est déplacée en footer (page CMS dédiée). */}
-          <ProductFAQ faq={p.faq_product?.length ? p.faq_product : p.narrative?.faq} design={design} />
-          <PeopleAlsoAsk items={p.narrative?.seo?.people_also_ask} design={design} lang={lang} />
+          {/* Phase 2.4 — FAQ : on ferme le wrapper max-w-7xl pour laisser la
+              FAQ s'étaler pleine largeur sur desktop (px-6 md:px-16 lg:px-24). */}
+        </div>
+      </div>
+
+      {/* Phase 2.4 (Lot I I12 v2) — FAQ produit unique, pleine largeur desktop.
+          Lit `p.faq_product` (priorité) → fallback legacy `p.narrative.faq`.
+          Le JSON-LD FAQPage est aligné UI ↔ SEO (cf <SEOHead> plus haut). */}
+      <section className="bg-white" data-testid="product-faq-section-fullwidth">
+        <div className="max-w-[1600px] mx-auto px-6 md:px-16 lg:px-24">
+          <ProductFAQ
+            faq={p.faq_product?.length ? p.faq_product : p.narrative?.faq}
+            design={design}
+          />
+        </div>
+      </section>
+
+      <div className="bg-white">
+        <div className="max-w-7xl mx-auto px-6 md:px-10 pb-12">
+          {/* Phase 2.4 — <PeopleAlsoAsk> retiré sur décision user 2026-04-27 :
+              le H2 "Frequently asked questions" qu'il rendait apparaissait
+              comme une 2ème FAQ, ce qui contredit la consigne "FAQ produit
+              unique". Le `narrative.seo.people_also_ask` reste en DB et peut
+              être réutilisé ailleurs si besoin (ex: page CMS dédiée). */}
           <ProductReviews product={p} design={design} lang={lang} />
           <RelatedQueries queries={p.narrative?.seo?.related_queries} design={design} />
           <UpsellsRecommendations
