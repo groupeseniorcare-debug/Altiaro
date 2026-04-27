@@ -133,7 +133,7 @@ export function StorefrontAbout() {
       })) : [
         { icon: Heart, title: "Bienveillance", desc: "Chaque produit est pensé pour préserver dignité, confort et autonomie." },
         { icon: ShieldCheck, title: "Exigence", desc: "Audits fournisseurs, tests ergothérapeutes, garantie 2 ans sur tout." },
-        { icon: HandHeart, title: "Accompagnement", desc: "Un conseiller humain Lun–Ven 9h–18h, installation possible à domicile." },
+        { icon: HandHeart, title: "Accompagnement", desc: "Notre support est disponible Lun–Ven 9h–18h, installation possible à domicile." },
         { icon: Leaf, title: "Responsabilité", desc: "Circuits courts privilégiés, emballages réduits, logistique optimisée." },
       ]);
 
@@ -337,7 +337,7 @@ export function StorefrontContact() {
           )}
 
           <div className="bg-neutral-50 rounded-2xl p-5 border border-neutral-100">
-            <div className="font-semibold mb-2 text-neutral-900">Un conseiller humain, pas un chatbot</div>
+            <div className="font-semibold mb-2 text-neutral-900">Un support attentif, pas un chatbot</div>
             <div className="text-sm text-neutral-600 leading-relaxed">
               Chez nous, on préfère prendre 5 minutes de plus pour vraiment comprendre votre besoin plutôt que de vous renvoyer vers une FAQ.
             </div>

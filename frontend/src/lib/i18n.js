@@ -232,7 +232,7 @@ const DICT = {
     product_highlight_delivery_72h:  "Livraison offerte sous 72h",
     product_highlight_warranty_2y:   "Garantie 2 ans incluse",
     product_highlight_returns_14d:   "Retour gratuit 14 jours",
-    product_highlight_support_7d:    "Conseiller humain 7j/7",
+    product_highlight_support_7d:    "Support 7j/7",
   },
   en: {
     shop_title: "Our shop",

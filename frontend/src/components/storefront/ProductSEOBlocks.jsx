@@ -175,6 +175,11 @@ export function UsageSteps({ steps, productName, design }) {
 
 /* ---------- Related Queries (internal linking) ---------- */
 export function RelatedQueries({ queries, design }) {
+  // Lot G Fix 8 — Le bloc "Recherches populaires" pollue la fin de fiche
+  // produit (faible valeur conversion + pas premium). Retiré du rendu.
+  // Code conservé pour réactivation future via `?showRelated=1` ou flag admin.
+  return null;
+  // eslint-disable-next-line no-unreachable
   const { siteId } = useParams();
   if (!queries || queries.length === 0) return null;
   const { primary, fontHeading } = designAccents(design);

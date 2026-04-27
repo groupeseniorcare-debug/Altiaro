@@ -55,11 +55,13 @@ export function NarrativeSections({ sections, design, productImages = [] }) {
               </div>
             )}
             <div className={hasImage ? "md:order-2" : "md:col-span-5"}>
+              {/* Lot G Fix 7 — Le pattern "01 · Chapitre / 02 · Chapitre"
+                  est jugé trop typé "magazine fashion" par l'utilisateur sur
+                  les fiches produits Altea. On garde le séparateur visuel
+                  (trait + point primary) sans le label numéroté. */}
               <div className="flex items-center gap-3 mb-5">
                 <span className="h-px w-8" style={{ background: primary }} />
-                <span className="text-[10px] uppercase tracking-[0.35em] font-medium" style={{ color: primary }}>
-                  {String(i + 1).padStart(2, "0")} · Chapitre
-                </span>
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: primary }} />
               </div>
               <h2
                 className="text-[30px] md:text-[44px] leading-[1.05] tracking-[-0.015em]"
