@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Check } from "@phosphor-icons/react";
 import {
   colorFromName,
@@ -6,6 +6,7 @@ import {
   colorFromNameOrFallback,
   isLightColor,
 } from "../../lib/colorMapping";
+import { useProductColor } from "../../lib/ProductColorContext";
 
 /**
  * VariantPicker — sélecteur de variantes premium pour les fiches produit.
@@ -50,39 +51,72 @@ function isParasiticAxis(values) {
 
 export default function VariantPicker({ variants = [], selected, onSelect, lang = "fr" }) {
   const labels = LABELS[lang] || LABELS.fr;
+  // Lot H Fix 4 — publie la couleur sélectionnée vers le Context React pour que
+  // ProductGallery + composants editorial puissent réagir au changement.
+  const { setSelectedColor } = useProductColor();
 
   const cleaned = useMemo(
     () => (variants || []).filter((v) => v && (v.vid || v.sku) && Array.isArray(v.properties)),
     [variants]
   );
-  // Si aucune variante OU une seule (cas dégénéré) → on n'affiche rien
-  if (cleaned.length <= 1) return null;
+
+  // Lot H Fix 4 — TOUS les hooks doivent être appelés AVANT tout `return null`
+  // conditionnel (Rules of Hooks). On calcule axes / visibleAxes / colorAxisIdx
+  // de manière mémoïsée, puis on applique les `return null` plus bas.
 
   // Détection du nombre d'axes (max 2)
-  const axisCount = Math.min(2, Math.max(...cleaned.map((v) => v.properties.length || 1), 1));
+  const axisCount = Math.min(
+    2,
+    Math.max(...(cleaned.length ? cleaned.map((v) => v.properties.length || 1) : [1]), 1)
+  );
 
   // Listes de valeurs uniques par axe
-  const axes = [];
-  for (let i = 0; i < axisCount; i++) {
-    const set = new Set();
-    cleaned.forEach((v) => {
-      const val = v.properties[i];
-      if (val) set.add(val);
-    });
-    axes.push(Array.from(set));
-  }
+  const axes = useMemo(() => {
+    const out = [];
+    for (let i = 0; i < axisCount; i++) {
+      const set = new Set();
+      cleaned.forEach((v) => {
+        const val = v.properties[i];
+        if (val) set.add(val);
+      });
+      out.push(Array.from(set));
+    }
+    return out;
+  }, [cleaned, axisCount]);
 
   // Lot H Fix 1 — détecte les axes parasites (ships_from, plug)
   // pour les masquer côté affichage (défense en profondeur).
-  const visibleAxesIndices = axes
-    .map((vals, i) => ({ i, vals }))
-    .filter(({ vals }) => !isParasiticAxis(vals))
-    .map(({ i }) => i);
-
-  // Si aucun axe visible (cas dégénéré, tous parasites) → rien à afficher.
-  if (visibleAxesIndices.length === 0) return null;
+  const visibleAxesIndices = useMemo(
+    () => axes
+      .map((vals, i) => ({ i, vals }))
+      .filter(({ vals }) => !isParasiticAxis(vals))
+      .map(({ i }) => i),
+    [axes]
+  );
 
   const selectedProps = selected?.properties || [];
+
+  // Lot H Fix 4 — détecte automatiquement l'axe couleur et publie la couleur
+  // sélectionnée dans le ProductColorContext (consommé par ProductGallery,
+  // composants editorial, etc.). Sync à chaque changement de variante.
+  const colorAxisIdx = useMemo(() => {
+    for (const i of visibleAxesIndices) {
+      if (isColorAxis(axes[i])) return i;
+    }
+    return -1;
+  }, [visibleAxesIndices, axes]);
+
+  useEffect(() => {
+    if (colorAxisIdx < 0) return;
+    const colorVal = selectedProps[colorAxisIdx];
+    if (colorVal) setSelectedColor(colorVal);
+  }, [selectedProps, colorAxisIdx, setSelectedColor]);
+
+  // ─── EARLY RETURNS (après tous les hooks) ───────────────────────────────
+  // Si aucune variante OU une seule (cas dégénéré) → on n'affiche rien
+  if (cleaned.length <= 1) return null;
+  // Si aucun axe visible (cas dégénéré, tous parasites) → rien à afficher.
+  if (visibleAxesIndices.length === 0) return null;
 
   // Helpers pour savoir si une valeur d'axe est dispo (≥1 variante en stock)
   // étant donné les sélections fixées sur les autres axes.

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -353,6 +354,159 @@ Règles :
         }},
     )
     logger.info("[launch] cms_pages (about+contact) persisted")
+
+
+# ------------------------------------------------------------------
+# Lot H Fix 6 — Color variant images (img-to-img) helper
+# ------------------------------------------------------------------
+async def _generate_color_variant_images_for_product(
+    db,
+    product_id: str,
+    site_id: str,
+    *,
+    max_colors: int = 5,
+    on_budget_exhausted=None,
+):
+    """Génère les images IA cohérentes pour les couleurs additionnelles d'un produit.
+
+    Stratégie (cohérente avec scripts/lotH_h2h3_regen_color_variants.py) :
+      - Lit `product.variants[].properties[0]` pour identifier les couleurs.
+      - La 1ère couleur = "default" → COPIE les `generated_images` existants
+        dans `generated_images_by_variant[default_slug]` (0 cost).
+      - Pour les autres couleurs (jusqu'à `max_colors`) → génère
+        studio + lifestyle + closeup via Nano Banana img-to-img avec
+        prompt strict (préservation identité produit).
+
+    Idempotent : skip les couleurs déjà présentes dans
+    `generated_images_by_variant`. Tolérant aux 402 (budget) :
+    propage l'exception au caller.
+
+    Pour TOUS les futurs sites créés via launch-auto, cela garantit que la
+    galerie variant-aware (Lot H Fix 4) fonctionne automatiquement.
+    """
+    from services.color_variant_images import (  # noqa: PLC0415
+        slugify_color,
+        generate_color_variant_image,
+        detect_product_kind,
+        color_label_to_english,
+        _fetch_image_b64,
+    )
+    from services.colormapping_py import is_color_axis  # noqa: PLC0415 # below
+
+    p = await db.products.find_one(
+        {"id": product_id},
+        {"_id": 0, "id": 1, "name": 1, "variants": 1, "generated_images": 1, "generated_images_by_variant": 1},
+    )
+    if not p:
+        return
+    variants = p.get("variants") or []
+    if len(variants) <= 1:
+        return  # mono-variant → pas de couleurs à générer
+
+    # Extract the color axis (must be position 0 after H1 audit + must look like colors)
+    raw_colors_pos0 = []
+    for v in variants:
+        props = v.get("properties") or []
+        if props and props[0]:
+            raw_colors_pos0.append(str(props[0]).strip())
+    distinct_colors = list({c.lower(): c for c in raw_colors_pos0}.values())  # preserve original-cased
+    if len(distinct_colors) <= 1:
+        return  # 1 single color → no variant set needed
+    if not is_color_axis(distinct_colors):
+        # Not a color axis (e.g., size only) → nothing to do
+        return
+
+    # Reorder by appearance order
+    seen = set()
+    ordered = []
+    for c in raw_colors_pos0:
+        if c.lower() in seen:
+            continue
+        seen.add(c.lower())
+        ordered.append(c)
+    colors = ordered[: max_colors + 1]  # +1 because [0] = default
+    default_color = colors[0]
+    default_slug = slugify_color(default_color)
+    other_colors = colors[1:]
+
+    gi = p.get("generated_images") or []
+    if not gi:
+        logger.info(f"[launch] color-variants {product_id[:8]}: no generated_images yet — skip")
+        return
+
+    by_variant = dict(p.get("generated_images_by_variant") or {})
+
+    # 1) Default color = copy from generated_images (0 LLM cost)
+    if default_slug not in by_variant:
+        by_variant[default_slug] = [
+            {
+                "style": img.get("style"),
+                "url": img.get("url"),
+                "color": default_color,
+                "color_label": default_color,
+                "generated_at": img.get("created_at") or datetime.now(timezone.utc).isoformat(),
+                "source_style": img.get("style"),
+                "tweak": "default-copy-from-generated_images",
+            }
+            for img in gi
+        ]
+        logger.info(f"[launch] color-variants {product_id[:8]}: default {default_slug} copied ({len(gi)} imgs)")
+
+    # 2) Other colors = regen via img-to-img
+    ref = next((img for img in gi if img.get("style") == "studio"), gi[0])
+    ref_b64 = await _fetch_image_b64(ref.get("url"))
+    if not ref_b64:
+        logger.warning(f"[launch] color-variants {product_id[:8]}: ref not loadable — skip")
+        return
+    product_kind = detect_product_kind(p.get("name") or "")
+    default_color_en = color_label_to_english(default_color)
+
+    for color in other_colors:
+        slug = slugify_color(color)
+        if slug in by_variant and isinstance(by_variant[slug], list) and len(by_variant[slug]) >= len(gi):
+            continue  # already done — idempotent skip
+        target_color_en = color_label_to_english(color)
+        color_imgs = []
+        for img in gi:
+            style = img.get("style", "studio")
+            try:
+                url = await generate_color_variant_image(
+                    product_id=product_id,
+                    color_slug=slug,
+                    color_label=color,
+                    target_color_label=target_color_en,
+                    original_color_label=default_color_en,
+                    style=style,
+                    reference_image_b64=ref_b64,
+                    product_kind=product_kind,
+                )
+            except Exception as e:
+                msg = str(e)
+                logger.warning(f"[launch] color-variant {product_id[:8]} {slug}/{style}: {msg[:120]}")
+                if "402" in msg or "budget" in msg.lower():
+                    raise
+                continue
+            if url:
+                color_imgs.append({
+                    "style": style,
+                    "url": url,
+                    "color": color,
+                    "color_label": color,
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
+                    "source_style": style,
+                    "tweak": "img-to-img-color",
+                })
+        if color_imgs:
+            by_variant[slug] = color_imgs
+            logger.info(f"[launch] color-variants {product_id[:8]}: {slug} = {len(color_imgs)} imgs")
+
+    await db.products.update_one(
+        {"id": product_id},
+        {"$set": {
+            "generated_images_by_variant": by_variant,
+            "generated_images_by_variant_updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
 
 
 # ------------------------------------------------------------------
@@ -827,6 +981,27 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                                 budget_exhausted = True
                 except Exception as e:
                     logger.warning(f"[launch] section-loop {p['id']}: {e}")
+
+                # 8d) Lot H Fix 6 — Color variant images (img-to-img)
+                # Si le produit a un axe couleur, génère le set d'images IA
+                # POUR CHAQUE couleur additionnelle (max MAX_COLOR_VARIANTS_AI),
+                # en partant de l'image studio comme référence visuelle stable.
+                # Ainsi tout futur site créé via launch-auto a automatiquement
+                # une galerie variant-aware (cohérente avec Lot H Fix 4 frontend).
+                # Coût ~$0.05/image × ~3 styles × ~3-4 couleurs = ~$0.6/produit max.
+                try:
+                    if budget_exhausted:
+                        pass
+                    else:
+                        await _generate_color_variant_images_for_product(
+                            db, p["id"], site_id, max_colors=int(os.environ.get("MAX_COLOR_VARIANTS_AI", "5")),
+                            on_budget_exhausted=lambda: None,  # signaled via raise below
+                        )
+                except Exception as e:
+                    msg = str(e)
+                    logger.warning(f"[launch] color-variants {p['id']}: {msg[:120]}")
+                    if "402" in msg or "budget" in msg.lower():
+                        budget_exhausted = True
 
         # ── Phase C — Cohérence storefront enrichie ─────────────────────
         # Témoignages premium fictifs + portraits Nano Banana + pages CMS

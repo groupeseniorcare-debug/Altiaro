@@ -529,12 +529,78 @@ concepteur.
 
 ---
 
+## §13.11 — RÈGLE D'OR : Test "from-scratch site" (2026-04-27)
+
+⚠️ **Règle structurale fondamentale** dictée par l'utilisateur :
+
+> *"Toutes les modifications doivent être dans le TEMPLATE de notre site internet
+> pour les concepteurs, les prochains produits et sites créés doivent avoir la
+> même structure de page, cards produits, etc."*
+
+### Procédure d'audit (à appliquer pour CHAQUE fix)
+
+Avant de marquer un fix "terminé", se poser la question :
+
+> ✅ **Si je crée un nouveau site sur la plateforme via `launch-auto` avec
+>    un nouveau brand_name + produits importés, ce fix sera-t-il
+>    AUTOMATIQUEMENT appliqué sans intervention manuelle ?**
+
+Si la réponse est NON → le fix est **incomplet**. Il faut le propager :
+1. au **pipeline** `backend/routes/launch.py` (génération images, JSON-LD,
+   testimonials, USPs, etc.)
+2. aux **composants partagés** (ex: `<ProductCard>`, `<PageHero>`,
+   `<ProductGallery>` doivent porter le comportement, pas être patchés
+   à chaque page)
+3. à l'**import sourcing** `backend/routes/sourcing.py` (filtres variantes,
+   normalisation données)
+4. aux **scripts d'audit** `backend/scripts/lotX_*.py` pour migrer les
+   sites existants en DB
+
+### Incident historique 2026-04-27 — Fix G12 inversé corrigé
+
+**Symptôme** : la 1ʳᵉ tentative du Fix G12 avait extrait un `<ProductCard>`
+épuré (fond ivoire, pas de CTA) basé sur le rendu Collection, et l'avait
+appliqué partout. Conséquence : la **Home a été appauvrie** (perte des
+highlights + dual CTA + design "Aesop" original).
+
+**Correction** : extraction du rendu RICHE original de `ProductGrid.jsx`
+(ancien) en composant `<ProductCard>` exporté. Ce composant porte
+désormais :
+- aspect-square image fond BLANC (le produit ressort vs ivoire de la card)
+- carte avec fond `accent_color` (ivoire dynamique selon site)
+- titre Cormorant, 4 highlights ✓ verts (auto-extraits via `getHighlights()`),
+  prix XL + "FREE SHIPPING", **dual CTA** (arrow → fiche / Add to cart)
+- hover : shadow + translate-y-[-1] + scale-[1.04] image
+- variante `compact` (sans CTA) pour cross-sell sidebar
+
+**Audit "from-scratch"** : ✅ tout site créé via launch-auto utilise
+automatiquement `<ProductCard>` car StorefrontHome → ProductGrid →
+ProductCard, StorefrontCollection → ProductCard, StorefrontSearch →
+ProductCard, CrossSellProducts → ProductCard. Aucun rendu inline.
+
+### Suivi des fixes "from-scratch-ready"
+
+| Fix | Composant / Pipeline porteur | from-scratch OK ? |
+|---|---|---|
+| G2  Logo transparent | `services/favicon_generator.py::ensure_alpha_channel` + `launch.py` (cleanup auto) | ✅ |
+| G5  4 USPs           | `StorefrontProduct.jsx` lit `design.usps` (fallback Altea wording) | ⚠️ pipeline `launch.py` ne génère pas encore `design.usps` (fallback OK pour MVP) |
+| G6  ProductBundle filter role | `ProductBundle.jsx` filtre `role ∈ {upsell, accessory}` | ✅ |
+| G12 ProductCard riche unifié | `ProductCard.jsx` exporté, utilisé partout | ✅ |
+| G13 PageHero transparent | `<PageHero>` partagé + `StorefrontBlog.jsx` aligné | ✅ |
+| H1  Whitelist axes variantes | `services/variant_filter.py` + `routes/sourcing.py` (à l'import) | ✅ |
+| H4  Galerie variant-aware | `ProductColorContext` + `ProductGallery` + `NarrativeProduct` + `ProductEditorialMosaic` | ✅ (composants partagés) |
+| H5  Swatches couleur | `VariantPicker.jsx` + `lib/colorMapping.js` | ✅ |
+| H6  Variant images génération auto | `launch.py::_generate_color_variant_images_for_product` | ✅ env `MAX_COLOR_VARIANTS_AI=5` |
+
+---
+
 ## Fin du document
 
 Cette note de reprise couvre l'état du produit au **2026-04-27**, après la
 cascade Phases 5-6-7 + Bloc 1 (résilience LLM, RGPD storefronts, légal
 centralisé) + Bloc 2 (Altea launch-auto, intégrations cockpit) + Bloc 3
-(audit + finalisation vitrine altiaro.com).
+(audit + finalisation vitrine altiaro.com) + **Lot G/H (cards riches +
+variantes couleur galerie variant-aware + propagation pipeline)**.
 
 Pour les livraisons suivantes, ajouter une nouvelle ligne en §1, mettre
 à jour les crons en §9/§12 si besoin, documenter les nouveaux bugs en §8,

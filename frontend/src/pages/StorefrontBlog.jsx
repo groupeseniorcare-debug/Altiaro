@@ -191,8 +191,10 @@ export function StorefrontBlog() {
         }}
       />
 
-      <section className="border-b" style={{ background: design?.brand?.accent_color || "#F5F2EB", borderColor: "#E7E5E4" }}>
-        <div className="max-w-6xl mx-auto px-6 md:px-10 py-16 md:py-20">
+      {/* Lot G Fix 13 — header transparent (hérite body), aligné sur PageHero des
+          autres pages secondaires. Pas de fond ivoire / accent_color. */}
+      <section className="border-b border-stone-200/60">
+        <div className="max-w-6xl mx-auto px-6 md:px-10 py-14 md:py-20">
           <div className="text-[11px] uppercase tracking-[0.2em] mb-3 font-medium" style={{ color: primary }}>Le Journal</div>
           <h1 className="text-4xl md:text-5xl lg:text-6xl leading-[1.05] tracking-tight text-neutral-900" style={{ fontFamily: `"${fontHeading}", serif` }}>
             Guides, conseils et inspirations
@@ -330,8 +332,8 @@ export function StorefrontBlogPost() {
       />
 
       <article className="pb-20" data-testid="blog-post">
-        {/* Hero */}
-        <div className="border-b" style={{ borderColor: "#E7E5E4", background: design?.brand?.accent_color || "#F5F2EB" }}>
+        {/* Lot G Fix 13 — hero article transparent (hérite body), aligné PageHero */}
+        <div className="border-b border-stone-200/60">
           <div className="max-w-3xl mx-auto px-6 md:px-10 py-12 md:py-16">
             <Link to={`/shop/${siteId}/blog`} className="inline-flex items-center gap-1.5 text-[13px] text-neutral-600 hover:text-neutral-900 mb-6">
               <CaretLeft size={14} weight="bold" /> Retour au journal

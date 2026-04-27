@@ -450,3 +450,74 @@ agent_communication:
       LOT H — 2 fixes :
       - H1 Plus aucun "GERMANY"/Ships From dans VariantPicker
       - H5 Swatches couleur (cercles ~36-40px) sur axe couleur, pills sur autres axes
+
+  - agent: "testing"
+    message: |
+      ## Lot G + H — RE-VALIDATION après corrections (Desktop 1920×1080 + Mobile 390×844)
+      Site Altea — 6867223e-7ea5-45a7-815a-300cd89b7656 — 2026-04-27
+
+      ═══════════════════════════════════════════════
+      PRIORITÉ 1 — G12 CARDS HOME = COLLECTION ✅ PASS (pixel-perfect)
+      ═══════════════════════════════════════════════
+      Comparaison strict equality Home vs Collection (même produit "Rise & recline chair…") :
+        · card_bg           : rgb(245,245,245) === rgb(245,245,245)  ✅ (ivoire identique)
+        · img_parent_bg     : rgb(255,255,255) === rgb(255,255,255)  ✅ (fond blanc pour image)
+        · img_src           : même URL studio_v2 p_1735081a…          ✅
+        · title_font        : "Cormorant Garamond", serif === même   ✅
+        · title_text        : identique                                ✅
+        · highlights_count  : 3 === 3                                  ✅ (check icons ✓ couleur primary rgb(10,10,10))
+        · price_text        : €1,033.45 === €1,033.45                 ✅
+        · eyebrow_text      : "Free shipping within 72h" === même     ✅ (FREE SHIPPING équivalent EN)
+        · cta_count         : 2 === 2                                  ✅ (product-details-X + product-add-to-cart-X)
+        · card_width        : 384px === 384px                          ✅
+        · card_height       : 648.5625px === 648.5625px                ✅ (identique au pixel près)
+        · border-top divider présent entre highlights et footer       ✅
+
+      Layout responsive :
+        · DESKTOP 1920 : Home `products-grid` = 384px × 3  /  Collection `collection-grid` = 384px × 3  ✅
+        · MOBILE 390  : Home = 342px (1 col)  /  Collection = 342px (1 col)  ✅
+      Note : StorefrontCollection passe testId="collection-product-{id}" (ce n'est PAS product-card-).
+             Les data-testid internes product-details-{id} et product-add-to-cart-{id} restent identiques.
+
+      ═══════════════════════════════════════════════
+      PRIORITÉ 2 — H4 GALERIE VARIANT-AWARE ✅ PASS
+      ═══════════════════════════════════════════════
+      Fiche fauteuil 1233€ (id 2a31bb75…) — default affiche image NOIR, puis :
+        · click variant-option-0-White  → galerie passe à  /variants/white/studio_dea7fd7c.png  ✅
+        · click variant-option-0-Brown  → galerie passe à  /variants/brown/studio_35563578.png  ✅
+        · ProductEditorialMosaic (data-testid=product-editorial-mosaic) reflète la variante :
+            /variants/white/closeup_*.png + /variants/white/lifestyle_*.png + /variants/white/studio_*.png  ✅
+        · NarrativeSections : 8 images /variants/white/ présentes dans la page après switch  ✅
+
+      ═══════════════════════════════════════════════
+      PRIORITÉ 3 — G13 PAGES SECONDAIRES TRANSPARENTES ✅ PASS (9/9)
+      ═══════════════════════════════════════════════
+      Pour chacune des 9 pages, first section/hero : background-color = rgba(0,0,0,0), background-image: none
+        ✅ /about           — bg rgba(0,0,0,0)  (H1 "Altea — L'art du repos retrouvé")
+        ✅ /contact         — bg rgba(0,0,0,0)
+        ✅ /faq             — bg rgba(0,0,0,0)
+        ✅ /livraison       — bg rgba(0,0,0,0)
+        ✅ /retours         — bg rgba(0,0,0,0)
+        ✅ /blog            — bg rgba(0,0,0,0)
+        ✅ /track           — bg rgba(0,0,0,0)
+        ✅ /cgv             — bg rgba(0,0,0,0)
+        ✅ /mentions        — bg rgba(0,0,0,0)
+
+      ═══════════════════════════════════════════════
+      PRIORITÉ 4 — Régressions Lot G/H ✅ PASS
+      ═══════════════════════════════════════════════
+        ✅ Logo Altea transparent : bg rgba(0,0,0,0) + src …logo_*_transparent_df84281e.png
+        ✅ Testimonials Embla : data-testid=storefront-testimonials présent, 6 cards
+        ✅ VariantPicker swatches : 3 cercles Black/White/Brown (variant-option-0-Black/White/Brown)
+        ✅ Zéro "GERMANY" / "Ships From" : has_germany=false dans page text
+        ✅ 4 USPs Altea : product-usp-0..3 présents (4)
+        ✅ ProductBundle : aucun produit 1000€+ parasite (bundle_prices vide ou filtré par role)
+
+      ═══════════════════════════════════════════════
+      VERDICT FINAL : TOUS LES FIXES LOT G + LOT H VALIDÉS ✅
+      ═══════════════════════════════════════════════
+      Aucune régression détectée. Cards Home ↔ Collection strictement identiques
+      (même bg, même image, même padding, même hauteur 648.5625px, mêmes 2 CTAs).
+      Galerie variant-aware fonctionnelle pour main + mosaic + narrative.
+      9/9 pages secondaires avec hero transparent.
+

@@ -1,23 +1,67 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { ShoppingBagOpen, MagnifyingGlassPlus, X } from "@phosphor-icons/react";
+import { useProductColor } from "../../lib/ProductColorContext";
+import { getProductGalleryForColor } from "../../lib/productImage";
 
 /**
  * Premium product gallery — image principale + vignettes + zoom modal.
+ *
+ * Lot H Fix 4 — variant-aware. Si le composant est wrappé par
+ * `<ProductColorProvider product={...}>`, la galerie réagit au changement de
+ * couleur sélectionnée et affiche les images de `generated_images_by_variant
+ * [selectedColor]` avec un fade transition. Fallback transparent sur la
+ * galerie classique si aucune variant image n'existe.
+ *
+ * Backward compat : si `product` n'est PAS passé en prop, le composant utilise
+ * uniquement `images` (comportement legacy, aucune réactivité).
  */
-export default function ProductGallery({ images = [], name, design, styledImages = [] }) {
+export default function ProductGallery({
+  images: imagesProp = [],
+  name,
+  design,
+  styledImages = [],
+  product = null, // Lot H — passer le produit complet pour activer la réactivité variant-aware
+}) {
   const primary = "#0A0A0A";
   const accent = "#F5F5F5";
   const [idx, setIdx] = useState(0);
   const [zoomOpen, setZoomOpen] = useState(false);
+  const { selectedColor, hasVariantImages } = useProductColor();
+
+  // Calcule les images affichées : variant-aware si possible, sinon legacy prop
+  const images = useMemo(() => {
+    if (product && hasVariantImages && selectedColor) {
+      const colorImages = getProductGalleryForColor(product, selectedColor);
+      if (colorImages.length > 0) return colorImages;
+    }
+    return imagesProp;
+  }, [product, hasVariantImages, selectedColor, imagesProp]);
+
+  // Reset thumb index quand on change de couleur (la 1ère image n'est plus la même)
+  useEffect(() => {
+    setIdx(0);
+  }, [selectedColor]);
 
   const hasImages = images && images.length > 0;
   const activeImg = hasImages ? images[idx] : null;
 
-  // Map styled image URLs to their AI style for better alt text
-  const styleByUrl = {};
-  (styledImages || []).forEach((g) => {
-    if (g?.url) styleByUrl[g.url] = g.style;
-  });
+  // Map styled image URLs to their AI style for better alt text.
+  // En mode variant-aware, on utilise `product.generated_images_by_variant[selectedColor]`,
+  // sinon `styledImages` (passé en prop par StorefrontProduct).
+  const styleByUrl = useMemo(() => {
+    const out = {};
+    if (product && selectedColor && product.generated_images_by_variant?.[selectedColor]) {
+      product.generated_images_by_variant[selectedColor].forEach((g) => {
+        if (g?.url) out[g.url] = g.style;
+      });
+    }
+    (styledImages || []).forEach((g) => {
+      if (g?.url && !out[g.url]) out[g.url] = g.style;
+    });
+    return out;
+  }, [styledImages, product, selectedColor]);
+
   const styleLabel = {
     closeup: "gros plan détail",
     studio: "vue studio éditoriale",
@@ -31,7 +75,7 @@ export default function ProductGallery({ images = [], name, design, styledImages
   };
 
   return (
-    <div className="md:sticky md:top-24" data-testid="product-gallery">
+    <div className="md:sticky md:top-24" data-testid="product-gallery" data-selected-color={selectedColor || ""}>
       {/* Main image */}
       <div
         className="aspect-square overflow-hidden relative group mb-3"
@@ -39,12 +83,20 @@ export default function ProductGallery({ images = [], name, design, styledImages
       >
         {activeImg ? (
           <>
-            <img
-              src={activeImg}
-              alt={altFor(activeImg, idx)}
-              className="w-full h-full object-cover"
-              loading="eager"
-            />
+            {/* Lot H Fix 4 — fade transition entre les images de couleurs différentes */}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.img
+                key={`${selectedColor || "default"}-${idx}`}
+                src={activeImg}
+                alt={altFor(activeImg, idx)}
+                className="w-full h-full object-cover"
+                loading={idx === 0 ? "eager" : "lazy"}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.32, ease: "easeOut" }}
+              />
+            </AnimatePresence>
             <button
               type="button"
               onClick={() => setZoomOpen(true)}
@@ -68,7 +120,7 @@ export default function ProductGallery({ images = [], name, design, styledImages
         <div className="grid grid-cols-5 gap-2" data-testid="gallery-thumbs">
           {images.slice(0, 5).map((img, i) => (
             <button
-              key={i}
+              key={`${selectedColor || "default"}-${i}`}
               type="button"
               onClick={() => setIdx(i)}
               data-testid={`gallery-thumb-${i}`}

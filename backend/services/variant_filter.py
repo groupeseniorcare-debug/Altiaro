@@ -152,8 +152,33 @@ def filter_useless_axes(variants: list[dict]) -> tuple[list[dict], list[dict]]:
 
     # Combien d'axes (positions) ?
     n_axes = max((len(v.get("properties") or []) for v in variants), default=0)
-    if n_axes <= 1:
-        return variants, []  # 1 seul axe → forcément utile
+    if n_axes == 0:
+        return variants, []  # aucun axe → rien à filtrer
+
+    # Lot H — fix bug : auparavant on skippait si n_axes == 1, mais des produits AE
+    # ont parfois un UNIQUE axe parasite (ex: ships_from "FRANCE" sur fauteuil mono-couleur).
+    # Cas spécial : si n_axes == 1 et l'axe est parasite, on remet `properties: []` pour
+    # que le VariantPicker ne s'affiche pas du tout (1 seule variante générique).
+    if n_axes == 1:
+        sole_values = [
+            (v.get("properties") or [None])[0]
+            for v in variants
+            if (v.get("properties") or [None])[0]
+        ]
+        sole_kind = classify_axis([str(s) for s in sole_values])
+        if sole_kind != "useful":
+            removed = [{
+                "position": 0,
+                "kind": sole_kind,
+                "sample_values": sorted(set(str(s) for s in sole_values))[:6],
+                "n_values": len(set(str(s) for s in sole_values)),
+            }]
+            # Garde 1 seule variante "neutre" (la 1ère) sans properties → pas de picker
+            head = dict(variants[0])
+            head["properties"] = []
+            head["name"] = ""
+            return [head], removed
+        return variants, []  # 1 seul axe utile → on garde tel quel
 
     # Classifie chaque position
     axis_kinds: list[str] = []

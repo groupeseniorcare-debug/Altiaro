@@ -1,5 +1,6 @@
 import React from "react";
 import { designAccents } from "./storefrontUtils";
+import { useProductColor } from "../../lib/ProductColorContext";
 
 /**
  * Editorial magazine-style mosaic — 4 asymmetric tiles built from the product
@@ -7,29 +8,49 @@ import { designAccents } from "./storefrontUtils";
  * page never feels text-heavy. Pure monochrome (white + #F5F5F5 frames).
  *
  * Requires `images` (>= 2). Gracefully hides itself otherwise.
+ *
+ * Lot H Fix 4 — variant-aware. Si un Context `<ProductColorProvider>` parent
+ * fournit une couleur sélectionnée, on lit `product.generated_images_by_variant
+ * [selectedColor]` pour assigner closeup / studio / lifestyle / in_use plutôt
+ * que `styledImages` legacy. Le visiteur voit la mosaïque entière dans la
+ * couleur qu'il a choisie.
  */
-export default function ProductEditorialMosaic({ images = [], styledImages = [], productName, design, captions }) {
+export default function ProductEditorialMosaic({ images = [], styledImages = [], productName, design, captions, product = null }) {
   const { primary, textMuted, fontHeading } = designAccents(design);
   const accent = "#F5F5F5";
+  const { selectedColor, hasVariantImages } = useProductColor();
+
+  // Lot H Fix 4 — pick the variant-specific styled images if available
+  const variantStyledImages = React.useMemo(() => {
+    if (product && hasVariantImages && selectedColor) {
+      const arr = product.generated_images_by_variant?.[selectedColor];
+      if (Array.isArray(arr) && arr.length) return arr;
+    }
+    return styledImages;
+  }, [product, hasVariantImages, selectedColor, styledImages]);
+
   const pool = (images || []).filter(Boolean);
-  if (pool.length < 2) return null;
+  if (pool.length < 2 && (!variantStyledImages || variantStyledImages.length < 2)) return null;
 
   // Smart assignment: prefer specific AI styles per tile when available.
   const byStyle = (name) => {
-    const hit = (styledImages || []).find((g) => g && g.style === name && g.url);
+    const hit = (variantStyledImages || []).find((g) => g && g.style === name && g.url);
     return hit ? hit.url : null;
   };
   const closeup = byStyle("closeup");
   const studio = byStyle("studio");
   const lifestyle = byStyle("lifestyle");
   const inUse = byStyle("in_use") || lifestyle;
-  const fallback = (i) => pool[i % pool.length];
+  // Lot H — fallback : utiliser les images de la couleur sélectionnée en priorité
+  const variantPool = (variantStyledImages || []).map((g) => g?.url).filter(Boolean);
+  const finalPool = variantPool.length ? variantPool : pool;
+  const fallback = (i) => finalPool[i % finalPool.length];
   // Tile 1 (big portrait, "Vu de près") = closeup
   // Tile 2 ("Dans le geste") = second closeup or in_use
   // Tile 3 ("En situation") = lifestyle or in_use
   // Tile 4 banner ("Détail") = studio
   const tile0 = closeup || fallback(0);
-  const tile1 = (styledImages || []).filter((g) => g.style === "closeup")[1]?.url
+  const tile1 = (variantStyledImages || []).filter((g) => g.style === "closeup")[1]?.url
     || inUse
     || fallback(1);
   const tile2 = lifestyle || inUse || fallback(2);

@@ -1,8 +1,10 @@
 import React from "react";
 import { Check } from "@phosphor-icons/react";
 import { designAccents } from "./storefrontUtils";
+import { useProductColor } from "../../lib/ProductColorContext";
+import { getProductGalleryForColor } from "../../lib/productImage";
 
-export function NarrativeSections({ sections, design, productImages = [] }) {
+export function NarrativeSections({ sections, design, productImages = [], product = null }) {
   const fallback = [
     {
       title: "Pensé pour un usage quotidien",
@@ -24,10 +26,24 @@ export function NarrativeSections({ sections, design, productImages = [] }) {
     },
   ];
   const base = (Array.isArray(sections) && sections.length > 0) ? sections : fallback;
-  // Auto-fill section images with product gallery shots when AI images are missing.
-  const pool = (productImages || []).filter(Boolean);
+  const { selectedColor, hasVariantImages } = useProductColor();
+
+  // Lot H Fix 4 — Auto-fill section images with product gallery shots from
+  // the SELECTED COLOR's variant gallery when available. Falls back to the
+  // legacy `productImages` pool otherwise.
+  const colorPool = React.useMemo(() => {
+    if (product && hasVariantImages && selectedColor) {
+      const arr = getProductGalleryForColor(product, selectedColor);
+      if (Array.isArray(arr) && arr.length) return arr;
+    }
+    return null;
+  }, [product, hasVariantImages, selectedColor]);
+
+  const pool = (colorPool || productImages || []).filter(Boolean);
   const items = base.map((s, i) => ({
     ...s,
+    // Pour l'image éditoriale de la section, si la section a une image fixe
+    // (`s.image`), on l'utilise. Sinon, on prend dans le pool variant-aware.
     image: s.image || (pool.length ? pool[(i + 1) % pool.length] : null),
   }));
   const { primary, accent, divider, textMuted, fontHeading } = designAccents(design);

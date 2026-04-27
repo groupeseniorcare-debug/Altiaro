@@ -134,6 +134,90 @@ export function getProductGallery(product) {
 }
 
 /**
+ * Lot H Fix 4 — Galerie d'une COULEUR spécifique (variant-aware).
+ *
+ * Lit `product.generated_images_by_variant[colorSlug]` (généré par Lot H2/H3)
+ * et retourne la galerie ordonnée pour cette couleur. Fallback sur la galerie
+ * principale si la couleur n'a pas d'images dédiées.
+ *
+ * @param {object} product
+ * @param {string} colorSlug - slug de la couleur sélectionnée (ex: "white", "brown")
+ * @returns {string[]}
+ */
+export function getProductGalleryForColor(product, colorSlug) {
+  if (!product || typeof product !== "object") return getProductGallery(product);
+  const byVariant = product.generated_images_by_variant;
+  if (!colorSlug || !byVariant || typeof byVariant !== "object") {
+    return getProductGallery(product);
+  }
+  const variantImages = byVariant[colorSlug];
+  if (!Array.isArray(variantImages) || variantImages.length === 0) {
+    return getProductGallery(product);
+  }
+  const out = [];
+  const seen = new Set();
+  const push = (url) => {
+    if (url && !seen.has(url)) {
+      seen.add(url);
+      out.push(url);
+    }
+  };
+  // Order by preferred style
+  for (const style of PREFERRED_STYLES) {
+    for (const g of variantImages) {
+      if (g && typeof g === "object" && g.style === style) push(_itemUrl(g));
+    }
+  }
+  for (const g of variantImages) {
+    const u = _itemUrl(g);
+    if (u && !seen.has(u)) push(u);
+  }
+  // Fallback : ajoute les autres images du produit en queue (ex: photos AE backup)
+  if (Array.isArray(product.images)) {
+    for (const i of product.images) push(_itemUrl(i));
+  }
+  return out;
+}
+
+/**
+ * Lot H Fix 4 — Image principale pour une couleur (variant-aware).
+ *
+ * Comme `getPrimaryImage()` mais en privilégiant la couleur sélectionnée.
+ * @param {object} product
+ * @param {string} colorSlug
+ * @returns {string|null}
+ */
+export function getPrimaryImageForColor(product, colorSlug) {
+  if (!colorSlug) return getPrimaryImage(product);
+  const gallery = getProductGalleryForColor(product, colorSlug);
+  return gallery[0] || getPrimaryImage(product);
+}
+
+/**
+ * Lot H Fix 4 — Récupère l'image d'un STYLE spécifique pour une couleur donnée.
+ * Utilisé par les composants editorial qui demandent "le shot lifestyle de la
+ * couleur sélectionnée".
+ *
+ * @param {object} product
+ * @param {string} colorSlug
+ * @param {string} style - "studio" | "lifestyle" | "closeup" | ...
+ * @returns {string|null}
+ */
+export function getStyleImageForColor(product, colorSlug, style) {
+  const byVariant = product?.generated_images_by_variant;
+  if (colorSlug && byVariant && Array.isArray(byVariant[colorSlug])) {
+    const match = byVariant[colorSlug].find((g) => g && g.style === style);
+    if (match && _itemUrl(match)) return _itemUrl(match);
+  }
+  // Fallback sur le générique du même style
+  if (Array.isArray(product?.generated_images)) {
+    const match = product.generated_images.find((g) => g && g.style === style);
+    if (match && _itemUrl(match)) return _itemUrl(match);
+  }
+  return null;
+}
+
+/**
  * Fournit un placeholder neutre si aucune image disponible.
  * Utile pour les composants qui ne tolèrent pas un null.
  * @param {object} product

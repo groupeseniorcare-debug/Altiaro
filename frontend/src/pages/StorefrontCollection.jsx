@@ -403,7 +403,7 @@ export function StorefrontCollection() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-8" data-testid="collection-grid">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6" data-testid="collection-grid">
             {products.map((p) => (
               <ProductCard
                 key={p.id}

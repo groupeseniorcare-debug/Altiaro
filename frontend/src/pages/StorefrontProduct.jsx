@@ -36,6 +36,7 @@ import {
   ProductFAQ,
 } from "../components/storefront/NarrativeProduct";
 import ProductGallery from "../components/storefront/ProductGallery";
+import { ProductColorProvider } from "../lib/ProductColorContext";
 import ProductReviews from "../components/storefront/ProductReviews";
 import CrossSellProducts from "../components/storefront/CrossSellProducts";
 import UpsellsRecommendations from "../components/storefront/UpsellsRecommendations";
@@ -139,6 +140,7 @@ export function StorefrontProduct() {
   }
 
   return (
+    <ProductColorProvider product={p}>
     <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
       <SEOHead
         title={
@@ -308,6 +310,8 @@ export function StorefrontProduct() {
                 images={variantImages}
                 name={pickLang(p.name, lang)}
                 design={design}
+                product={p}
+                styledImages={p.generated_images}
               />
             </div>
 
@@ -535,12 +539,14 @@ export function StorefrontProduct() {
             styledImages={p.generated_images || []}
             productName={pickLang(p.name, lang)}
             design={design}
+            product={p}
           />
 
           <NarrativeSections
             sections={p.narrative?.sections}
             design={design}
             productImages={[...(p.generated_images || []).map(g => g.url).filter(Boolean), ...(p.images || [])]}
+            product={p}
           />
           <TechSpecs specs={p.narrative?.tech_specs} design={design} />
           <BestForNotFor best_for={p.narrative?.seo?.best_for} not_for={p.narrative?.seo?.not_for} design={design} />
@@ -591,6 +597,7 @@ export function StorefrontProduct() {
         </button>
       </div>
     </StorefrontLayout>
+    </ProductColorProvider>
   );
 }
 
