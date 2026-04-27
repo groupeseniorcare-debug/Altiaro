@@ -203,46 +203,37 @@ export function StorefrontCollection() {
         schema={[breadcrumbSchema, itemListSchema].filter(Boolean)}
       />
 
-      {/* ============ HERO BANNER MINIMAL ============ */}
+      {/* ============ HERO BANNER MINIMAL — Fix 9 simplifié ============ */}
       <section
-        className="border-b"
-        style={{ background: design?.brand?.accent_color || "#F5F2EB", borderColor: "#E7E5E4" }}
+        className="bg-white"
         data-testid="collection-hero"
       >
-        <div className="max-w-7xl mx-auto px-6 md:px-10 py-12 md:py-16">
-          <nav className="text-[12px] text-neutral-500 mb-6" data-testid="collection-breadcrumb">
-            <Link to={`/shop/${siteId}`} className="hover:underline">Accueil</Link>
-            <span className="mx-2">/</span>
-            <Link to={`/shop/${siteId}/collections`} className="hover:underline">Collections</Link>
-            <span className="mx-2">/</span>
-            <span className="text-neutral-900">{title}</span>
-          </nav>
-
-          <div className="flex items-end justify-between gap-8 flex-wrap">
-            <div className="max-w-2xl">
-              <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-3">Collection</div>
-              <h1
-                className="text-4xl md:text-5xl lg:text-6xl leading-[1.05] tracking-tight text-neutral-900"
-                style={{ fontFamily: `${fontHeading}, serif` }}
-                data-testid="collection-title"
-              >
-                {title}
-              </h1>
-              {description && (
-                <p className="text-[16px] md:text-[17px] text-neutral-600 mt-5 leading-relaxed">
-                  {description}
-                </p>
-              )}
-            </div>
-            <div className="text-sm text-neutral-500">
-              {totalCount} produit{totalCount > 1 ? "s" : ""}
+        <div className="max-w-7xl mx-auto px-6 md:px-10 pt-12 md:pt-20 pb-8 md:pb-10">
+          <div className="max-w-3xl">
+            <div className="text-[11px] uppercase tracking-[0.3em] text-neutral-500 mb-4">Collection</div>
+            <h1
+              className="text-4xl md:text-5xl lg:text-6xl leading-[1.05] tracking-tight text-neutral-900"
+              style={{ fontFamily: `${fontHeading}, serif` }}
+              data-testid="collection-title"
+            >
+              {title}
+            </h1>
+            {description && (
+              <p className="text-[15px] md:text-[16px] text-neutral-600 mt-5 leading-relaxed">
+                {description}
+              </p>
+            )}
+            <div className="text-xs text-neutral-400 mt-6 uppercase tracking-[0.2em]" data-testid="collection-count">
+              {totalCount} référence{totalCount > 1 ? "s" : ""}
             </div>
           </div>
         </div>
       </section>
 
-      {/* ============ FILTER BAR HORIZONTAL ============ */}
-      <section className="sticky top-[140px] lg:top-[88px] z-20 bg-white border-b" style={{ borderColor: "#E7E5E4" }} data-testid="collection-filters">
+      {/* Fix 9 — Filter bar masquée par défaut sur les sites premium (peu de
+          produits, layout clean). Garder le code en place pour ré-activation
+          future via flag `?showFilters=1` ou config admin. */}
+      <section className="hidden sticky top-[140px] lg:top-[88px] z-20 bg-white border-b" style={{ borderColor: "#E7E5E4" }} data-testid="collection-filters">
         <div className="max-w-7xl mx-auto px-6 md:px-10 py-3 flex items-center gap-2 md:gap-3 flex-wrap">
           {/* Mobile toggle */}
           <button

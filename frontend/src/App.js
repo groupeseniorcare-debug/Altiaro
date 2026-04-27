@@ -1,6 +1,7 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/auth";
+import ScrollToTop from "./components/ScrollToTop";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Sites from "./pages/Sites";
@@ -121,6 +122,8 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        {/* Fix 3 — Reset scroll to top on every route change (storefront + cockpit) */}
+        <ScrollToTop />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />

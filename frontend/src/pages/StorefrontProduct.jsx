@@ -294,11 +294,16 @@ export function StorefrontProduct() {
           </nav>
 
           <div className="grid grid-cols-1 md:grid-cols-[1.1fr_1fr] gap-8 lg:gap-16 mb-24 md:mb-32 items-start">
-            <ProductGallery
-              images={variantImages}
-              name={pickLang(p.name, lang)}
-              design={design}
-            />
+            {/* Fix 4 — Mobile : galerie edge-to-edge (annule le px-6 du parent
+                via -mx-6) pour un rendu premium type Apple/Hermès. Desktop :
+                comportement normal (dans le grid). */}
+            <div className="-mx-6 md:mx-0">
+              <ProductGallery
+                images={variantImages}
+                name={pickLang(p.name, lang)}
+                design={design}
+              />
+            </div>
 
             <div className="md:pt-2 md:sticky md:top-28">
               <div className="flex items-center gap-3 mb-5">

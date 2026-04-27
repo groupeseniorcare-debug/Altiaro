@@ -496,6 +496,37 @@ régénérer après tout partage en clair, même via un canal interne.
 **État avant rotation** : `Client ID = app_ebp94GjeM4t23GDbk83GHBDo`,
 `Client Secret = a9k...lzyTn` (créé le 2026-04-27).
 
+### 13.10 — 🟡 P1 · Pages "Guide d'achat" et "Conseils experts" à créer
+
+**Contexte** : Lot F Fix 8 a retiré ces 2 entrées du menu storefront Altea
+car les pages cibles n'existaient pas (clic → redirection silencieuse vers
+landing plateforme = bug UX). Les liens « Guides d'achat » et « Conseil »
+étaient générés par le pipeline `nav_optimizer` mais aucune route frontend
+ni génération de contenu ne les supportait.
+
+**À faire dans une future itération** :
+
+1. **Backend** — extension `launch.py::_generate_premium_cms_pages` pour
+   générer 2 pages additionnelles dans `design.cms_pages` :
+   - `cms_pages.guide` : "Guide d'achat — Comment choisir son fauteuil
+     releveur" (~600 mots, structure H2+H3, FAQ AEO)
+   - `cms_pages.advice` : "Nos conseils experts" (~600 mots, format magazine
+     éditorial, 5-6 conseils clés sur la santé senior)
+
+2. **Frontend** — routes dans `App.js` :
+   - `/shop/:siteId/guide` → reuse pattern `StorefrontPages.jsx`
+   - `/shop/:siteId/conseils` → idem
+
+3. **`nav_optimizer`** — ajouter ces 2 slugs dans la liste autorisée du menu
+   header pour que les nouveaux sites les exposent automatiquement.
+
+4. **Tests** — vérifier que les liens du menu retournent 200 et affichent
+   du contenu cohérent avec la niche du site.
+
+⏳ **Ne pas faire en MVP** — Altea fonctionne sans (Lot F a retiré du menu).
+À planifier dès qu'on relance la pipeline launch-auto pour le 2ᵉ site
+concepteur.
+
 ---
 
 ## Fin du document

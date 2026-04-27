@@ -177,6 +177,12 @@ const DICT = {
     newsletter_consent_link:   "politique de confidentialité",
     newsletter_sending:        "Envoi…",
     newsletter_consent_short:  "En vous inscrivant, vous acceptez notre politique de confidentialité. Désinscription en un clic.",
+    // Fix 5 — clé manquante en FR : sans elle PaymentOptions affichait le slug brut "payment_methods_short"
+    payment_methods_short:     "Visa, Mastercard, PayPal, Apple Pay, Bancontact",
+    // Fix 7 — variantes des titres collections selon le nombre
+    collections_heading_single:      "Notre collection.",
+    collections_cta:                 "Découvrir",
+    collections_cta_big:             "Découvrir nos références",
     // Sweep i18n complémentaire — Collections, BrandProcess, Testimonials, Press, NewsletterCTA, Footer
     collections_eyebrow:             "Nos univers",
     collections_heading_line1:       "Explorer par",

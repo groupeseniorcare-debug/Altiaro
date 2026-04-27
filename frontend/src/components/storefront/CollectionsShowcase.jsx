@@ -1,122 +1,131 @@
-import React from "react";
+/**
+ * Fix 7 — CollectionsShowcase 100% dynamique selon le nombre RÉEL de
+ * collections du site (lue depuis l'API publique au mount).
+ *
+ * Logique :
+ *   0 collection → la section ne s'affiche pas (return null)
+ *   1 collection → carte unique premium "héro" pleine largeur
+ *   2 collections → grille 2 colonnes desktop, 1 col mobile
+ *   3 collections → grille 3 colonnes desktop, 1 col mobile
+ *   4+ collections → grille 4 colonnes desktop, scroll horizontal mobile
+ *
+ * Plus aucun fallback Unsplash (Lot A2). Le composant lit l'image IA cover
+ * de chaque collection depuis l'API.
+ */
+import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { motion } from "framer-motion";
+import axios from "axios";
 import { ArrowRight } from "@phosphor-icons/react";
 import { pickLang, t } from "../../lib/i18n";
-import { designAccents } from "./storefrontUtils";
+import { BACKEND_URL, designAccents } from "./storefrontUtils";
 
-/**
- * CollectionsShowcase — MONOCHROME. White canvas, 3 tall editorial cards that use
- * a gray frame + image, with the title & CTA living BELOW the card (not on top
- * of the image). Cleaner, less photographic-heavy, closer to Jacquemus or Acne Studios.
- */
-export default function CollectionsShowcase({ collections, lang = "fr", design }) {
+function CollectionCard({ c, primary, fontHeading, lang, siteId, big = false }) {
+  const title = pickLang(c.title || c.name, lang) || c.title || c.name || c.slug;
+  const description = pickLang(c.description, lang) || c.description || "";
+  const image = c.image || c.cover_image || null;
+  const aspect = big ? "aspect-[16/9] md:aspect-[21/9]" : "aspect-[4/5]";
+  return (
+    <Link
+      to={`/shop/${siteId}/collection/${c.slug}`}
+      data-testid={`collection-card-${c.slug}`}
+      className="group block"
+    >
+      <div className={`relative overflow-hidden rounded-sm bg-[#F5F2EB] ${aspect}`}>
+        {image && (
+          <img
+            src={image.startsWith("http") ? image : `${BACKEND_URL}${image}`}
+            alt={title}
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+          />
+        )}
+        {/* Overlay subtil pour la lisibilité du titre */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/0 to-transparent pointer-events-none" />
+        {/* Title en bas, premium minimal */}
+        <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-8 lg:p-10">
+          <h3
+            className={`text-white ${big ? "text-[42px] md:text-[64px] lg:text-[80px]" : "text-[28px] md:text-[34px]"} leading-[1.05] tracking-[-0.01em]`}
+            style={{ fontFamily: `"${fontHeading}", serif`, fontWeight: 400 }}
+          >
+            {title}
+          </h3>
+          {description && (
+            <p className={`mt-3 text-white/90 ${big ? "text-base md:text-lg max-w-2xl" : "text-sm"} font-light`}>
+              {description.slice(0, big ? 220 : 90)}
+            </p>
+          )}
+          <span className="mt-5 inline-flex items-center gap-2 text-white text-[12px] uppercase tracking-[0.3em] after:h-px after:bg-white/60 after:w-8 group-hover:after:w-12 after:transition-all">
+            {big
+              ? t(lang, "collections_cta_big") || "Découvrir nos références"
+              : t(lang, "collections_cta") || "Découvrir"}
+            <ArrowRight size={12} weight="bold" />
+          </span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+export default function CollectionsShowcase({ collections: legacyCollections, lang = "fr", design }) {
   const { siteId } = useParams();
-  const { primary, accent, divider, textMuted, textFaint, fontHeading } = designAccents(design);
+  const { primary, fontHeading } = designAccents(design);
+  const [collections, setCollections] = useState(null);
 
-  const list = collections?.length ? collections : [
-    { slug: "mobilite", title: t(lang, "collections_fallback_1_title"), description: t(lang, "collections_fallback_1_desc"),
-      image: "https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=900&auto=format&fit=crop" },
-    { slug: "sommeil", title: t(lang, "collections_fallback_2_title"), description: t(lang, "collections_fallback_2_desc"),
-      image: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=900&auto=format&fit=crop" },
-    { slug: "quotidien", title: t(lang, "collections_fallback_3_title"), description: t(lang, "collections_fallback_3_desc"),
-      image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=900&auto=format&fit=crop" },
-  ];
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await axios.get(`${BACKEND_URL}/api/public/sites/${siteId}/collections`);
+        if (!cancelled && Array.isArray(r.data)) setCollections(r.data);
+      } catch {
+        if (!cancelled) setCollections(legacyCollections || []);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [siteId, legacyCollections]);
+
+  if (collections === null) return null;
+  if (!collections || collections.length === 0) return null;
+
+  const count = collections.length;
+  const heading2 = t(lang, "collections_heading_line2") || "Nos collections";
+
+  let gridCls;
+  if (count === 1) gridCls = "grid grid-cols-1";
+  else if (count === 2) gridCls = "grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8";
+  else if (count === 3) gridCls = "grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8";
+  else gridCls = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8";
 
   return (
-    <section className="py-24 md:py-36 px-6 bg-white" data-testid="storefront-collections">
+    <section className="py-20 md:py-32 px-6 bg-white" data-testid="storefront-collections">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-end justify-between flex-wrap gap-6 mb-14 md:mb-20">
-          <div>
-            <div className="flex items-center gap-3 mb-5">
-              <span className="h-px w-10" style={{ background: primary }} />
-              <span className="text-[11px] uppercase tracking-[0.4em]" style={{ color: primary }}>
-                {t(lang, "collections_eyebrow")}
-              </span>
-            </div>
-            <h2
-              className="text-[40px] md:text-[56px] lg:text-[64px] leading-[1.02] tracking-[-0.02em]"
-              style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
-            >
-              {t(lang, "collections_heading_line1")}<br />{t(lang, "collections_heading_line2")}
-            </h2>
+        <div className="mb-12 md:mb-16">
+          <div className="flex items-center gap-3 mb-5">
+            <span className="h-px w-10" style={{ background: primary }} />
+            <span className="text-[11px] uppercase tracking-[0.4em]" style={{ color: primary }}>
+              {t(lang, "collections_eyebrow") || "Nos sélections"}
+            </span>
           </div>
-          <Link
-            to={`/shop/${siteId}`}
-            data-testid="collections-see-all"
-            className="relative inline-flex items-center gap-2 text-[13px] font-medium tracking-wide after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-px after:bg-current after:opacity-30 hover:after:opacity-100 after:transition-opacity"
-            style={{ color: primary }}
+          <h2
+            className="text-[40px] md:text-[56px] lg:text-[64px] leading-[1.02] tracking-[-0.02em]"
+            style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
           >
-            {t(lang, "collections_see_all")} <ArrowRight size={13} weight="bold" />
-          </Link>
+            {count === 1 ? t(lang, "collections_heading_single") || heading2 : heading2}
+          </h2>
         </div>
 
-        {/* 3 editorial cards */}
-        <div
-          className="flex md:grid md:grid-cols-3 gap-4 md:gap-6 -mx-6 md:mx-0 px-6 md:px-0 overflow-x-auto md:overflow-visible snap-x snap-mandatory md:snap-none scroll-smooth pb-2 md:pb-0"
-          data-testid="collections-carousel"
-        >
-          {list.slice(0, 3).map((c, i) => {
-            const title = pickLang(c.title, lang) || c.title;
-            const desc = pickLang(c.description, lang) || c.description;
-            const href = c.slug
-              ? `/shop/${siteId}/collection/${c.slug}`
-              : (c.href?.startsWith("/") ? c.href : `/shop/${siteId}${c.href || ""}`);
-            return (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-60px" }}
-                transition={{ duration: 0.7, delay: 0.1 * i }}
-                className="snap-center shrink-0 w-[85vw] md:w-auto"
-              >
-                <Link to={href} data-testid={`collection-${i}`} className="group block">
-                  {/* Image inside a gray frame — image alone is highlighted, text stays outside */}
-                  <div
-                    className="relative overflow-hidden aspect-[4/5]"
-                    style={{ background: accent, borderRadius: "2px" }}
-                  >
-                    {c.image ? (
-                      <img
-                        src={c.image}
-                        alt={title}
-                        loading="lazy"
-                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.04]"
-                      />
-                    ) : null}
-                    <div
-                      className="absolute top-5 left-5 text-[10px] uppercase tracking-[0.32em] px-2.5 py-1 bg-white"
-                      style={{ color: primary, borderRadius: "2px" }}
-                    >
-                      {t(lang, "hero_collection")} {String(i + 1).padStart(2, "0")}
-                    </div>
-                  </div>
-                  {/* Text lives BELOW the image, with a thin divider */}
-                  <div className="mt-5 flex items-start justify-between gap-3 pt-5" style={{ borderTop: `1px solid ${divider}` }}>
-                    <div className="flex-1 min-w-0">
-                      <h3
-                        className="text-[22px] md:text-[24px] leading-tight tracking-tight"
-                        style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}
-                      >
-                        {title}
-                      </h3>
-                      <p className="text-[13px] mt-2 line-clamp-2" style={{ color: textMuted }}>
-                        {desc}
-                      </p>
-                    </div>
-                    <ArrowRight
-                      size={20}
-                      weight="thin"
-                      className="mt-1 shrink-0 transition-transform group-hover:translate-x-1"
-                      style={{ color: textFaint }}
-                    />
-                  </div>
-                </Link>
-              </motion.div>
-            );
-          })}
+        <div className={gridCls}>
+          {collections.map((c) => (
+            <CollectionCard
+              key={c.slug}
+              c={c}
+              primary={primary}
+              fontHeading={fontHeading}
+              lang={lang}
+              siteId={siteId}
+              big={count === 1}
+            />
+          ))}
         </div>
       </div>
     </section>

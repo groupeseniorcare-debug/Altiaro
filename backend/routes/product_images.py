@@ -61,12 +61,14 @@ STYLE_PRESETS = {
         "No text, no watermark, no brand names."
     ),
     "studio": (
-        "Generate a high-end studio product photography. Background: seamless gradient from warm "
-        "ivory (#F5F2EB top) to soft anthracite (#1F1F1F bottom), no texture, no clutter. "
+        "Generate a high-end studio product photography. Background: clean uniform soft warm "
+        "ivory (#F5F2EB), perfectly even, no gradient, no vignette, no dark zones, no shadows on the wall. "
+        "The product is fully lit and centered. "
         "Camera: 50mm at f/8, three-quarter view (slightly from the right), eye-level. "
-        "Lighting: large softbox at 45° upper-left + subtle rim light upper-right, soft shadow under product. "
+        "Lighting: large softbox at 45° upper-left + subtle rim light upper-right + soft fill bottom — "
+        "very soft natural shadow ONLY directly under the product (floating effect, no harsh shadow on the floor edges). "
         "Style: Apple-product-page minimalist aesthetic, ultra-clean, ultra-sharp focus, photorealistic, 4K. "
-        "No logo, no text, no background distraction."
+        "No logo, no text, no background distraction, NO DARK GRADIENT AT THE BOTTOM."
     ),
     "closeup": (
         "Generate a closeup detail product photography. Tight macro on the most visible textural "

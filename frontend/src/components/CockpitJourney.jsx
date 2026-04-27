@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   CheckCircle, ArrowRight, CurrencyEur, ChartLineUp, Package, Stack,
   Sparkle, ShieldCheck, PaintBrush, Target, ClipboardText, Rocket, Warning, Lock,
+  Globe,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 
@@ -23,20 +24,24 @@ const STEP_META = {
   upsells:  { Icon: Stack,          subtitle: "Accessoires et upgrades · 3 minimum pour débloquer le prévisionnel" },
   forecast: { Icon: ChartLineUp,    subtitle: "CA prévisionnel, marge, ROAS calculés sur ton vrai catalogue" },
   branding: { Icon: PaintBrush,     subtitle: "Nom, logo IA, palette · publie le design pour valider cette étape" },
+  domain:   { Icon: Globe,          subtitle: "Choisis et achète ton nom de domaine (étape optionnelle, peut être skippée)" },
   pages:    { Icon: ClipboardText,  subtitle: "Pages légales + about/FAQ/contact · tout doit être rempli" },
   content:  { Icon: Sparkle,        subtitle: "Blog SEO : 1 article pilier + 3 satellites minimum" },
   seo:      { Icon: Target,         subtitle: "Score SEO ≥70/100 pour valider" },
   qa:       { Icon: ShieldCheck,    subtitle: "Soumission à la validation admin" },
 };
 
+// Fix 6 — mapping step → route. `domain` ajouté en position 6 (Lot D).
+// Les `?step=N` sont décalés de 1 pour les étapes après domain.
 const STEP_LINKS = (siteId) => ({
   pricing:  `/sites/${siteId}/pricing`,
   import:   `/sites/${siteId}/sourcing`,
   upsells:  `/sites/${siteId}/upsells`,
   forecast: `/sites/${siteId}/forecast`,
   branding: `/sites/${siteId}/branding?step=5`,
-  pages:    `/sites/${siteId}/pages?step=6`,
-  content:  `/sites/${siteId}/blog-posts?step=7`,
+  domain:   `/sites/${siteId}/domains?step=6`,
+  pages:    `/sites/${siteId}/pages?step=7`,
+  content:  `/sites/${siteId}/blog-posts?step=8`,
   seo:      `/sites/${siteId}/seo`,
   qa:       "#site-qa-panel",
 });
