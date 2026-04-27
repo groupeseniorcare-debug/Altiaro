@@ -21,7 +21,7 @@ import {
   Headphones,
 } from "@phosphor-icons/react";
 import SEOHead from "../components/SEOHead";
-import { getPrimaryImage, getProductGallery } from "../lib/productImage";
+import { getPrimaryImage, getProductGallery, getProductGalleryForColor } from "../lib/productImage";
 
 import {
   BACKEND_URL,
@@ -53,6 +53,7 @@ import {
   LastUpdatedBadge,
 } from "../components/storefront/ProductSEOBlocks";
 import ProductUsps from "../components/storefront/ProductUsps";
+import ProductHowTo from "../components/storefront/ProductHowTo";
 import WideLifestyleBanner from "../components/storefront/WideLifestyleBanner";
 
 export function StorefrontProduct() {
@@ -108,6 +109,21 @@ export function StorefrontProduct() {
     return baseImgs;
   })();
   const isVariantOutOfStock = selectedVariant?.stock === 0;
+
+  // Phase 2.3 — Slug couleur sélectionnée (variant-aware) pour piocher
+  // dans `generated_images_by_variant[colorSlug]` les images cohérentes.
+  // Logique alignée sur backend `services/color_variant_images.slugify_color`.
+  const selectedColorSlug = (() => {
+    const props = selectedVariant?.properties;
+    if (!Array.isArray(props) || !props[0]) return null;
+    return String(props[0])
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+  })();
 
   const handleAdd = () => {
     addToCart(siteId, p, lang, qty, {
@@ -237,10 +253,11 @@ export function StorefrontProduct() {
               { "@type": "ListItem", position: p.category ? 4 : 3, name: pickLang(p.name, lang), item: `${window.location.origin}/shop/${siteId}/product/${p.id}` },
             ].filter(Boolean),
           },
-          (p.narrative?.faq?.length || p.narrative?.seo?.people_also_ask?.length) ? {
+          (p.faq_product?.length || p.narrative?.faq?.length || p.narrative?.seo?.people_also_ask?.length) ? {
             "@context": "https://schema.org",
             "@type": "FAQPage",
             mainEntity: [
+              ...(p.faq_product || []),
               ...(p.narrative?.faq || []),
               ...(p.narrative?.seo?.people_also_ask || []),
             ].slice(0, 12).map((f) => ({
@@ -249,7 +266,19 @@ export function StorefrontProduct() {
               acceptedAnswer: { "@type": "Answer", text: f.answer },
             })),
           } : null,
-          p.narrative?.seo?.usage_steps?.length ? {
+          (p.how_to_steps?.length >= 3) ? {
+            "@context": "https://schema.org",
+            "@type": "HowTo",
+            name: `Comment utiliser ${pickLang(p.name, lang)}`,
+            description: `Guide pas à pas pour l'utilisation de ${pickLang(p.name, lang)}.`,
+            totalTime: "PT5M",
+            step: p.how_to_steps.map((s, idx) => ({
+              "@type": "HowToStep",
+              position: idx + 1,
+              name: s.title,
+              text: s.description,
+            })),
+          } : (p.narrative?.seo?.usage_steps?.length ? {
             "@context": "https://schema.org",
             "@type": "HowTo",
             name: `Comment utiliser ${pickLang(p.name, lang)}`,
@@ -261,7 +290,7 @@ export function StorefrontProduct() {
               name: s.name,
               text: s.text,
             })),
-          } : null,
+          } : null),
         ].filter(Boolean)}
       />
       <div className="bg-white" data-testid="product-page-root">
@@ -411,7 +440,32 @@ export function StorefrontProduct() {
                   sidebar et remplacés par une section narrative pleine largeur
                   `<ProductUsps>` plus bas (lecture stricte de `p.usps` généré
                   par Haiku 4.5). Décision user 2026-04-27 : section
-                  "Est-ce fait pour vous" supprimée, USPs amplifiés à la place. */}
+                  "Est-ce fait pour vous" supprimée, USPs amplifiés à la place.
+                  Phase 2.3 : version COMPACTE (4 lignes condensées) au-dessus
+                  du CTA pour visibilité immédiate des bénéfices clés. */}
+              {Array.isArray(p.usps) && p.usps.length >= 3 && (
+                <div
+                  className="mt-7 mb-1 py-5 px-5"
+                  style={{ background: "#FAF8F4", border: "1px solid #E7E5E4", borderRadius: "2px" }}
+                  data-testid="product-usps-compact"
+                >
+                  <ul className="space-y-3">
+                    {p.usps.slice(0, 4).map((u, i) => (
+                      <li key={i} className="flex items-start gap-3">
+                        <Check size={14} weight="bold" className="mt-1 shrink-0" style={{ color: "#9F6E50" }} />
+                        <div className="min-w-0">
+                          <div className="text-[13.5px] font-medium leading-tight" style={{ color: "#0A0A0A" }}>
+                            {u.title}
+                          </div>
+                          <div className="text-[12px] mt-0.5 leading-snug" style={{ color: "#737373" }}>
+                            {u.description}
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {typeof p.stock === "number" && p.stock > 0 && p.stock < 10 && (
                 <div
@@ -482,20 +536,31 @@ export function StorefrontProduct() {
 
               <div className="mt-8 grid grid-cols-2 gap-2.5" data-testid="product-trust-badges">
                 {[
-                  { Icon: Truck,       label: t(lang, "trust_free_shipping"), sub: "48–72 h" },
-                  { Icon: ShieldCheck, label: t(lang, "trust_warranty_2y"),   sub: "Pièces & MO" },
-                  { Icon: CheckCircle, label: t(lang, "trust_returns_14d"),   sub: { fr: "Gratuit", en: "Free", de: "Kostenlos", nl: "Gratis", it: "Gratis", es: "Gratis" }[lang] || "Gratuit" },
-                  { Icon: Star,        label: "4.8 / 5",                      sub: `${p.rating?.count ?? 127} ${t(lang, "testimonials_verified_reviews")}` },
+                  { Icon: Truck,                  label: t(lang, "trust_free_shipping"), sub: "48–72 h" },
+                  { Icon: ShieldCheck,            label: t(lang, "trust_warranty_2y"),   sub: "Pièces & MO" },
+                  { Icon: ArrowsCounterClockwise, label: t(lang, "trust_returns_14d"),   sub: { fr: "Gratuit", en: "Free", de: "Kostenlos", nl: "Gratis", it: "Gratis", es: "Gratis" }[lang] || "Gratuit" },
+                  { Icon: Headphones,             label: "Conseil dédié",                sub: "Lun–Sam 9h–19h" },
                 ].map((b, i) => (
                   <div
                     key={i}
-                    className="p-3.5 flex items-start gap-2.5"
-                    style={{ background: "#F5F5F5", borderRadius: "2px" }}
+                    className="p-4 flex items-start gap-3 transition-all hover:translate-y-[-1px]"
+                    style={{
+                      background: "#F5F2EB",
+                      border: "1px solid #E7E5E4",
+                      borderRadius: "2px",
+                    }}
                   >
-                    <b.Icon size={16} weight="thin" className="mt-[2px] shrink-0" style={{ color: "#0A0A0A" }} />
+                    <b.Icon size={18} weight="thin" className="mt-[2px] shrink-0" style={{ color: "#0A0A0A" }} />
                     <div className="min-w-0">
-                      <div className="text-[12.5px] font-semibold leading-tight" style={{ color: "#0A0A0A" }}>{b.label}</div>
-                      <div className="text-[11px] mt-0.5" style={{ color: "#737373" }}>{b.sub}</div>
+                      <div
+                        className="text-[14px] leading-tight font-light"
+                        style={{ fontFamily: fontHeading, color: "#0A0A0A" }}
+                      >
+                        {b.label}
+                      </div>
+                      <div className="text-[10.5px] mt-1 uppercase tracking-[0.18em]" style={{ color: "#9C8C7C" }}>
+                        {b.sub}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -520,14 +585,26 @@ export function StorefrontProduct() {
               généré par Haiku 4.5 dans `services/product_content_ai.py`. */}
           <ProductUsps usps={p.usps} design={design} lang={lang} />
 
+          {/* Phase 2.3 (Lot I I11) — "Comment l'utiliser" infographique
+              (3-4 étapes premium Aesop). Lecture de `p.how_to_steps` généré
+              par Haiku via `services/product_content_ai.py::generate_product_how_to`.
+              JSON-LD HowTo posé dans `<SEOHead>` plus haut. */}
+          <ProductHowTo steps={p.how_to_steps} design={design} lang={lang} />
+
           {/* Lot I Fix I6 — Wide cinematic lifestyle banner (16:9). Variant-aware,
               utilise `wide_lifestyle` généré par le pipeline I7. Si la couleur
               sélectionnée n'a pas ce style → masqué proprement. */}
           <WideLifestyleBanner product={p} productName={pickLang(p.name, lang)} design={design} />
 
+          {/* Phase 2.3 (Lot I A) — Editorial mosaic & narrative sections passent
+              désormais par le pool `getProductGalleryForColor()` qui :
+                1. Privilégie la variante couleur sélectionnée
+                2. Filtre les images `qa_passed === false` (cf productImage.js)
+                3. Tombe en fallback sur image fournisseur AE plutôt que sur
+                   une mauvaise image IA. */}
           <ProductEditorialMosaic
-            images={[...(p.generated_images || []).map(g => g.url).filter(Boolean), ...(p.images || [])]}
-            styledImages={p.generated_images || []}
+            images={getProductGalleryForColor(p, selectedColorSlug)}
+            styledImages={(selectedColorSlug && p.generated_images_by_variant?.[selectedColorSlug]) || p.generated_images || []}
             productName={pickLang(p.name, lang)}
             design={design}
             product={p}
@@ -536,12 +613,17 @@ export function StorefrontProduct() {
           <NarrativeSections
             sections={p.narrative?.sections}
             design={design}
-            productImages={[...(p.generated_images || []).map(g => g.url).filter(Boolean), ...(p.images || [])]}
+            productImages={getProductGalleryForColor(p, selectedColorSlug)}
             product={p}
           />
           <TechSpecs specs={p.narrative?.tech_specs} design={design} />
-          <UsageSteps steps={p.narrative?.seo?.usage_steps} productName={pickLang(p.name, lang)} design={design} />
-          <ProductFAQ faq={p.narrative?.faq} design={design} />
+
+          {/* Phase 2.3 (Lot I I12) — FAQ produit unique : priorité au champ
+              `p.faq_product` (Haiku 4.5, 5 Q/R spécifiques au produit, sans
+              questions livraison/retours/garantie). Fallback legacy
+              `p.narrative?.faq` si pas encore généré. La FAQ générique
+              livraison/retours/SAV est déplacée en footer (page CMS dédiée). */}
+          <ProductFAQ faq={p.faq_product?.length ? p.faq_product : p.narrative?.faq} design={design} />
           <PeopleAlsoAsk items={p.narrative?.seo?.people_also_ask} design={design} lang={lang} />
           <ProductReviews product={p} design={design} lang={lang} />
           <RelatedQueries queries={p.narrative?.seo?.related_queries} design={design} />

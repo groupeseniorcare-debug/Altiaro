@@ -966,6 +966,62 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                             if "402" in msg or "budget" in msg.lower():
                                 budget_exhausted = True
 
+                    # 8a-ter (Phase 2.3 / Lot I I11) — HowTo steps (3-4 étapes, ton premium)
+                    if (overwrite or not fresh_p.get("how_to_steps")) and not budget_exhausted:
+                        try:
+                            from services.product_content_ai import generate_product_how_to
+                            steps = await asyncio.wait_for(
+                                generate_product_how_to(
+                                    fresh_p, brand_dict,
+                                    n_steps=4,
+                                    request_id=f"launch-howto-{p['id'][:8]}",
+                                ),
+                                timeout=45,
+                            )
+                            if steps and len(steps) >= 3:
+                                await db.products.update_one(
+                                    {"id": p["id"]},
+                                    {"$set": {
+                                        "how_to_steps": steps,
+                                        "how_to_steps_generated_at": datetime.now(timezone.utc).isoformat(),
+                                    }},
+                                )
+                        except asyncio.TimeoutError:
+                            logger.warning(f"[launch] how-to {p['id']} timed out")
+                        except Exception as e:
+                            msg = str(e)
+                            logger.warning(f"[launch] how-to {p['id']}: {msg[:120]}")
+                            if "402" in msg or "budget" in msg.lower():
+                                budget_exhausted = True
+
+                    # 8a-quater (Phase 2.3 / Lot I I12) — FAQ produit (4-6 Q/R spécifiques)
+                    if (overwrite or not fresh_p.get("faq_product")) and not budget_exhausted:
+                        try:
+                            from services.product_content_ai import generate_product_faq
+                            faq = await asyncio.wait_for(
+                                generate_product_faq(
+                                    fresh_p, brand_dict,
+                                    n_questions=5,
+                                    request_id=f"launch-faq-{p['id'][:8]}",
+                                ),
+                                timeout=50,
+                            )
+                            if faq and len(faq) >= 3:
+                                await db.products.update_one(
+                                    {"id": p["id"]},
+                                    {"$set": {
+                                        "faq_product": faq,
+                                        "faq_product_generated_at": datetime.now(timezone.utc).isoformat(),
+                                    }},
+                                )
+                        except asyncio.TimeoutError:
+                            logger.warning(f"[launch] faq {p['id']} timed out")
+                        except Exception as e:
+                            msg = str(e)
+                            logger.warning(f"[launch] faq {p['id']}: {msg[:120]}")
+                            if "402" in msg or "budget" in msg.lower():
+                                budget_exhausted = True
+
                 # 8b) 5 product hero images (use existing imported supplier images as base; add AI)
                 await _advance(
                     job_id,

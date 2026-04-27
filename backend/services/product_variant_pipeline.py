@@ -52,6 +52,11 @@ from services.image_qa import (
     analyze_source_product_multi,
     qa_check_generated_image,
 )
+from services.style_profiles import (
+    STYLE_PROFILES,
+    classify_product_kind,
+    get_style_profile,
+)
 from services.llm_resilience import LLMUnavailableError, safe_nano_banana_bytes
 
 logger = logging.getLogger("altiaro.product_variant_pipeline")
@@ -606,11 +611,39 @@ async def generate_full_variant_set(
             }
 
     material = source_lock.get("material") or "fabric upholstery"
-    color_descriptor = source_lock.get("color") or f"{target_color_en}, matte finish"
     if source_lock.get("product_kind") and len(source_lock["product_kind"]) > len(product_kind):
         product_kind = source_lock["product_kind"]
     silhouette_signature = source_lock.get("silhouette_signature") or ""
     unique_features_visible = source_lock.get("unique_features_visible") or ""
+
+    # ---------------------------------------------------------------
+    # COLOR LOCK per VARIANT (Phase 2.3 fix bug 2026-04-27)
+    # ---------------------------------------------------------------
+    # `source_vision_lock.color` describes the PRIMARY color observed on the
+    # source AE/CJ photos (e.g. "primary: black charcoal matte; alt: brown,
+    # white"). For each variant we want to override this primary with the
+    # CURRENT variant's target color (e.g. White, Brown), keeping the same
+    # finish/undertone descriptor when possible. Otherwise QA Vision will
+    # reject every White/Brown image because color "doesn't match" the cached
+    # lock that says "black".
+    finish_suffix = "matte finish, identical material and texture as reference"
+    svl_color_raw = (source_lock.get("color") or "").lower()
+    if "satin" in svl_color_raw:
+        finish_suffix = "satin finish, identical material and texture as reference"
+    elif "glossy" in svl_color_raw or "gloss" in svl_color_raw:
+        finish_suffix = "subtle glossy finish, identical material and texture as reference"
+    color_descriptor = f"{target_color_en} ({finish_suffix})"
+
+    # Phase 2.3 — Adaptive style profile selection based on Vision-detected
+    # product_kind. Falls back to the legacy 8-styles seated_furniture set if
+    # classifier returns "seated_furniture" (no behaviour change for chairs).
+    profile_key = classify_product_kind(product_kind)
+    selected_styles = get_style_profile(profile_key)
+    selected_slugs = [s["slug"] for s in selected_styles]
+    logger.info(
+        f"[variant-pipeline] {request_id}: profile='{profile_key}' "
+        f"styles={selected_slugs}"
+    )
 
     new_images: List[Dict[str, Any]] = []
     skipped: List[str] = []
@@ -619,12 +652,12 @@ async def generate_full_variant_set(
     # Build the final image set : start with existing kept ones, then add new
     final_for_color: List[Dict[str, Any]] = []
     if not overwrite:
-        # Keep existing entries that match one of our 8 slugs (preserve work)
+        # Keep existing entries that match one of the selected slugs
         for img in existing_for_color:
-            if img.get("style") in ALL_STYLE_SLUGS:
+            if img.get("style") in selected_slugs:
                 final_for_color.append(img)
 
-    for style in VARIANT_STYLES:
+    for style in selected_styles:
         if not overwrite and style["slug"] in existing_styles:
             skipped.append(style["slug"])
             continue
@@ -692,6 +725,7 @@ async def generate_full_variant_set(
             "generated_images_locked_product_kind": product_kind,
             "generated_images_locked_silhouette": silhouette_signature,
             "generated_images_locked_features": unique_features_visible,
+            "generated_images_style_profile": profile_key,
         }},
     )
 
@@ -700,6 +734,7 @@ async def generate_full_variant_set(
         "product_id": product_id,
         "color_slug": color_slug,
         "color_label": color_label,
+        "style_profile": profile_key,
         "locked": {
             "product_kind":            product_kind,
             "material":                material,

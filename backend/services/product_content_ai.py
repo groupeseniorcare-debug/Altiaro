@@ -113,6 +113,43 @@ def _product_context(product: Dict[str, Any], brand: Dict[str, Any]) -> str:
     brand_voice = brand.get("voice") or "premium"
     brand_name = _pick_primary_lang_text(brand.get("name") or brand.get("logo_text"))
 
+    # Phase 2.3 — Inject source_vision_lock so the LLM knows the REAL material
+    # / color / silhouette detected by Gemini Vision on the source AE/CJ photos.
+    # This prevents text drift (e.g. saying "microsuède" when the material is
+    # actually PU leather).
+    svl = product.get("source_vision_lock") or {}
+    svl_lines: List[str] = []
+    canonical_material_fr = ""
+    forbidden_terms_fr: List[str] = []
+    if isinstance(svl, dict):
+        if svl.get("product_kind"):
+            svl_lines.append(f"  - Type produit (Vision) : {svl['product_kind']}")
+        if svl.get("material"):
+            mat_en = svl['material']
+            svl_lines.append(f"  - Matériau réel (Vision) : {mat_en}")
+            mat_low = mat_en.lower()
+            if "pu leather" in mat_low or ("leather" in mat_low and "real" not in mat_low and "top-grain" not in mat_low and "genuine" not in mat_low):
+                canonical_material_fr = "cuir synthétique (PU leather, simili-cuir)"
+                forbidden_terms_fr = ["microsuède", "microsuede", "microfibre", "suède", "suede", "tissu", "velours", "lin"]
+            elif "top-grain" in mat_low or "real leather" in mat_low or "genuine leather" in mat_low:
+                canonical_material_fr = "cuir véritable (top-grain leather)"
+                forbidden_terms_fr = ["microsuède", "microsuede", "microfibre", "PU", "simili", "tissu"]
+            elif "microsuede" in mat_low or "suede-like" in mat_low or "microfiber suede" in mat_low:
+                canonical_material_fr = "microsuède (microfibre type suède)"
+                forbidden_terms_fr = ["cuir", "leather", "velours", "lin"]
+            elif "velvet" in mat_low:
+                canonical_material_fr = "velours"
+                forbidden_terms_fr = ["cuir", "leather", "microsuède", "tissu uni"]
+            elif "linen" in mat_low or "cotton" in mat_low or "woven" in mat_low or "fabric" in mat_low:
+                canonical_material_fr = "tissu (textile tissé)"
+                forbidden_terms_fr = ["cuir", "leather", "PU", "simili", "microsuède"]
+        if svl.get("color"):
+            svl_lines.append(f"  - Couleur réelle (Vision) : {svl['color']}")
+        if svl.get("silhouette_signature"):
+            svl_lines.append(f"  - Traits distinctifs (Vision) : {svl['silhouette_signature']}")
+        if svl.get("unique_features_visible"):
+            svl_lines.append(f"  - Features visibles (Vision) : {svl['unique_features_visible']}")
+
     lines = [
         f"MARQUE : {brand_name} (ton de voix : {brand_voice})",
         f"PRODUIT : {name}",
@@ -129,6 +166,23 @@ def _product_context(product: Dict[str, Any], brand: Dict[str, Any]) -> str:
         lines.append(f"DESCRIPTION : {desc}")
     if specs_str:
         lines.append("CARACTÉRISTIQUES TECHNIQUES :\n" + specs_str)
+    if svl_lines:
+        block = (
+            "🔒 ANALYSE VISUELLE SOURCE (AUTORITAIRE — PRIME SUR TOUT LE RESTE) :\n"
+            + "\n".join(svl_lines)
+            + "\n  ⚠️ RÈGLE ABSOLUE : si la description ou les specs ci-dessus contredisent "
+            "cette analyse Vision (ex: la description dit 'microsuède' mais la Vision dit "
+            "'PU leather'), tu DOIS croire la Vision et IGNORER les contradictions textuelles. "
+            "La Vision a regardé le vrai produit ; la description fournisseur peut être inexacte ou traduite n'importe comment."
+        )
+        if canonical_material_fr:
+            block += (
+                f"\n\n  📌 MATÉRIAU CANONIQUE À EMPLOYER (français, OBLIGATOIRE) : {canonical_material_fr}.\n"
+                f"  ❌ TERMES INTERDITS POUR CE PRODUIT (ne JAMAIS écrire ces mots) : "
+                + ", ".join(forbidden_terms_fr)
+                + ".\n  Si tu écris un terme interdit, ta réponse est rejetée et régénérée."
+            )
+        lines.append(block)
     return "\n".join(lines)
 
 
@@ -408,5 +462,207 @@ async def _call_usps_llm(
             ci = next((i for i in ALLOWED_USP_ICONS if i.lower() == icon.lower()), None)
             icon = ci or "Sparkles"
         cleaned_items.append({"icon": icon, "title": title, "description": desc})
+    return cleaned_items
+
+
+# ---------------------------------------------------------------------------
+# Phase 2.3 — Allowed icons for HowTo steps (subset, more action-oriented)
+# ---------------------------------------------------------------------------
+ALLOWED_HOWTO_ICONS = [
+    "ArrowDownToLine", "Hand", "MousePointer2", "Settings2", "Move",
+    "ChevronsRight", "Check", "Sparkles", "Gauge", "Headphones",
+    "Heart", "Sofa", "Plug", "Power", "Volume2", "Compass",
+]
+
+
+# ---------------------------------------------------------------------------
+# 3) "Comment l'utiliser" — 3-4 step infographic (Phase 2.3 / Lot I I11)
+# ---------------------------------------------------------------------------
+async def generate_product_how_to(
+    product: Dict[str, Any],
+    brand: Dict[str, Any],
+    *,
+    n_steps: int = 4,
+    request_id: Optional[str] = None,
+) -> List[Dict[str, str]]:
+    """Generate `n_steps` (default 4) actionable, sensorielle steps to use the
+    product. Output : list of {icon, title (≤32 chars), description (≤120 chars)}.
+
+    Lit `source_vision_lock` (matériau + features visibles) pour ancrer le
+    contenu sur la réalité du produit, et non sur des suppositions génériques.
+    """
+    n_steps = max(3, min(int(n_steps or 4), 5))
+    context = _product_context(product, brand)
+    icons = ", ".join(ALLOWED_HOWTO_ICONS)
+
+    system = (
+        "Tu es directeur éditorial d'une marque premium (références Aesop, "
+        "Hermès Petit h, Le Labo). Tu écris en français un guide pas à pas "
+        "ESSENTIEL et POÉTIQUE pour utiliser un produit. Tu produis du JSON valide.\n\n"
+        "Ton : sobre, sensoriel, narratif. Jamais d'impératif sec, jamais d'emoji. "
+        "Privilégie verbes d'expérience (« installez-vous », « laissez », « retrouvez »).\n\n"
+        "CONTRAINTES DE LONGUEUR ABSOLUES :\n"
+        "- title : MAXIMUM 32 caractères, espaces inclus.\n"
+        "- description : MAXIMUM 120 caractères.\n"
+        "Compte AVANT de répondre. Si tu dépasses, ta réponse est rejetée."
+    )
+    user = (
+        f"{context}\n\n"
+        f"TÂCHE : produis EXACTEMENT {n_steps} étapes d'utilisation, ton premium, "
+        f"ancrées sur le matériau et les features réellement visibles (ANALYSE VISUELLE SOURCE ci-dessus).\n\n"
+        f"FORMAT JSON STRICT (réponds UNIQUEMENT ceci, sans markdown) :\n"
+        f'{{\n'
+        f'  "steps": [\n'
+        f'    {{"icon": "<icon>", "title": "<≤32 chars>", '
+        f'"description": "<≤120 chars, ton sensoriel, geste ou expérience concrète>"}},\n'
+        f'    ... ({n_steps} items)\n'
+        f'  ]\n'
+        f'}}\n\n'
+        f"icon DOIT être l'un de : {icons}.\n"
+        f"Choisis l'icône la plus pertinente pour chaque étape."
+    )
+
+    raw = await safe_claude_text(
+        system=system, user=user,
+        quality_tier="standard", timeout=40.0, request_id=request_id,
+    )
+    cleaned = _strip_json_fence(raw or "")
+    try:
+        data = json.loads(cleaned)
+    except json.JSONDecodeError:
+        m = re.search(r"\{[\s\S]+\}", cleaned)
+        if not m:
+            raise ValueError("Réponse Claude HowTo non parsable")
+        data = json.loads(m.group(0))
+
+    items = data.get("steps") or data.get("items") or []
+    if not isinstance(items, list) or not items:
+        raise ValueError("Réponse Claude HowTo invalide (liste vide)")
+
+    out: List[Dict[str, str]] = []
+    for it in items[:n_steps]:
+        if not isinstance(it, dict):
+            continue
+        icon = str(it.get("icon") or "").strip()
+        title = str(it.get("title") or "").strip()
+        desc = str(it.get("description") or "").strip()
+        if not title:
+            continue
+        if icon not in ALLOWED_HOWTO_ICONS:
+            ci = next((i for i in ALLOWED_HOWTO_ICONS if i.lower() == icon.lower()), None)
+            icon = ci or "ChevronsRight"
+        out.append({
+            "icon": icon,
+            "title": _truncate_clean(title, 32),
+            "description": _truncate_clean(desc, 120),
+        })
+    if len(out) < 3:
+        raise ValueError(f"Réponse Claude HowTo : {len(out)} étapes valides (min 3)")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 4) FAQ produit — 4-6 questions ultra-spécifiques au modèle (Lot I I12)
+# ---------------------------------------------------------------------------
+async def generate_product_faq(
+    product: Dict[str, Any],
+    brand: Dict[str, Any],
+    *,
+    n_questions: int = 5,
+    request_id: Optional[str] = None,
+) -> List[Dict[str, str]]:
+    """Generate 4-6 FAQ items SPECIFIC to this exact product (model, material,
+    technical features, dimensions, usage cases). Excludes generic shipping/
+    returns/warranty questions (those go to a global FAQ in the footer).
+
+    Output : list of {question, answer}.
+    """
+    n_questions = max(4, min(int(n_questions or 5), 6))
+    context = _product_context(product, brand)
+
+    system = (
+        "Tu es responsable expérience client pour une marque premium. "
+        "Tu écris en français des FAQs UTILES, FACTUELLES et ANCRÉES sur le produit "
+        "(matériau, mécanisme, dimensions, usage). Pas de jargon, pas de marketing-speak. "
+        "Tu produis du JSON valide, sans markdown."
+    )
+    user = (
+        f"{context}\n\n"
+        f"TÂCHE : produis EXACTEMENT {n_questions} questions/réponses SPÉCIFIQUES À CE PRODUIT.\n\n"
+        f"INTERDITS — ne pose JAMAIS de questions :\n"
+        f"- Sur la livraison, les délais d'expédition, le suivi de commande\n"
+        f"- Sur les retours, garantie, SAV, remboursement\n"
+        f"- Sur le paiement, les promos, le code promo\n"
+        f"  (ces sujets sont traités dans une FAQ globale en footer)\n\n"
+        f"PRIVILÉGIE — questions PRODUIT spécifiques :\n"
+        f"- Le matériau réel (cf ANALYSE VISUELLE SOURCE) et son entretien\n"
+        f"- Le mécanisme, la motorisation, l'autonomie, le bruit\n"
+        f"- Les dimensions, la charge max, la compatibilité (qui peut l'utiliser ?)\n"
+        f"- L'installation, le branchement, l'usage quotidien\n"
+        f"- Les variantes (couleurs, tailles, finitions disponibles)\n"
+        f"- Les bénéfices ergonomiques / médicaux (si applicable)\n\n"
+        f"CONTRAINTES :\n"
+        f"- question : phrase claire, ≤ 110 caractères\n"
+        f"- answer   : 1-3 phrases factuelles, 80-280 caractères, ton premium sobre\n\n"
+        f"FORMAT JSON STRICT :\n"
+        f'{{\n'
+        f'  "faq": [\n'
+        f'    {{"question": "<≤110 chars>", "answer": "<80-280 chars>"}},\n'
+        f'    ... ({n_questions} items)\n'
+        f'  ]\n'
+        f'}}\n'
+    )
+
+    raw = await safe_claude_text(
+        system=system, user=user,
+        quality_tier="standard", timeout=45.0, request_id=request_id,
+    )
+    cleaned = _strip_json_fence(raw or "")
+    try:
+        data = json.loads(cleaned)
+    except json.JSONDecodeError:
+        m = re.search(r"\{[\s\S]+\}", cleaned)
+        if not m:
+            raise ValueError("Réponse Claude FAQ non parsable")
+        data = json.loads(m.group(0))
+
+    items = data.get("faq") or data.get("items") or []
+    if not isinstance(items, list) or not items:
+        raise ValueError("Réponse Claude FAQ invalide (liste vide)")
+
+    out: List[Dict[str, str]] = []
+    for it in items[:n_questions]:
+        if not isinstance(it, dict):
+            continue
+        q = str(it.get("question") or "").strip()
+        a = str(it.get("answer") or "").strip()
+        if not q or not a:
+            continue
+        out.append({
+            "question": _truncate_clean(q, 110),
+            "answer": _truncate_clean(a, 320),
+        })
+    if len(out) < 3:
+        raise ValueError(f"Réponse Claude FAQ : {len(out)} items valides (min 3)")
+    return out
+
+    items = data.get("usps") or data.get("items") or []
+    if not isinstance(items, list) or len(items) < 1:
+        raise ValueError("Réponse Claude USPs invalide (liste vide)")
+
+    cleaned_items: List[Dict[str, str]] = []
+    for it in items[:4]:
+        if not isinstance(it, dict):
+            continue
+        icon = str(it.get("icon") or "").strip()
+        title = str(it.get("title") or "").strip()
+        desc = str(it.get("description") or it.get("desc") or "").strip()
+        if not title:
+            continue
+        if icon not in ALLOWED_USP_ICONS:
+            ci = next((i for i in ALLOWED_USP_ICONS if i.lower() == icon.lower()), None)
+            icon = ci or "Sparkles"
+        cleaned_items.append({"icon": icon, "title": title, "description": desc})
 
     return cleaned_items
+

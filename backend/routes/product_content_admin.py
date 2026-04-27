@@ -28,6 +28,8 @@ from deps import db, require_admin
 from services.product_content_ai import (
     generate_product_tagline,
     generate_product_usps,
+    generate_product_how_to,
+    generate_product_faq,
 )
 from services.product_variant_pipeline import (
     DEFAULT_BUDGET_CAP_USD,
@@ -176,6 +178,92 @@ async def regenerate_product_usps(
         "usps": usps,
         "model": "claude-haiku-4-5",
         "cost_estimate_usd": 0.005,
+    }
+
+
+# ============================================================================
+# Phase 2.3 (Lot I I11) — Product HowTo steps
+# ============================================================================
+@router.post(
+    "/admin/products/{product_id}/regenerate-how-to",
+    tags=["product-content-admin"],
+    summary="Regénère les 3-4 étapes HowTo IA d'un produit (Haiku 4.5) — admin only",
+)
+async def regenerate_product_how_to_endpoint(
+    product_id: str,
+    n_steps: int = Query(4, ge=3, le=5),
+    user: dict = Depends(require_admin),
+):
+    product = await db.products.find_one({"id": product_id}, {"_id": 0})
+    if not product:
+        raise HTTPException(404, "Produit introuvable")
+    site = await db.sites.find_one({"id": product["site_id"]}, {"_id": 0, "design.brand": 1})
+    brand = ((site or {}).get("design") or {}).get("brand") or {}
+    try:
+        steps = await generate_product_how_to(
+            product, brand, n_steps=n_steps,
+            request_id=f"backfill-howto-{product_id[:8]}",
+        )
+    except Exception as e:
+        logger.exception(f"[regenerate-how-to] {product_id} failed")
+        raise HTTPException(502, f"Génération IA échouée : {str(e)[:200]}")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.products.update_one(
+        {"id": product_id},
+        {"$set": {
+            "how_to_steps": steps,
+            "how_to_steps_generated_at": now_iso,
+            "updated_at": now_iso,
+        }},
+    )
+    logger.info(f"[regenerate-how-to] {product_id} → {len(steps)} steps")
+    return {
+        "ok": True, "product_id": product_id, "how_to_steps": steps,
+        "model": "claude-haiku-4-5", "cost_estimate_usd": 0.004,
+    }
+
+
+# ============================================================================
+# Phase 2.3 (Lot I I12) — Product-specific FAQ (single source of truth)
+# ============================================================================
+@router.post(
+    "/admin/products/{product_id}/regenerate-faq",
+    tags=["product-content-admin"],
+    summary="Regénère la FAQ produit (4-6 Q/R) IA — admin only",
+)
+async def regenerate_product_faq_endpoint(
+    product_id: str,
+    n_questions: int = Query(5, ge=4, le=6),
+    user: dict = Depends(require_admin),
+):
+    product = await db.products.find_one({"id": product_id}, {"_id": 0})
+    if not product:
+        raise HTTPException(404, "Produit introuvable")
+    site = await db.sites.find_one({"id": product["site_id"]}, {"_id": 0, "design.brand": 1})
+    brand = ((site or {}).get("design") or {}).get("brand") or {}
+    try:
+        faq = await generate_product_faq(
+            product, brand, n_questions=n_questions,
+            request_id=f"backfill-faq-{product_id[:8]}",
+        )
+    except Exception as e:
+        logger.exception(f"[regenerate-faq] {product_id} failed")
+        raise HTTPException(502, f"Génération IA échouée : {str(e)[:200]}")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.products.update_one(
+        {"id": product_id},
+        {"$set": {
+            "faq_product": faq,
+            "faq_product_generated_at": now_iso,
+            "updated_at": now_iso,
+        }},
+    )
+    logger.info(f"[regenerate-faq] {product_id} → {len(faq)} Q/A")
+    return {
+        "ok": True, "product_id": product_id, "faq_product": faq,
+        "model": "claude-haiku-4-5", "cost_estimate_usd": 0.005,
     }
 
 
