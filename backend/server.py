@@ -96,6 +96,7 @@ from routes import google_ads_manual as google_ads_manual_routes
 from routes import upsells_ai as upsells_ai_routes
 from routes import admin_llm_health as admin_llm_health_routes
 from routes import legal as legal_routes
+from routes import product_content_admin as product_content_admin_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -180,6 +181,7 @@ api.include_router(admin_llm_health_routes.router)
 api.include_router(admin_llm_health_routes.public_router)
 api.include_router(legal_routes.public_router)
 api.include_router(legal_routes.admin_router)
+api.include_router(product_content_admin_routes.router)  # Lot I — admin back-fill tagline + USPs
 
 
 @app.on_event("startup")

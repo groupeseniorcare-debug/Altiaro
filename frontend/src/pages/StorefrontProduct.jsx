@@ -48,11 +48,11 @@ import VariantPicker from "../components/storefront/VariantPicker";
 import ProductEditorialMosaic from "../components/storefront/ProductEditorialMosaic";
 import {
   PeopleAlsoAsk,
-  BestForNotFor,
   UsageSteps,
   RelatedQueries,
   LastUpdatedBadge,
 } from "../components/storefront/ProductSEOBlocks";
+import ProductUsps from "../components/storefront/ProductUsps";
 
 export function StorefrontProduct() {
   const { siteId, productId } = useParams();
@@ -330,7 +330,24 @@ export function StorefrontProduct() {
               >
                 {p.narrative?.headline || pickLang(p.name, lang)}
               </h1>
-              {p.narrative?.subheadline && (
+              {/* Lot I Fix I2 — Tagline IA (40-80 chars, Haiku 4.5) sous le titre.
+                  Lecture stricte de `p.tagline`. Si absente, on retombe sur
+                  narrative.subheadline (ancien comportement). Dict multi-lang
+                  géré par pickLang défensif. */}
+              {pickLang(p.tagline, lang) ? (
+                <p
+                  className="text-[15px] md:text-[17px] mt-5 leading-[1.6] italic"
+                  style={{
+                    color: "#525252",
+                    fontFamily: `"${fontHeading}", Georgia, serif`,
+                    fontWeight: 400,
+                    letterSpacing: "0.005em",
+                  }}
+                  data-testid="product-tagline"
+                >
+                  {pickLang(p.tagline, lang)}
+                </p>
+              ) : p.narrative?.subheadline && (
                 <p className="text-[15px] md:text-[17px] mt-5 leading-[1.65]" style={{ color: "#525252" }}>
                   {p.narrative.subheadline}
                 </p>
@@ -389,49 +406,11 @@ export function StorefrontProduct() {
                 </div>
               )}
 
-              {/* Lot G Fix 5 — 4 USPs premium (cards visuelles avec icône) au lieu
-                  de la carte grise highlights. Wording exact Altea (validation user
-                  2026-04-27). Lecture optionnelle de `design.usps` pour propagation
-                  multi-sites via helper Claude Haiku dans le pipeline launch.py. */}
-              {(() => {
-                const ALTEA_USPS = [
-                  { Icon: Truck, label: "Livraison offerte", sub: "sous 72h" },
-                  { Icon: ShieldCheck, label: "Garantie 2 ans", sub: "incluse" },
-                  { Icon: ArrowsCounterClockwise, label: "Retour gratuit", sub: "14 jours" },
-                  { Icon: Headphones, label: "Support 7j/7", sub: "Conseillers experts" },
-                ];
-                const ICON_MAP = { truck: Truck, shield: ShieldCheck, returns: ArrowsCounterClockwise, support: Headphones, headphones: Headphones };
-                // Si pipeline a généré des USPs custom pour le site, les utiliser
-                const customUsps = Array.isArray(design?.usps) && design.usps.length === 4
-                  ? design.usps.map((u) => ({
-                      Icon: ICON_MAP[u.icon] || Truck,
-                      label: u.label || "",
-                      sub: u.sub || "",
-                    }))
-                  : null;
-                const usps = customUsps || ALTEA_USPS;
-                return (
-                  <ul
-                    className="mt-8 grid grid-cols-2 gap-2.5"
-                    data-testid="product-usps"
-                  >
-                    {usps.map(({ Icon, label, sub }, i) => (
-                      <li
-                        key={i}
-                        className="flex items-start gap-3 px-4 py-3.5 bg-white border border-stone-200"
-                        style={{ borderRadius: "2px" }}
-                        data-testid={`product-usp-${i}`}
-                      >
-                        <Icon size={20} weight="regular" className="shrink-0 mt-0.5" style={{ color: "#0A0A0A" }} />
-                        <div className="min-w-0">
-                          <div className="text-[13px] font-semibold leading-tight" style={{ color: "#0A0A0A" }}>{label}</div>
-                          {sub && <div className="text-[11.5px] mt-0.5 leading-tight" style={{ color: "#737373" }}>{sub}</div>}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                );
-              })()}
+              {/* Lot I Fix I3 — Les 4 USPs ALTEA hardcodés sont retirés de la
+                  sidebar et remplacés par une section narrative pleine largeur
+                  `<ProductUsps>` plus bas (lecture stricte de `p.usps` généré
+                  par Haiku 4.5). Décision user 2026-04-27 : section
+                  "Est-ce fait pour vous" supprimée, USPs amplifiés à la place. */}
 
               {typeof p.stock === "number" && p.stock > 0 && p.stock < 10 && (
                 <div
@@ -534,6 +513,12 @@ export function StorefrontProduct() {
 
           <ProductBundle currentProduct={p} lang={lang} design={design} />
 
+          {/* Lot I Fix I3 — USPs narratifs amplifiés. Cards verticales fond ivoire,
+              icônes Lucide. Remplace l'ex-section "Est-ce fait pour vous"
+              (BestForNotFor) qui a été retirée. Lecture stricte de `p.usps`
+              généré par Haiku 4.5 dans `services/product_content_ai.py`. */}
+          <ProductUsps usps={p.usps} design={design} lang={lang} />
+
           <ProductEditorialMosaic
             images={[...(p.generated_images || []).map(g => g.url).filter(Boolean), ...(p.images || [])]}
             styledImages={p.generated_images || []}
@@ -549,7 +534,6 @@ export function StorefrontProduct() {
             product={p}
           />
           <TechSpecs specs={p.narrative?.tech_specs} design={design} />
-          <BestForNotFor best_for={p.narrative?.seo?.best_for} not_for={p.narrative?.seo?.not_for} design={design} />
           <UsageSteps steps={p.narrative?.seo?.usage_steps} productName={pickLang(p.name, lang)} design={design} />
           <ProductFAQ faq={p.narrative?.faq} design={design} />
           <PeopleAlsoAsk items={p.narrative?.seo?.people_also_ask} design={design} lang={lang} />

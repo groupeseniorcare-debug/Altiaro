@@ -1,3 +1,22 @@
+/**
+ * Lot I (Phase 2.1) Fix I4 — Bundle "Souvent achetés ensemble" — 3 slots stricts.
+ *
+ * Slots fixes (décision user Q3 2026-04-27) :
+ * - Slot 1 = produit principal de la page (toujours, non décochable)
+ * - Slots 2 et 3 = 2 produits réellement importés depuis AE/CJ avec
+ *   `role ∈ {upsell, accessory, accessoire, addon}`. PAS d'IA-suggéré
+ *   hors panier d'imports.
+ *
+ * Si <2 accessoires existent sur le site → la section entière est masquée
+ * (pas de demo fallback, pas d'image générique Unsplash).
+ *
+ * Images : `getPrimaryImage()` strict → renvoie l'image IA Nano Banana
+ * (priorité generated_images.url). Jamais l'image AliExpress brute.
+ *
+ * Total = somme des 3 prix (pas de discount auto, décision user — voir Phase 4).
+ *
+ * Composant partagé → propagation auto sur tous les sites.
+ */
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
@@ -8,31 +27,24 @@ import { addToCart } from "../../lib/cart";
 import { toast } from "sonner";
 import { getPrimaryImage } from "../../lib/productImage";
 
-/**
- * Product bundle — "Souvent achetés ensemble"
- * Sélectionne automatiquement 2 produits de la même category (fallback : 2 produits quelconques).
- * Offre -10% si les 3 produits sont achetés ensemble.
- *
- * Design : 3 cartes horizontales avec "+" entre elles, récap prix barré à droite.
- */
+// Roles considered as "companion" products for bundling
+const COMPANION_ROLES = new Set(["upsell", "accessory", "accessoire", "addon"]);
+const isCompanion = (p) => COMPANION_ROLES.has((p?.role || "").toLowerCase());
+
 export default function ProductBundle({ currentProduct, lang = "fr", design }) {
   const { siteId } = useParams();
   const { primary, fontHeading } = designAccents(design);
-  const [candidates, setCandidates] = useState([]);
+  const [accessories, setAccessories] = useState([]);
   const [selected, setSelected] = useState({});
+  const [loaded, setLoaded] = useState(false);
 
+  // Fetch accessories — uses the dedicated `/upsells` public endpoint which
+  // returns products with role=upsell (linked first, fallback to any upsell of
+  // the site). Lot I I4 — strict: never any AI-suggested out-of-catalog item.
   useEffect(() => {
     if (!siteId || !currentProduct) return;
 
-    // Lot G Fix 6 — On affiche UNIQUEMENT des produits compagnons : `role === "upsell"`
-    // ou `role === "accessory"` (jamais d'autres "main" à 1000+€). C'est le pack "Souvent
-    // achetés ensemble" : produits complémentaires de petit prix qui boostent le panier.
-    const isCompanion = (p) => {
-      const r = (p?.role || "").toLowerCase();
-      return r === "upsell" || r === "accessory" || r === "addon" || r === "accessoire";
-    };
-
-    // Priority 1 : explicit bundles_with configured (AI-suggested or manual)
+    // Priority 1 : explicit bundles_with configured (manual link)
     const bundleIds = currentProduct.bundles_with || [];
     if (bundleIds.length > 0) {
       Promise.all(
@@ -42,50 +54,47 @@ export default function ProductBundle({ currentProduct, lang = "fr", design }) {
             .catch(() => null)
         )
       ).then((res) => {
-        // Filter to keep only companions even if the AI suggested a "main"
-        setCandidates(res.filter(Boolean).filter(isCompanion).slice(0, 2));
+        // Filter to keep only real companions even if the AI suggested a "main"
+        setAccessories(res.filter(Boolean).filter(isCompanion).slice(0, 2));
+        setLoaded(true);
       });
       return;
     }
 
-    // Priority 2 : fallback — fetch all site products, keep only upsell/accessory
-    // (no category filter — companions have no category in our schema)
-    axios.get(`${BACKEND_URL}/api/public/sites/${siteId}/products?sort=featured`)
+    // Priority 2 : public upsells endpoint (filters role=upsell server-side,
+    // includes role-aware fallback to any upsell of the site)
+    axios.get(`${BACKEND_URL}/api/public/sites/${siteId}/products/${currentProduct.id}/upsells?limit=4`)
       .then(({ data }) => {
         const filtered = (data || [])
           .filter((p) => p.id !== currentProduct.id)
           .filter(isCompanion)
           .slice(0, 2);
-        setCandidates(filtered);
+        setAccessories(filtered);
+        setLoaded(true);
       })
-      .catch(() => setCandidates([]));
+      .catch(() => {
+        setAccessories([]);
+        setLoaded(true);
+      });
   }, [siteId, currentProduct]);
 
-  // Demo fallback if no real companions exist (template completeness only)
-  const demoFallback = [
-    { id: "bundle-1", name: "Coussin ergonomique lombaire", price: 39, currency: "EUR", role: "upsell", images: ["https://images.unsplash.com/photo-1568162603664-fcd658421851?w=500&auto=format&fit=crop"], _demo: true },
-    { id: "bundle-2", name: "Protection anti-taches fauteuil", price: 29, currency: "EUR", role: "accessory", images: ["https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=500&auto=format&fit=crop"], _demo: true },
-  ];
-  const hasReal = candidates.length > 0;
-  const accessories = hasReal ? candidates : demoFallback;
-
-  // Initial selection: all selected
+  // Initial selection: all selected, current product locked
   useEffect(() => {
     const init = {};
     accessories.forEach((p) => { init[p.id] = true; });
     init[currentProduct.id] = true;
     setSelected(init);
-  // eslint-disable-next-line
+    // eslint-disable-next-line
   }, [currentProduct.id, accessories.map(a => a.id).join(",")]);
 
-  if (!accessories.length) return null;
+  // Décision Q3 user : ne JAMAIS afficher de demo fallback. Si <2 accessoires
+  // réels → section entièrement masquée pour ne pas tromper l'acheteur.
+  if (!loaded) return null;
+  if (accessories.length < 2) return null;
 
   const allItems = [currentProduct, ...accessories];
   const selectedItems = allItems.filter((p) => selected[p.id]);
-  const subtotal = selectedItems.reduce((s, p) => s + (p.price || 0), 0);
-  const DISCOUNT = selectedItems.length >= 2 ? 0.10 : 0; // 10% if at least 2 items
-  const finalTotal = subtotal * (1 - DISCOUNT);
-  const savings = subtotal - finalTotal;
+  const total = selectedItems.reduce((s, p) => s + (p.price || 0), 0);
   const currency = currentProduct.currency || "EUR";
 
   const toggle = (id) => {
@@ -94,8 +103,8 @@ export default function ProductBundle({ currentProduct, lang = "fr", design }) {
   };
 
   const addAll = () => {
+    let count = 0;
     selectedItems.forEach((p) => {
-      if (p._demo) return;
       addToCart(siteId, {
         product_id: p.id,
         name: pickLang(p.name, lang) || p.name,
@@ -104,34 +113,25 @@ export default function ProductBundle({ currentProduct, lang = "fr", design }) {
         image: getPrimaryImage(p),
         quantity: 1,
       });
+      count++;
       try { window.altiaroTrack?.addToCart?.(p, 1, lang); } catch (_) {}
     });
-    toast.success(`${selectedItems.filter(p => !p._demo).length} produit(s) ajoutés au panier`);
+    toast.success(`${count} produit${count > 1 ? "s" : ""} ajouté${count > 1 ? "s" : ""} au panier`);
   };
 
   return (
     <section className="py-14 border-t" style={{ borderColor: "#E7E5E4" }} data-testid="product-bundle">
       <div className="bg-[#F5F2EB] rounded-3xl p-6 md:p-10">
-        <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-2">
-              Pack économies
-            </div>
-            <h2 className="text-2xl md:text-3xl" style={{ fontFamily: `"${fontHeading}", serif`, color: "#1C1917" }}>
-              Souvent achetés ensemble
-            </h2>
+        <div className="mb-8">
+          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-2">
+            Pack complet
           </div>
-          {DISCOUNT > 0 && (
-            <div
-              className="px-3 py-1.5 rounded-full text-white text-xs font-semibold"
-              style={{ background: primary }}
-            >
-              −{Math.round(DISCOUNT * 100)}% en lot
-            </div>
-          )}
+          <h2 className="text-2xl md:text-3xl" style={{ fontFamily: `"${fontHeading}", serif`, color: "#1C1917" }}>
+            Souvent achetés ensemble
+          </h2>
         </div>
 
-        {/* Items row */}
+        {/* Items row — 3 cards with "+" between them */}
         <div className="flex items-center gap-3 md:gap-4 overflow-x-auto pb-2 -mx-6 px-6 md:mx-0 md:px-0">
           {allItems.map((p, i) => (
             <React.Fragment key={p.id}>
@@ -159,18 +159,8 @@ export default function ProductBundle({ currentProduct, lang = "fr", design }) {
             </div>
             <div className="flex items-baseline gap-3 mt-1">
               <span className="text-2xl md:text-3xl font-semibold" style={{ color: primary }}>
-                {formatPrice(finalTotal, currency, lang)}
+                {formatPrice(total, currency, lang)}
               </span>
-              {savings > 0 && (
-                <>
-                  <span className="text-lg text-neutral-400 line-through">
-                    {formatPrice(subtotal, currency, lang)}
-                  </span>
-                  <span className="text-sm font-medium text-emerald-700">
-                    Économie {formatPrice(savings, currency, lang)}
-                  </span>
-                </>
-              )}
             </div>
           </div>
           <button
@@ -190,16 +180,21 @@ export default function ProductBundle({ currentProduct, lang = "fr", design }) {
 }
 
 function BundleItem({ product, isCurrent, checked, onToggle, lang, primary, fontHeading }) {
+  // Force getPrimaryImage → priorité images IA Nano Banana, jamais AE brutes
+  const src = getPrimaryImage(product);
   return (
-    <div className="flex items-center gap-3 bg-white rounded-2xl p-3 md:p-4 w-[220px] md:w-[260px] shrink-0" data-testid={`bundle-item-${product.id}`}>
+    <div
+      className="flex items-center gap-3 bg-white rounded-2xl p-3 md:p-4 w-[220px] md:w-[260px] shrink-0"
+      data-testid={`bundle-item-${product.id}`}
+    >
       <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl overflow-hidden bg-[#F5F2EB] shrink-0">
-        {(() => { const _src = getPrimaryImage(product); return _src ? (
-          <img src={_src} alt={pickLang(product.name, lang) || product.name} loading="lazy" className="w-full h-full object-cover" />
+        {src ? (
+          <img src={src} alt={pickLang(product.name, lang) || product.name} loading="lazy" className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-neutral-300">
             <ShoppingBagOpen size={28} weight="thin" />
           </div>
-        ); })()}
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-start gap-2 mb-1">
@@ -218,7 +213,10 @@ function BundleItem({ product, isCurrent, checked, onToggle, lang, primary, font
           >
             {checked && <Check size={12} weight="bold" />}
           </button>
-          <div className="text-[13px] md:text-sm font-medium leading-tight text-neutral-900 line-clamp-2" style={{ fontFamily: `"${fontHeading}", serif` }}>
+          <div
+            className="text-[13px] md:text-sm font-medium leading-tight text-neutral-900 line-clamp-2"
+            style={{ fontFamily: `"${fontHeading}", serif` }}
+          >
             {pickLang(product.name, lang) || product.name}
           </div>
         </div>

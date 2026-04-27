@@ -905,6 +905,67 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                             budget_exhausted = True
                             continue
 
+                # 8a-bis) Lot I — Tagline (40-80 chars) + 4 USPs product-specific
+                # Cheap (Haiku 4.5, ~$0.007/produit) and propagated to every new
+                # site via the "from-scratch" rule (HANDOFF §13.11).
+                # Skipped if budget exhausted or already present (idempotent).
+                fresh_p = await db.products.find_one(
+                    {"id": p["id"]},
+                    {"_id": 0, "id": 1, "name": 1, "description": 1, "category": 1,
+                     "price": 1, "currency": 1, "tagline": 1, "usps": 1, "narrative": 1},
+                )
+                if fresh_p and not budget_exhausted:
+                    site_brand = (await db.sites.find_one(
+                        {"id": site_id}, {"_id": 0, "design.brand": 1}
+                    )) or {}
+                    brand_dict = ((site_brand.get("design") or {}).get("brand") or {})
+
+                    if overwrite or not fresh_p.get("tagline"):
+                        try:
+                            from services.product_content_ai import generate_product_tagline
+                            tag = await asyncio.wait_for(
+                                generate_product_tagline(fresh_p, brand_dict, request_id=f"launch-tag-{p['id'][:8]}"),
+                                timeout=30,
+                            )
+                            if tag:
+                                await db.products.update_one(
+                                    {"id": p["id"]},
+                                    {"$set": {
+                                        "tagline": tag,
+                                        "tagline_generated_at": datetime.now(timezone.utc).isoformat(),
+                                    }},
+                                )
+                        except asyncio.TimeoutError:
+                            logger.warning(f"[launch] tagline {p['id']} timed out")
+                        except Exception as e:
+                            msg = str(e)
+                            logger.warning(f"[launch] tagline {p['id']}: {msg[:120]}")
+                            if "402" in msg or "budget" in msg.lower():
+                                budget_exhausted = True
+
+                    if (overwrite or not fresh_p.get("usps")) and not budget_exhausted:
+                        try:
+                            from services.product_content_ai import generate_product_usps
+                            usps = await asyncio.wait_for(
+                                generate_product_usps(fresh_p, brand_dict, request_id=f"launch-usps-{p['id'][:8]}"),
+                                timeout=45,
+                            )
+                            if usps and len(usps) >= 4:
+                                await db.products.update_one(
+                                    {"id": p["id"]},
+                                    {"$set": {
+                                        "usps": usps,
+                                        "usps_generated_at": datetime.now(timezone.utc).isoformat(),
+                                    }},
+                                )
+                        except asyncio.TimeoutError:
+                            logger.warning(f"[launch] usps {p['id']} timed out")
+                        except Exception as e:
+                            msg = str(e)
+                            logger.warning(f"[launch] usps {p['id']}: {msg[:120]}")
+                            if "402" in msg or "budget" in msg.lower():
+                                budget_exhausted = True
+
                 # 8b) 5 product hero images (use existing imported supplier images as base; add AI)
                 await _advance(
                     job_id,

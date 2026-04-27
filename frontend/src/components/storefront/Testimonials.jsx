@@ -1,15 +1,13 @@
 /**
- * Lot G Fix 1 — Testimonials premium converti en Embla Carousel infini.
+ * Lot I (Phase 2.1) Fix I1 — Refonte Testimonials style Aesop.
  *
- * - 6 portraits IA (Margot, Heinrich, Isabelle, Sylvain, Catherine, Roland)
- *   stockés dans `design.testimonials_premium` après run du pipeline +
- *   les scripts lotG_fix1_3more_portraits.py.
- * - Embla `loop: true` + `dragFree: true` + autoplay manuel via setInterval
- *   (scrollNext toutes les ~3.5 s, pause on hover).
- * - Cards 280×420 mobile / 320×480 desktop, full-bleed image, dark gradient
- *   en haut (étoiles) et en bas (citation + nom).
- * - Fallback : DEFAULT mocks Unsplash (FR uniquement). Section auto-skipped
- *   si lang ≠ fr et pas de testimonials premium en DB.
+ * - Image **en haut** (portrait IA déjà généré, ratio 4:5)
+ * - Texte **en bas** sur fond ivoire (jamais d'overlay sombre sur l'image)
+ * - Citation en Cormorant (typo de marque), nom + rôle en sans-serif fine
+ * - Embla carousel infini avec autoplay 3.8s + pause au survol (conservé Lot G)
+ *
+ * Composant partagé → propagation automatique sur tous les sites créés via
+ * launch.py (pas de hardcoding Altea).
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
@@ -47,42 +45,60 @@ const DEFAULT = [
     text: "Une vraie tranquillité d'esprit pour accompagner mon père. Simple à mettre en place, interface claire." },
 ];
 
-function ReviewCard({ item }) {
+function ReviewCard({ item, primary, fontHeading }) {
   const text = typeof item.text === "string" ? item.text : item.quote?.fr || "";
   const img = resolveImage(item.image || item.avatar || item.photo);
   return (
     <div
-      className="flex-shrink-0 w-[280px] md:w-[320px] h-[420px] md:h-[480px] rounded-2xl overflow-hidden relative group/card"
+      className="flex-shrink-0 w-[300px] md:w-[340px] flex flex-col group/card"
       data-testid="review-card"
     >
-      {img ? (
-        <img
-          src={img}
-          alt={item.name}
-          loading="lazy"
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-105"
-        />
-      ) : (
-        <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #1a1a1a, #3a3a3a)" }} />
-      )}
-
-      {/* Top gradient + stars */}
-      <div className="absolute top-0 left-0 right-0 p-3 md:p-4 bg-gradient-to-b from-black/40 to-transparent">
-        <div className="flex gap-0.5">
-          {[...Array(item.rating || 5)].map((_, i) => (
-            <Star key={i} size={11} weight="fill" className="text-white" />
-          ))}
-        </div>
+      {/* Image — aspect 4:5, no overlay, hover zoom subtil */}
+      <div className="aspect-[4/5] overflow-hidden bg-stone-100">
+        {img ? (
+          <img
+            src={img}
+            alt={item.name}
+            loading="lazy"
+            className="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-[1.03]"
+          />
+        ) : (
+          <div className="w-full h-full" style={{ background: "linear-gradient(135deg, #E7E5E4, #D6D3D1)" }} />
+        )}
       </div>
 
-      {/* Bottom gradient + quote */}
-      <div className="absolute bottom-0 left-0 right-0 p-5 pt-24 bg-gradient-to-t from-black/80 via-black/50 to-transparent">
-        <p className="text-white/90 text-[13px] leading-[1.6] mb-4 line-clamp-3">
+      {/* Texte — fond blanc, ton Aesop */}
+      <div className="pt-6 pb-2 px-1">
+        {/* étoiles */}
+        <div className="flex gap-0.5 mb-3" style={{ color: "#1C1917" }}>
+          {[...Array(item.rating || 5)].map((_, i) => (
+            <Star key={i} size={11} weight="fill" />
+          ))}
+        </div>
+
+        {/* citation — Cormorant */}
+        <p
+          className="text-[18px] md:text-[19px] leading-[1.45] mb-5"
+          style={{
+            fontFamily: `"${fontHeading}", Georgia, serif`,
+            color: "#1C1917",
+            letterSpacing: "-0.005em",
+          }}
+        >
           &ldquo;{text}&rdquo;
         </p>
-        <div>
-          <p className="text-white font-semibold text-sm">{item.name}</p>
-          <p className="text-white/60 mt-0.5 text-xs">{item.role || item.location}</p>
+
+        {/* nom + rôle — sans-serif fine, hairline */}
+        <div className="pt-3 border-t" style={{ borderColor: "#E7E5E4" }}>
+          <p
+            className="text-[12px] uppercase tracking-[0.18em] font-medium"
+            style={{ color: primary }}
+          >
+            {item.name}
+          </p>
+          <p className="text-[12px] mt-1" style={{ color: "#737373" }}>
+            {item.role || item.location}
+          </p>
         </div>
       </div>
     </div>
@@ -96,7 +112,7 @@ export function Testimonials({ design, lang }) {
   const hasPremium = Array.isArray(premium) && premium.length > 0;
   const hasLegacy = !hasPremium && Array.isArray(legacy) && legacy.length > 0;
   const hasReal = hasPremium || hasLegacy;
-  if (!hasReal && (lang || "fr") !== "fr") return null;
+  const skipNonFr = !hasReal && (lang || "fr") !== "fr";
 
   const list = hasPremium
     ? premium.map((p) => ({
@@ -112,6 +128,7 @@ export function Testimonials({ design, lang }) {
     : DEFAULT;
 
   // Embla setup — loop + dragFree + autoplay manuel
+  // IMPORTANT : les hooks DOIVENT rester avant tout early-return (rules-of-hooks).
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: true,
     align: "start",
@@ -125,7 +142,6 @@ export function Testimonials({ design, lang }) {
   const scrollPrev = useCallback(() => emblaApi && emblaApi.scrollPrev(), [emblaApi]);
   const scrollNext = useCallback(() => emblaApi && emblaApi.scrollNext(), [emblaApi]);
 
-  // Autoplay : scroll vers la suite toutes les 3.8 s, pause au survol
   useEffect(() => {
     if (!emblaApi) return undefined;
     const start = () => {
@@ -143,6 +159,9 @@ export function Testimonials({ design, lang }) {
     start();
     return stop;
   }, [emblaApi, isHovered]);
+
+  // Early return APRÈS tous les hooks (rules-of-hooks compliant)
+  if (skipNonFr) return null;
 
   return (
     <section className="py-24 md:py-36 bg-white overflow-hidden" data-testid="storefront-testimonials">
@@ -180,15 +199,14 @@ export function Testimonials({ design, lang }) {
         onMouseLeave={() => setIsHovered(false)}
       >
         <div className="overflow-hidden" ref={emblaRef}>
-          <div className="flex gap-5 md:gap-6 px-6 md:px-10">
+          <div className="flex gap-6 md:gap-8 px-6 md:px-10 items-stretch">
             {list.map((it, i) => (
-              <ReviewCard key={i} item={it} />
+              <ReviewCard key={i} item={it} primary={primary} fontHeading={fontHeading} />
             ))}
           </div>
         </div>
 
-        {/* Nav buttons (desktop only) */}
-        <div className="hidden md:flex items-center justify-end gap-2 max-w-7xl mx-auto px-10 mt-8">
+        <div className="hidden md:flex items-center justify-end gap-2 max-w-7xl mx-auto px-10 mt-10">
           <button
             type="button"
             onClick={scrollPrev}
