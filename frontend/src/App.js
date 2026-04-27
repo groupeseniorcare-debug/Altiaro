@@ -9,6 +9,7 @@ import SiteDetail from "./pages/SiteDetail";
 import Finance from "./pages/Finance";
 import AdminFinances from "./pages/AdminFinances";
 import AdminLegalSettings from "./pages/AdminLegalSettings";
+import SiteIntegrations from "./pages/SiteIntegrations";
 import Users from "./pages/Users";
 import NicheEngine from "./pages/Analyzer";
 import NicheAnalysisDetail from "./pages/NicheAnalysisDetail";
@@ -250,6 +251,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <SiteBranding />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites/:siteId/integrations"
+            element={
+              <ProtectedRoute>
+                <SiteIntegrations />
               </ProtectedRoute>
             }
           />

@@ -139,7 +139,26 @@ export function StorefrontAbout() {
 
   return (
     <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
-      <SEOHead title={`À propos · ${site?.name || ""}`} description={`${site?.name || "Notre maison"} — Notre histoire, nos valeurs, notre équipe.`} />
+      <SEOHead
+        title={`À propos · ${site?.name || ""}`}
+        description={`${site?.name || "Notre maison"} — Notre histoire, nos valeurs, notre équipe.`}
+        schema={[
+          {
+            "@context": "https://schema.org",
+            "@type": "AboutPage",
+            name: `À propos · ${site?.name || ""}`,
+            url: typeof window !== "undefined" ? window.location.href : "",
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              { "@type": "ListItem", position: 1, name: "Accueil", item: `/shop/${site?.id || ""}` },
+              { "@type": "ListItem", position: 2, name: "À propos", item: `/shop/${site?.id || ""}/about` },
+            ],
+          },
+        ]}
+      />
       <PageHero
         eyebrow="À propos"
         title={headline}
@@ -242,7 +261,26 @@ export function StorefrontContact() {
 
   return (
     <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
-      <SEOHead title={`Contact · ${site?.name || ""}`} description="Contactez notre équipe par email, téléphone ou via le formulaire." />
+      <SEOHead
+        title={`Contact · ${site?.name || ""}`}
+        description="Contactez notre équipe par email, téléphone ou via le formulaire."
+        schema={[
+          {
+            "@context": "https://schema.org",
+            "@type": "ContactPage",
+            name: `Contact · ${site?.name || ""}`,
+            url: typeof window !== "undefined" ? window.location.href : "",
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              { "@type": "ListItem", position: 1, name: "Accueil", item: `/shop/${site?.id || ""}` },
+              { "@type": "ListItem", position: 2, name: "Contact", item: `/shop/${site?.id || ""}/contact` },
+            ],
+          },
+        ]}
+      />
       <PageHero
         eyebrow="Contact"
         title={heroTitle}
