@@ -8,15 +8,24 @@ Flow :
 3. Il clique "Vérifier" → on résout le DNS et confirme que le CNAME pointe bien.
 4. Une fois vérifié, le storefront public est accessible via https://luméaconfort.fr
    (résolution via GET /api/public/domains/resolve?host=... pour le front storefront).
+
+Phase 1 (2026-04-27) — Workaround "manual purchase link" :
+Quand le mandate Mollie standard d'un concepteur est cassé (recurring KO), on
+expose un lien Mollie **one-shot** (sequenceType=oneoff) au prix OVH **sans
+markup plateforme**. Le webhook Mollie existant (`mollie_webhook`) détecte le
+metadata `type=domain_purchase` et déclenche automatiquement l'achat OVH +
+le cron auto-DNS prend le relais.
 """
 import logging
 import os
 import re
 import socket
+import uuid
+from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 
 try:
@@ -207,6 +216,213 @@ async def verify_domain(site_id: str, user: dict = Depends(get_current_user)):
         "cname_found": cname,
         "cname_target": target_norm,
         "checked_at": now,
+    }
+
+
+# -------------------------------------------------------------------- #
+# Phase 1 — Manual purchase link (Mollie one-shot, OVH price, no markup)
+# -------------------------------------------------------------------- #
+class ManualPurchaseInput(BaseModel):
+    domain: Optional[str] = None  # if absent, takes the site's pending_payment domain
+
+
+@router.post(
+    "/sites/{site_id}/domain/manual-purchase-link",
+    tags=["domain-manual-purchase"],
+    summary="Génère un lien Mollie one-shot (sans markup) pour débloquer l'achat d'un domaine",
+)
+async def create_manual_domain_purchase_link(
+    site_id: str,
+    data: ManualPurchaseInput,
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
+    """Workaround manuel pour acheter un domaine quand le mandate Mollie
+    standard est KO sur le concepteur.
+
+    - Crée un paiement Mollie **one-shot** (`sequenceType=oneoff`, pas de mandate)
+      au **prix OVH brut** (markup plateforme = 0, exceptionnel).
+    - Réutilise le webhook `mollie_webhook` existant (metadata
+      `type=domain_purchase`) qui déclenche automatiquement l'achat OVH +
+      cron DNS auto /5min.
+    - Si un record `domains` `pending_payment` existe déjà pour ce couple
+      (site_id, domain), on lui rattache le nouveau paiement.
+
+    Body :
+    - `domain` (optionnel) : si absent, prend le domaine `pending_payment` du
+      site. Format `altea.com`, sans schéma ni path.
+
+    Retour :
+    ```json
+    {
+      "ok": true,
+      "domain": "altea.com",
+      "amount": "7.99",
+      "currency": "EUR",
+      "checkout_url": "https://www.mollie.com/checkout/...",
+      "mollie_payment_id": "tr_xxx",
+      "expires_at": "...",
+      "domain_record_id": "dom-altea-com-xxxxxxxx",
+      "manual": true
+    }
+    ```
+    """
+    await _check_site_access(site_id, user)
+
+    # Local imports to avoid circular deps at module load
+    from routes.ovh_domains import (
+        _normalise_domain as _ovh_normalise,
+        _client as _ovh_client,
+        _tld_of,
+        ALLOWED_TLDS,
+    )
+    from routes.payments import _get_client as _mollie_client
+
+    # 1. Resolve target domain
+    domain_input = (data.domain or "").strip() if data and data.domain else ""
+    if not domain_input:
+        existing = await db.domains.find_one(
+            {"site_id": site_id, "status": "pending_payment"}, {"_id": 0}
+        )
+        if not existing:
+            raise HTTPException(
+                status_code=404,
+                detail="Aucun domaine en attente de paiement pour ce site. "
+                       "Renseigne `domain` dans le body.",
+            )
+        domain = existing["domain"]
+    else:
+        domain = _ovh_normalise(domain_input)
+        if "." not in domain:
+            raise HTTPException(400, "Domaine invalide. Ex : altea.com")
+
+    tld = _tld_of(domain)
+    if tld not in ALLOWED_TLDS:
+        raise HTTPException(400, f"Extension non supportée : {tld}")
+
+    # 2. Re-fetch OVH price live
+    client = _ovh_client()
+    import asyncio as _aio
+
+    try:
+        cart = await _aio.to_thread(
+            client.post, "/order/cart",
+            ovhSubsidiary="FR", description=f"cf-manual-{site_id[:8]}",
+        )
+        cart_id = cart["cartId"]
+        items = await _aio.to_thread(
+            client.post, f"/order/cart/{cart_id}/domain", domain=domain,
+        )
+        item = items if isinstance(items, dict) else (items[0] if items else {})
+        ovh_price_ttc = 0.0
+        for p in item.get("prices", []):
+            if p.get("label") == "TOTAL":
+                ovh_price_ttc = float(p.get("price", {}).get("value") or 0)
+                break
+        try:
+            await _aio.to_thread(client.delete, f"/order/cart/{cart_id}")
+        except Exception:
+            pass
+    except Exception as e:
+        logger.exception("OVH manual price check failed")
+        raise HTTPException(502, f"OVH : {str(e)[:200]}")
+
+    if ovh_price_ttc <= 0:
+        raise HTTPException(400, "Domaine indisponible ou non cotable par OVH.")
+
+    manual_price = round(ovh_price_ttc, 2)  # NO markup (exceptional, manual flow)
+
+    # 3. Get or create domain record
+    now_iso = datetime.now(timezone.utc).isoformat()
+    record = await db.domains.find_one(
+        {"domain": domain, "site_id": site_id}, {"_id": 0}
+    )
+    if record:
+        record_id = record["id"]
+        if record.get("status") in ("purchased", "dns_configured", "active"):
+            raise HTTPException(400, "Ce domaine est déjà acheté.")
+    else:
+        record_id = f"dom-{domain.replace('.', '-')}-{uuid.uuid4().hex[:8]}"
+        await db.domains.insert_one({
+            "id": record_id,
+            "domain": domain,
+            "tld": tld,
+            "site_id": site_id,
+            "purchased_by": user.get("id"),
+            "purchased_at": now_iso,
+            "ovh_price_ttc_eur": ovh_price_ttc,
+            "markup_eur": 0,
+            "platform_price_eur": manual_price,
+            "status": "pending_payment",
+            "manual_purchase": True,
+            "created_at": now_iso,
+            "updated_at": now_iso,
+        })
+
+    # 4. Create Mollie one-shot payment
+    mollie, mode = _mollie_client()
+
+    redirect_url = f"{FRONTEND_URL}/sites/{site_id}/domains?domain_payment=1&domain={domain}"
+    webhook_url = f"{FRONTEND_URL}/api/webhooks/mollie"
+
+    try:
+        payment = mollie.payments.create({
+            "amount": {"currency": "EUR", "value": f"{manual_price:.2f}"},
+            "description": f"Domaine {domain} (achat manuel)",
+            "redirectUrl": redirect_url,
+            "webhookUrl": webhook_url,
+            "sequenceType": "oneoff",  # explicit : NO mandate, NO subscription
+            "metadata": {
+                "type": "domain_purchase",  # routes to complete_domain_purchase()
+                "manual": True,
+                "domain": domain,
+                "domain_record_id": record_id,
+                "site_id": site_id,
+                "user_id": user.get("id"),
+            },
+            "locale": "fr_FR",
+        })
+    except Exception as e:
+        logger.exception("Mollie create manual one-shot payment failed")
+        raise HTTPException(502, f"Mollie : {str(e)[:200]}")
+
+    await db.domains.update_one(
+        {"id": record_id},
+        {"$set": {
+            "mollie_payment_id": payment.id,
+            "mollie_checkout_url": payment.checkout_url,
+            "mollie_mode": mode,
+            "ovh_price_ttc_eur": ovh_price_ttc,
+            "platform_price_eur": manual_price,
+            "markup_eur": 0,
+            "manual_purchase": True,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+
+    # Best-effort expires_at extraction (mollie SDK exposes attrs lazily)
+    expires_at = (
+        getattr(payment, "expires_at", None)
+        or getattr(payment, "expiresAt", None)
+        or None
+    )
+
+    logger.info(
+        f"[manual-purchase] site={site_id[:8]} domain={domain} "
+        f"price={manual_price}€ payment={payment.id} mode={mode}"
+    )
+
+    return {
+        "ok": True,
+        "domain": domain,
+        "amount": f"{manual_price:.2f}",
+        "currency": "EUR",
+        "checkout_url": payment.checkout_url,
+        "mollie_payment_id": payment.id,
+        "expires_at": expires_at,
+        "domain_record_id": record_id,
+        "manual": True,
+        "mode": mode,
     }
 
 

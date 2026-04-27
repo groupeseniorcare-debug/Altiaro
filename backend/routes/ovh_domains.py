@@ -506,3 +506,75 @@ async def config_status(user: dict = Depends(get_current_user)):
             status["auth_ok"] = False
             status["auth_error"] = str(e)[:200]
     return status
+
+
+# ============== ADMIN MONITORING ============== #
+@router.get(
+    "/admin/domains/{domain_id}/status",
+    tags=["domain-manual-purchase"],
+    summary="Admin : statut complet d'un record domain (DB + Mollie + OVH)",
+)
+async def admin_domain_status(
+    domain_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Retourne l'état détaillé d'un record `domains` :
+    - `db` : le record Mongo brut
+    - `mollie` : le paiement Mollie (status, is_paid, amount, checkout_url)
+    - `ovh` : la commande OVH (si déjà déclenchée)
+
+    Réservé aux admins. Utile pour diagnostiquer un blocage de paiement
+    manuel (Phase 1 — workaround domaine).
+    """
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Admin only")
+
+    record = await db.domains.find_one({"id": domain_id}, {"_id": 0})
+    if not record:
+        raise HTTPException(404, "Domaine inconnu")
+
+    out = {"db": record, "mollie": None, "ovh": None}
+
+    # Mollie payment status
+    payment_id = record.get("mollie_payment_id")
+    if payment_id:
+        try:
+            from routes.payments import _get_client as _mollie_client
+            client, mode = _mollie_client()
+            payment = client.payments.get(payment_id)
+            out["mollie"] = {
+                "id": payment.id,
+                "mode": mode,
+                "status": getattr(payment, "status", None),
+                "is_paid": bool(payment.is_paid()) if hasattr(payment, "is_paid") else None,
+                "is_expired": bool(payment.is_expired()) if hasattr(payment, "is_expired") else None,
+                "is_failed": bool(payment.is_failed()) if hasattr(payment, "is_failed") else None,
+                "is_canceled": bool(payment.is_canceled()) if hasattr(payment, "is_canceled") else None,
+                "amount": dict(payment.amount) if hasattr(payment, "amount") else None,
+                "checkout_url": getattr(payment, "checkout_url", None),
+                "method": getattr(payment, "method", None),
+                "metadata": getattr(payment, "metadata", None),
+                "sequence_type": getattr(payment, "sequence_type", None) or getattr(payment, "sequenceType", None),
+                "expires_at": getattr(payment, "expires_at", None) or getattr(payment, "expiresAt", None),
+                "paid_at": getattr(payment, "paid_at", None) or getattr(payment, "paidAt", None),
+            }
+        except Exception as e:
+            out["mollie"] = {"error": str(e)[:200]}
+
+    # OVH order status
+    ovh_order_id = record.get("ovh_order_id")
+    if ovh_order_id:
+        try:
+            client = _client()
+            import asyncio as _aio
+            order = await _aio.to_thread(client.get, f"/me/order/{ovh_order_id}")
+            try:
+                status_info = await _aio.to_thread(client.get, f"/me/order/{ovh_order_id}/status")
+                order["status"] = status_info
+            except Exception:
+                pass
+            out["ovh"] = order
+        except Exception as e:
+            out["ovh"] = {"error": str(e)[:200]}
+
+    return out

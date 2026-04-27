@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { LANGUAGES, t } from "../lib/i18n";
+import { LANGUAGES, t, pickLang } from "../lib/i18n";
 import LanguageSwitcher from "./storefront/LanguageSwitcher";
 import { readCart, cartTotals } from "../lib/cart";
 import { getCustomer } from "../lib/customerAuth";
@@ -116,13 +116,10 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
   // Priority: explicit logo_text > brand.name > site.name > fallback.
   const rawLogoCandidate = brand.logo_text || brand.name || site?.name || "";
   const logoText = sanitizeBrandText(rawLogoCandidate, 40) || "Maison";
-  const brandTaglineRaw = design?.brand?.tagline;
-  const taglineRaw = typeof brandTaglineRaw === "string"
-    ? brandTaglineRaw
-    : (brandTaglineRaw?.[lang] || brandTaglineRaw?.fr || site?.niche_data?.tagline);
-  const tagline = taglineRaw ? sanitizeBrandText(taglineRaw, 80) : "";
+  const brandTaglineRaw = pickLang(design?.brand?.tagline, lang) || site?.niche_data?.tagline;
+  const tagline = brandTaglineRaw ? sanitizeBrandText(brandTaglineRaw, 80) : "";
 
-  const footerTagline = design?.footer?.tagline?.[lang] || design?.footer?.tagline?.fr
+  const footerTagline = pickLang(design?.footer?.tagline, lang)
     || "Des produits pensés pour bien vieillir chez soi, avec dignité.";
   const contact = design?.contact || {};
   const contactEmail = contact.email || "bonjour@boutique.fr";

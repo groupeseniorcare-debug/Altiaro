@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { ArrowRight } from "@phosphor-icons/react";
 import { designText, designAccents } from "./storefrontUtils";
 import { sanitizeBrandText } from "../../lib/brandText";
-import { t } from "../../lib/i18n";
+import { t, pickLang } from "../../lib/i18n";
 
 /**
  * FinalCTA — MONOCHROME closing statement. Pure white canvas with gray
@@ -15,7 +15,7 @@ export function FinalCTA({ design, lang }) {
   const brandLabel = sanitizeBrandText(brand.logo_text || brand.name || "", 40);
   const hook = sanitizeBrandText(
     designText(design, "final_cta.headline", lang)
-      || brand.tagline
+      || pickLang(brand.tagline, lang)
       || designText(design, "hero.title", lang)
       || t(lang, "shop_title"),
     120,

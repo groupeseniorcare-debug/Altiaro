@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowRight, ShieldCheck, Star, Truck } from "@phosphor-icons/react";
 import { designText, designAccents } from "./storefrontUtils";
-import { t } from "../../lib/i18n";
+import { t, pickLang } from "../../lib/i18n";
 import { sanitizeBrandText } from "../../lib/brandText";
 import { getPrimaryImage } from "../../lib/productImage";
 
@@ -25,7 +25,7 @@ export function Hero({ site, design, lang, products }) {
   const heroSub = designText(design, "hero.subtitle", lang) || t(lang, "hero_subtitle_default");
   const heroCta = designText(design, "hero.cta_label", lang) || t(lang, "shop_now");
   const heroCta2 = designText(design, "hero.cta_secondary_label", lang) || t(lang, "nav_about");
-  const eyebrowRaw = designText(design, "hero.eyebrow", lang) || brand.tagline || t(lang, "hero_eyebrow_default");
+  const eyebrowRaw = designText(design, "hero.eyebrow", lang) || pickLang(brand.tagline, lang) || t(lang, "hero_eyebrow_default");
   const eyebrow = sanitizeBrandText(eyebrowRaw, 60);
   const rating = design?.hero?.rating || { score: 4.8, count: 2143 };
   const chapterNumber = "01";

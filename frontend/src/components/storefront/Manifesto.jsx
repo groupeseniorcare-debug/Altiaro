@@ -2,7 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { designAccents } from "./storefrontUtils";
 import { sanitizeBrandText } from "../../lib/brandText";
-import { t } from "../../lib/i18n";
+import { t, pickLang } from "../../lib/i18n";
 
 /**
  * Manifesto — MONOCHROME editorial statement. White canvas, near-black ink.
@@ -14,17 +14,14 @@ export default function Manifesto({ design, lang = "fr" }) {
   const brand = design?.brand || {};
   const brandName = sanitizeBrandText(brand.logo_text || brand.name || "", 40);
   const m = design?.manifesto || {};
-  const eyebrow = sanitizeBrandText(m.eyebrow?.[lang] || m.eyebrow || t(lang, "section_manifesto"), 40);
+  const eyebrow = sanitizeBrandText(pickLang(m.eyebrow, lang) || t(lang, "section_manifesto"), 40);
   const headline = sanitizeBrandText(
-    m.headline?.[lang]
-      || m.headline
-      || brand.tagline?.[lang]
-      || brand.tagline
+    pickLang(m.headline, lang)
+      || pickLang(brand.tagline, lang)
       || t(lang, "manifesto_headline_default"),
     240,
   );
-  const kicker = m.kicker?.[lang]
-    || m.kicker
+  const kicker = pickLang(m.kicker, lang)
     || t(lang, "manifesto_kicker_default").replace("{brand}", brandName || t(lang, "manifesto_fallback_brand"));
 
   // Three pillars — fall back to localized defaults if none were generated
