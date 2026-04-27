@@ -615,6 +615,8 @@ async def import_product(site_id: str, data: ImportInput, user: dict = Depends(g
     variants = []
     shipping_by_country = {}
     suggested_sell_price_usd = None
+    # Lot H Fix 1 — track removed parasitic axes to log to admin after insert
+    _import_removed_axes: list[dict] = []
     if data.provider == "cj" and data.product_id:
         detail = await _cj_product_detail(data.product_id)
         raw_desc = detail.get("description") or detail.get("productDescription") or ""
@@ -710,6 +712,18 @@ async def import_product(site_id: str, data: ImportInput, user: dict = Depends(g
                 usd_to_eur=usd_to_eur,
                 max_variants=30,
             )
+            # Lot H Fix 1 — strip parasitic axes (Ships From, Plug Type)
+            # AVANT le calcul du prix moyen pour ne pas le biaiser sur les doublons.
+            try:
+                from services.variant_filter import filter_useless_axes_with_log
+                variants, _removed_axes = filter_useless_axes_with_log(
+                    variants, site_id=site_id, product_id=data.product_id
+                )
+                # Stash removed_axes for post-insert admin notification
+                _import_removed_axes = _removed_axes
+            except Exception as _ve:
+                logger.warning(f"[sourcing] variant_filter failed: {_ve}")
+                _import_removed_axes = []
             # Suggested sell price : moyenne des variantes (en USD)
             try:
                 ae_prices = [v["sell_price_usd"] for v in variants if v.get("sell_price_usd")]
@@ -779,6 +793,13 @@ async def import_product(site_id: str, data: ImportInput, user: dict = Depends(g
     }
     await db.products.insert_one(dict(doc))
     doc.pop("_id", None)
+    # Lot H Fix 1 — log filtered axes to admin_notifications (audit) async, non-blocking
+    if _import_removed_axes:
+        try:
+            from services.variant_filter import log_filtered_axes_to_admin
+            await log_filtered_axes_to_admin(db, site_id, pid, _import_removed_axes)
+        except Exception as _le:
+            logger.warning(f"[sourcing] log_filtered_axes_to_admin failed: {_le}")
     return {"ok": True, "product": doc}
 
 

@@ -1,4 +1,11 @@
 import React, { useMemo } from "react";
+import { Check } from "@phosphor-icons/react";
+import {
+  colorFromName,
+  isColorAxis,
+  colorFromNameOrFallback,
+  isLightColor,
+} from "../../lib/colorMapping";
 
 /**
  * VariantPicker — sélecteur de variantes premium pour les fiches produit.
@@ -12,7 +19,35 @@ import React, { useMemo } from "react";
  *
  * Cross-axis stock : si l'utilisateur sélectionne une combinaison
  * (axis1=A, axis2=B) qui n'existe pas en stock, on affiche en grisé.
+ *
+ * Lot H Fix 1 — Filtre défensif côté front : si malgré le clean DB un axe
+ * "ships_from" / "plug" remonte (ex: site pas encore migré), on ne l'affiche
+ * pas. Plus jamais de "GERMANY" / "EU PLUG" présenté au client.
+ *
+ * Lot H Fix 5 — Swatches couleur visuels (cercles ~36-40px) avec mapping
+ * nom → hex. Les autres axes (taille, modèle) gardent les pills rectangulaires.
  */
+
+// Heuristique défensive : valeurs typiques qu'on ne veut JAMAIS afficher
+// même si le filtre backend a raté (anciens sites pas encore migrés).
+const PARASITIC_VALUE_PATTERNS = [
+  /^(germany|france|china|italy|spain|usa|united kingdom|poland|czech|australia|japan|netherlands|belgium|russia|brazil|turkey|uae|mexico|canada|india|korea|portugal|austria|denmark|finland|norway|sweden|switzerland|ireland|greece)$/i,
+  /^(allemagne|chine|italie|espagne|royaume-uni|pologne|tchequie|australie|japon|pays-bas|belgique|russie|bresil|turquie|emirats|mexique|inde|coree|portugal|autriche|danemark|finlande|norvege|suede|suisse|irlande|grece)$/i,
+  /^(ships from|overseas|warehouse|entrepot|depot|domestic|global|worldwide)/i,
+  /plug/i,
+];
+
+function isParasiticValue(v) {
+  if (!v) return false;
+  return PARASITIC_VALUE_PATTERNS.some((rx) => rx.test(String(v).trim()));
+}
+
+function isParasiticAxis(values) {
+  if (!Array.isArray(values) || values.length === 0) return false;
+  const parasitic = values.filter(isParasiticValue).length;
+  return parasitic / values.length >= 0.8; // ≥80% parasites → axe à hide
+}
+
 export default function VariantPicker({ variants = [], selected, onSelect, lang = "fr" }) {
   const labels = LABELS[lang] || LABELS.fr;
 
@@ -36,6 +71,16 @@ export default function VariantPicker({ variants = [], selected, onSelect, lang 
     });
     axes.push(Array.from(set));
   }
+
+  // Lot H Fix 1 — détecte les axes parasites (ships_from, plug)
+  // pour les masquer côté affichage (défense en profondeur).
+  const visibleAxesIndices = axes
+    .map((vals, i) => ({ i, vals }))
+    .filter(({ vals }) => !isParasiticAxis(vals))
+    .map(({ i }) => i);
+
+  // Si aucun axe visible (cas dégénéré, tous parasites) → rien à afficher.
+  if (visibleAxesIndices.length === 0) return null;
 
   const selectedProps = selected?.properties || [];
 
@@ -73,44 +118,115 @@ export default function VariantPicker({ variants = [], selected, onSelect, lang 
 
   return (
     <div className="space-y-5" data-testid="variant-picker">
-      {axes.map((values, axisIdx) => (
-        <div key={axisIdx} data-testid={`variant-axis-${axisIdx + 1}`}>
-          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-2 flex items-center gap-2">
-            {axisIdx === 0 ? labels.axis1 : labels.axis2}
-            {selectedProps[axisIdx] && (
-              <span className="text-neutral-900 normal-case tracking-normal text-xs font-medium">
-                · {selectedProps[axisIdx]}
-              </span>
+      {visibleAxesIndices.map((axisIdx) => {
+        const values = axes[axisIdx];
+        const colorAxis = isColorAxis(values);
+        const renderIdx = visibleAxesIndices.indexOf(axisIdx);
+        const labelText = colorAxis
+          ? labels.color
+          : renderIdx === 0
+          ? labels.axis1
+          : labels.axis2;
+        return (
+          <div key={axisIdx} data-testid={`variant-axis-${axisIdx + 1}`} data-axis-kind={colorAxis ? "color" : "other"}>
+            <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-2 flex items-center gap-2">
+              {labelText}
+              {selectedProps[axisIdx] && (
+                <span className="text-neutral-900 normal-case tracking-normal text-xs font-medium">
+                  · {selectedProps[axisIdx]}
+                </span>
+              )}
+            </div>
+            {colorAxis ? (
+              // Lot H Fix 5 — swatches couleur cercles 36-40px (32 mobile)
+              <div className="flex flex-wrap gap-2.5">
+                {values.map((val) => {
+                  const active = selectedProps[axisIdx] === val;
+                  const available = isAxisValueAvailable(axisIdx, val);
+                  const hex = colorFromName(val);
+                  const swatchColor = colorFromNameOrFallback(val);
+                  const isLight = isLightColor(swatchColor);
+                  // Special markers for unrecognized cases
+                  const isMulti = hex === "MULTI";
+                  const isPattern = hex === "PATTERN";
+
+                  return (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => handleSelect(axisIdx, val)}
+                      disabled={!available}
+                      data-testid={`variant-option-${axisIdx}-${val}`}
+                      title={available ? val : `${val} — ${labels.outOfStock}`}
+                      aria-label={`Couleur ${val}${active ? " (sélectionnée)" : ""}${!available ? " indisponible" : ""}`}
+                      className={[
+                        "relative w-9 h-9 md:w-10 md:h-10 rounded-full transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900",
+                        active
+                          ? "ring-2 ring-offset-2 ring-neutral-900 scale-110"
+                          : available
+                          ? "hover:scale-110 hover:ring-2 hover:ring-offset-1 hover:ring-neutral-300"
+                          : "opacity-30 cursor-not-allowed",
+                        isLight && !active ? "border border-neutral-300" : "",
+                      ].join(" ")}
+                      style={{
+                        background: isMulti
+                          ? "conic-gradient(#F97316, #FCD34D, #166534, #1E3A8A, #7E22CE, #B91C1C, #F97316)"
+                          : isPattern
+                          ? "repeating-linear-gradient(45deg, #C0C0C0, #C0C0C0 4px, #808080 4px, #808080 8px)"
+                          : swatchColor,
+                      }}
+                    >
+                      {active && (
+                        <Check
+                          size={16}
+                          weight="bold"
+                          className={isLight ? "text-neutral-900 mx-auto" : "text-white mx-auto"}
+                        />
+                      )}
+                      {!available && (
+                        <span
+                          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                          aria-hidden="true"
+                        >
+                          <span className="block w-full h-px bg-neutral-400 rotate-45" />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              // Axes non-couleur : pills rectangulaires (comportement initial)
+              <div className="flex flex-wrap gap-2">
+                {values.map((val) => {
+                  const active = selectedProps[axisIdx] === val;
+                  const available = isAxisValueAvailable(axisIdx, val);
+                  return (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => handleSelect(axisIdx, val)}
+                      disabled={!available}
+                      data-testid={`variant-option-${axisIdx}-${val}`}
+                      title={available ? val : `${val} — ${labels.outOfStock}`}
+                      className={[
+                        "h-10 px-4 rounded-full border text-sm font-medium transition",
+                        active
+                          ? "bg-neutral-900 text-white border-neutral-900"
+                          : available
+                          ? "bg-white text-neutral-900 border-neutral-300 hover:border-neutral-900"
+                          : "bg-neutral-50 text-neutral-400 border-neutral-200 line-through cursor-not-allowed",
+                      ].join(" ")}
+                    >
+                      {val}
+                    </button>
+                  );
+                })}
+              </div>
             )}
           </div>
-          <div className="flex flex-wrap gap-2">
-            {values.map((val) => {
-              const active = selectedProps[axisIdx] === val;
-              const available = isAxisValueAvailable(axisIdx, val);
-              return (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => handleSelect(axisIdx, val)}
-                  disabled={!available}
-                  data-testid={`variant-option-${axisIdx}-${val}`}
-                  title={available ? val : `${val} — ${labels.outOfStock}`}
-                  className={[
-                    "h-10 px-4 rounded-full border text-sm font-medium transition",
-                    active
-                      ? "bg-neutral-900 text-white border-neutral-900"
-                      : available
-                        ? "bg-white text-neutral-900 border-neutral-300 hover:border-neutral-900"
-                        : "bg-neutral-50 text-neutral-400 border-neutral-200 line-through cursor-not-allowed",
-                  ].join(" ")}
-                >
-                  {val}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+        );
+      })}
 
       {selected?.stock != null && selected.stock <= 5 && selected.stock > 0 && (
         <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-center gap-1.5">
@@ -127,10 +243,10 @@ export default function VariantPicker({ variants = [], selected, onSelect, lang 
 }
 
 const LABELS = {
-  fr: { axis1: "Choix",      axis2: "Taille",  outOfStock: "Indisponible",   lowStock: "Plus que {n} en stock" },
-  en: { axis1: "Variant",    axis2: "Size",    outOfStock: "Out of stock",   lowStock: "Only {n} left in stock" },
-  de: { axis1: "Variante",   axis2: "Größe",   outOfStock: "Nicht verfügbar",lowStock: "Nur noch {n} auf Lager" },
-  nl: { axis1: "Variant",    axis2: "Maat",    outOfStock: "Niet beschikbaar",lowStock: "Nog {n} op voorraad" },
-  it: { axis1: "Variante",   axis2: "Taglia",  outOfStock: "Non disponibile",lowStock: "Solo {n} disponibile" },
-  es: { axis1: "Variante",   axis2: "Talla",   outOfStock: "Sin stock",      lowStock: "Solo quedan {n}" },
+  fr: { axis1: "Choix",      axis2: "Taille",  color: "Couleur",    outOfStock: "Indisponible",   lowStock: "Plus que {n} en stock" },
+  en: { axis1: "Variant",    axis2: "Size",    color: "Color",      outOfStock: "Out of stock",   lowStock: "Only {n} left in stock" },
+  de: { axis1: "Variante",   axis2: "Größe",   color: "Farbe",      outOfStock: "Nicht verfügbar",lowStock: "Nur noch {n} auf Lager" },
+  nl: { axis1: "Variant",    axis2: "Maat",    color: "Kleur",      outOfStock: "Niet beschikbaar",lowStock: "Nog {n} op voorraad" },
+  it: { axis1: "Variante",   axis2: "Taglia",  color: "Colore",     outOfStock: "Non disponibile",lowStock: "Solo {n} disponibile" },
+  es: { axis1: "Variante",   axis2: "Talla",   color: "Color",      outOfStock: "Sin stock",      lowStock: "Solo quedan {n}" },
 };

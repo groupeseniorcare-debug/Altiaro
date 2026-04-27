@@ -294,6 +294,68 @@ frontend:
           Déjà en place (line 64) : <StorefrontLayout site={site}>{contenu}</StorefrontLayout>.
           Aucune modif nécessaire — confirmé visuellement, header + footer storefront cohérents.
 
+  - task: "Lot H Fix 1 — Whitelist axes variantes (Ships From, Plug Type)"
+    implemented: true
+    working: true
+    file: "backend/services/variant_filter.py + backend/routes/sourcing.py + backend/scripts/lotH_fix1_clean_variants.py + frontend/src/components/storefront/VariantPicker.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Architecture défense en profondeur (3 couches) :
+          (1) Backend `services/variant_filter.py` : heuristique de classification des
+              axes par VALEURS (pas par label, schéma actuel sans axis_label).
+              `classify_axis()` retourne 'ships_from' | 'plug' | 'useful'.
+              `filter_useless_axes()` strip axes parasites + dédoublonne `properties[]`.
+              Whitelist stricte (a) + log admin (d) selon décision user 2026-04-27.
+              SHIPS_FROM_VALUES couvre ~50 pays + warehouse keywords + ISO codes.
+          (2) Pipeline import `routes/sourcing.py` : appelle `filter_useless_axes_with_log()`
+              juste après `_map_ae_skus_to_variants()`. Notification async vers
+              `db.admin_notifications` (type=variant_axis_filtered) après insert.
+              Tous les futurs imports AE auront un `variants[]` propre par défaut.
+          (3) Frontend défensif `VariantPicker.jsx` : filtre `isParasiticAxis()` côté
+              affichage (regex pays + plug). Sécurité si site pas encore migré.
+
+          Audit Altea exécuté : 4/9 produits cleaned, axe "GERMANY" supprimé partout.
+          DB : 10 main variants total, 0 GERMANY restant ✅.
+          admin_notifications : 4 docs type=variant_axis_filtered créés (audit OK).
+
+          Test visuel confirmé : fiche fauteuil 1233€ Altea → axe COLOR seul,
+          3 swatches Black/White/Brown, "GERMANY" totalement disparu.
+
+  - task: "Lot H Fix 5 — VariantPicker swatches couleur visuels"
+    implemented: true
+    working: true
+    file: "frontend/src/lib/colorMapping.js + frontend/src/components/storefront/VariantPicker.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          - `lib/colorMapping.js` : dictionnaire FR + EN → CSS hex (~80 couleurs).
+            Insensible à la casse + accents (normalize NFD strip diacritics).
+            Helpers : colorFromName(), isColorAxis(), colorFromNameOrFallback(),
+            isLightColor() (ITU-R BT.601 luminance pour border conditional).
+            Cas spéciaux : "MULTI" → conic-gradient arc-en-ciel,
+            "PATTERN" → repeating-linear-gradient gris diagonale.
+          - `VariantPicker.jsx` : détection auto axe couleur via `isColorAxis(values)`.
+            Si oui → swatches cercles 36-40px (32 mobile) avec :
+              · background = colorFromNameOrFallback (gris neutre si non reconnu)
+              · border subtil pour couleurs claires (white/ivory/cream)
+              · ring 2px + scale 1.10 + check icon quand sélectionné
+              · scale 1.10 hover + ring 2px gris léger sur hover (si dispo)
+              · opacity 30% + barre diagonale si out-of-stock
+              · aria-label complet pour accessibilité
+              · focus-visible:ring pour navigation clavier
+            Sinon (taille, modèle) → boutons rectangulaires texte (comportement initial).
+          - Test visuel confirmé : 3 swatches Noir/Blanc/Brun avec ✓ blanc sur noir actif.
+          - data-testid='variant-axis-X' + data-axis-kind='color' pour Playwright.
+
 metadata:
   created_by: "main_agent"
   version: "1.3"
@@ -309,24 +371,82 @@ test_plan:
     - "Lot G Fix 6 — ProductBundle filter role"
     - "Lot G Fix 3 — Mobile edge-to-edge fiche produit"
     - "Lot G Fix 13 — PageHero transparent"
+    - "Lot H Fix 1 — Whitelist axes variantes (ships_from filter)"
+    - "Lot H Fix 5 — VariantPicker swatches couleur"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
+  - agent: "testing"
+    message: |
+      ## Lot G + H1 + H5 — RÉSULTATS TESTS (Desktop 1920x1080 + Mobile 390x844)
+      
+      ✅ F1 Testimonials Embla — PASS
+         - storefront-testimonials présent (1), 6 review-card, prev+next buttons desktop, next click fait défiler OK
+         - Mobile : 6 cards présentes (swipe natif)
+      ✅ F2 Logo transparent + Favicon — PASS
+         - Header logo background rgba(0,0,0,0) (transparent) desktop ET mobile
+         - Favicon URL /api/uploads/favicons/.../favicon-32.png → HTTP 200
+      ✅ F3 Mobile edge-to-edge — PASS (code-verified)
+         - Breadcrumb a classe "hidden md:block" (hidden en mobile, visible desktop confirmé)
+         - Image gallery : -mx-6 md:mx-0 appliqué
+         - Desktop : product-breadcrumb visible=true confirmé
+      ✅ F5 4 USPs — PASS
+         - product-usps container (1), product-usp-0..3 (4) présents
+         - Texts exacts : "Livraison offerte/sous 72h", "Garantie 2 ans/incluse", "Retour gratuit/14 jours", "Support 7j/7/Conseillers experts"
+         - 4 icônes SVG Phosphor visibles
+         - product-highlights count=0 (ancienne carte grise absente) ✅
+         - Mobile : grid 2-col confirmé (USPs 0&1 même y, 2&3 ligne suivante)
+      ✅ F6 ProductBundle filter — PASS
+         - Bundle "Souvent achetés ensemble" présent
+         - Produits : "Coussin ergonomique lombaire" (39€) + "Protection anti-taches" (29€) = upsells uniquement
+         - Aucun autre fauteuil principal >1000€ dans le bundle ✅
+      ✅ F12 ProductCard unifié — PASS
+         - Home : 6 product-card-* sans CTA inline
+         - Collection : 6 collection-product-* sans CTA inline
+         - Search (q=fauteuil) : 6 search-result-* sans CTA inline
+         - Fiche produit cross-sell : 4 xsell-* présents
+      ✅ F13 PageHero transparent — PASS
+         - /about, /faq, /contact, /livraison, /retours : hero hérite body rgb(255,255,255) (blanc body)
+         - Aucun fond accent_color détecté, H1 visible
+      ✅ H1 Axes parasites filtrés — PASS
+         - Body text ne contient NI "GERMANY"/"Germany" NI "Ships From"/"Emplacement" (desktop + mobile)
+         - variant-picker (1), variant-axis (1), color axis (1) — axe couleur uniquement ✅
+      ✅ H5 Swatches couleur — PASS
+         - 3 variant-option-0-* swatches cercles rounded-full (border-radius 9999px)
+         - Black : rgb(26,26,26) ✅ (#1a1a1a)
+         - White : rgb(255,255,255) ✅
+         - Brown : rgb(107,68,35) ✅ (#6B4423)
+         - Aria-label format "Couleur X (sélectionnée)" — accessible
+         - Click White → ring-2 ring-offset-2 appliqué (état actif OK)
+         - Mobile : 40x40px (sélectionné 44x44 avec ring). Desktop md:w-10 (40px) ✅
+         - Label axe "COLOR · White" affiché (nom couleur sélectionnée)
+      
+      AUCUNE régression visuelle détectée. Cookie banner RGPD visible et fonctionnel.
+      Les 9 fixes (7 Lot G + 2 Lot H) sont VALIDÉS en production.
+      
   - agent: "main"
     message: |
-      Lot G livré (10 fixes finalisés) sur Altea.
-      - ProductCard unifié : 4 designs hétérogènes → 1 composant avec 2 modes (default/compact).
-      - Logo Altea : RGB → RGBA propre (45% pixels transparents, favicon 70-79%).
-        Pipeline launch.py auto-cleanse pour tous les futurs sites.
-      - Testimonials : marquee CSS → Embla Carousel infini avec autoplay 3.8s + pause on hover.
-      - 4 USPs visuelles avec wording exact Altea (Livraison 72h / Garantie 2 ans / Retour 14j / Support 7j/7).
-      - ProductBundle filtre role={upsell, accessory} → bundle propre des 3 upsells DB Altea.
-      - Mobile fiche produit : breadcrumb caché + pt-0 → image edge-to-edge collée au header.
-      - PageHero : fond accent retiré → transparent (hérite body).
-      - SEO Product : déjà excellent (JSON-LD x4 + OG + Twitter + hreflang + alt + LCP),
-        amélioré pour utiliser getPrimaryImage/getProductGallery (priorité IA).
-      - Domain Purchase UI : markup interne caché au concepteur.
-      Tous les fixes lintés OK (Python ruff + JS eslint). Backend + frontend redémarrés.
-      Validation visuelle preview faite. Prêt pour testing automatisé si user le demande.
+      Lot G + H1 + H5 livrés, prêts pour test agent.
+      Validation visuelle confirmée sur Altea (fauteuil 1233€) :
+      - GERMANY disparu, 3 swatches couleur Black/White/Brown
+      - Logo Altea transparent dans le header
+      - 4 USPs visuelles avec wording exact
+      - Cookie banner RGPD actif
+      - Lint Python+JS OK partout
+      - Backend /api/health 200, Frontend 200
+
+      À tester par testing agent en mobile (390x844) + desktop (1920x1080) :
+      LOT G — 7 fixes :
+      - F1 Testimonials carousel infinite scroll + autoplay 3.8s + pause hover
+      - F3 Mobile fiche produit edge-to-edge (image full-width sous header)
+      - F5 4 USPs (Livraison/Garantie/Retour/Support) au-dessus add-to-cart
+      - F6 ProductBundle ne montre que upsells/accessories (pas d'autres mains)
+      - F12 ProductCard cohérent partout (Home, Collection, Search, CrossSell)
+      - F13 PageHero transparent sur pages secondaires (FAQ, Contact, Livraison...)
+      - F2 Logo Altea transparent + favicons RGBA propres
+
+      LOT H — 2 fixes :
+      - H1 Plus aucun "GERMANY"/Ships From dans VariantPicker
+      - H5 Swatches couleur (cercles ~36-40px) sur axe couleur, pills sur autres axes
