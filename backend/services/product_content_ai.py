@@ -321,44 +321,56 @@ async def _call_usps_llm(
     icon_list = ", ".join(ALLOWED_USP_ICONS)
 
     system = (
-        "Tu es directeur de création pour une marque e-commerce premium. "
-        "Tu écris en français. Tu produis des bénéfices CONCRETS, "
-        "tangibles, spécifiques au produit (pas génériques). "
+        "Tu es copywriter premium pour une marque de lifestyle haut de gamme "
+        "(références : Aesop, Hermès, Officine Universelle Buly, Le Labo). "
+        "Tu écris en français. Ta plume est sobre, sensorielle, narrative — "
+        "jamais agressive. La marque parle bas et juste.\n\n"
+        "Tu produis des USPs (bénéfices clés) qui mêlent CONCRÈTEMENT "
+        "ce que fait le produit ET l'expérience sensible qu'il offre. "
         "Tu réponds STRICTEMENT en JSON valide, sans markdown.\n\n"
         f"CONTRAINTES DE LONGUEUR ABSOLUES — TU DOIS LES RESPECTER :\n"
-        f"- title  : MAXIMUM {title_max} caractères, espaces et ponctuation inclus. "
+        f"- title  : MAXIMUM {title_max} caractères, espaces inclus. "
         f"Plus court c'est mieux. Compte les caractères AVANT de répondre.\n"
-        f"- description : MAXIMUM {desc_max} caractères, espaces et ponctuation inclus. "
-        f"Plus court c'est mieux. Compte les caractères AVANT de répondre.\n"
+        f"- description : MAXIMUM {desc_max} caractères. "
+        f"Compte AVANT de répondre.\n"
         + ("INSTRUCTION CRITIQUE : si tu dépasses, ta réponse est rejetée. "
            "Sois TRÈS concis. Coupe les mots inutiles." if strict else "")
     )
     user = (
         f"{context}\n\n"
-        f"TÂCHE : produis 4 USPs (Unique Selling Points) PRODUIT-SPÉCIFIQUES.\n\n"
+        f"TÂCHE : produis 4 USPs PRODUIT-SPÉCIFIQUES, ton premium narratif.\n\n"
         f"INTERDITS (génériques inutiles, ne jamais inclure) :\n"
-        f"- Livraison rapide / livraison offerte\n"
-        f"- Garantie 2 ans / SAV\n"
-        f"- Retour gratuit\n"
-        f"- Service client / support 7j/7\n"
-        f"- Paiement sécurisé\n\n"
-        f"CHAQUE USP DOIT :\n"
-        f"- décrire un BÉNÉFICE TANGIBLE lié à la mécanique, au matériau, à la techno, à l'ergonomie\n"
-        f"- Exemples BONS (≤{title_max} chars titre) : « 2 moteurs silencieux » | "
-        f"« Mémoire de forme HD » | « Repose-pieds 12 cm » | « Télécommande LED »\n"
-        f"- Exemples MAUVAIS : « Confort optimal » | « Très qualitatif »\n\n"
+        f"- Livraison rapide / livraison offerte / garantie / SAV / retour gratuit\n"
+        f"- Mots fonctionnels plats : « pratique », « efficace », « qualité supérieure »\n"
+        f"- Tournures techniques sèches déshabillées (« 2 moteurs » sans poésie)\n"
+        f"- Superlatifs : « meilleur », « N°1 », « incroyable »\n\n"
+        f"PRIVILÉGIE :\n"
+        f"- Verbes d'expérience : « s'abandonne », « épouse », « révèle », "
+        f"« apaise », « accompagne », « se laisse oublier »\n"
+        f"- Évocations sensorielles : texture, geste, lumière, son, douceur\n"
+        f"- Précision technique HABILLÉE poétiquement (pas niée)\n"
+        f"- Le titre est elliptique, évocateur (style Cormorant)\n"
+        f"- La description prolonge le titre, raconte une expérience CONCRÈTE\n\n"
+        f"EXEMPLES CIBLES (à imiter en TON, pas à recopier) — fauteuil releveur :\n"
+        f'  {{"icon": "Feather", "title": "Le geste sans effort", '
+        f'"description": "Deux moteurs silencieux accompagnent la verticale en douceur, sans rupture."}}\n'
+        f'  {{"icon": "Heart", "title": "Mémoire enveloppante", '
+        f'"description": "Une mousse haute densité épouse votre silhouette et la garde en mémoire."}}\n'
+        f'  {{"icon": "Volume2", "title": "Le silence des belles mécaniques", '
+        f'"description": "Moteurs et articulations à moins de 30 dB, comme un soupir."}}\n'
+        f'  {{"icon": "Layers", "title": "Sous la main, la matière", '
+        f'"description": "Microfibre dense, finition sourde, sans aucun reflet plastique."}}\n\n'
         f"FORMAT JSON STRICT (réponds UNIQUEMENT ceci, pas de markdown autour) :\n"
         f'{{\n'
         f'  "usps": [\n'
         f'    {{"icon": "<icon_name>", "title": "<≤{title_max} caractères>", '
-        f'"description": "<≤{desc_max} caractères, bénéfice concret>"}},\n'
+        f'"description": "<≤{desc_max} caractères, ton sensoriel narratif>"}},\n'
         f'    ... (exactement 4 items)\n'
         f'  ]\n'
         f'}}\n\n'
         f"icon_name DOIT être l'un de : {icon_list}\n"
         f"Choisis l'icône la plus pertinente pour chaque USP.\n"
-        f"RAPPEL : title ≤ {title_max} chars, description ≤ {desc_max} chars. "
-        f"Compte les caractères AVANT de répondre."
+        f"RAPPEL : title ≤ {title_max} chars, description ≤ {desc_max} chars."
     )
 
     raw = await safe_claude_text(

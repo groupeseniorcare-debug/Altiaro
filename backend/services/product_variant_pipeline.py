@@ -34,6 +34,7 @@ Schema (sur `products[]`) :
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -46,6 +47,11 @@ from services.color_variant_images import (
     detect_product_kind,
     slugify_color,
 )
+from services.image_qa import (
+    GEMINI_VISION_USD_PER_CALL,
+    analyze_source_product,
+    qa_check_generated_image,
+)
 from services.llm_resilience import LLMUnavailableError, safe_nano_banana_bytes
 
 logger = logging.getLogger("altiaro.product_variant_pipeline")
@@ -57,18 +63,43 @@ DEFAULT_BUDGET_CAP_USD = 5.0  # per-site cap (brief 2026-04-27)
 
 
 # -------------------------------------------------------------------------
-# 8 fixed styles — slug, aspect ratio, prompt template
-# Each prompt MUST keep the product identity stable (img-to-img Nano Banana).
-# Templates use {product_kind} and {target_color} placeholders.
+# 8 fixed styles — slug, aspect ratio, per-style scene brief.
+# Phase 2.2 hardening (2026-04-27 user feedback) :
+#   - Identity Lock + Material Lock + Color Lock injected per call
+#   - Per-style brief is ULTRA-PRECISE (no ambiguity) — esp. `in_use`
+#   - Negative prompt block hardens against common Nano Banana failures
+# Templates use {product_kind}, {material}, {color}, {color_label_en}.
 # -------------------------------------------------------------------------
 IDENTITY_BLOCK = (
-    "EXACTLY the same {product_kind} as the reference image: "
-    "SAME silhouette, SAME mechanism, SAME proportions, SAME materials, "
-    "SAME stitching pattern, SAME features and accessories. "
-    "Do not redesign, restyle, or alter the product shape. "
-    "The {product_kind} upholstery / dominant color is {target_color}. "
-    "Photorealistic 4K editorial product photography. "
+    "REFERENCE IMAGE LOCK (HIGHEST PRIORITY) — The provided reference image "
+    "shows the EXACT product to render. You MUST preserve PIXEL-IDENTICAL: "
+    "the {product_kind} silhouette, dimensions, armrest shape, headrest shape, "
+    "footrest mechanism, base/legs structure, button or control placement, "
+    "stitching pattern, capitonnage (tufting) lines, every visible technical "
+    "feature. The ONLY things you may change between images are: camera angle, "
+    "framing, lighting, and the surrounding decor. The {product_kind} itself "
+    "MUST be the SAME exact model, SAME exact finish, SAME exact proportions. "
+    "Never substitute one material for another, never alter the silhouette, "
+    "never add or remove buttons, seams, or technical features.\n\n"
+    "MATERIAL LOCK — The upholstery / surface material is: {material}. "
+    "This material is FIXED across all 8 images. NEVER substitute leather "
+    "for fabric or fabric for leather. The texture, grain, weave and finish "
+    "must look IDENTICAL to the reference.\n\n"
+    "COLOR LOCK — The exact color of the {product_kind} upholstery is: "
+    "{color} (target color label: {color_label_en}). Identical undertone, "
+    "identical finish (matte/satin/glossy as in reference) across all images.\n\n"
+    "QUALITY — Photorealistic 4K editorial product photography. "
     "No text, no watermark, no brand mark, no logo overlay."
+)
+
+NEGATIVE_BLOCK = (
+    "AVOID — blurry product, distorted proportions, warped or asymmetric "
+    "shape where the {product_kind} should be symmetrical, missing armrests, "
+    "extra limbs, extra chair parts, ghost elements, deformed hands, "
+    "watermarks, text, logos, photoshop seams, glossy plastic when source "
+    "is fabric, leather grain when source is fabric (or vice versa), "
+    "different chair/object model than reference, different color, "
+    "different material, person standing instead of seated for in_use."
 )
 
 VARIANT_STYLES: List[Dict[str, str]] = [
@@ -77,11 +108,13 @@ VARIANT_STYLES: List[Dict[str, str]] = [
         "aspect": "4:5",
         "label_en": "main studio shot",
         "scene": (
-            "Clean professional studio setup with soft warm directional lighting from the upper left. "
-            "Background is plain ivory #F5F2EB seamless paper, gradient fading slightly darker at the edges. "
-            "The {product_kind} is centered, shot frontally, three-quarter pose, full product visible. "
-            "Subtle ground shadow under the product anchoring it. "
-            "Editorial catalog hero — vertical 4:5 framing, generous negative space above and below."
+            "Pure ivory studio background (#F5F2EB warm off-white seamless paper). "
+            "Three-quarter front view of the {product_kind}, shot at eye level, "
+            "soft diffused lighting from the upper left, no harsh shadows on the background. "
+            "The full {product_kind} is visible from headrest down to footrest base. "
+            "Subtle ground shadow under the product. "
+            "Vertical 4:5 framing with generous negative space above and below. "
+            "Editorial catalog hero quality."
         ),
     },
     {
@@ -89,10 +122,10 @@ VARIANT_STYLES: List[Dict[str, str]] = [
         "aspect": "1:1",
         "label_en": "square card shot",
         "scene": (
-            "Same ivory #F5F2EB seamless studio background as the main shot, soft natural lighting. "
-            "The {product_kind} is centered, slightly closer-cropped framing for a square 1:1 grid card. "
-            "Tight composition, the product fills 75% of the frame, balanced negative space. "
-            "Suitable for a product grid thumbnail."
+            "Same ivory #F5F2EB seamless studio background as the main shot. "
+            "Tighter framing — the {product_kind} occupies 70% of a square 1:1 frame, "
+            "perfectly centered. Same lighting and angle as studio_main. "
+            "Suitable as a product grid card thumbnail."
         ),
     },
     {
@@ -100,12 +133,14 @@ VARIANT_STYLES: List[Dict[str, str]] = [
         "aspect": "4:5",
         "label_en": "lifestyle scene",
         "scene": (
-            "Upscale Parisian Haussmannian living room interior: oak parquet floor with herringbone pattern, "
-            "tall window with sheer linen curtains diffusing soft afternoon daylight, "
-            "white wall mouldings in the background, a vintage gold-framed mirror partially visible. "
-            "The {product_kind} sits naturally in the room, slightly off-center, integrated as a real piece of furniture. "
-            "Subtle props: a stack of art books, a reading lamp, a cashmere throw nearby. "
-            "Vertical 4:5 framing, depth of field bringing the {product_kind} forward."
+            "Premium Parisian Haussmannian apartment interior: oak parquet floor with "
+            "herringbone pattern, tall window with sheer linen curtains diffusing soft "
+            "afternoon daylight, white wall mouldings in the background. "
+            "The {product_kind} sits naturally in the room, slight side angle, "
+            "integrated as a real piece of furniture. NO PEOPLE in this shot. "
+            "Subtle props nearby: a stack of art books, a reading lamp, a cashmere throw. "
+            "Vertical 4:5 framing, depth of field bringing the {product_kind} forward. "
+            "High-end interior magazine editorial quality."
         ),
     },
     {
@@ -114,12 +149,12 @@ VARIANT_STYLES: List[Dict[str, str]] = [
         "label_en": "wide cinematic lifestyle",
         "scene": (
             "PANORAMIC 16:9 horizontal cinematic view of the same Haussmannian living room: "
-            "wide-angle perspective showing the full corner of the room, oak parquet, tall window with linen curtains, "
-            "white mouldings, soft natural daylight from the side. "
-            "The {product_kind} is positioned in the right third of the frame, the room extending to the left "
-            "with elegant decor (art books, plants, a vintage rug, a soft wool throw). "
-            "Cinematic editorial composition, shot at 35mm equivalent focal length, "
-            "shallow gradient of light from window, calm and timeless atmosphere."
+            "wide-angle perspective showing the full corner of the room, oak parquet, "
+            "tall window with linen curtains, white mouldings, soft natural daylight. "
+            "The {product_kind} is positioned on the LEFT THIRD of the frame, the room "
+            "extending to the right with elegant decor (art books, a plant, a vintage rug). "
+            "NO PEOPLE in this shot. Cinematic editorial composition, 35mm equivalent focal "
+            "length, golden hour soft light, calm and timeless atmosphere."
         ),
     },
     {
@@ -127,11 +162,14 @@ VARIANT_STYLES: List[Dict[str, str]] = [
         "aspect": "1:1",
         "label_en": "macro material closeup",
         "scene": (
-            "Macro extreme close-up on the {product_kind} upholstery and seam textures. "
-            "Show the weave of the fabric, the stitching detail, the grain of the material in {target_color}. "
+            "Extreme macro close-up on the EXACT upholstery surface of THIS {product_kind} "
+            "(same chair as the reference, not a different one). "
+            "Show the texture of the {material} in {color}: weave, stitching, grain, "
+            "every fiber detail visible. "
             "Shallow depth of field, beautiful natural light from a soft side window, warm tone. "
-            "1:1 square framing, no full product visible — only the rich textured surface filling the frame. "
-            "Editorial textile photography style."
+            "1:1 square framing — only the rich textured surface fills the frame, "
+            "with at most a hint of the seam or armrest curve to anchor context. "
+            "Editorial textile photography style. NO PEOPLE."
         ),
     },
     {
@@ -139,24 +177,29 @@ VARIANT_STYLES: List[Dict[str, str]] = [
         "aspect": "1:1",
         "label_en": "technical detail",
         "scene": (
-            "Detail shot of a key technical feature of the {product_kind}: the mechanism articulation, "
-            "the remote control or recline lever, the motor housing, or a precision-engineered hinge. "
-            "Clean light grey neutral background, soft directional studio lighting from the right. "
-            "1:1 square framing, the technical detail is the hero of the shot, "
-            "beautifully lit to convey precision and quality. "
-            "No human present, no text or labels visible."
+            "Macro detail shot of ONE specific technical feature of THIS {product_kind} "
+            "(same chair as reference): the recline mechanism articulation, the remote "
+            "control or recline lever, the motor housing, or the armrest joint. "
+            "Plain neutral light grey #E7E5E4 background, soft directional studio lighting "
+            "from the right. 1:1 square framing, the technical detail is the hero of the shot. "
+            "Conveys precision and quality engineering. NO PEOPLE, no text, no labels visible."
         ),
     },
     {
         "slug": "in_use",
         "aspect": "4:5",
-        "label_en": "in-use lifestyle",
+        "label_en": "in-use lifestyle (person seated)",
         "scene": (
-            "Realistic in-use scene: a person (anonymous, no face visible — only partial silhouette, "
-            "back of the head, hand on armrest, or feet on footrest) is using the {product_kind} comfortably. "
-            "Warm cozy interior in soft golden afternoon light, like reading a book or relaxing. "
-            "Vertical 4:5 framing, natural authentic moment, no posing, the product is the setting. "
-            "Editorial lifestyle photography, hint of motion blur if appropriate."
+            "Realistic in-use scene with a PERSON FULLY SEATED IN the {product_kind}. "
+            "CRITICAL: the person's back must be against the backrest, their bottom on the "
+            "seat, legs naturally placed (or footrest extended if applicable). The person "
+            "is INSIDE/ON the chair, NOT standing next to it, NOT in front of it, NOT far away. "
+            "The person is anonymous — face is partially out of frame, in soft shadow, "
+            "or only the back of the head / a hand on the armrest is shown (no recognisable "
+            "facial features). Casual elegant attire, 50-70 years old, relaxed posture. "
+            "Warm cozy interior in soft golden afternoon light, an open book or a cup of tea "
+            "as a subtle prop. Vertical 4:5 framing, natural authentic moment. "
+            "Editorial lifestyle photography."
         ),
     },
     {
@@ -164,11 +207,12 @@ VARIANT_STYLES: List[Dict[str, str]] = [
         "aspect": "4:5",
         "label_en": "side profile shot",
         "scene": (
-            "Pure side-view profile of the {product_kind}, shot at 90 degrees from the side or three-quarter back angle. "
-            "Plain neutral light grey #E7E5E4 studio background, single soft side light revealing the silhouette. "
-            "Vertical 4:5 framing, the product fills 80% of the frame, all profile lines visible: "
-            "the curve of the back, the angle of the armrest, the shape of the legs or base. "
-            "Architectural product photography emphasizing form and proportions."
+            "Pure 90-degree side profile of the {product_kind}, shot at exactly 90° from the "
+            "side. Plain neutral light grey #E7E5E4 studio background, single soft side light "
+            "revealing every silhouette line. Vertical 4:5 framing — the {product_kind} fills "
+            "80% of the frame. All profile lines visible: the curve of the back, the angle of "
+            "the armrest, the shape of the legs or base. Architectural product photography "
+            "emphasizing form, proportions, and engineering. NO PEOPLE."
         ),
     },
 ]
@@ -182,6 +226,7 @@ ALL_STYLE_SLUGS = [s["slug"] for s in VARIANT_STYLES]
 class BudgetCap:
     """Mutable cumulative cost tracker (USD) shared across many parallel
     image generations. Caller checks `.exhausted()` before each new call.
+    Phase 2.2 v2 — also tracks Gemini Vision QA calls (~0.008 USD each).
     """
 
     def __init__(self, cap_usd: float = DEFAULT_BUDGET_CAP_USD):
@@ -189,6 +234,8 @@ class BudgetCap:
         self.spent_usd = 0.0
         self.images_generated = 0
         self.images_failed = 0
+        self.qa_calls = 0
+        self.source_analyses = 0
 
     def add_image(self, success: bool = True) -> None:
         self.spent_usd += NANO_BANANA_USD_PER_IMAGE
@@ -196,6 +243,14 @@ class BudgetCap:
             self.images_generated += 1
         else:
             self.images_failed += 1
+
+    def add_qa_call(self) -> None:
+        self.spent_usd += GEMINI_VISION_USD_PER_CALL
+        self.qa_calls += 1
+
+    def add_source_analysis(self) -> None:
+        self.spent_usd += GEMINI_VISION_USD_PER_CALL
+        self.source_analyses += 1
 
     def exhausted(self) -> bool:
         return self.spent_usd + NANO_BANANA_USD_PER_IMAGE > self.cap_usd
@@ -207,76 +262,166 @@ class BudgetCap:
             "remaining_usd": round(max(0.0, self.cap_usd - self.spent_usd), 4),
             "images_generated": self.images_generated,
             "images_failed": self.images_failed,
+            "qa_calls": self.qa_calls,
+            "source_analyses": self.source_analyses,
         }
 
 
 # -------------------------------------------------------------------------
 # Build a single style prompt
 # -------------------------------------------------------------------------
-def build_style_prompt(style: Dict[str, str], product_kind: str, target_color: str) -> str:
-    identity = IDENTITY_BLOCK.format(product_kind=product_kind, target_color=target_color)
-    scene = style["scene"].format(product_kind=product_kind, target_color=target_color)
+def build_style_prompt(
+    style: Dict[str, str],
+    product_kind: str,
+    material: str,
+    color: str,
+    color_label_en: str,
+) -> str:
+    fmt = dict(product_kind=product_kind, material=material,
+               color=color, color_label_en=color_label_en)
+    identity = IDENTITY_BLOCK.format(**fmt)
+    scene = style["scene"].format(**fmt)
+    negative = NEGATIVE_BLOCK.format(**fmt)
     aspect = style["aspect"]
     return (
         f"{identity}\n\n"
-        f"SCENE: {scene}\n\n"
+        f"SCENE BRIEF: {scene}\n\n"
+        f"{negative}\n\n"
         f"ASPECT RATIO: render at exactly {aspect} aspect ratio."
     )
 
 
 # -------------------------------------------------------------------------
-# Generate a single style image and persist it on disk
+# Generate ONE style image with QA + retry. Returns the persisted image dict
+# or None on failure.
 # -------------------------------------------------------------------------
 async def _generate_one_style(
     *,
     product_id: str,
     color_slug: str,
     color_label: str,
+    color_label_en: str,
     style: Dict[str, str],
     product_kind: str,
-    target_color_en: str,
+    material: str,
+    color_descriptor: str,
     reference_image_b64: str,
     request_id_prefix: str,
+    qa_enabled: bool = True,
+    max_retries: int = 2,
 ) -> Optional[Dict[str, Any]]:
-    """Generate one style image. Returns the dict ready to insert in
-    `generated_images_by_variant[color_slug]` or None on failure."""
-    prompt = build_style_prompt(style, product_kind, target_color_en)
-    try:
-        data = await safe_nano_banana_bytes(
-            prompt,
-            system=(
-                "You generate premium product photography for a Silver Economy "
-                "D2C brand. You preserve product identity strictly: same shape, "
-                "same materials, same features. Only the scene, the lighting and "
-                "the camera framing change. Photorealistic editorial style."
-            ),
-            session_id=f"{request_id_prefix}-{style['slug']}",
-            timeout=120,
-            request_id=f"{request_id_prefix}-{style['slug']}",
-            reference_image_b64=reference_image_b64,
-        )
-    except LLMUnavailableError as e:
-        logger.warning(
-            f"[variant-pipeline] LLM down for {product_id[:8]}/{color_slug}/{style['slug']}: {e.last_error}"
-        )
-        return None
-    except Exception as e:
-        msg = str(e)
-        if "402" in msg or "Budget has been exceeded" in msg or "budget" in msg.lower():
-            logger.error("[variant-pipeline] BUDGET EXHAUSTED — abort propagated")
-            raise
-        logger.exception(f"[variant-pipeline] {product_id[:8]}/{color_slug}/{style['slug']} failed")
-        return None
-    if not data:
-        return None
+    """Generate one style image. Runs Gemini Vision QA against the reference
+    + style brief. Retries up to `max_retries` (default 2) on QA failure.
+    Returns None on definitive failure (caller may flag the slot as
+    `failed_qa`)."""
+    prompt = build_style_prompt(
+        style, product_kind, material, color_descriptor, color_label_en,
+    )
+    last_qa: Optional[Dict[str, Any]] = None
 
-    # Persist to /uploads/products_ai/{product_id}/variants/{color_slug}/{style}_<rand>.png
+    for attempt in range(max_retries + 1):
+        try:
+            data = await safe_nano_banana_bytes(
+                prompt,
+                system=(
+                    "You generate premium product photography for a Silver Economy "
+                    "D2C brand. You preserve product identity strictly: same shape, "
+                    "same materials, same color, same features. Only the scene, "
+                    "the lighting and the camera framing change. Photorealistic "
+                    "editorial style."
+                ),
+                session_id=f"{request_id_prefix}-{style['slug']}-a{attempt}",
+                timeout=120,
+                request_id=f"{request_id_prefix}-{style['slug']}-a{attempt}",
+                reference_image_b64=reference_image_b64,
+            )
+        except LLMUnavailableError as e:
+            logger.warning(
+                f"[variant-pipeline] LLM down for {product_id[:8]}/{color_slug}/{style['slug']} "
+                f"a{attempt}: {e.last_error}"
+            )
+            return None
+        except Exception as e:
+            msg = str(e)
+            if "402" in msg or "Budget has been exceeded" in msg or "budget" in msg.lower():
+                logger.error("[variant-pipeline] BUDGET EXHAUSTED — abort propagated")
+                raise
+            logger.exception(
+                f"[variant-pipeline] {product_id[:8]}/{color_slug}/{style['slug']} a{attempt}"
+            )
+            continue
+
+        if not data:
+            continue
+
+        # QA Vision check against reference + style brief
+        if qa_enabled:
+            try:
+                gen_b64 = base64.b64encode(data).decode()
+                qa = await qa_check_generated_image(
+                    generated_b64=gen_b64,
+                    reference_b64=reference_image_b64,
+                    style_slug=style["slug"],
+                    style_brief=style["scene"].format(
+                        product_kind=product_kind, material=material,
+                        color=color_descriptor, color_label_en=color_label_en,
+                    ),
+                    expected_material=material,
+                    expected_color=color_descriptor,
+                    request_id=f"qa-{request_id_prefix}-{style['slug']}-a{attempt}",
+                )
+                last_qa = qa
+                if qa.get("all_pass"):
+                    return _persist_image(
+                        data, product_id, color_slug, color_label,
+                        style, attempt, qa,
+                    )
+                else:
+                    failed = [k for k, v in (qa.get("checks") or {}).items() if not v]
+                    logger.warning(
+                        f"[variant-pipeline] QA FAILED {style['slug']} a{attempt}: "
+                        f"failed={failed} issues={qa.get('issues', [])[:3]}"
+                    )
+                    # On retry, the prompt stays the same — but Nano Banana is stochastic
+                    # so a fresh attempt may pass. (Optionally we could mutate prompt.)
+                    continue
+            except Exception as e:
+                logger.warning(
+                    f"[variant-pipeline] QA exception {style['slug']} a{attempt}: {str(e)[:200]} "
+                    "— accepting image (fail-open)"
+                )
+                return _persist_image(
+                    data, product_id, color_slug, color_label,
+                    style, attempt,
+                    {"vision_qa_skipped": True, "issues": [str(e)[:120]]},
+                )
+        else:
+            return _persist_image(data, product_id, color_slug, color_label, style, attempt, None)
+
+    # All retries exhausted with QA failures — return None to signal failure.
+    # Caller will not persist the slot, only log.
+    logger.error(
+        f"[variant-pipeline] {style['slug']} FAILED ALL {max_retries + 1} "
+        f"attempts for {product_id[:8]}/{color_slug}. Last QA: {last_qa}"
+    )
+    return None
+
+
+def _persist_image(
+    data: bytes,
+    product_id: str,
+    color_slug: str,
+    color_label: str,
+    style: Dict[str, str],
+    attempt: int,
+    qa_result: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Persist the image bytes to disk and return the descriptor dict."""
     out_dir = UPLOAD_DIR / "products_ai" / product_id / "variants" / color_slug
     out_dir.mkdir(parents=True, exist_ok=True)
     fname = f"{style['slug']}_{uuid.uuid4().hex[:8]}.png"
     (out_dir / fname).write_bytes(data)
     url = f"/api/uploads/products_ai/{product_id}/variants/{color_slug}/{fname}"
-
     return {
         "style": style["slug"],
         "aspect": style["aspect"],
@@ -285,8 +430,11 @@ async def _generate_one_style(
         "color_label": color_label,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source_style": "img-to-img",
-        "tweak": "8styles-pipeline-v1",
+        "tweak": "8styles-pipeline-v2-qa",
         "label_en": style["label_en"],
+        "qa_attempt": attempt,
+        "qa_passed": bool(qa_result and qa_result.get("all_pass") if qa_result else None),
+        "qa_issues": (qa_result or {}).get("issues") or [],
     }
 
 
@@ -361,8 +509,32 @@ async def generate_full_variant_set(
         budget = BudgetCap()
 
     request_id = request_id or f"vpipe-{product_id[:8]}-{color_slug}"
+
+    # ---------------------------------------------------------------
+    # Phase 2.2 v2 — Source analysis : run Gemini Vision ONCE on the
+    # reference image to extract the locked material/color/product_kind
+    # descriptors that will be injected into every per-style prompt.
+    # ---------------------------------------------------------------
+    try:
+        source = await analyze_source_product(ref_b64, request_id=f"{request_id}-source")
+        budget.add_source_analysis()
+        material = source["material"]
+        color_descriptor = source["color"]
+        # Use the Vision-detected product_kind if more specific (e.g.
+        # "lift recliner armchair" vs heuristic "armchair")
+        if source.get("product_kind") and len(source["product_kind"]) > len(product_kind):
+            product_kind = source["product_kind"]
+    except Exception as e:
+        logger.warning(
+            f"[variant-pipeline] {request_id} source analysis failed: {str(e)[:200]} "
+            "— falling back to generic material/color descriptors"
+        )
+        material = "fabric upholstery, woven texture"
+        color_descriptor = f"{target_color_en}, matte finish"
+
     new_images: List[Dict[str, Any]] = []
     skipped: List[str] = []
+    failed_qa: List[str] = []
 
     # Build the final image set : start with existing kept ones, then add new
     final_for_color: List[Dict[str, Any]] = []
@@ -384,25 +556,47 @@ async def generate_full_variant_set(
             skipped.append(style["slug"] + "(budget)")
             continue
 
+        # Account for the ~3 image attempts and ~3 QA calls in the worst case
+        # against the budget when we choose to start a style (don't start if
+        # we can't afford even 1 try).
         img = await _generate_one_style(
             product_id=product_id,
             color_slug=color_slug,
             color_label=color_label,
+            color_label_en=target_color_en,
             style=style,
             product_kind=product_kind,
-            target_color_en=target_color_en,
+            material=material,
+            color_descriptor=color_descriptor,
             reference_image_b64=ref_b64,
             request_id_prefix=request_id,
+            qa_enabled=True,
+            max_retries=2,
         )
-        budget.add_image(success=bool(img))
+        # Crude budget accounting : we don't know exactly how many attempts
+        # _generate_one_style made; we assume successful = 1 image + 1 QA,
+        # failed = 3 images + 3 QA (worst case). Caller can refine if needed.
         if img:
+            attempts = int(img.get("qa_attempt") or 0) + 1
+            for _ in range(attempts):
+                budget.add_image(success=True)
+                budget.add_qa_call()
             new_images.append(img)
-            # Replace any existing entry of the same style if overwrite, else append
             if overwrite:
                 final_for_color = [x for x in final_for_color if x.get("style") != style["slug"]]
             final_for_color.append(img)
             logger.info(
-                f"[variant-pipeline] {request_id}: {style['slug']} OK ({img['aspect']})"
+                f"[variant-pipeline] {request_id}: {style['slug']} OK "
+                f"({img['aspect']}, {attempts} attempt(s), qa_passed={img.get('qa_passed')})"
+            )
+        else:
+            for _ in range(3):
+                budget.add_image(success=False)
+                budget.add_qa_call()
+            failed_qa.append(style["slug"])
+            logger.error(
+                f"[variant-pipeline] {request_id}: {style['slug']} FAILED — "
+                "not persisted (all 3 attempts rejected by Vision QA)"
             )
 
     by_variant[color_slug] = final_for_color
@@ -411,6 +605,9 @@ async def generate_full_variant_set(
         {"$set": {
             "generated_images_by_variant": by_variant,
             "generated_images_by_variant_updated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_images_locked_material": material,
+            "generated_images_locked_color": color_descriptor,
+            "generated_images_locked_product_kind": product_kind,
         }},
     )
 
@@ -419,9 +616,15 @@ async def generate_full_variant_set(
         "product_id": product_id,
         "color_slug": color_slug,
         "color_label": color_label,
+        "locked": {
+            "material": material,
+            "color": color_descriptor,
+            "product_kind": product_kind,
+        },
         "images": final_for_color,
         "new_images_count": len(new_images),
         "skipped_styles": skipped,
+        "failed_qa_styles": failed_qa,
         "budget": budget.to_dict(),
     }
 
