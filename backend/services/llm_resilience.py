@@ -422,6 +422,7 @@ async def safe_nano_banana_bytes(
     session_id: Optional[str] = None,
     timeout: float = 120.0,
     request_id: Optional[str] = None,
+    reference_image_b64: Optional[str] = None,
 ) -> Optional[bytes]:
     """Generate an image with Nano Banana (gemini-3.1-flash-image-preview)
     and return the **raw decoded bytes** (typically PNG/JPEG). The caller
@@ -430,6 +431,13 @@ async def safe_nano_banana_bytes(
     Returns None if the model returned no image data (degraded path —
     happens occasionally even on successful HTTP). Raises LLMUnavailableError
     on persistent upstream failure (502/503/504/timeout × 4 retries).
+
+    Lot C — image-to-image support :
+        Si `reference_image_b64` est fourni (base64 brut, sans préfixe data-uri),
+        l'image est attachée comme contexte multimodal Gemini (`ImageContent`)
+        ce qui permet de générer une variation cohérente avec la source
+        (ex : « le même fauteuil que sur cette photo, scène lifestyle »).
+        Sans `reference_image_b64`, comportement classique text→image.
 
     Used by routes/product_images.py and routes/testimonials_ai.py to keep
     `LlmChat(...)` import out of `routes/` (Phase 0 audit).
@@ -441,11 +449,16 @@ async def safe_nano_banana_bytes(
 
     async def _do() -> Optional[bytes]:
         import base64 as _b64
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
         chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=sid,
                        system_message=system or "")
         chat.with_model("gemini", NANO_MODEL).with_params(modalities=["image", "text"])
-        _, images = await chat.send_message_multimodal_response(UserMessage(text=prompt))
+        # Build the user message — attach reference image if provided (img-to-img mode)
+        file_contents = []
+        if reference_image_b64:
+            file_contents.append(ImageContent(image_base64=reference_image_b64))
+        msg = UserMessage(text=prompt, file_contents=file_contents)
+        _, images = await chat.send_message_multimodal_response(msg)
         if not images:
             return None
         first = images[0]

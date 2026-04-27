@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>POC img-to-img Altea — comparaison</title>
+<style>
+  body { font-family: system-ui; padding: 30px; background: #fafaf7; max-width: 1400px; margin: 0 auto; }
+  h2 { font-family: 'Cormorant Garamond', serif; font-size: 26px; margin-top: 36px; border-bottom: 1px solid #ddd; padding-bottom: 8px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 16px; }
+  .grid img { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 12px; background: #eee; }
+  .label { font-size: 13px; color: #666; text-align: center; margin-top: 6px; }
+  .verdict { background: #fff; padding: 24px; border-radius: 12px; border: 1px solid #e5e5e5; margin-top: 24px; }
+</style></head>
+<body>
+<h1 style="font-family: 'Cormorant Garamond', serif; font-size: 36px;">POC image-to-image — Fauteuil Altea (2a31bb75)</h1>
+<p>Référence AE → 3 anciennes IA "génériques" (text-only) → 3 nouvelles IA "img-to-img" (avec ref visuelle).</p>
+
+<h2>1. Image source AliExpress (référence)</h2>
+<div class="grid" style="grid-template-columns: 1fr 1fr 1fr;">
+  <div><img src="https://ae01.alicdn.com/kf/Ac524bf581d824560bc8011ac22235639L.jpg" alt="AE source"><div class="label">📦 AliExpress source</div></div>
+  <div></div><div></div>
+</div>
+
+<h2>2. Anciennes images IA générées (TEXT-ONLY, pas img2img)</h2>
+<p style="color:#999;font-size:14px">Prompt générique sans référence visuelle. Le modèle "invente" un fauteuil senior générique.</p>
+<div class="grid">
+  <div><img src="/api/uploads/products_ai/p_2a31bb75-4dcf-424d-ab2f-cda6b88303fb_05cafeec.png"><div class="label">ancienne #1</div></div>
+  <div><img src="/api/uploads/products_ai/p_2a31bb75-4dcf-424d-ab2f-cda6b88303fb_dd7e8e79.png"><div class="label">ancienne #2</div></div>
+  <div><img src="/api/uploads/products_ai/p_2a31bb75-4dcf-424d-ab2f-cda6b88303fb_88b34ea1.png"><div class="label">ancienne #3</div></div>
+</div>
+
+<h2>3. Nouvelles images IA (IMG-TO-IMG avec ref AliExpress)</h2>
+<p style="color:#0a0;font-size:14px">Prompt avec image source attachée + instruction "EXACT same chair model, color, fabric, structure".</p>
+<div class="grid">
+  <div><img src="/api/uploads/products_ai/_poc_img2img/2a31bb75-4dcf-424d-ab2f-cda6b88303fb/poc_lifestyle_6d637aff.png"><div class="label">🆕 lifestyle (salon Parisien, golden hour)</div></div>
+  <div><img src="/api/uploads/products_ai/_poc_img2img/2a31bb75-4dcf-424d-ab2f-cda6b88303fb/poc_studio_1c5377fc.png"><div class="label">🆕 studio (cyclo blanc, softbox)</div></div>
+  <div><img src="/api/uploads/products_ai/_poc_img2img/2a31bb75-4dcf-424d-ab2f-cda6b88303fb/poc_detail_fc52d851.png"><div class="label">🆕 detail (closeup tissu/coutures)</div></div>
+</div>
+
+<div class="verdict">
+  <h3>✅ Verdict POC</h3>
+  <ul>
+    <li><b>Cohérence produit</b> : à valider visuellement par l'utilisateur</li>
+    <li><b>Coût</b> : ~$0.60 par produit (3 images × ~$0.20 Nano Banana)</li>
+    <li><b>Régen totale Altea (6 produits)</b> : 18 images × ~$0.20 = <b>~$3.60</b></li>
+    <li><b>Durée totale estimée</b> : ~4 min (parallélisable, mais sequential ici pour ne pas saturer la clé)</li>
+  </ul>
+</div>
+</body></html>

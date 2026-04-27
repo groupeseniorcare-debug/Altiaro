@@ -5,6 +5,7 @@ import { ShoppingBagOpen, Plus, Sparkle } from "@phosphor-icons/react";
 import { pickLang, t } from "../../lib/i18n";
 import { addToCart } from "../../lib/cart";
 import { BACKEND_URL, designAccents, formatPrice } from "./storefrontUtils";
+import { getPrimaryImage } from "../../lib/productImage";
 
 /**
  * Upsells : accessoires complémentaires sélectionnés à l'étape 3 du cockpit
@@ -104,9 +105,9 @@ export default function UpsellsRecommendations({
                 to={`/shop/${siteId}/product/${p.id}`}
                 className="aspect-square bg-[#F5F2EB] relative overflow-hidden group block"
               >
-                {p.images?.[0] ? (
+                {(() => { const _src = getPrimaryImage(p); return _src ? (
                   <img
-                    src={p.images[0]}
+                    src={_src}
                     alt={name}
                     loading="lazy"
                     className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700"
@@ -115,7 +116,7 @@ export default function UpsellsRecommendations({
                   <div className="w-full h-full flex items-center justify-center text-neutral-300">
                     <ShoppingBagOpen size={40} weight="thin" />
                   </div>
-                )}
+                ); })()}
               </Link>
               <div className="p-4 flex-1 flex flex-col">
                 <Link

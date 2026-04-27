@@ -3,6 +3,7 @@ import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom"
 import axios from "axios";
 import StorefrontLayout, { useSiteData } from "../components/StorefrontLayout";
 import { MagnifyingGlass } from "@phosphor-icons/react";
+import { getPrimaryImage } from "../lib/productImage";
 
 const BACKEND = "";
 
@@ -61,7 +62,7 @@ export default function StorefrontSearch() {
             <Link to={`/shop/${siteId}/product/${p.id}`} key={p.id} data-testid={`search-result-${p.id}`}
               className="group block bg-white border border-neutral-200 rounded-2xl overflow-hidden hover:border-neutral-900 transition">
               <div className="aspect-[4/3] bg-neutral-100 overflow-hidden">
-                {p.images?.[0] && <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-700" />}
+                {(() => { const _src = getPrimaryImage(p); return _src ? <img src={_src} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-700" /> : null; })()}
               </div>
               <div className="p-5">
                 <h3 className="font-medium mb-1 line-clamp-2">{p.name}</h3>

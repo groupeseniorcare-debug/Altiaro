@@ -5,6 +5,7 @@ import { ArrowRight, ShieldCheck, Star, Truck } from "@phosphor-icons/react";
 import { designText, designAccents } from "./storefrontUtils";
 import { t } from "../../lib/i18n";
 import { sanitizeBrandText } from "../../lib/brandText";
+import { getPrimaryImage } from "../../lib/productImage";
 
 /**
  * Hero — MONOCHROME editorial magazine. Pure white, black ink, gray cards.
@@ -32,8 +33,11 @@ export function Hero({ site, design, lang, products }) {
 
   const firstProductImg = (() => {
     if (!Array.isArray(products) || products.length === 0) return null;
-    const featured = products.find((p) => p.featured && p.images?.[0]);
-    return (featured || products.find((p) => p.images?.[0]))?.images?.[0] || null;
+    // Lot B — préfère les produits "featured" puis prend la 1ère image IA
+    // (priorité generated_images.url > images[0] via getPrimaryImage).
+    const featured = products.find((p) => p.featured && getPrimaryImage(p));
+    const fallback = featured || products.find((p) => getPrimaryImage(p));
+    return fallback ? getPrimaryImage(fallback) : null;
   })();
   const heroImage = designText(design, "hero.image", lang) || design?.hero?.image || firstProductImg || null;
 

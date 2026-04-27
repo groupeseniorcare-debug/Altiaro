@@ -9,6 +9,7 @@ import StorefrontLayout from "../components/StorefrontLayout";
 import SEOHead from "../components/SEOHead";
 import { pickLang, t } from "../lib/i18n";
 import { useSiteAndLang, designAccents, formatPrice, buildHreflangs, BACKEND_URL } from "../components/storefront/storefrontUtils";
+import { getPrimaryImage } from "../lib/productImage";
 
 const SORT_OPTIONS = [
   { value: "featured", label: "Mis en avant" },
@@ -419,13 +420,13 @@ export function StorefrontCollection() {
                 className="group block"
               >
                 <div className="aspect-square bg-[#F5F2EB] rounded-2xl overflow-hidden relative mb-4">
-                  {p.images?.[0] ? (
-                    <img src={p.images[0]} alt={pickLang(p.name, lang)} loading="lazy" className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700 ease-out" />
+                  {(() => { const _src = getPrimaryImage(p); return _src ? (
+                    <img src={_src} alt={pickLang(p.name, lang)} loading="lazy" className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700 ease-out" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-neutral-300">
                       <ShoppingBagOpen size={56} weight="thin" />
                     </div>
-                  )}
+                  ); })()}
                   {p.featured && (
                     <div className="absolute top-4 left-4 text-white text-[10px] uppercase tracking-widest font-semibold px-3 py-1.5 rounded-full backdrop-blur-sm flex items-center gap-1"
                          style={{ background: `${primary}dd` }}>

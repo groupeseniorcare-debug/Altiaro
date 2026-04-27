@@ -470,6 +470,32 @@ Quand un concepteur pilote rejoint la plateforme :
 5. Pré-remplir son `billing_profile` (SIRET, IBAN, adresse) avant qu'il
    reçoive une commande, sinon les payouts SEPA bi-mensuels seront bloqués.
 
+### 13.9 — 🔴 P0 · ROTATION URGENTE · Régénérer le `MOLLIE_CLIENT_SECRET`
+
+⚠️ **À faire IMMÉDIATEMENT après que l'intégration Mollie Connect soit
+testée et fonctionnelle (Lot E livré).**
+
+**Pourquoi** : Le `MOLLIE_CLIENT_SECRET` a été partagé en clair lors de la
+configuration initiale (transmis dans le chat plateforme Altiaro pour
+ajout au `.env`). C'est une bonne hygiène de sécurité standard de le
+régénérer après tout partage en clair, même via un canal interne.
+
+**Procédure (2 minutes)** :
+
+1. Connexion → [https://my.mollie.com/dashboard/developers/applications](https://my.mollie.com/dashboard/developers/applications)
+2. Ouvrir l'application **« Altiaro Platform »** (Client ID `app_ebp94GjeM4t23GDbk83GHBDo`)
+3. Onglet **Credentials** → bouton **« Reset Client Secret »**
+4. Confirmer la régénération → Mollie affiche le **nouveau secret** une seule fois → copier
+5. Mettre à jour la variable `MOLLIE_CLIENT_SECRET` dans `/app/backend/.env`
+6. `sudo supervisorctl restart backend`
+7. Tester un flow Mollie Connect (re-connexion d'un site déjà autorisé) pour
+   valider que tout fonctionne avec le nouveau secret. Note : les
+   `access_token` déjà émis pour les sites concepteurs **restent valides**
+   (le secret ne sert qu'à demander de NOUVEAUX tokens / refresh).
+
+**État avant rotation** : `Client ID = app_ebp94GjeM4t23GDbk83GHBDo`,
+`Client Secret = a9k...lzyTn` (créé le 2026-04-27).
+
 ---
 
 ## Fin du document

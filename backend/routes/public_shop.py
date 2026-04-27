@@ -83,7 +83,10 @@ async def public_products(
 
     q: dict = {"site_id": site_id, "status": "active", "role": {"$ne": "upsell"}}
     if collection:
-        q["category"] = collection
+        # Lot A2 — match flexible sur `category` (string) OU `categories` (array)
+        # pour supporter à la fois l'ancien schéma et les produits classifiés
+        # en multi-collection (ex: fauteuil dans `fauteuils-releveurs` + `fauteuils-massage`).
+        q["$or"] = [{"category": collection}, {"categories": collection}]
     if tag:
         q["tags"] = {"$in": tag}
     price_q: dict = {}
@@ -94,7 +97,13 @@ async def public_products(
     if price_q:
         q["price"] = price_q
     if in_stock:
-        q["$or"] = [{"stock": None}, {"stock": {"$gt": 0}}]
+        # Lot A2 — préserve un éventuel $or précédent (ex: collection match)
+        # via $and pour éviter qu'il soit écrasé ici.
+        stock_or = [{"stock": None}, {"stock": {"$gt": 0}}]
+        if "$or" in q:
+            q["$and"] = [{"$or": q.pop("$or")}, {"$or": stock_or}]
+        else:
+            q["$or"] = stock_or
     if on_sale:
         q["compare_at_price"] = {"$gt": 0, "$exists": True}
 
@@ -161,20 +170,17 @@ async def public_collections(site_id: str):
         slug = c.get("slug") or ""
         if not slug or slug in existing_slugs:
             continue
-        count = await db.products.count_documents(
-            {"site_id": site_id, "status": "active", "category": slug}
-        )
+        # Bloc 4 — match flexible : la classification produit peut écrire `category`
+        # (string) ou `categories` (array). On compte les deux pour ne rien rater.
+        count = await db.products.count_documents({
+            "site_id": site_id, "status": "active",
+            "$or": [{"category": slug}, {"categories": slug}],
+        })
         out.append({**{k: v for k, v in c.items() if k != "_id"},
                     "products_count": count, "source": "legacy"})
-    if not out:
-        out = [
-            {"slug": "mobilite", "title": "Mobilité & confort", "description": "Fauteuils releveurs, déambulateurs, aides à la marche.",
-             "image": "https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=900&auto=format&fit=crop", "products_count": 0, "source": "fallback"},
-            {"slug": "sommeil", "title": "Sommeil & récupération", "description": "Matelas médicaux, lits électriques, linge adapté.",
-             "image": "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=900&auto=format&fit=crop", "products_count": 0, "source": "fallback"},
-            {"slug": "quotidien", "title": "Quotidien serein", "description": "Alarmes, éclairages, ustensiles ergonomiques.",
-             "image": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=900&auto=format&fit=crop", "products_count": 0, "source": "fallback"},
-        ]
+    # Lot A2 — Plus de fallback "Silver Economy" hardcoded avec stocks Unsplash
+    # hors-niche. Si aucune collection n'est définie, on retourne [] et le
+    # frontend affichera un état vide propre (« Toutes nos références »).
     return out
 
 
@@ -204,16 +210,15 @@ async def public_collection_detail(site_id: str, slug: str):
     legacy = (site.get("design") or {}).get("collections") or []
     found = next((c for c in legacy if c.get("slug") == slug), None)
     if not found:
-        fallback = {
-            "mobilite": {"title": "Mobilité & confort", "description": "Fauteuils releveurs, déambulateurs, aides à la marche, cannes et rollators."},
-            "sommeil": {"title": "Sommeil & récupération", "description": "Matelas médicaux, lits électriques, linge de lit adapté, oreillers ergonomiques."},
-            "quotidien": {"title": "Quotidien serein", "description": "Alarmes, éclairages automatiques, ustensiles ergonomiques, téléphones simplifiés."},
-        }
-        if slug in fallback:
-            found = {"slug": slug, **fallback[slug]}
-        else:
-            raise HTTPException(status_code=404, detail="Collection introuvable")
-    count = await db.products.count_documents({"site_id": site_id, "status": "active", "category": slug})
+        # Lot A2 — Plus de fallback générique "Silver Economy" hardcoded.
+        # Si la collection demandée n'existe pas en DB ni dans le legacy
+        # design.collections, on renvoie 404 propre.
+        raise HTTPException(status_code=404, detail="Collection introuvable")
+    # Bloc 4 — match flexible : `category` (string) OU `categories` (array)
+    count = await db.products.count_documents({
+        "site_id": site_id, "status": "active",
+        "$or": [{"category": slug}, {"categories": slug}],
+    })
     return {**{k: v for k, v in found.items() if k != "_id"}, "products_count": count, "source": "legacy"}
 
 

@@ -47,6 +47,58 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
     };
   }, [siteId]);
 
+  // ────────────────────────────────────────────────────────────────────
+  // Lot A1 — Favicon dynamique par site (storefront)
+  // ────────────────────────────────────────────────────────────────────
+  // Le `<head>` global pointe par défaut sur le favicon plateforme Altiaro
+  // (`/favicon-altiora.png`). Sur les pages storefront, on remplace
+  // dynamiquement les `<link rel="icon">` par le favicon spécifique du site
+  // (généré depuis le logo via `services/favicon_generator.py`).
+  // Au démontage du layout, les favicons plateforme sont restaurés.
+  useEffect(() => {
+    const favBase = design?.favicon_url;
+    const favApple = design?.favicon_apple_url || design?.favicon_url;
+    if (!favBase) return undefined;
+
+    // Build absolute URLs (favicon_url is stored as `/api/uploads/...`)
+    const absBase = favBase.startsWith("http") ? favBase : `${BACKEND_URL}${favBase}`;
+    const absApple = favApple.startsWith("http") ? favApple : `${BACKEND_URL}${favApple}`;
+
+    // Snapshot original href values to restore on unmount
+    const head = document.head;
+    const iconLink = head.querySelector('link[rel="icon"]');
+    const shortcutLink = head.querySelector('link[rel="shortcut icon"]');
+    const appleLink = head.querySelector('link[rel="apple-touch-icon"]');
+
+    const originals = {
+      icon: iconLink?.getAttribute("href"),
+      shortcut: shortcutLink?.getAttribute("href"),
+      apple: appleLink?.getAttribute("href"),
+    };
+
+    // Patch (or create) the link tags
+    if (iconLink) iconLink.setAttribute("href", absBase);
+    if (shortcutLink) shortcutLink.setAttribute("href", absBase);
+    if (appleLink) appleLink.setAttribute("href", absApple);
+    else {
+      const newApple = document.createElement("link");
+      newApple.rel = "apple-touch-icon";
+      newApple.href = absApple;
+      newApple.dataset.altiaroSiteFavicon = "1";
+      head.appendChild(newApple);
+    }
+
+    return () => {
+      // Restore plateforme favicons (Altiaro) when leaving storefront pages
+      if (iconLink && originals.icon) iconLink.setAttribute("href", originals.icon);
+      if (shortcutLink && originals.shortcut) shortcutLink.setAttribute("href", originals.shortcut);
+      if (appleLink && originals.apple) appleLink.setAttribute("href", originals.apple);
+      // Remove the apple-touch-icon we may have created
+      const created = head.querySelector('link[data-altiaro-site-favicon="1"]');
+      if (created) head.removeChild(created);
+    };
+  }, [design?.favicon_url, design?.favicon_apple_url]);
+
   const shopRoot = `/shop/${siteId}`;
   const brand = design?.brand || {};
   // Template mode — "monochrome" (default) vs "brand". See designAccents().

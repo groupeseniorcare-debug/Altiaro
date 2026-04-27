@@ -5,6 +5,7 @@ import { Check, ShoppingBagOpen, Star, ArrowRight, CheckCircle } from "@phosphor
 import { pickLang, t } from "../../lib/i18n";
 import { designAccents, formatPrice } from "./storefrontUtils";
 import { addToCart } from "../../lib/cart";
+import { getPrimaryImage } from "../../lib/productImage";
 
 const DEMO_PRODUCTS = [
   { id: "demo-1", name: "Fauteuil releveur Confort Plus", price: 899, compare_at_price: 1199, currency: "EUR", images: ["https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=700&auto=format&fit=crop"], featured: true,
@@ -83,9 +84,9 @@ function ProductCard({ product: p, siteId, primary, accent, divider, textMuted, 
         {/* Image */}
         <Link to={href} className="block">
           <div className="aspect-square relative overflow-hidden bg-white">
-            {p.images?.[0] ? (
+            {(() => { const _src = getPrimaryImage(p); return _src ? (
               <img
-                src={p.images[0]}
+                src={_src}
                 alt={name}
                 loading="lazy"
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
@@ -94,7 +95,7 @@ function ProductCard({ product: p, siteId, primary, accent, divider, textMuted, 
               <div className="w-full h-full flex items-center justify-center" style={{ color: textFaint }}>
                 <ShoppingBagOpen size={60} weight="thin" />
               </div>
-            )}
+            ); })()}
             {/* Badges */}
             {p.featured && (
               <div

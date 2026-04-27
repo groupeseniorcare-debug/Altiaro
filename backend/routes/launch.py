@@ -463,6 +463,13 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                         {"$set": {"design.brand.logo_url": url,
                                   "design.updated_at": datetime.now(timezone.utc).isoformat()}},
                     )
+                    # Lot A1 — Auto-generate favicons (5 sizes) from the logo PNG.
+                    # 0 LLM, 0 cost. Idempotent : peut être ré-appelé.
+                    try:
+                        from services.favicon_generator import regenerate_and_persist_favicons
+                        await regenerate_and_persist_favicons(site_id)
+                    except Exception as fe:
+                        logger.warning(f"[launch] favicon generation failed: {fe}")
             except asyncio.TimeoutError:
                 logger.warning("[launch] logo timed out")
             except Exception as e:

@@ -4,6 +4,7 @@ import axios from "axios";
 import { ArrowRight, ShoppingBagOpen, Star } from "@phosphor-icons/react";
 import { pickLang, t } from "../../lib/i18n";
 import { BACKEND_URL, designAccents, formatPrice } from "./storefrontUtils";
+import { getPrimaryImage } from "../../lib/productImage";
 
 /**
  * Cross-sell — "Vous aimerez aussi" : 4 produits complémentaires.
@@ -60,13 +61,13 @@ export default function CrossSellProducts({ currentProduct, lang = "fr", design 
             className="group block"
           >
             <div className="aspect-square bg-[#F5F2EB] rounded-2xl overflow-hidden relative mb-3">
-              {p.images?.[0] ? (
-                <img src={p.images[0]} alt={pickLang(p.name, lang) || p.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700" />
+              {(() => { const _src = getPrimaryImage(p); return _src ? (
+                <img src={_src} alt={pickLang(p.name, lang) || p.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-neutral-300">
                   <ShoppingBagOpen size={48} weight="thin" />
                 </div>
-              )}
+              ); })()}
               {p.featured && (
                 <div className="absolute top-3 left-3 text-white text-[10px] uppercase tracking-widest font-semibold px-2 py-1 rounded-full flex items-center gap-1" style={{ background: `${primary}dd` }}>
                   <Star size={9} weight="fill" /> Phare

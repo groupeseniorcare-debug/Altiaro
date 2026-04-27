@@ -6,6 +6,7 @@ import { pickLang, t } from "../../lib/i18n";
 import { BACKEND_URL, designAccents, formatPrice } from "./storefrontUtils";
 import { addToCart } from "../../lib/cart";
 import { toast } from "sonner";
+import { getPrimaryImage } from "../../lib/productImage";
 
 /**
  * Product bundle — "Souvent achetés ensemble"
@@ -90,7 +91,7 @@ export default function ProductBundle({ currentProduct, lang = "fr", design }) {
         name: pickLang(p.name, lang) || p.name,
         price: p.price,
         currency: p.currency || currency,
-        image: p.images?.[0],
+        image: getPrimaryImage(p),
         quantity: 1,
       });
       try { window.altiaroTrack?.addToCart?.(p, 1, lang); } catch (_) {}
@@ -182,13 +183,13 @@ function BundleItem({ product, isCurrent, checked, onToggle, lang, primary, font
   return (
     <div className="flex items-center gap-3 bg-white rounded-2xl p-3 md:p-4 w-[220px] md:w-[260px] shrink-0" data-testid={`bundle-item-${product.id}`}>
       <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl overflow-hidden bg-[#F5F2EB] shrink-0">
-        {product.images?.[0] ? (
-          <img src={product.images[0]} alt={pickLang(product.name, lang) || product.name} loading="lazy" className="w-full h-full object-cover" />
+        {(() => { const _src = getPrimaryImage(product); return _src ? (
+          <img src={_src} alt={pickLang(product.name, lang) || product.name} loading="lazy" className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-neutral-300">
             <ShoppingBagOpen size={28} weight="thin" />
           </div>
-        )}
+        ); })()}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-start gap-2 mb-1">
