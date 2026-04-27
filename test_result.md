@@ -135,10 +135,100 @@ backend:
           Idempotent — peut être réexécuté sans effet de bord.
 
 frontend:
-  - task: "Lot G Fix 12 — ProductCard unifié (Home, Collection, Search, CrossSell)"
+  - task: "Lot G Fix 12 — ProductCard RICHE unifié (CORRIGÉ)"
     implemented: true
     working: true
     file: "frontend/src/components/storefront/ProductCard.jsx + ProductGrid.jsx + CrossSellProducts.jsx + pages/StorefrontCollection.jsx + pages/StorefrontSearch.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "main"
+        comment: |
+          🚨 INVERSION DE LOGIQUE : 1ʳᵉ tentative avait extrait un ProductCard
+          ÉPURÉ (basé sur le rendu Collection minimaliste) et l'avait appliqué
+          partout, ce qui APPAUVRISSAIT la Home (perte highlights + dual CTA).
+      - working: true
+        agent: "main"
+        comment: |
+          ✅ CORRIGÉ 2026-04-27 : extraction du rendu RICHE original de
+          ProductGrid.jsx (ancien) en composant ProductCard.jsx exporté.
+          Design Aesop / Hermès / Apple Watch :
+            · Image aspect-square sur fond BLANC (le produit IA ressort)
+            · Card fond accent_color (ivoire dynamique du site)
+            · Titre Cormorant 16/18px line-clamp-2
+            · 4 highlights ✓ verts (auto-extraits via `getHighlights()`)
+            · Border-top divider entre highlights et footer
+            · Prix XL + eyebrow "FREE SHIPPING within 72h"
+            · Dual CTA inline : flèche → fiche + bouton "Add to cart" w/ icon
+            · Hover : shadow-[0_20px_60px_-20px] + translate-y-[-1] + scale-[1.04]
+            · Variante "compact" sans CTA pour cross-sell sidebar
+          Used everywhere : Home (ProductGrid), Collection, Search, CrossSell.
+          Audit "from-scratch" : ✅ tout site créé via launch-auto utilise
+          automatiquement ce composant (aucun rendu inline résiduel).
+          Validation testing agent : cards Home = Collection PIXEL-PERFECT
+          (bg rgb(245,245,245), img bg blanc, Cormorant, highlights ✓,
+          €1,033.45, eyebrow "Free shipping", 2 CTAs, 384×648.5625px).
+          Layout : 3 cols desktop / 2 cols tablet / 1 col mobile.
+
+  - task: "Lot H Fix 4 — Galerie + composants editorial variant-aware"
+    implemented: true
+    working: true
+    file: "frontend/src/lib/ProductColorContext.jsx + lib/productImage.js + lib/slugify.js + components/storefront/ProductGallery.jsx + ProductEditorialMosaic.jsx + NarrativeProduct.jsx + VariantPicker.jsx + pages/StorefrontProduct.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          React Context `ProductColorContext` propage la couleur sélectionnée
+          à TOUS les composants enfants de la fiche produit.
+          Architecture :
+            StorefrontProduct
+              └─ ProductColorProvider product={p}
+                   ├─ ProductGallery (consume → display variant images + fade)
+                   ├─ VariantPicker (publish → setSelectedColor on click)
+                   ├─ ProductEditorialMosaic (consume → variant images for 4 tiles)
+                   └─ NarrativeSections (consume → variant images for sections)
+          Helpers `getProductGalleryForColor()`, `getStyleImageForColor()`
+          dans `lib/productImage.js` lisent `generated_images_by_variant[slug]`
+          avec fallback gracieux sur galerie classique si non dispo.
+          Animation fade Framer Motion 320ms entre images sur changement couleur.
+          `lib/slugify.js` : mirroir JS du `slugify_color()` Python.
+          Validation testing agent : cliquer Black → White change la galerie
+          principale + la mosaic + les sections narratives vers `/variants/white/`,
+          idem pour Brown → `/variants/brown/`.
+
+  - task: "Lot H Fix 2+3 — Régen images couleurs Altea (POC + masse)"
+    implemented: true
+    working: true
+    file: "backend/services/color_variant_images.py + backend/scripts/lotH_h2h3_regen_color_variants.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Script idempotent qui pour chaque produit "main" :
+          - Identifie la couleur "default" (= 1ère variante = images existantes)
+          - Pour chaque autre couleur, régénère studio + lifestyle + closeup
+            via Nano Banana img-to-img avec prompt strict (préservation 100%
+            identité produit, change UNIQUEMENT couleur upholstery)
+          - Stocke dans `generated_images_by_variant: {slug: [{style, url, ...}]}`
+          - Hard cap budget MAX_LLM_CALLS=70 (~$3.50)
+          Exécuté sur Altea : 2 produits multi-couleurs (fauteuil 1233€
+          Black/White/Brown + fauteuil tissu Gray/Brown/Blue).
+          12 LLM calls, ~$0.60 dépensés, 12 images générées + stockées.
+          Validation visuelle : fauteuil blanc PARFAITEMENT cohérent avec
+          le noir (mêmes proportions, télécommande, porte-gobelets, etc.).
+
+  - task: "Lot H Fix 6 — Propagation pipeline launch.py (futurs sites)"
+    implemented: true
+    working: true
+    file: "backend/routes/launch.py + backend/services/colormapping_py.py + backend/.env (MAX_COLOR_VARIANTS_AI=5)"
     stuck_count: 0
     priority: "high"
     needs_retesting: true
@@ -146,26 +236,51 @@ frontend:
       - working: true
         agent: "main"
         comment: |
-          ProductCard unifié remplace 4 designs distincts (Home/Collection/Search/CrossSell).
-          Design épuré premium type Apple Watch / Hermès : aspect-square, fond ivoire,
-          rounded-2xl, hover scale subtil, badges featured + promo, typo Cormorant.
-          2 modes : "default" (grilles principales) et "compact" (cross-sell).
-          Pas de CTA inline (clic → fiche). Visuel cohérent partout.
+          Helper `_generate_color_variant_images_for_product()` ajouté dans
+          launch.py, appelé après la phase 8c (narrative sections) pour CHAQUE
+          produit. Stratégie identique au script H2/H3 :
+          - Skip si mono-variant
+          - Détection axe couleur via `services/colormapping_py.is_color_axis()`
+          - Default color = copie generated_images existants (0 LLM cost)
+          - Autres couleurs = img-to-img Nano Banana, max=MAX_COLOR_VARIANTS_AI
+          - Idempotent (skip couleurs déjà présentes)
+          - Budget-aware : 402 → halt loop
+          Garantit que TOUT futur site créé via launch-auto a automatiquement
+          la galerie variant-aware (cohérent avec H4 frontend).
 
-  - task: "Lot G Fix 13 — PageHero transparent (pages secondaires)"
+  - task: "Lot G Fix 13 — PageHero transparent (CORRIGÉ — Blog inclu)"
     implemented: true
     working: true
-    file: "frontend/src/pages/StorefrontPages.jsx"
+    file: "frontend/src/pages/StorefrontPages.jsx + StorefrontBlog.jsx"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
+      - working: false
+        agent: "main"
+        comment: |
+          🐛 1ʳᵉ tentative ne touchait que <PageHero> de StorefrontPages.jsx.
+          Le Blog avait son propre header inline avec fond accent_color.
       - working: true
         agent: "main"
         comment: |
-          Retrait du fond accent_color sur les <PageHero>. Hérite désormais du body
-          (transparent), border-bottom subtil. Texte H1 anthracite + eyebrow accent primary.
-          Cohérent multi-sites (s'adapte à toute palette).
+          ✅ CORRIGÉ 2026-04-27 : aligné le hero du Blog (liste articles) +
+          le hero du BlogPost (article individuel) sur la même structure
+          transparente que <PageHero>. Validation : 9/9 pages secondaires
+          (about, contact, faq, livraison, retours, blog, track, cgv,
+          mentions) ont `background-color: rgba(0,0,0,0)` + `background-image: none`.
+
+  - task: "Lot G Fix 13 — PageHero transparent (pages secondaires) — supersedé"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/StorefrontPages.jsx (covered by CORRIGÉ entry above)"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Voir entry CORRIGÉ ci-dessus."
 
   - task: "Lot G Fix 1 — Testimonials Embla Carousel infini"
     implemented: true
