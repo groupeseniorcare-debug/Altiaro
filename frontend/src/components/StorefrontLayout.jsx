@@ -773,9 +773,17 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
         {/* Bottom bar — copyright + payments */}
         <div className="relative z-10 max-w-7xl mx-auto px-6 py-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
-            <p data-testid="footer-copyright" className="text-[12px] text-white/40">
-              © {new Date().getFullYear()} {logoText} — {t(lang, "footer_all_rights")}.
-            </p>
+            <div className="flex flex-col gap-1.5">
+              <p data-testid="footer-copyright" className="text-[12px] text-white/40">
+                © {new Date().getFullYear()} {logoText} — {t(lang, "footer_all_rights")}.
+              </p>
+              {/* Bloc 2 — mention SIRET obligatoire (LCEN art. 6, code de commerce). */}
+              <p className="text-[11px] text-white/30 leading-relaxed">
+                Édité par la <strong className="font-medium text-white/50">Société Altiaro</strong>
+                {" "}— SIRET 883 803 967 00016 — 4 IMP CLOS FLEURI, 42320 FARNAY
+                {" "}— TVA non applicable (art. 293 B du CGI)
+              </p>
+            </div>
             <div>
               <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-white/30 mb-3">{t(lang, "trust_secure_payment")}</p>
               <div className="flex items-center gap-2.5 flex-wrap" data-testid="footer-payments">

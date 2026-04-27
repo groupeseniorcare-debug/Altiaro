@@ -70,7 +70,9 @@ async def platform_info():
     """Public meta about the Altiaro platform — consumed by the landing page."""
     return {
         "name": "Altiaro",
-        "legal_name": "Robin Zuchiatti (entrepreneur individuel)",
+        "legal_name": "Société Altiaro",
+        "siren": "883 803 967",
+        "siret": "883 803 967 00016",
         "tagline": "La plateforme e-commerce des partenariats éclairés.",
         "value_prop": (
             "Altiaro accompagne les entrepreneurs qui lancent des marques "
@@ -80,7 +82,7 @@ async def platform_info():
         ),
         "email": "contact@altiaro.com",
         "website": "https://altiaro.com",
-        "founded": 2026,
+        "founded": 2020,
         "markets": ["FR", "DE", "BL", "NL", "CH", "UK"],
     }
 

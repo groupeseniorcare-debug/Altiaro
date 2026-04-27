@@ -130,7 +130,11 @@ function useSiteDesign() {
       .then(({ data }) => setDesign(data?.published ? data.design : null))
       .catch(() => setDesign(null));
   }, [siteId]);
-  return { siteId, site, design: design || {}, lang, setLang };
+  // Bloc 2 — fix bug `availableLangs is not defined` qui plantait /blog
+  const availableLangs = (site?.selected_languages && site.selected_languages.length)
+    ? site.selected_languages
+    : ["fr"];
+  return { siteId, site, design: design || {}, lang, setLang, availableLangs };
 }
 
 function getPosts(design) {
@@ -159,7 +163,7 @@ function mdLite(md) {
  * BLOG INDEX — /shop/:siteId/blog
  * ========================================================= */
 export function StorefrontBlog() {
-  const { siteId, site, design, lang, setLang } = useSiteDesign();
+  const { siteId, site, design, lang, setLang, availableLangs } = useSiteDesign();
   const posts = getPosts(design);
   const { primary, fontHeading } = designAccents(design);
   const canonical = typeof window !== "undefined" ? `${window.location.origin}/shop/${siteId}/blog` : undefined;
@@ -245,7 +249,7 @@ export function StorefrontBlog() {
  * ========================================================= */
 export function StorefrontBlogPost() {
   const { siteId, slug } = useParams();
-  const { site, design, lang, setLang } = useSiteDesign();
+  const { site, design, lang, setLang, availableLangs } = useSiteDesign();
   const posts = getPosts(design);
   const post = posts.find((p) => p.slug === slug);
   const { primary, fontHeading } = designAccents(design);

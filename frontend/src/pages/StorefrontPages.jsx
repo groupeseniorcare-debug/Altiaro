@@ -605,52 +605,43 @@ export function StorefrontFAQ() {
  * Legal pages (CGV / Mentions / Confidentialité)
  * ========================================================= */
 function LegalPage({ kind, title }) {
-  const { site, design, lang, setLang, availableLangs } = useSiteDesign();
-  const page = design?.legal_pages?.[kind];
-  // Bloc 1 sous-chantier 3 — fallback statique légalement valide pour la
-  // politique de cookies (obligatoire UE, doit toujours répondre à un GET)
-  const COOKIES_FALLBACK = `## Politique de cookies
+  const { siteId, site, design, lang, setLang, availableLangs } = useSiteDesign();
+  // Bloc 2 — fetch the centralized template from the new /public/sites/{id}/legal/{slug}
+  // endpoint. This includes mentions-légales, CGV, confidentialité, cookies,
+  // retours et livraison avec les vraies infos KBIS Altiaro et le nom commercial du site.
+  const [centralPage, setCentralPage] = useState(null);
+  useEffect(() => {
+    if (!siteId) return;
+    let cancelled = false;
+    axios
+      .get(`${BACKEND_URL}/api/public/sites/${siteId}/legal/${kind}`)
+      .then(({ data }) => { if (!cancelled) setCentralPage(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [siteId, kind]);
 
-Ce site utilise des cookies pour fonctionner correctement et améliorer votre expérience. Vous pouvez à tout moment modifier vos choix via la bannière de consentement (icône cookie en bas à gauche après réouverture).
-
-### 1. Catégories de cookies
-
-**Essentiels (toujours actifs)** — Indispensables au bon fonctionnement du site : panier, session, sécurité, mémorisation de la langue. Sans eux, le site ne peut pas fonctionner. Base légale : intérêt légitime (Art. 82 LCEN, exemption stricte de consentement).
-
-**Mesure d'audience (analytics)** — Statistiques anonymes pour comprendre l'usage du site et améliorer son contenu. Outils : Google Analytics 4 (mesure agrégée, IP anonymisée). Désactivable.
-
-**Marketing & publicité** — Pixels publicitaires (Google Ads, Meta) pour mesurer l'efficacité de nos campagnes et vous proposer des contenus personnalisés sur d'autres sites. Désactivable.
-
-**Personnalisation** — Mémoriser vos préférences (langue, devise, recommandations produits). Désactivable.
-
-### 2. Durée de conservation
-
-Les cookies essentiels durent au maximum 13 mois. Les cookies de mesure et marketing durent au maximum 13 mois conformément aux recommandations de la CNIL. Les cookies de personnalisation durent 6 mois.
-
-### 3. Vos droits
-
-Conformément au RGPD et à la directive ePrivacy, vous avez le droit de :
-- consulter vos préférences à tout moment (via la bannière)
-- révoquer votre consentement (effet immédiat, prend effet sur les pages suivantes)
-- demander la suppression des données associées en nous écrivant via la page Contact
-
-### 4. Coordonnées
-
-Pour toute question sur cette politique : contactez-nous via le formulaire en page Contact.
-
-### 5. Mise à jour
-
-Cette politique peut être mise à jour. La date de dernière mise à jour figure en pied de page.`;
+  // Legacy override : if the operator manually edited a page (`design.legal_pages.{kind}`),
+  // it wins over the auto-generated central template (so concepteurs can still customize).
+  const legacyPage = design?.legal_pages?.[kind];
+  const md = (legacyPage && legacyPage.body_md)
+    || (centralPage && centralPage.body_md)
+    || null;
+  // Last-resort fallback for /cookies (CNIL-compliant minimal text), used only
+  // when neither the legacy nor the central endpoint returned content yet.
+  const COOKIES_FALLBACK = `## Politique de cookies\n\nNous utilisons des cookies essentiels au fonctionnement, et avec votre consentement des cookies de mesure d'audience et marketing. Vous pouvez modifier vos choix à tout moment via la bannière.`;
   return (
     <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
-      <PageHero eyebrow="Mentions légales" title={title} design={design} />
+      <PageHero eyebrow="Mentions légales" title={(centralPage && centralPage.title) || title} design={design} />
       <div className="max-w-3xl mx-auto px-6 py-16" data-testid={`page-${kind}`}>
-        {page ? (
-          <MarkdownLite md={page.body_md} />
+        {md ? (
+          <MarkdownLite md={md} />
         ) : kind === "cookies" ? (
           <MarkdownLite md={COOKIES_FALLBACK} />
         ) : (
-          <div className="text-neutral-500">Cette page n'est pas encore générée. Elle sera disponible après la validation du prompt #9.</div>
+          <div className="text-neutral-500">Cette page est en cours de génération. Réessayez dans quelques secondes.</div>
+        )}
+        {(centralPage && centralPage.updated) && (
+          <p className="mt-12 text-xs text-neutral-400">Dernière mise à jour : {centralPage.updated}</p>
         )}
       </div>
     </StorefrontLayout>

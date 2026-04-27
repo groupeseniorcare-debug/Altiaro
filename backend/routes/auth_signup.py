@@ -112,7 +112,7 @@ async def _send_otp_email(to: str, name: str, code: str) -> None:
   </div>
   <div style="margin-top:32px;padding:20px 32px;background:#FAFAF9;border-top:1px solid #E7E5E4;font-size:12px;color:#78716C;line-height:1.6">
     <div><strong style="color:#0A0A0A">Altiaro</strong> — La plateforme e-commerce des partenariats éclairés.</div>
-    <div style="margin-top:6px">Édité par Robin Zuchiatti · SIREN 883 803 967 · <a href="https://altiaro.com/mentions-legales" style="color:#78716C">Mentions légales</a></div>
+    <div style="margin-top:6px">Édité par la Société Altiaro · SIREN 883 803 967 · <a href="https://altiaro.com/mentions-legales" style="color:#78716C">Mentions légales</a></div>
   </div>
 </div></body></html>"""
 

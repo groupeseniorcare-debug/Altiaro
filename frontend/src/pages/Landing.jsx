@@ -647,9 +647,9 @@ function Footer() {
         <div className="col-span-2">
           <AltiaroLogo variant="horizontal" size={22} color="#0A0A0A" />
           <p className="text-neutral-500 mt-5 max-w-sm leading-relaxed">
-            La plateforme e-commerce des partenariats éclairés. Édité par
-            Robin Zuchiatti (entrepreneur individuel), exerçant sous le nom
-            commercial Altiaro.
+            La plateforme e-commerce des partenariats éclairés. Éditée par la
+            Société Altiaro · SIRET 883 803 967 00016 · 4 IMP CLOS FLEURI,
+            42320 FARNAY.
           </p>
         </div>
         <div>

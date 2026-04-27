@@ -94,6 +94,7 @@ from routes import seo_automation as seo_automation_routes
 from routes import google_ads_manual as google_ads_manual_routes
 from routes import upsells_ai as upsells_ai_routes
 from routes import admin_llm_health as admin_llm_health_routes
+from routes import legal as legal_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -175,6 +176,8 @@ api.include_router(google_ads_manual_routes.router)
 api.include_router(upsells_ai_routes.router)
 api.include_router(admin_llm_health_routes.router)
 api.include_router(admin_llm_health_routes.public_router)
+api.include_router(legal_routes.public_router)
+api.include_router(legal_routes.admin_router)
 
 
 @app.on_event("startup")
