@@ -24,6 +24,7 @@ router = APIRouter()
 
 
 def _get_client():
+    """Legacy plateforme client (fallback si site pas encore connecté à Mollie Connect)."""
     from mollie.api.client import Client
     mode = (os.environ.get("MOLLIE_MODE") or "test").lower()
     key = os.environ.get("MOLLIE_LIVE_KEY" if mode == "live" else "MOLLIE_TEST_KEY") or ""
@@ -32,6 +33,102 @@ def _get_client():
     c = Client()
     c.set_api_key(key)
     return c, mode
+
+
+async def _get_mollie_client(site_id: str):
+    """Lot E — Mollie Connect multi-tenant client resolver.
+
+    Pour un `site_id` donné :
+      1. Si le site a un `payments.mollie_oauth.access_token` valide en DB
+         → utilise ce token (paiements vont sur le compte Mollie du concepteur)
+      2. Sinon, fallback sur la clé plateforme globale (`MOLLIE_TEST_KEY` /
+         `MOLLIE_LIVE_KEY`) — paiements vont sur le compte Mollie d'Altiaro.
+
+    Refresh automatique du token si expiré (utilise `refresh_token` stocké).
+    Retourne `(client, mode, source)` où source ∈ {"oauth", "platform"}.
+
+    # TODO: split payments routing 5% commission Altiaro
+    # (décision user 2026-04-27 : pas pour l'instant, on commence sans split)
+    """
+    from mollie.api.client import Client
+    site = await db.sites.find_one(
+        {"id": site_id},
+        {"_id": 0, "payments.mollie_oauth": 1},
+    )
+    oauth = ((site or {}).get("payments") or {}).get("mollie_oauth") or {}
+    access_token = oauth.get("access_token")
+    expires_at = oauth.get("expires_at")  # ISO string
+    if access_token and expires_at:
+        # Check expiry
+        try:
+            exp_dt = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+            now = datetime.now(timezone.utc)
+            if exp_dt > now:
+                c = Client()
+                c.set_access_token(access_token)
+                # Mode is determined by the connected organization (typically live in Mollie Connect)
+                # For test mode of plateform : check `mode` claim if stored
+                mode = oauth.get("mode") or "live"
+                return c, mode, "oauth"
+            # Token expiré → refresh
+            refresh_token = oauth.get("refresh_token")
+            if refresh_token:
+                refreshed = await _refresh_oauth_token(site_id, refresh_token)
+                if refreshed:
+                    c = Client()
+                    c.set_access_token(refreshed["access_token"])
+                    return c, refreshed.get("mode") or "live", "oauth-refreshed"
+        except Exception as e:
+            logger.warning(f"[mollie] OAuth resolve failed for site {site_id[:8]}: {e}")
+    # Fallback plateforme
+    c, mode = _get_client()
+    return c, mode, "platform"
+
+
+async def _refresh_oauth_token(site_id: str, refresh_token: str):
+    """Lot E — Refresh un access_token Mollie via OAuth refresh_token grant.
+    Persiste les nouveaux tokens en DB. Retourne le dict refreshed ou None."""
+    import httpx
+    client_id = os.environ.get("MOLLIE_CLIENT_ID")
+    client_secret = os.environ.get("MOLLIE_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        logger.warning("[mollie] MOLLIE_CLIENT_ID/SECRET missing — cannot refresh OAuth token")
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=20) as cli:
+            r = await cli.post(
+                "https://api.mollie.com/oauth2/tokens",
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": refresh_token,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                },
+                headers={"Accept": "application/json"},
+            )
+            if r.status_code != 200:
+                logger.warning(f"[mollie] refresh failed HTTP {r.status_code}: {r.text[:200]}")
+                return None
+            tok = r.json()
+            new_token = tok.get("access_token")
+            new_refresh = tok.get("refresh_token", refresh_token)
+            expires_in = int(tok.get("expires_in", 3600))
+            new_expires = datetime.now(timezone.utc).isoformat()
+            from datetime import timedelta
+            new_expires = (datetime.now(timezone.utc) + timedelta(seconds=expires_in - 60)).isoformat()
+            await db.sites.update_one(
+                {"id": site_id},
+                {"$set": {
+                    "payments.mollie_oauth.access_token": new_token,
+                    "payments.mollie_oauth.refresh_token": new_refresh,
+                    "payments.mollie_oauth.expires_at": new_expires,
+                    "payments.mollie_oauth.last_refreshed_at": datetime.now(timezone.utc).isoformat(),
+                }},
+            )
+            return {"access_token": new_token, "mode": "live"}
+    except Exception as e:
+        logger.warning(f"[mollie] OAuth refresh exception: {e}")
+        return None
 
 
 class CreatePaymentInput(BaseModel):
@@ -51,7 +148,10 @@ async def create_payment(data: CreatePaymentInput, request: Request):
     if order.get("status") != "pending_payment":
         raise HTTPException(status_code=400, detail=f"Commande déjà {order.get('status')}")
 
-    client, mode = _get_client()
+    # Lot E — Mollie Connect multi-tenant : utilise le token OAuth du site
+    # si connecté, sinon fallback sur la clé plateforme globale.
+    client, mode, src = await _get_mollie_client(data.site_id)
+    logger.info(f"[mollie] create_payment site={data.site_id[:8]} mode={mode} via={src}")
 
     total = round(float(order.get("total") or 0), 2)
     currency = (order.get("currency") or "EUR").upper()

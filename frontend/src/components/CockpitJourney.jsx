@@ -79,6 +79,8 @@ export default function CockpitJourney({ site, onRefresh }) {
   const steps = status.steps || [];
   const links = STEP_LINKS(site.id);
   const completedCount = status.completed_count;
+  // Lot D — totalCount dynamique (10 étapes maintenant que `domain` est inséré)
+  const totalCount = (status.steps && status.steps.length) || status.total_count || 10;
   const pct = status.progress_pct;
 
   return (
@@ -112,7 +114,7 @@ export default function CockpitJourney({ site, onRefresh }) {
             <Rocket size={12} weight="bold" /> Parcours du site
           </div>
           <h2 className="text-xl font-semibold text-neutral-900" style={{ fontFamily: "'Fraunces', serif" }}>
-            {completedCount === 9 ? "Prêt à soumettre 🎯" : `${completedCount}/9 étapes complétées automatiquement`}
+            {completedCount === totalCount ? "Prêt à soumettre 🎯" : `${completedCount}/${totalCount} étapes complétées automatiquement`}
           </h2>
           <p className="text-[11px] text-neutral-500 mt-1">
             Les étapes se valident automatiquement selon les données. Aucune validation manuelle.

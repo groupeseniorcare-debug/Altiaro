@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
-  GoogleLogo, ChartLineUp, ShoppingBag, Lightning,
+  GoogleLogo, ChartLineUp, ShoppingBag, Lightning, CreditCard,
   CheckCircle, Warning, ArrowSquareOut, SpinnerGap, Info,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
@@ -88,17 +88,20 @@ export default function SiteIntegrations() {
   const [gscStatus, setGscStatus] = useState({ connected: false });
   const [merchantStatus, setMerchantStatus] = useState({ connected: false });
   const [indexnowState, setIndexnowState] = useState({ url: null, last_ping: null });
-  const [loading, setLoading] = useState({ gsc: false, merchant: false, indexnow: false });
+  const [mollieStatus, setMollieStatus] = useState({ connected: false });
+  const [loading, setLoading] = useState({ gsc: false, merchant: false, indexnow: false, mollie: false });
   const [pingResult, setPingResult] = useState(null);
   const [sitemapSubmitted, setSitemapSubmitted] = useState(false);
 
   const reloadAll = async () => {
-    const [g, m] = await Promise.all([
+    const [g, m, mo] = await Promise.all([
       apiCall(() => api.get(`/sites/${siteId}/gsc/status`)),
       apiCall(() => api.get(`/sites/${siteId}/merchant/status`)),
+      apiCall(() => api.get(`/sites/${siteId}/mollie/status`)),
     ]);
     if (g.data) setGscStatus(g.data);
     if (m.data) setMerchantStatus(m.data);
+    if (mo.data) setMollieStatus(mo.data);
     // IndexNow: derive the public key URL from the platform constant
     setIndexnowState({
       url: `${window.location.origin}/api/public/sites/${siteId}/sitemap.xml`,
@@ -109,6 +112,16 @@ export default function SiteIntegrations() {
   useEffect(() => {
     if (!siteId) return;
     reloadAll();
+    // Lot E — handle ?mollie=connected redirect after OAuth callback
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("mollie") === "connected") {
+      window.history.replaceState({}, "", window.location.pathname);
+      // Status will be loaded by reloadAll above
+    }
+    if (params.get("mollie_error")) {
+      window.alert(`Erreur OAuth Mollie : ${params.get("mollie_error")}`);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
   }, [siteId]);
 
   const connectGSC = async () => {
@@ -167,6 +180,28 @@ export default function SiteIntegrations() {
     setLoading((l) => ({ ...l, indexnow: false }));
     if (error) { setPingResult({ ok: false, msg: error }); return; }
     setPingResult({ ok: true, msg: `Ping envoyé : ${data?.urls_pinged || 0} URLs soumises à Bing.` });
+  };
+
+  // ────────────────────────────────────────────────────────────────────
+  // Lot E — Mollie Connect handlers
+  // ────────────────────────────────────────────────────────────────────
+  const connectMollie = async () => {
+    setLoading((l) => ({ ...l, mollie: true }));
+    const { data, error, rawDetail } = await apiCall(() => api.get(`/sites/${siteId}/mollie/oauth/start`));
+    setLoading((l) => ({ ...l, mollie: false }));
+    if (error) { window.alert(rawDetail?.detail || error); return; }
+    if (data?.authorize_url) {
+      // Redirect même fenêtre (le callback Mollie revient sur /sites/{id}/integrations?mollie=connected)
+      window.location.href = data.authorize_url;
+    }
+  };
+  const disconnectMollie = async () => {
+    if (!window.confirm("Déconnecter le compte Mollie de ce site ? Les paiements futurs basculeront sur le compte plateforme Altiaro.")) return;
+    setLoading((l) => ({ ...l, mollie: true }));
+    await apiCall(() => api.post(`/sites/${siteId}/mollie/oauth/disconnect`));
+    setLoading((l) => ({ ...l, mollie: false }));
+    setMollieStatus({ connected: false });
+    reloadAll();
   };
 
   return (
@@ -260,6 +295,29 @@ export default function SiteIntegrations() {
                 </span>
               )}
             </>
+          }
+        />
+
+        {/* === Lot E — Mollie Connect === */}
+        <IntegrationCard
+          icon={CreditCard}
+          title="Mollie Connect — Paiements sur ton compte"
+          why="Connecte TON compte Mollie pour que les paiements clients arrivent directement chez toi (et que ton nom commercial s'affiche sur la page de paiement). Sans connexion, les paiements transitent par le compte Altiaro."
+          ariaLabel="mollie"
+          connected={mollieStatus.connected}
+          status={mollieStatus}
+          loading={loading.mollie}
+          onConnect={connectMollie}
+          onDisconnect={disconnectMollie}
+          actions={
+            mollieStatus.connected ? (
+              <span className="text-[12px] text-neutral-700">
+                Compte connecté :{" "}
+                <strong className="text-neutral-900">
+                  {mollieStatus.organization_name || mollieStatus.organization_id || "Mollie"}
+                </strong>
+              </span>
+            ) : null
           }
         />
       </div>

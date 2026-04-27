@@ -32,10 +32,10 @@ from deps import db, get_current_user, _check_site_access
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Ordre canonique des 9 étapes
+# Ordre canonique des 10 étapes (Lot D — Domaine inséré entre branding et pages)
 STEP_ORDER = [
     "pricing", "import", "upsells", "forecast", "branding",
-    "pages", "content", "seo", "qa",
+    "domain", "pages", "content", "seo", "qa",
 ]
 
 STEP_LABELS = {
@@ -44,6 +44,7 @@ STEP_LABELS = {
     "upsells":  "Upsells & accessoires",
     "forecast": "Étude financière 30j",
     "branding": "Identité & branding",
+    "domain":   "Nom de domaine",
     "pages":    "Pages essentielles (about, FAQ, CGV…)",
     "content":  "Blog & contenu SEO",
     "seo":      "Santé SEO / AEO",
@@ -254,6 +255,38 @@ async def _check_branding(site_id: str, site: dict) -> dict:
     }
 
 
+async def _check_domain(site_id: str, site: dict) -> dict:
+    """Lot D — Étape 6 Domaine.
+
+    Considérée complète dès que le site a un `custom_domain` peuplé OU s'il
+    a explicitement choisi de continuer avec le sous-domaine plateforme
+    (`domain_skipped: true`) — étape OPTIONNELLE.
+    """
+    custom_domain = site.get("custom_domain") or site.get("domain")
+    domain_skipped = bool(site.get("domain_skipped"))
+    purchased_at = site.get("domain_purchased_at")
+    has_domain = bool(custom_domain)
+    completed = has_domain or domain_skipped
+    if has_domain:
+        reason = f"Domaine attaché : {custom_domain}"
+    elif domain_skipped:
+        reason = "Sous-domaine plateforme conservé (étape optionnelle skippée)"
+    else:
+        reason = "Choisis un domaine ou continue avec le sous-domaine plateforme."
+    return {
+        "key": "domain",
+        "label": STEP_LABELS["domain"],
+        "completed": completed,
+        "reason": reason,
+        "optional": True,  # Étape optionnelle — n'empêche pas la soumission QA
+        "counters": {
+            "custom_domain": custom_domain,
+            "skipped": domain_skipped,
+            "purchased_at": purchased_at,
+        },
+    }
+
+
 def _page_has_content(page: dict) -> bool:
     if not page:
         return False
@@ -373,6 +406,7 @@ _CHECKERS = {
     "upsells":  _check_upsells,
     "forecast": _check_forecast,
     "branding": _check_branding,
+    "domain":   _check_domain,  # Lot D — étape 6 (optional)
     "pages":    _check_pages,
     "content":  _check_content,
     "seo":      _check_seo,
@@ -381,9 +415,12 @@ _CHECKERS = {
 
 
 async def compute_step_statuses(site_id: str) -> list[dict]:
-    """Calcule le statut des 9 étapes pour un site.
+    """Calcule le statut des 10 étapes pour un site (Lot D — domain inséré).
     Retourne la liste ordonnée [pricing, import, …, qa] avec
     `blocked_by_previous` pour chaque étape.
+
+    L'étape `domain` est marquée `optional: true` : elle ne bloque pas la
+    suite (le concepteur peut la skipper et utiliser le sous-domaine plateforme).
     """
     site = await db.sites.find_one({"id": site_id}, {"_id": 0})
     if not site:
@@ -397,7 +434,13 @@ async def compute_step_statuses(site_id: str) -> list[dict]:
         s["order"] = STEP_ORDER.index(key) + 1
         s["blocked_by_previous"] = not previous_completed
         statuses.append(s)
-        previous_completed = s["completed"]
+        # Lot D — Une étape optionnelle ne bloque pas l'étape suivante :
+        # même si `domain` n'est pas complété, `pages` reste accessible.
+        if s.get("optional"):
+            # propage le previous_completed précédent
+            pass
+        else:
+            previous_completed = s["completed"]
     return statuses
 
 

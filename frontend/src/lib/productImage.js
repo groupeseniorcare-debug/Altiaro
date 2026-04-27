@@ -23,7 +23,11 @@
  *   - images peut être [string, ...] OU [{url}, ...]
  */
 
-const PREFERRED_STYLES = ["lifestyle", "studio", "closeup", "in_use", "detail"];
+// Lot C (utilisateur 2026-04-27) — STUDIO en première position : c'est l'image
+// la plus fidèle au produit (cohérence visuelle commerciale max), affichée
+// par défaut sur les cards de grille, fiches produit, hero, etc.
+// Le storefront product page peut afficher la galerie complète via `getProductGallery()`.
+const PREFERRED_STYLES = ["studio", "lifestyle", "closeup", "in_use", "detail"];
 
 /**
  * Extrait l'URL d'un item generated_images (objet ou string).

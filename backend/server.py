@@ -53,6 +53,7 @@ from routes import empire as empire_routes
 from routes import blocks_execute as blocks_execute_routes
 from routes import copilot as copilot_routes
 from routes import payments as payments_routes
+from routes import mollie_oauth as mollie_oauth_routes  # Lot E — Mollie Connect multi-tenant
 from routes import billing as billing_routes
 from routes import design as design_routes
 from routes import sourcing as sourcing_routes
@@ -127,6 +128,7 @@ api.include_router(empire_routes.router)
 api.include_router(blocks_execute_routes.router)
 api.include_router(copilot_routes.router)
 api.include_router(payments_routes.router)
+api.include_router(mollie_oauth_routes.router)  # Lot E — Mollie Connect OAuth
 api.include_router(billing_routes.router)
 api.include_router(design_routes.router)
 api.include_router(sourcing_routes.router)

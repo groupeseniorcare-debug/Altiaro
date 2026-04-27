@@ -746,7 +746,8 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                 # Le mode "Tout boost premium" (`boost_premium=true` dans wizard) bascule à 5.
                 boost_premium = bool(wizard.get("boost_premium") or wizard.get("premium_5_images"))
                 target_ai_count = 5 if boost_premium else 3
-                full_preset_order = ["lifestyle", "studio", "closeup", "detail", "in_use"]
+                # Lot C — studio en premier (image principale lue par getPrimaryImage)
+                full_preset_order = ["studio", "lifestyle", "closeup", "detail", "in_use"]
                 styles_to_gen = []
                 # Bloc 1 sous-chantier 1c — skip si déjà target atteint (sauf overwrite)
                 if not overwrite and existing_ai_count >= target_ai_count:
