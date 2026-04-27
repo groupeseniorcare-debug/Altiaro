@@ -202,6 +202,42 @@ async def generate_product_tagline(
 
 
 # ---------------------------------------------------------------------------
+# Length caps (Phase 2.1 hardening — 2026-04-27)
+# Brief user : titre ≤30 chars, description ≤140 chars. Le LLM tend à dépasser
+# de quelques chars → on demande explicitement 28/130 dans le prompt
+# (margin), on vérifie côté backend, on retry 1× si dépassement, et on
+# tronque proprement en dernier recours.
+# ---------------------------------------------------------------------------
+USP_TITLE_PROMPT_MAX = 28
+USP_DESC_PROMPT_MAX = 130
+USP_TITLE_HARD_MAX = 30
+USP_DESC_HARD_MAX = 140
+
+
+def _truncate_clean(text: str, hard_max: int) -> str:
+    """Truncate at hard_max keeping word boundaries, append ellipsis if cut."""
+    if len(text) <= hard_max:
+        return text
+    cut = text[: hard_max - 1]
+    sp = cut.rfind(" ")
+    if sp > hard_max * 0.6:
+        cut = cut[:sp]
+    return cut.rstrip(",.;:· ") + "…"
+
+
+def _is_within_caps(usps: List[Dict[str, str]]) -> bool:
+    """All 4 USPs must respect title ≤ HARD_MAX and desc ≤ HARD_MAX."""
+    if len(usps) < 4:
+        return False
+    for u in usps:
+        if len(u.get("title", "")) > USP_TITLE_HARD_MAX:
+            return False
+        if len(u.get("description", "")) > USP_DESC_HARD_MAX:
+            return False
+    return True
+
+
+# ---------------------------------------------------------------------------
 # 2) USPs — 4 product-specific items with Lucide icon name
 # ---------------------------------------------------------------------------
 async def generate_product_usps(
@@ -219,7 +255,68 @@ async def generate_product_usps(
     Returns exactly 4 items (raises on failure). Icons are validated against
     `ALLOWED_USP_ICONS`; unknown names default to "Sparkles" to never break
     the frontend.
+
+    Hardening (Phase 2.1, 2026-04-27) :
+    - Asks Claude for ≤28 chars titles and ≤130 chars descriptions (margin)
+    - Validates the response. If any item exceeds 30/140 → retries ONCE with
+      a stricter prompt. If still over → truncates cleanly with ellipsis.
     """
+    items = await _call_usps_llm(
+        product, brand,
+        title_max=USP_TITLE_PROMPT_MAX,
+        desc_max=USP_DESC_PROMPT_MAX,
+        request_id=request_id,
+        strict=False,
+    )
+
+    # Retry once if any item exceeds the hard cap
+    if not _is_within_caps(items):
+        too_long = [
+            f"  USP {i}: t={len(u.get('title',''))}/{USP_TITLE_HARD_MAX} "
+            f"d={len(u.get('description',''))}/{USP_DESC_HARD_MAX}"
+            for i, u in enumerate(items[:4])
+            if len(u.get("title", "")) > USP_TITLE_HARD_MAX
+            or len(u.get("description", "")) > USP_DESC_HARD_MAX
+        ]
+        logger.warning(
+            f"[usps] {request_id or ''} caps exceeded, retry with stricter prompt:\n"
+            + "\n".join(too_long)
+        )
+        items = await _call_usps_llm(
+            product, brand,
+            title_max=22,  # even tighter on retry
+            desc_max=110,
+            request_id=(request_id or "") + "-retry",
+            strict=True,
+        )
+
+    # Final defensive truncation (always applied, even on the retry result)
+    cleaned: List[Dict[str, str]] = []
+    for it in items[:4]:
+        title = _truncate_clean(it.get("title", ""), USP_TITLE_HARD_MAX)
+        desc = _truncate_clean(it.get("description", ""), USP_DESC_HARD_MAX)
+        cleaned.append({"icon": it.get("icon") or "Sparkles", "title": title, "description": desc})
+
+    if len(cleaned) < 4:
+        logger.warning(
+            f"[usps] only {len(cleaned)} valid items after retry — caller may want to retry"
+        )
+
+    return cleaned
+
+
+async def _call_usps_llm(
+    product: Dict[str, Any],
+    brand: Dict[str, Any],
+    *,
+    title_max: int,
+    desc_max: int,
+    request_id: Optional[str],
+    strict: bool,
+) -> List[Dict[str, str]]:
+    """Single LLM call to generate 4 USPs with explicit length constraints.
+    Returns sanitized items (Lucide icon validated, length capped at prompt
+    request — final hard cap is enforced by the caller)."""
     context = _product_context(product, brand)
     icon_list = ", ".join(ALLOWED_USP_ICONS)
 
@@ -227,7 +324,14 @@ async def generate_product_usps(
         "Tu es directeur de création pour une marque e-commerce premium. "
         "Tu écris en français. Tu produis des bénéfices CONCRETS, "
         "tangibles, spécifiques au produit (pas génériques). "
-        "Tu réponds STRICTEMENT en JSON valide, sans markdown."
+        "Tu réponds STRICTEMENT en JSON valide, sans markdown.\n\n"
+        f"CONTRAINTES DE LONGUEUR ABSOLUES — TU DOIS LES RESPECTER :\n"
+        f"- title  : MAXIMUM {title_max} caractères, espaces et ponctuation inclus. "
+        f"Plus court c'est mieux. Compte les caractères AVANT de répondre.\n"
+        f"- description : MAXIMUM {desc_max} caractères, espaces et ponctuation inclus. "
+        f"Plus court c'est mieux. Compte les caractères AVANT de répondre.\n"
+        + ("INSTRUCTION CRITIQUE : si tu dépasses, ta réponse est rejetée. "
+           "Sois TRÈS concis. Coupe les mots inutiles." if strict else "")
     )
     user = (
         f"{context}\n\n"
@@ -240,18 +344,21 @@ async def generate_product_usps(
         f"- Paiement sécurisé\n\n"
         f"CHAQUE USP DOIT :\n"
         f"- décrire un BÉNÉFICE TANGIBLE lié à la mécanique, au matériau, à la techno, à l'ergonomie\n"
-        f"- Exemple BON : « Mécanisme à 2 moteurs silencieux » | « Mémoire de forme haute densité » | "
-        f"« Repose-pieds extensible 12 cm » | « Télécommande rétroéclairée »\n"
-        f"- Exemple MAUVAIS : « Confort optimal » | « Très qualitatif »\n\n"
-        f"FORMAT JSON (réponds UNIQUEMENT ceci, pas de markdown, pas de texte autour) :\n"
+        f"- Exemples BONS (≤{title_max} chars titre) : « 2 moteurs silencieux » | "
+        f"« Mémoire de forme HD » | « Repose-pieds 12 cm » | « Télécommande LED »\n"
+        f"- Exemples MAUVAIS : « Confort optimal » | « Très qualitatif »\n\n"
+        f"FORMAT JSON STRICT (réponds UNIQUEMENT ceci, pas de markdown autour) :\n"
         f'{{\n'
         f'  "usps": [\n'
-        f'    {{"icon": "<icon_name>", "title": "<≤30 chars>", "description": "<≤140 chars, bénéfice concret>"}},\n'
+        f'    {{"icon": "<icon_name>", "title": "<≤{title_max} caractères>", '
+        f'"description": "<≤{desc_max} caractères, bénéfice concret>"}},\n'
         f'    ... (exactement 4 items)\n'
         f'  ]\n'
         f'}}\n\n'
         f"icon_name DOIT être l'un de : {icon_list}\n"
-        f"Choisis l'icône la plus pertinente pour chaque USP."
+        f"Choisis l'icône la plus pertinente pour chaque USP.\n"
+        f"RAPPEL : title ≤ {title_max} chars, description ≤ {desc_max} chars. "
+        f"Compte les caractères AVANT de répondre."
     )
 
     raw = await safe_claude_text(
@@ -266,7 +373,6 @@ async def generate_product_usps(
     try:
         data = json.loads(cleaned)
     except json.JSONDecodeError:
-        # Try to find the first {...} block
         m = re.search(r"\{[\s\S]+\}", cleaned)
         if not m:
             logger.warning(f"[usps] JSON parse failed, raw={raw[:200]!r}")
@@ -286,23 +392,9 @@ async def generate_product_usps(
         desc = str(it.get("description") or it.get("desc") or "").strip()
         if not title:
             continue
-        # Validate icon
         if icon not in ALLOWED_USP_ICONS:
-            # Try case-insensitive match
             ci = next((i for i in ALLOWED_USP_ICONS if i.lower() == icon.lower()), None)
             icon = ci or "Sparkles"
-        # Hard caps
-        if len(title) > 36:
-            title = title[:33] + "…"
-        if len(desc) > 160:
-            desc = desc[:157] + "…"
         cleaned_items.append({"icon": icon, "title": title, "description": desc})
-
-    if len(cleaned_items) < 4:
-        # Pad with generic-but-not-empty items keyed off product name to never break UI
-        # Caller can detect the partial result via len() < 4
-        logger.warning(
-            f"[usps] only {len(cleaned_items)} valid items returned by Claude — caller should retry"
-        )
 
     return cleaned_items

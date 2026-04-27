@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from deps import db, get_current_user
+from deps import db, require_admin
 from services.product_content_ai import (
     generate_product_tagline,
     generate_product_usps,
@@ -32,24 +32,21 @@ logger = logging.getLogger("conceptfactory.product_content_admin")
 router = APIRouter()
 
 
-async def _require_admin_or_site_owner(user: dict, site_id: str) -> None:
-    """Allow admins or site owners (concepteur with site_id access)."""
-    if user.get("role") == "admin":
-        return
-    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "owner_id": 1})
-    if site and site.get("owner_id") == user.get("id"):
-        return
-    raise HTTPException(403, "Admin or site owner required")
+# Note (2026-04-27 Phase 2.1 hardening) : ces routes sont **strictement
+# admin-only**. Le site owner n'a PLUS le droit d'appeler ces endpoints
+# (resserrage de sécurité après audit e1_tester). Pour une régénération
+# côté concepteur, exposer plus tard un endpoint dédié sous
+# `/sites/{site_id}/products/{id}/regenerate-*` avec `_check_site_access`.
 
 
 @router.post(
     "/admin/products/{product_id}/regenerate-tagline",
     tags=["product-content-admin"],
-    summary="Regénère la tagline IA d'un produit (Haiku 4.5)",
+    summary="Regénère la tagline IA d'un produit (Haiku 4.5) — admin only",
 )
 async def regenerate_product_tagline(
     product_id: str,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_admin),
 ):
     """Regenerate the product tagline (40-80 chars, French) via Claude Haiku 4.5.
 
@@ -68,7 +65,6 @@ async def regenerate_product_tagline(
     product = await db.products.find_one({"id": product_id}, {"_id": 0})
     if not product:
         raise HTTPException(404, "Produit introuvable")
-    await _require_admin_or_site_owner(user, product.get("site_id"))
 
     site = await db.sites.find_one(
         {"id": product["site_id"]}, {"_id": 0, "design.brand": 1}
@@ -108,11 +104,11 @@ async def regenerate_product_tagline(
 @router.post(
     "/admin/products/{product_id}/regenerate-usps",
     tags=["product-content-admin"],
-    summary="Regénère les 4 USPs IA d'un produit (Haiku 4.5)",
+    summary="Regénère les 4 USPs IA d'un produit (Haiku 4.5) — admin only",
 )
 async def regenerate_product_usps(
     product_id: str,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_admin),
 ):
     """Regenerate 4 product-specific USPs via Claude Haiku 4.5.
 
@@ -135,7 +131,6 @@ async def regenerate_product_usps(
     product = await db.products.find_one({"id": product_id}, {"_id": 0})
     if not product:
         raise HTTPException(404, "Produit introuvable")
-    await _require_admin_or_site_owner(user, product.get("site_id"))
 
     site = await db.sites.find_one(
         {"id": product["site_id"]}, {"_id": 0, "design.brand": 1}

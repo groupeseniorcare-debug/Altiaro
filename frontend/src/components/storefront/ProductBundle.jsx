@@ -116,18 +116,25 @@ export default function ProductBundle({ currentProduct, lang = "fr", design }) {
       count++;
       try { window.altiaroTrack?.addToCart?.(p, 1, lang); } catch (_) {}
     });
-    toast.success(`${count} produit${count > 1 ? "s" : ""} ajouté${count > 1 ? "s" : ""} au panier`);
+    const msg = count > 1
+      ? t(lang, "bundle_added_n").replace("{n}", count)
+      : t(lang, "bundle_added_one");
+    toast.success(msg);
   };
+
+  const totalLabel = selectedItems.length > 1
+    ? t(lang, "bundle_total_for_n").replace("{n}", selectedItems.length)
+    : t(lang, "bundle_total_for_one");
 
   return (
     <section className="py-14 border-t" style={{ borderColor: "#E7E5E4" }} data-testid="product-bundle">
       <div className="bg-[#F5F2EB] rounded-3xl p-6 md:p-10">
         <div className="mb-8">
           <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-2">
-            Pack complet
+            {t(lang, "bundle_eyebrow")}
           </div>
           <h2 className="text-2xl md:text-3xl" style={{ fontFamily: `"${fontHeading}", serif`, color: "#1C1917" }}>
-            Souvent achetés ensemble
+            {t(lang, "bundle_title")}
           </h2>
         </div>
 
@@ -155,7 +162,7 @@ export default function ProductBundle({ currentProduct, lang = "fr", design }) {
         <div className="mt-8 flex items-center justify-between flex-wrap gap-4 border-t border-neutral-200 pt-6">
           <div>
             <div className="text-sm text-neutral-600">
-              Total pour les {selectedItems.length} article{selectedItems.length > 1 ? "s" : ""} :
+              {totalLabel}
             </div>
             <div className="flex items-baseline gap-3 mt-1">
               <span className="text-2xl md:text-3xl font-semibold" style={{ color: primary }}>
@@ -202,7 +209,7 @@ function BundleItem({ product, isCurrent, checked, onToggle, lang, primary, font
             type="button"
             onClick={onToggle}
             disabled={isCurrent}
-            aria-label={checked ? "Retirer du pack" : "Ajouter au pack"}
+            aria-label={checked ? t(lang, "bundle_remove_from_pack") : t(lang, "bundle_add_to_pack")}
             className={`w-5 h-5 rounded-md flex items-center justify-center border transition shrink-0 mt-0.5 ${
               checked ? "text-white" : "bg-white"
             } ${isCurrent ? "opacity-50 cursor-not-allowed" : "hover:scale-110"}`}
@@ -225,7 +232,7 @@ function BundleItem({ product, isCurrent, checked, onToggle, lang, primary, font
         </div>
         {isCurrent && (
           <div className="text-[10px] uppercase tracking-widest text-neutral-400 pl-7 mt-0.5">
-            Cet article
+            {t(lang, "bundle_current_item")}
           </div>
         )}
       </div>
