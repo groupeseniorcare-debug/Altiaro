@@ -157,7 +157,7 @@ export default function CookieConsentBanner({ siteId }) {
                   Nous utilisons des cookies pour assurer le bon fonctionnement du site
                   (essentiels), mesurer la performance (analytics) et personnaliser nos
                   communications (marketing). Vous pouvez accepter, refuser ou personnaliser à tout moment.{" "}
-                  <Link to={`/shop/${siteId}/cookies`} className="underline text-amber-800 hover:text-amber-900">
+                  <Link to={siteId ? `/shop/${siteId}/cookies` : `/cookies`} className="underline text-amber-800 hover:text-amber-900">
                     En savoir plus
                   </Link>
                 </p>

@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { AltiaroLogo } from "../components/AltiaroLogo";
 import { Spinner, ArrowClockwise } from "@phosphor-icons/react";
 import { useAuth } from "../lib/auth";
+import CookieConsentBanner from "../components/storefront/CookieConsentBanner";
 
 function formatError(detail) {
   if (detail == null) return "Une erreur est survenue";
@@ -109,6 +110,7 @@ export default function VerifyEmail() {
       className="min-h-screen bg-white flex flex-col items-center px-6"
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
+      <CookieConsentBanner />
       <nav className="w-full max-w-6xl h-16 flex items-center justify-between border-b border-neutral-200">
         <Link to="/" className="flex items-center" data-testid="verify-home-link">
           <AltiaroLogo variant="horizontal" size={22} color="#0A0A0A" />

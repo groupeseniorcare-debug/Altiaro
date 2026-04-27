@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { AltiaroLogo } from "../components/AltiaroLogo";
+import CookieConsentBanner from "../components/storefront/CookieConsentBanner";
 
 function MarkdownLegal({ md }) {
   if (!md) return null;
@@ -60,6 +61,7 @@ export default function Legal({ slug }) {
 
   return (
     <div className="min-h-screen bg-white text-neutral-900">
+      <CookieConsentBanner />
       {/* Nav */}
       <nav className="border-b border-neutral-200 bg-white/80 backdrop-blur sticky top-0 z-20">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">

@@ -292,9 +292,193 @@ Throttle global sur les appels Claude : `asyncio.Semaphore(2)` dans `routes/seo_
 
 ---
 
+## 13 — 🛠️ Actions manuelles utilisateur (à faire hors-code)
+
+> **Source de vérité** des actions humaines à effectuer en dehors de la
+> plateforme. Le code de l'application est propre — ces actions concernent des
+> consoles tierces (Mollie, Google, OVH) ou des décisions métier qui ne
+> peuvent pas être automatisées.
+
+### 13.1 — 🔴 P0 · Mollie · Anonymiser le nom commercial affiché sur la page de paiement
+
+**Pourquoi** : la page de paiement hébergée par Mollie affiche actuellement
+le **nom personnel** du dirigeant (« Robin Zuchiatti ») au lieu du nom
+commercial du site. C'est une fuite d'anonymat critique. Le code de l'app
+est propre (0 occurrence du nom personnel — vérifiable via
+`grep -rIin "robin" backend/ frontend/src/ memory/`).
+
+**Pourquoi pas un fix code** : l'API Mollie ne permet pas de surcharger le
+`tradeName` (nom commercial) à la volée par paiement. Le nom est attaché au
+**Profile Mollie**, configurable uniquement depuis le dashboard.
+
+**Procédure** (5 minutes, dashboard Mollie) :
+
+1. Connexion → [https://my.mollie.com/dashboard](https://my.mollie.com/dashboard)
+2. Menu latéral → **Settings** → **Website profiles**
+3. Cliquer sur le profil actif (celui marqué `default` ou actif en mode test/live)
+4. Dans le formulaire :
+   - **Trading name** → remplacer le nom personnel par `Altiaro`
+     (ou par le nom commercial du site concepteur courant si compte mono-tenant)
+   - **Website** → renseigner `https://altiaro.com` (ou domaine du shop si dédié)
+   - **Email** → `contact@altiaro.com`
+5. **Sauvegarder**.
+
+**Effet** : immédiat sur toutes les nouvelles pages de paiement (test ET live).
+Aucun redéploiement code nécessaire. Les paiements en cours conservent l'ancien
+nom (acceptable, expirent en 1h).
+
+⚠️ **Cas multi-tenant** (plusieurs sites concepteurs sur un seul compte Mollie) :
+un profil = un nom affiché. Si on doit afficher des noms commerciaux différents
+par site, il faudra :
+- Créer un profil Mollie dédié par site (`POST /v2/profiles` côté code)
+- Renseigner `MOLLIE_PROFILE_ID` par site dans la config DB
+- Adapter `routes/payments.py` pour passer `profileId` à `payments.create`
+**Hors scope MVP — à prévoir si on dépasse 1 site live.**
+
+### 13.2 — 🟡 P1 · Achat domaine du site Altea (ou autre site concepteur)
+
+L'API OVH a confirmé que **`altea.com` est disponible** à 7,99 € HT (17,99 €
+TTC plateforme avec markup) — vérification effectuée le 2026-04-27.
+
+Alternatives également disponibles (toutes à 7,99 € OVH) :
+- `altea-store.com`, `altea-living.com`, `altea-mobilite.com`,
+  `mon-altea.com`, `altea-bienetre.com`, `altea-officiel.com`,
+  `altea-paris.com`, `altea-confort.com`, `altea-relax.com`
+- `altea.fr` à **4,99 €** OVH (le plus économique, niche FR pure)
+
+**Procédure** (depuis le cockpit, 3 minutes) :
+
+1. Connexion → [/login](https://altiaro.com/login) (admin ou concepteur owner)
+2. Aller sur `/sites/{site_id}/domains`
+3. Champ « Vérifier un domaine » → saisir le nom (ex: `altea.com`)
+4. Cliquer « Vérifier » → la dispo + prix s'affichent
+5. Cliquer « Acheter » → tunnel Mollie s'ouvre → paiement CB
+6. À la confirmation Mollie → webhook OVH lance l'achat + DNS auto-config (~5 min)
+7. Email Resend de confirmation reçu quand DNS propagé (`🌍 domain is live`)
+
+⚠️ **Vigilance prix .com courts** : les `.com` 4 lettres ou moins peuvent être
+classés « premium » par certains registrars (renouvellement à 50-200 €/an).
+OVH a affiché le prix promo 1ère année à 7,99 € — le **renouvellement à
+N+1** sera probablement plus cher. À vérifier dans le compte OVH avant
+l'achat ou interroger le support OVH (chat en ligne).
+
+### 13.3 — 🟡 P1 · Connexion Google Search Console (par site validé)
+
+**Pourquoi** : permet d'envoyer le sitemap au moteur Google + de récupérer
+les positions de mots-clés du site dans Search Console. Sans ça, plusieurs
+crons SEO Phase 6 fonctionnent en mode dégradé silencieux
+(`gsc_position_alerts_daily` skip si non connecté).
+
+**Procédure** (par site, 2 minutes) :
+
+1. Cockpit → `/sites/{site_id}/integrations`
+2. Card **« Google Search Console »** → cliquer **« Connecter »**
+3. Popup Google OAuth → choisir le compte qui possède le site GSC → autoriser
+4. Une fois connecté, cliquer **« Soumettre le sitemap »**
+5. ⚠️ Pré-requis : le **domaine du site doit être déjà ajouté** dans
+   [https://search.google.com/search-console](https://search.google.com/search-console)
+   en tant que propriété (vérifiée via DNS ou meta-tag — le meta-tag est
+   injecté automatiquement par Altiaro à la validation step 9).
+
+### 13.4 — 🟡 P1 · Connexion Google Merchant Center (par site validé)
+
+**Pourquoi** : permet le push automatique du feed Shopping (produits)
+vers Google Merchant Center → annonces Shopping gratuites + Performance
+Max ads.
+
+**Procédure** (par site, 5 minutes) :
+
+1. Pré-requis : avoir un compte GMC (gratuit) et avoir vérifié le domaine
+   du site dans GMC (procédure 24h habituellement)
+2. Cockpit → `/sites/{site_id}/integrations`
+3. Card **« Google Merchant Center »** → cliquer **« Connecter »**
+4. Popup Google OAuth → autoriser le scope `content`
+5. Renseigner le **Merchant ID** (visible en haut à droite du dashboard GMC)
+6. Cliquer **« Sync now »** → envoie le feed initial (jusqu'à 30 min de
+   propagation côté Google avant que les produits passent l'inspection).
+
+Cron `merchant_daily_sync` (4h UTC) prend le relais ensuite — push delta
+quotidien automatique.
+
+### 13.5 — 🔴 P0 · Mollie · Passage du mode TEST au mode LIVE
+
+⚠️ **À faire UNIQUEMENT après §13.1 (anonymisation tradeName)**.
+
+**Procédure** (admin uniquement, 30 secondes) :
+
+1. Cockpit → `/admin/integrations` → section **Mollie**
+2. Toggle **Mode** : `test` → `live`
+3. Vérifier que `MOLLIE_LIVE_KEY` est bien renseigné dans `.env`
+   (déjà OK : `MOLLIE_LIVE_KEY=live_…` actif)
+4. ⚠️ Vérifier que le compte Mollie est bien **KYC validé** (statut `Verified`
+   dans dashboard Mollie). Sinon → impossible d'accepter du LIVE.
+5. **Test post-bascule** : faire un mini-paiement réel de 1 € sur le site
+   le moins critique pour vérifier que le tunnel fonctionne. Ensuite
+   refund immédiat depuis le dashboard Mollie.
+
+### 13.6 — 🟢 P2 · Google Ads · Demander Basic Access Developer Token
+
+**Pourquoi** : actuellement Dev Token en **mode test** → seuls les comptes
+de la sandbox Google sont accessibles → fallback Claude pour Keyword
+Planner. En `Basic Access`, la `KeywordPlanIdeaService` retourne les vrais
+volumes Google.
+
+**Procédure** :
+
+1. [https://ads.google.com/aw/apicenter](https://ads.google.com/aw/apicenter)
+2. Onglet **Standard / Basic access** → bouton **Apply for Basic Access**
+3. Remplir le formulaire (objet de l'app : « usine à sites e-commerce
+   internes, scan de niches via Keyword Planner, création RSA via API »)
+4. Validation Google : 2-5 jours ouvrés en moyenne, parfois jusqu'à 2
+   semaines. Réponses dans les **48h obligatoires** sinon ticket fermé.
+5. Une fois approuvé → checklist post-approbation déjà documentée en §5.
+
+### 13.7 — 🟡 P1 · Vérification anti-fuite RGPD vitrine altiaro.com
+
+**Bloc 3 livré** : retrait du tracker PostHog inline qui se chargeait sans
+consentement + montée du `<CookieConsentBanner>` sur Landing/Login/Signup/
+VerifyEmail/Legal. La vitrine altiaro.com est désormais conforme RGPD.
+
+**À vérifier de temps en temps** (audit trimestriel recommandé) :
+
+```bash
+# Aucun tracker tiers ne doit charger sans consentement
+curl -s https://altiaro.com/ | grep -E "posthog|gtag|fbq|hotjar|clarity" || echo "✅ Aucun tracker"
+
+# 4 pages légales accessibles publiquement
+for slug in mentions-legales cgu confidentialite cookies; do
+  echo -n "$slug: "
+  curl -s -o /dev/null -w "HTTP %{http_code}\n" https://altiaro.com/api/platform/legal/$slug
+done
+
+# JSON-LD Organization présent dans <head>
+curl -s https://altiaro.com/ | grep -A1 'application/ld+json' | head -5
+
+# robots.txt + sitemap.xml plateforme
+curl -s -o /dev/null -w "robots: %{http_code}\n" https://altiaro.com/robots.txt
+curl -s -o /dev/null -w "sitemap: %{http_code}\n" https://altiaro.com/sitemap.xml
+```
+
+### 13.8 — 🟢 P2 · Création utilisateurs concepteurs supplémentaires
+
+Quand un concepteur pilote rejoint la plateforme :
+
+1. Cockpit admin → `/users` → **« Ajouter un utilisateur »**
+2. Email pro + mot de passe temporaire (8 caractères, 1 lettre + 1 chiffre)
+3. Rôle = `operator`
+4. Envoyer les credentials par mail privé (pas via Altiaro).
+5. Pré-remplir son `billing_profile` (SIRET, IBAN, adresse) avant qu'il
+   reçoive une commande, sinon les payouts SEPA bi-mensuels seront bloqués.
+
+---
+
 ## Fin du document
 
-Cette note de reprise couvre l'état du produit au **2026-04-24 soir**, après la
-cascade Phases 5-6-7. Pour les livraisons suivantes, ajouter une nouvelle ligne
-en §1, mettre à jour les crons en §9/§12 si besoin, et documenter les nouveaux
-bugs en §8.
+Cette note de reprise couvre l'état du produit au **2026-04-27**, après la
+cascade Phases 5-6-7 + Bloc 1 (résilience LLM, RGPD storefronts, légal
+centralisé) + Bloc 2 (Altea launch-auto, intégrations cockpit) + Bloc 3
+(audit + finalisation vitrine altiaro.com).
+
+Pour les livraisons suivantes, ajouter une nouvelle ligne en §1, mettre
+à jour les crons en §9/§12 si besoin, documenter les nouveaux bugs en §8,
+et compléter la checklist actions manuelles en §13.

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { AltiaroLogo } from "../components/AltiaroLogo";
 import { ArrowUpRight, Spinner, Eye, EyeSlash } from "@phosphor-icons/react";
+import CookieConsentBanner from "../components/storefront/CookieConsentBanner";
 
 function formatError(detail) {
   if (detail == null) return "Une erreur est survenue";
@@ -40,6 +41,7 @@ export default function Signup() {
       className="min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-white"
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
+      <CookieConsentBanner />
       {/* Brand panel (hidden on mobile) */}
       <div className="hidden lg:flex flex-col justify-between p-12 bg-neutral-900 text-white">
         <Link to="/" className="flex items-center" data-testid="signup-brand-link">

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AltiaroLogo } from "../components/AltiaroLogo";
+import CookieConsentBanner from "../components/storefront/CookieConsentBanner";
 import {
   ArrowUpRight,
   Gauge,
@@ -515,6 +516,13 @@ export default function Landing() {
           FOOTER
       ====================================================================== */}
       <Footer />
+
+      {/* ======================================================================
+          RGPD — Bannière cookies plateforme (Bloc 3)
+          Mounted sans `siteId` => le composant fallback sur /cookies platform.
+          Le tracking analytics éventuel reste blocké tant que pas de consentement.
+      ====================================================================== */}
+      <CookieConsentBanner />
     </div>
   );
 }

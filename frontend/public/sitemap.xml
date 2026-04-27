@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Sitemap public de la vitrine Altiaro (https://altiaro.com).
+  Référencé par /robots.txt. Liste les pages publiques crawlables :
+   - landing
+   - signup / login (utiles pour Google qui peut indexer la page de signup)
+   - 4 pages légales (mentions, CGU, confidentialité, cookies)
+
+  Les sitemaps des storefronts (boutiques concepteurs) sont servis
+  dynamiquement par le backend sur /api/public/sites/{site_id}/sitemap.xml
+  et NE sont PAS référencés ici (chaque shop a son propre domaine + son
+  propre robots.txt + sitemap, géré par routes/seo.py).
+
+  À mettre à jour à chaque ajout de page publique plateforme.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://altiaro.com/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://altiaro.com/signup</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://altiaro.com/login</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://altiaro.com/mentions-legales</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://altiaro.com/cgu</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://altiaro.com/confidentialite</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://altiaro.com/cookies</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+</urlset>

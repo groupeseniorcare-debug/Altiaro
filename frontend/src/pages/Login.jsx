@@ -3,6 +3,7 @@ import { useNavigate, Navigate, Link } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { Rocket, SignIn, Spinner } from "@phosphor-icons/react";
 import { AltiaroLogo } from "../components/AltiaroLogo";
+import CookieConsentBanner from "../components/storefront/CookieConsentBanner";
 
 export default function Login() {
   const { user, login, error } = useAuth();
@@ -39,6 +40,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-stretch bg-white">
+      <CookieConsentBanner />
       <div className="flex-1 hidden lg:block relative overflow-hidden">
         <div
           className="absolute inset-0 bg-cover bg-center"
