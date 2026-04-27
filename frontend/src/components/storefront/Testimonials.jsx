@@ -1,5 +1,19 @@
-import React from "react";
-import { Star } from "@phosphor-icons/react";
+/**
+ * Lot G Fix 1 — Testimonials premium converti en Embla Carousel infini.
+ *
+ * - 6 portraits IA (Margot, Heinrich, Isabelle, Sylvain, Catherine, Roland)
+ *   stockés dans `design.testimonials_premium` après run du pipeline +
+ *   les scripts lotG_fix1_3more_portraits.py.
+ * - Embla `loop: true` + `dragFree: true` + autoplay manuel via setInterval
+ *   (scrollNext toutes les ~3.5 s, pause on hover).
+ * - Cards 280×420 mobile / 320×480 desktop, full-bleed image, dark gradient
+ *   en haut (étoiles) et en bas (citation + nom).
+ * - Fallback : DEFAULT mocks Unsplash (FR uniquement). Section auto-skipped
+ *   si lang ≠ fr et pas de testimonials premium en DB.
+ */
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import useEmblaCarousel from "embla-carousel-react";
+import { Star, CaretLeft, CaretRight } from "@phosphor-icons/react";
 import { designAccents } from "./storefrontUtils";
 import { t } from "../../lib/i18n";
 
@@ -12,70 +26,33 @@ function resolveImage(raw) {
   return raw;
 }
 
-/**
- * Premium reviews marquee — inspired by Chutex Care.
- * Tall cards (320×480) with full-bleed portrait, dark gradient overlay,
- * 5-star rating overlay + bottom quote + name + subtitle.
- * Scrolls horizontally with `animate-marquee-reviews` (pauses on hover).
- */
-
 const DEFAULT = [
-  {
-    name: "Françoise D.",
-    location: "Lyon · 72 ans",
-    role: "Cliente · 72 ans",
-    rating: 5,
+  { name: "Françoise D.", location: "Lyon · 72 ans", role: "Cliente · 72 ans", rating: 5,
     image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&h=900&fit=crop&crop=faces",
-    text: "J'hésitais à commander en ligne à mon âge. Le conseiller a été patient, et la livraison s'est parfaitement passée.",
-  },
-  {
-    name: "Marc & Jeannine L.",
-    location: "Rennes · 78 ans",
-    role: "Couple · 78 ans",
-    rating: 5,
+    text: "J'hésitais à commander en ligne à mon âge. Le conseiller a été patient, et la livraison s'est parfaitement passée." },
+  { name: "Marc & Jeannine L.", location: "Rennes · 78 ans", role: "Couple · 78 ans", rating: 5,
     image: "https://images.unsplash.com/photo-1556911220-bff31c812dba?w=600&h=900&fit=crop&crop=faces",
-    text: "Nous avons équipé la salle de bain de ma belle-mère. Tout est arrivé en 2 jours, bien emballé. Un vrai soulagement.",
-  },
-  {
-    name: "Hélène P.",
-    location: "Bordeaux · 65 ans",
-    role: "Cliente · 65 ans",
-    rating: 5,
+    text: "Nous avons équipé la salle de bain de ma belle-mère. Tout est arrivé en 2 jours, bien emballé. Un vrai soulagement." },
+  { name: "Hélène P.", location: "Bordeaux · 65 ans", role: "Cliente · 65 ans", rating: 5,
     image: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=600&h=900&fit=crop&crop=faces",
-    text: "Service client exceptionnel. J'ai appelé pour un conseil, on m'a rappelée et orientée sans rien essayer de me vendre.",
-  },
-  {
-    name: "Gérard M.",
-    location: "Marseille · 80 ans",
-    role: "Client · 80 ans",
-    rating: 5,
+    text: "Service client exceptionnel. J'ai appelé pour un conseil, on m'a rappelée et orientée sans rien essayer de me vendre." },
+  { name: "Gérard M.", location: "Marseille · 80 ans", role: "Client · 80 ans", rating: 5,
     image: "https://images.unsplash.com/photo-1541534401786-2077eed87a74?w=600&h=900&fit=crop&crop=faces",
-    text: "Prix équitable, livraison rapide et un vrai suivi. C'est rare aujourd'hui d'être traité comme un client et pas un numéro.",
-  },
-  {
-    name: "Catherine V.",
-    location: "Nantes · 68 ans",
-    role: "Cliente · 68 ans",
-    rating: 5,
+    text: "Prix équitable, livraison rapide et un vrai suivi. C'est rare aujourd'hui d'être traité comme un client et pas un numéro." },
+  { name: "Catherine V.", location: "Nantes · 68 ans", role: "Cliente · 68 ans", rating: 5,
     image: "https://images.unsplash.com/photo-1551836022-deb4988cc6c0?w=600&h=900&fit=crop&crop=faces",
-    text: "La qualité des produits est au rendez-vous. J'apprécie la transparence sur les matériaux et les fabricants.",
-  },
-  {
-    name: "Thomas K.",
-    location: "Paris · 45 ans",
-    role: "Aidant familial",
-    rating: 5,
+    text: "La qualité des produits est au rendez-vous. J'apprécie la transparence sur les matériaux et les fabricants." },
+  { name: "Thomas K.", location: "Paris · 45 ans", role: "Aidant familial", rating: 5,
     image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=600&h=900&fit=crop&crop=faces",
-    text: "Une vraie tranquillité d'esprit pour accompagner mon père. Simple à mettre en place, interface claire.",
-  },
+    text: "Une vraie tranquillité d'esprit pour accompagner mon père. Simple à mettre en place, interface claire." },
 ];
 
-function ReviewCard({ item, lang }) {
-  const text = typeof item.text === "string" ? item.text : item.quote?.[lang] || item.quote?.fr || "";
+function ReviewCard({ item }) {
+  const text = typeof item.text === "string" ? item.text : item.quote?.fr || "";
   const img = resolveImage(item.image || item.avatar || item.photo);
   return (
     <div
-      className="flex-shrink-0 w-[280px] md:w-[320px] h-[420px] md:h-[480px] rounded-2xl overflow-hidden relative group"
+      className="flex-shrink-0 w-[280px] md:w-[320px] h-[420px] md:h-[480px] rounded-2xl overflow-hidden relative group/card"
       data-testid="review-card"
     >
       {img ? (
@@ -83,7 +60,7 @@ function ReviewCard({ item, lang }) {
           src={img}
           alt={item.name}
           loading="lazy"
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-105"
         />
       ) : (
         <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #1a1a1a, #3a3a3a)" }} />
@@ -105,7 +82,7 @@ function ReviewCard({ item, lang }) {
         </p>
         <div>
           <p className="text-white font-semibold text-sm">{item.name}</p>
-          <p className="text-white/50 mt-0.5 text-xs">{item.role || item.location}</p>
+          <p className="text-white/60 mt-0.5 text-xs">{item.role || item.location}</p>
         </div>
       </div>
     </div>
@@ -114,20 +91,13 @@ function ReviewCard({ item, lang }) {
 
 export function Testimonials({ design, lang }) {
   const { primary, fontHeading } = designAccents(design);
-  // Phase 0.5 — priorité au contenu premium généré par le pipeline étape 5
-  // (`design.testimonials_premium`, list of {name, city, age, text, image, rating}).
-  // Fallback ordre : (1) testimonials_premium, (2) testimonials.items legacy,
-  // (3) testimonials array brut, (4) DEFAULT mockés Unsplash (FR uniquement).
   const premium = design?.testimonials_premium;
   const legacy = design?.testimonials?.items || design?.testimonials;
   const hasPremium = Array.isArray(premium) && premium.length > 0;
   const hasLegacy = !hasPremium && Array.isArray(legacy) && legacy.length > 0;
   const hasReal = hasPremium || hasLegacy;
-  // Fallback testimonials are FR-only (mock names + quotes). Skip section
-  // if storefront lang is not FR and no real testimonials exist in DB.
   if (!hasReal && (lang || "fr") !== "fr") return null;
-  // Map premium items to the same shape expected by ReviewCard
-  // (ReviewCard already accepts { name, role|location, text, image, rating }).
+
   const list = hasPremium
     ? premium.map((p) => ({
         name: p.name || "",
@@ -138,16 +108,44 @@ export function Testimonials({ design, lang }) {
         text: p.text || p.quote || "",
       }))
     : hasLegacy
-      ? legacy
-      : DEFAULT;
-  // Duplicate once so marquee loops seamlessly
-  const doubled = [...list, ...list];
+    ? legacy
+    : DEFAULT;
+
+  // Embla setup — loop + dragFree + autoplay manuel
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    loop: true,
+    align: "start",
+    dragFree: true,
+    skipSnaps: false,
+    containScroll: false,
+  });
+  const [isHovered, setIsHovered] = useState(false);
+  const intervalRef = useRef(null);
+
+  const scrollPrev = useCallback(() => emblaApi && emblaApi.scrollPrev(), [emblaApi]);
+  const scrollNext = useCallback(() => emblaApi && emblaApi.scrollNext(), [emblaApi]);
+
+  // Autoplay : scroll vers la suite toutes les 3.8 s, pause au survol
+  useEffect(() => {
+    if (!emblaApi) return undefined;
+    const start = () => {
+      stop();
+      intervalRef.current = setInterval(() => {
+        if (!isHovered) emblaApi.scrollNext();
+      }, 3800);
+    };
+    const stop = () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+    start();
+    return stop;
+  }, [emblaApi, isHovered]);
 
   return (
-    <section
-      className="py-24 md:py-36 bg-white overflow-hidden"
-      data-testid="storefront-testimonials"
-    >
+    <section className="py-24 md:py-36 bg-white overflow-hidden" data-testid="storefront-testimonials">
       <div className="max-w-7xl mx-auto px-6 mb-14 md:mb-16">
         <div className="flex items-end justify-between flex-wrap gap-6">
           <div>
@@ -174,25 +172,45 @@ export function Testimonials({ design, lang }) {
         </div>
       </div>
 
-      {/* Marquee row */}
-      <div className="relative" data-testid="reviews-marquee">
-        <div className="hidden md:flex w-max animate-marquee-reviews">
-          <div className="flex gap-5 shrink-0 pr-5">
-            {doubled.map((t, i) => (
-              <ReviewCard key={i} item={t} lang={lang} />
+      {/* Embla carousel — full width, pause on hover, infinite loop */}
+      <div
+        className="relative"
+        data-testid="reviews-carousel"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <div className="overflow-hidden" ref={emblaRef}>
+          <div className="flex gap-5 md:gap-6 px-6 md:px-10">
+            {list.map((it, i) => (
+              <ReviewCard key={i} item={it} />
             ))}
           </div>
         </div>
 
-        {/* Mobile fallback: vertical scroll */}
-        <div className="md:hidden px-6 flex gap-4 overflow-x-auto snap-x snap-mandatory pb-4 -mx-6">
-          {list.map((t, i) => (
-            <div key={i} className="snap-start shrink-0">
-              <ReviewCard item={t} lang={lang} />
-            </div>
-          ))}
+        {/* Nav buttons (desktop only) */}
+        <div className="hidden md:flex items-center justify-end gap-2 max-w-7xl mx-auto px-10 mt-8">
+          <button
+            type="button"
+            onClick={scrollPrev}
+            aria-label="Précédent"
+            data-testid="reviews-prev"
+            className="w-11 h-11 rounded-full border border-neutral-300 flex items-center justify-center hover:border-neutral-900 transition"
+          >
+            <CaretLeft size={16} weight="bold" />
+          </button>
+          <button
+            type="button"
+            onClick={scrollNext}
+            aria-label="Suivant"
+            data-testid="reviews-next"
+            className="w-11 h-11 rounded-full border border-neutral-300 flex items-center justify-center hover:border-neutral-900 transition"
+          >
+            <CaretRight size={16} weight="bold" />
+          </button>
         </div>
       </div>
     </section>
   );
 }
+
+export default Testimonials;

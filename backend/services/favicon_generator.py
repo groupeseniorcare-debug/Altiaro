@@ -14,6 +14,9 @@ Stratégie :
 - Si le logo est carré, redimensionne directement.
 - Si rectangulaire, paste sur fond transparent carré centré (préserve
   les marges visuelles du design).
+- Lot G Fix 2 — si le logo source n'a pas d'alpha (Nano Banana ne respecte
+  pas toujours `transparent background` malgré le prompt), `remove_white_background()`
+  détecte les pixels quasi-blancs et les passe en alpha=0 avant resize.
 - Aucun appel LLM. Coût : 0 €.
 
 Persiste l'URL principale (32×32) dans `site.design.favicon_url` et
@@ -38,6 +41,82 @@ FAVICON_SIZES: Dict[str, int] = {
     "android-192": 192,
     "android-512": 512,
 }
+
+# Lot G Fix 2 — Seuil de luminance au-dessus duquel un pixel est considéré
+# "quasi-blanc" et donc éligible au remove background. 245 = très permissif
+# (efface tout ce qui est blanc cassé), conserve les zones grises et noires
+# du wordmark intact. R+G+B > 735 ≈ chaque canal > 245.
+WHITE_BG_THRESHOLD_SUM = 735
+
+
+def remove_white_background(img: Image.Image, threshold_sum: int = WHITE_BG_THRESHOLD_SUM) -> Image.Image:
+    """Convertit les pixels quasi-blancs d'un PNG en pixels transparents.
+
+    Utile en fallback quand Nano Banana / autre générateur d'image ne respecte
+    pas la consigne `transparent background` malgré le prompt. Conserve l'anti-
+    aliasing en faisant un fade alpha proportionnel à la luminosité (les bords
+    flous des lettres ne pixelisent pas en escaliers).
+
+    Args:
+        img: PIL Image (RGB ou RGBA acceptés)
+        threshold_sum: somme R+G+B au-dessus de laquelle alpha=0 (default 735)
+
+    Returns:
+        PIL Image en mode RGBA avec fond transparent.
+    """
+    if img.mode != "RGBA":
+        img = img.convert("RGBA")
+    pixels = img.load()
+    w, h = img.size
+    # Boucle pixel-par-pixel : pour 2k×512px ≈ 1M pixels = ~150 ms, acceptable.
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = pixels[x, y]
+            s = r + g + b
+            if s >= threshold_sum:
+                # Pixel blanc → totalement transparent
+                pixels[x, y] = (r, g, b, 0)
+            elif s >= threshold_sum - 90:
+                # Bord anti-aliasé entre 645 et 735 → fade alpha proportionnel
+                # pour un edge propre (évite les escaliers visibles)
+                fade = int(((threshold_sum - s) / 90) * 255)
+                pixels[x, y] = (r, g, b, min(a, fade))
+    return img
+
+
+def ensure_alpha_channel(src_path: Path) -> Image.Image:
+    """Charge une image et garantit qu'elle a un canal alpha utilisable.
+
+    Si l'image source est RGB (sans transparence), applique automatiquement
+    `remove_white_background()` pour obtenir un alpha cohérent. Si déjà RGBA
+    avec alpha non-nul partout (= image opaque encadrée), applique aussi le
+    remove pour que les coins blancs deviennent transparents.
+
+    Args:
+        src_path: chemin du PNG source.
+
+    Returns:
+        PIL Image en mode RGBA prête à être resize / pastée.
+    """
+    img = Image.open(src_path)
+    img.load()
+    needs_remove = False
+    if img.mode != "RGBA":
+        needs_remove = True
+    else:
+        # Détection : si tous les pixels coins sont opaques + blancs, l'image
+        # a un fond blanc opaque malgré le mode RGBA → on force le remove.
+        w, h = img.size
+        corners = [img.getpixel((0, 0)), img.getpixel((w - 1, 0)),
+                   img.getpixel((0, h - 1)), img.getpixel((w - 1, h - 1))]
+        whites = sum(1 for c in corners if c[3] >= 250 and (c[0] + c[1] + c[2]) >= WHITE_BG_THRESHOLD_SUM)
+        if whites >= 3:
+            needs_remove = True
+
+    if needs_remove:
+        logger.info(f"[favicon] {src_path.name} : applying remove_white_background fallback")
+        img = remove_white_background(img)
+    return img
 
 
 def _load_logo_bytes_from_url(logo_url: str) -> Optional[Path]:
@@ -89,19 +168,21 @@ def generate_favicons_from_logo(site_id: str, logo_url: str) -> Dict[str, str]:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        with Image.open(src_path) as orig:
-            squared = _square_with_padding(orig)
-            urls: Dict[str, str] = {}
-            for slug, size in FAVICON_SIZES.items():
-                resized = squared.resize((size, size), Image.LANCZOS)
-                # PWA icons gagnent à être en RGBA, le manifeste gère bien
-                fname = f"{slug}.png"
-                fpath = out_dir / fname
-                resized.save(fpath, format="PNG", optimize=True)
-                urls[slug] = f"/api/uploads/favicons/{site_id}/{fname}"
-                logger.debug(f"[favicon] {site_id[:8]} {fname} ({size}x{size}, {fpath.stat().st_size}B)")
-            logger.info(f"[favicon] generated {len(urls)} sizes for site {site_id[:8]}")
-            return urls
+        # Lot G Fix 2 — garantit alpha channel propre (remove_white_background
+        # si le logo source est RGB ou a un fond blanc opaque)
+        cleaned = ensure_alpha_channel(src_path)
+        squared = _square_with_padding(cleaned)
+        urls: Dict[str, str] = {}
+        for slug, size in FAVICON_SIZES.items():
+            resized = squared.resize((size, size), Image.LANCZOS)
+            # PWA icons gagnent à être en RGBA, le manifeste gère bien
+            fname = f"{slug}.png"
+            fpath = out_dir / fname
+            resized.save(fpath, format="PNG", optimize=True)
+            urls[slug] = f"/api/uploads/favicons/{site_id}/{fname}"
+            logger.debug(f"[favicon] {site_id[:8]} {fname} ({size}x{size}, {fpath.stat().st_size}B)")
+        logger.info(f"[favicon] generated {len(urls)} sizes for site {site_id[:8]}")
+        return urls
     except Exception as e:
         logger.exception(f"[favicon] generation failed for site {site_id[:8]}: {e}")
         return {}

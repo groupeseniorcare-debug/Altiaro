@@ -24,6 +24,14 @@ export default function ProductBundle({ currentProduct, lang = "fr", design }) {
   useEffect(() => {
     if (!siteId || !currentProduct) return;
 
+    // Lot G Fix 6 — On affiche UNIQUEMENT des produits compagnons : `role === "upsell"`
+    // ou `role === "accessory"` (jamais d'autres "main" à 1000+€). C'est le pack "Souvent
+    // achetés ensemble" : produits complémentaires de petit prix qui boostent le panier.
+    const isCompanion = (p) => {
+      const r = (p?.role || "").toLowerCase();
+      return r === "upsell" || r === "accessory" || r === "addon" || r === "accessoire";
+    };
+
     // Priority 1 : explicit bundles_with configured (AI-suggested or manual)
     const bundleIds = currentProduct.bundles_with || [];
     if (bundleIds.length > 0) {
@@ -34,27 +42,29 @@ export default function ProductBundle({ currentProduct, lang = "fr", design }) {
             .catch(() => null)
         )
       ).then((res) => {
-        setCandidates(res.filter(Boolean));
+        // Filter to keep only companions even if the AI suggested a "main"
+        setCandidates(res.filter(Boolean).filter(isCompanion).slice(0, 2));
       });
       return;
     }
 
-    // Priority 2 : same category fallback
-    const params = new URLSearchParams();
-    if (currentProduct.category) params.set("collection", currentProduct.category);
-    params.set("sort", "featured");
-    axios.get(`${BACKEND_URL}/api/public/sites/${siteId}/products?${params.toString()}`)
+    // Priority 2 : fallback — fetch all site products, keep only upsell/accessory
+    // (no category filter — companions have no category in our schema)
+    axios.get(`${BACKEND_URL}/api/public/sites/${siteId}/products?sort=featured`)
       .then(({ data }) => {
-        const filtered = (data || []).filter((p) => p.id !== currentProduct.id).slice(0, 2);
+        const filtered = (data || [])
+          .filter((p) => p.id !== currentProduct.id)
+          .filter(isCompanion)
+          .slice(0, 2);
         setCandidates(filtered);
       })
       .catch(() => setCandidates([]));
   }, [siteId, currentProduct]);
 
-  // Demo fallback if no other real products exist
+  // Demo fallback if no real companions exist (template completeness only)
   const demoFallback = [
-    { id: "bundle-1", name: "Coussin ergonomique lombaire", price: 39, currency: "EUR", images: ["https://images.unsplash.com/photo-1568162603664-fcd658421851?w=500&auto=format&fit=crop"], _demo: true },
-    { id: "bundle-2", name: "Protection anti-taches fauteuil", price: 29, currency: "EUR", images: ["https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=500&auto=format&fit=crop"], _demo: true },
+    { id: "bundle-1", name: "Coussin ergonomique lombaire", price: 39, currency: "EUR", role: "upsell", images: ["https://images.unsplash.com/photo-1568162603664-fcd658421851?w=500&auto=format&fit=crop"], _demo: true },
+    { id: "bundle-2", name: "Protection anti-taches fauteuil", price: 29, currency: "EUR", role: "accessory", images: ["https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=500&auto=format&fit=crop"], _demo: true },
   ];
   const hasReal = candidates.length > 0;
   const accessories = hasReal ? candidates : demoFallback;

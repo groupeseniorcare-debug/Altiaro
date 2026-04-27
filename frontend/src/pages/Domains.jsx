@@ -373,9 +373,6 @@ export default function Domains() {
                         <>
                           Disponible · Prix TTC année 1 :{" "}
                           <strong className="text-emerald-400">{price}€</strong>
-                          <span className="text-neutral-400">
-                            {" "}(coût OVH {r.data.ovh_price_ttc_eur}€ + frais plateforme {r.data.markup_eur}€)
-                          </span>
                         </>
                       ) : (
                         "Déjà pris"

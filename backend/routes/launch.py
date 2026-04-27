@@ -458,9 +458,29 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                     timeout=150,
                 )
                 if url:
+                    # Lot G Fix 2 — Nano Banana ne respecte PAS toujours la consigne
+                    # `transparent background`. On garde le prompt "fond blanc"
+                    # (mieux respecté) puis on applique systématiquement le fallback
+                    # Pillow `ensure_alpha_channel()` pour transformer le fond blanc
+                    # opaque en transparence parfaite (anti-aliasing préservé).
+                    try:
+                        from services.favicon_generator import ensure_alpha_channel
+                        from pathlib import Path as _Path
+                        # url est de la forme /api/uploads/logos/xxx.png
+                        rel = url.split("/api/uploads/", 1)
+                        if len(rel) == 2:
+                            disk_path = _Path("/app/backend/uploads") / rel[1]
+                            if disk_path.exists():
+                                cleaned = ensure_alpha_channel(disk_path)
+                                cleaned.save(disk_path, format="PNG", optimize=True)
+                                logger.info(f"[launch] logo cleaned to RGBA: {disk_path.name}")
+                    except Exception as ce:
+                        logger.warning(f"[launch] logo alpha cleanup failed: {ce}")
+
                     await db.sites.update_one(
                         {"id": site_id},
                         {"$set": {"design.brand.logo_url": url,
+                                  "design.brand.logo_method": "nano-banana+pillow-cleaned",
                                   "design.updated_at": datetime.now(timezone.utc).isoformat()}},
                     )
                     # Lot A1 — Auto-generate favicons (5 sizes) from the logo PNG.

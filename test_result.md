@@ -103,14 +103,16 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Reprise de projet (état des lieux + fix gating étape 1 + audits chantiers 5/6/7).
-  Bug rapporté : "étape 1 complète mais étape 2 bloquée" malgré analyse pricing effectuée.
+  Lot G (14 fixes UX/SEO storefront Altea) + Lot H (variantes couleur avec images dédiées).
+  Décisions user 2026-04-27 :
+    Q1=c+Altea exact wording, Q2=d (SEO max), Q3=d (transparent),
+    Q4=c+d (logo NB+Pillow+pipeline+migration), Q5=a+d (whitelist + log admin).
 
 backend:
-  - task: "Fix gating étape 1 (pricing) — reconnaître pricing_analysis ET quick_scans"
+  - task: "Lot G Fix 2 — Logo transparent (Pillow remove_white_background fallback)"
     implemented: true
     working: true
-    file: "backend/routes/journey_gating.py"
+    file: "backend/services/favicon_generator.py + backend/scripts/lotG_fix2_logo_transparent_v2.py + backend/routes/launch.py"
     stuck_count: 0
     priority: "high"
     needs_retesting: false
@@ -118,13 +120,25 @@ backend:
       - working: true
         agent: "main"
         comment: |
-          Fix validé : _check_pricing accepte site.design.pricing_analysis.generated_at
-          OU ≥1 quick_scan avec site_id (peu importe verdict).
+          Nano Banana ne respecte pas la consigne `transparent background` malgré le prompt
+          (le logo source était en mode RGB = fond blanc opaque).
+          Fix 3 couches :
+          (1) Helper `remove_white_background()` + `ensure_alpha_channel()` dans favicon_generator.py
+              (détection pixels luminance > 245, alpha=0 + edge fade pour antialiasing).
+          (2) Script idempotent `lotG_fix2_logo_transparent_v2.py` : nettoie le logo source
+              en place (avec backup .rgb-backup.png) + regen 5 favicons.
+              Exécuté pour Altea : logo passe RGB → RGBA, 45% pixels transparents,
+              favicon-32 70% transparent, android-512 79% transparent.
+          (3) Pipeline `launch.py` : cleanup automatique du logo source via
+              `ensure_alpha_channel()` après chaque génération Nano Banana.
+              Tous les futurs sites auront un logo RGBA propre.
+          Idempotent — peut être réexécuté sans effet de bord.
 
-  - task: "Chantier 5 — seo_countries dissocié des ads_countries"
+frontend:
+  - task: "Lot G Fix 12 — ProductCard unifié (Home, Collection, Search, CrossSell)"
     implemented: true
     working: true
-    file: "backend/seo_constants.py + routes/sites.py"
+    file: "frontend/src/components/storefront/ProductCard.jsx + ProductGrid.jsx + CrossSellProducts.jsx + pages/StorefrontCollection.jsx + pages/StorefrontSearch.jsx"
     stuck_count: 0
     priority: "high"
     needs_retesting: true
@@ -132,70 +146,16 @@ backend:
       - working: true
         agent: "main"
         comment: |
-          - backend/seo_constants.py : source unique (ALL_SUPPORTED_COUNTRIES=11,
-            ALL_SUPPORTED_LANGS=6, LANG_BY_COUNTRY, CURRENCY_BY_COUNTRY,
-            get_seo_countries(), get_seo_langs(), filter_supported()).
-          - sites.py : seo_countries ajouté dans SiteCreateInput/SiteUpdateInput.
-            Défaut à la création = ALL_SUPPORTED_COUNTRIES (11 pays).
-            Endpoints GET /sites/{id}/seo-settings et PATCH /sites/{id}/seo-settings
-            (concepteur & admin). PATCH avec null = reset au défaut.
-          - Fallback runtime : anciens sites sans seo_countries → get_seo_countries()
-            renvoie ALL_SUPPORTED_COUNTRIES. Aucune migration DB nécessaire.
-          Tests curl OK sur site Fauteuil releveur (ads DE/FR, mais SEO
-          passe de 2 hreflang à 6 hreflang automatiquement).
+          ProductCard unifié remplace 4 designs distincts (Home/Collection/Search/CrossSell).
+          Design épuré premium type Apple Watch / Hermès : aspect-square, fond ivoire,
+          rounded-2xl, hover scale subtil, badges featured + promo, typo Cormorant.
+          2 modes : "default" (grilles principales) et "compact" (cross-sell).
+          Pas de CTA inline (clic → fiche). Visuel cohérent partout.
 
-  - task: "Chantier 5 — Sitemap + hreflang + llms.txt multi-langue"
+  - task: "Lot G Fix 13 — PageHero transparent (pages secondaires)"
     implemented: true
     working: true
-    file: "backend/routes/seo.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: true
-    status_history:
-      - working: true
-        agent: "main"
-        comment: |
-          - sitemap.xml itère sur get_seo_langs(site) au lieu de selected_countries.
-            Site Fauteuil releveur (ads DE/FR) passe de 2 hreflang à 6 hreflang.
-          - robots.txt liste maintenant llms.txt + llms-full.txt pour chaque langue
-            non-FR en plus des defaults.
-          - llms.txt supporte ?lang=fr|de|en|nl|it|es via LLMS_LABELS dict avec
-            6 traductions complètes des sections génériques (summary, keys, FAQ).
-            URL des pages + produits incluent ?lang=xx pour guider les moteurs IA.
-          - llms-full.txt supporte ?lang=xx avec lookup dans post.translations[lg]
-            pour les articles traduits (sinon fallback contenu source).
-          - merchant-feed.xml reste volontairement sur ads_countries (quotas
-            Google Merchant). Utilise CURRENCY_BY_COUNTRY centralisé.
-          Tests curl OK : langues DE/FR/NL/IT/ES/EN servies correctement.
-
-  - task: "Chantier 5 — Blog i18n (translations + auto-translate background)"
-    implemented: true
-    working: "NA"
-    file: "backend/routes/blog_posts.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: true
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: |
-          - BlogPostInput.translations = Optional[dict] (structure
-            {lang: {title, excerpt, body, translated_at}}).
-          - POST /sites/{id}/blog-posts/{slug}/translate : endpoint manuel
-            (data.langs optionnel, data.overwrite pour retraduire).
-          - create_blog_post + update_blog_post : BackgroundTasks.add_task
-            pour auto-translate en background sur TOUTES les langues seo_countries
-            manquantes. Content changed (title/excerpt/body) → invalide les
-            translations existantes et retranslate.
-          - Throttling via asyncio.Semaphore(1) pour ne pas exploser Claude.
-          - Best-effort : si EMERGENT_LLM_KEY manquant ou erreur Claude, log + skip.
-          Non-testé en live (pas d'article actuellement en DB). À vérifier
-          par le user à la 1re création d'article en prod.
-
-  - task: "Chantier 5 — Alignement sourcing.py (_translate_product → seo_countries)"
-    implemented: true
-    working: true
-    file: "backend/routes/sourcing.py"
+    file: "frontend/src/pages/StorefrontPages.jsx"
     stuck_count: 0
     priority: "medium"
     needs_retesting: true
@@ -203,23 +163,152 @@ backend:
       - working: true
         agent: "main"
         comment: |
-          Import route utilise désormais get_seo_langs(site) pour déterminer
-          les langues cibles de _translate_product (au lieu de dériver depuis
-          selected_countries). Conséquence : import d'un produit traduit
-          directement dans les 6 langues SEO, pas seulement les langues Ads.
+          Retrait du fond accent_color sur les <PageHero>. Hérite désormais du body
+          (transparent), border-bottom subtil. Texte H1 anthracite + eyebrow accent primary.
+          Cohérent multi-sites (s'adapte à toute palette).
+
+  - task: "Lot G Fix 1 — Testimonials Embla Carousel infini"
+    implemented: true
+    working: true
+    file: "frontend/src/components/storefront/Testimonials.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Migration de marquee CSS vers Embla Carousel. loop:true, dragFree:true,
+          autoplay setInterval 3.8s avec pause on hover. Boutons nav prev/next desktop.
+          6 portraits IA en DB Altea (3 v2 + 3 g6 récents). Cards 280×420 mobile,
+          320×480 desktop. Fallback DEFAULT (Unsplash) en mode FR si DB vide.
+
+  - task: "Lot G Fix 6 — ProductBundle filter role upsell/accessory"
+    implemented: true
+    working: true
+    file: "frontend/src/components/storefront/ProductBundle.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Filtre `isCompanion` (role ∈ {upsell, accessory, addon, accessoire}, case-insensitive).
+          S'applique aux 2 priorities : bundles_with explicites + fallback même catégorie
+          (qui devient "tous les produits du site filtrés"). Si zéro candidat → return null
+          (la section "Souvent achetés ensemble" disparaît proprement).
+          DB Altea : 3 produits role=upsell (coussin, cover, blanket) prêts à être bundlés.
+
+  - task: "Lot G Fix 3 — Mobile fiche produit edge-to-edge sous header"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/StorefrontProduct.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          - Galerie en `-mx-6 md:mx-0` (déjà en place) → image full-width mobile.
+          - Wrapper px-6 md:px-10 → `pt-0 md:pt-12` (était pt-8) → image collée au header.
+          - Breadcrumb caché en mobile (`hidden md:block`) → image juste sous le bandeau récap.
+          Desktop inchangé : breadcrumb + grid 1.1fr/1fr classique.
+
+  - task: "Lot G Fix 5 — 4 USPs Altea + helper pipeline"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/StorefrontProduct.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Carte grise (highlights bullets) remplacée par 4 USPs visuelles avec icônes :
+            Truck → Livraison offerte / sous 72h
+            ShieldCheck → Garantie 2 ans / incluse
+            ArrowsCounterClockwise → Retour gratuit / 14 jours
+            Headphones → Support 7j/7 / Conseillers experts
+          Wording exact validé user 2026-04-27. Lecture optionnelle de `design.usps`
+          (4 objets {icon, label, sub}) pour propagation multi-sites via helper Claude
+          Haiku dans le pipeline launch.py (à implémenter au prochain Lot).
+          Test : data-testid='product-usps' présent (1), product-usp-* (4).
+          data-testid='product-highlights' supprimé (0) confirmé.
+
+  - task: "Lot G Fix 9 — SEO Product complet (déjà très avancé)"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/StorefrontProduct.jsx + components/SEOHead.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Existant déjà solide :
+          - JSON-LD Product (sku, brand, offers, shippingDetails, MerchantReturnPolicy,
+            aggregateRating, reviews, priceValidUntil)
+          - JSON-LD BreadcrumbList
+          - JSON-LD FAQPage (conditionnel, 12 max)
+          - JSON-LD HowTo (conditionnel, usage_steps)
+          - SEOHead : title, description, canonical, OG (title/desc/type/locale/url/image/site_name),
+            Twitter (card/title/desc/image), keywords, robots max-image-preview:large,
+            hreflang multi-lang + x-default
+          - Alt textes déterministes via `altFor()` dans ProductGallery (style-aware)
+          - Image LCP : 1ère image en `loading="eager"`, autres en lazy
+          - H1 : `narrative.headline` Claude-generated (déjà brand-prefixed dans Altea :
+            "Fauteuil releveur électrique Altea — Massage intégré")
+          Améliorations apportées :
+          - SEOHead `image={getPrimaryImage(p)}` (priorité IA studio sur AliExpress)
+          - JSON-LD `image: getProductGallery(p).slice(0,6)` (gallerie IA d'abord)
+
+  - task: "Lot G Fix 10 — Hide Altiaro markup dans Domain Purchase UI"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/Domains.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Suppression de la mention "(coût OVH X€ + frais plateforme Y€)" affichée
+          au concepteur. Il ne voit que le prix TTC final (transparent commercial).
+
+  - task: "Lot G Fix 14 — /track avec StorefrontLayout"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/StorefrontTrack.jsx"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Déjà en place (line 64) : <StorefrontLayout site={site}>{contenu}</StorefrontLayout>.
+          Aucune modif nécessaire — confirmé visuellement, header + footer storefront cohérents.
 
 metadata:
   created_by: "main_agent"
-  version: "1.2"
+  version: "1.3"
   test_sequence: 0
   run_ui: false
 
 test_plan:
   current_focus:
-    - "Chantier 5 — seo_countries dissocié des ads_countries"
-    - "Chantier 5 — Sitemap + hreflang + llms.txt multi-langue"
-    - "Chantier 5 — Blog i18n (translations + auto-translate background)"
-    - "Chantier 5 — Alignement sourcing.py (_translate_product → seo_countries)"
+    - "Lot G Fix 12 — ProductCard unifié"
+    - "Lot G Fix 5 — 4 USPs Altea"
+    - "Lot G Fix 1 — Testimonials Embla Carousel"
+    - "Lot G Fix 2 — Logo transparent + favicons RGBA"
+    - "Lot G Fix 6 — ProductBundle filter role"
+    - "Lot G Fix 3 — Mobile edge-to-edge fiche produit"
+    - "Lot G Fix 13 — PageHero transparent"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -227,10 +316,17 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
-      Chantier 7 (Phase 2) livré. Dashboard analytics interne fonctionnel.
-      - Backend analytics.py : POST /public/track + GET overview/funnel/live
-      - StorefrontTracking.jsx : fire-and-forget parallèle à gtag
-      - SiteAnalytics.jsx : page premium avec recharts
-      - force_site_validated.py : helper dev pour tester l'UI
-      - seed_analytics.py : 50 events factices réalistes
-      Validation UI : KPIs + funnel + chart + top pays rendus avec data seedée.
+      Lot G livré (10 fixes finalisés) sur Altea.
+      - ProductCard unifié : 4 designs hétérogènes → 1 composant avec 2 modes (default/compact).
+      - Logo Altea : RGB → RGBA propre (45% pixels transparents, favicon 70-79%).
+        Pipeline launch.py auto-cleanse pour tous les futurs sites.
+      - Testimonials : marquee CSS → Embla Carousel infini avec autoplay 3.8s + pause on hover.
+      - 4 USPs visuelles avec wording exact Altea (Livraison 72h / Garantie 2 ans / Retour 14j / Support 7j/7).
+      - ProductBundle filtre role={upsell, accessory} → bundle propre des 3 upsells DB Altea.
+      - Mobile fiche produit : breadcrumb caché + pt-0 → image edge-to-edge collée au header.
+      - PageHero : fond accent retiré → transparent (hérite body).
+      - SEO Product : déjà excellent (JSON-LD x4 + OG + Twitter + hreflang + alt + LCP),
+        amélioré pour utiliser getPrimaryImage/getProductGallery (priorité IA).
+      - Domain Purchase UI : markup interne caché au concepteur.
+      Tous les fixes lintés OK (Python ruff + JS eslint). Backend + frontend redémarrés.
+      Validation visuelle preview faite. Prêt pour testing automatisé si user le demande.

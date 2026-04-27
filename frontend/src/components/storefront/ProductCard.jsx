@@ -1,22 +1,23 @@
 /**
- * Lot G Fix 12 — ProductCard unifié, réutilisable sur :
- * - StorefrontHome (grille principale)
- * - StorefrontCollection (page collection)
- * - StorefrontSearch (résultats)
- * - CrossSellProducts (cross-sell sur fiche produit)
- * - UpsellsRecommendations (upsells)
- * - FeaturedProduct (mise en avant)
+ * Lot G Fix 12 — ProductCard unifié, source de vérité pour TOUTES les cards
+ * produit du storefront (Home, Collection, Search, CrossSell, Upsells, Bundle...).
  *
- * Une seule source de vérité pour le rendu des cards = cohérence visuelle
- * absolue (image studio, prix, typo, ratio, hover) sur toutes les surfaces.
+ * Design : épuré premium type Apple Watch / Hermès — aspect-square, image en
+ * vedette sur fond ivoire (`#F5F2EB`) avec coins légèrement arrondis, badge
+ * featured + badge promo, hover scale subtil, titre en Cormorant et prix en
+ * Manrope. Pas de CTA add-to-cart inline (clic → fiche produit, plus premium).
  *
- * Layout :
- *   Desktop (≥lg) : 3 colonnes (parent doit fournir grid-cols-3)
- *   Tablette (md..lg) : 2 colonnes
- *   Mobile (<md)  : 1 colonne pleine largeur
+ * Modes :
+ *   variant="default"  → grille principale (Home, Collection, Search)
+ *   variant="compact"  → mini-card (cross-sell, bundle, upsells dans sidebar)
  *
- * Ce composant ne contient pas la grille — juste 1 card. Le parent
- * doit utiliser : `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6`
+ * Usage parent :
+ *   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+ *     {products.map(p => <ProductCard key={p.id} product={p} siteId={siteId} ... />)}
+ *   </div>
+ *
+ * Le composant n'inclut PAS de grid : c'est la responsabilité du parent.
+ * Mobile edge-to-edge : passer `edgeToEdge` (radius 0, image full-width).
  */
 import React from "react";
 import { Link } from "react-router-dom";
@@ -30,8 +31,14 @@ export default function ProductCard({
   siteId,
   lang = "fr",
   design,
+  variant = "default", // "default" | "compact"
+  edgeToEdge = false,  // true → no rounding (mobile edge-to-edge)
+  showRating = true,
+  showFeaturedBadge = true,
+  showPromoBadge = true,
   className = "",
   testId,
+  href, // override URL (pour cas spécial : non-cliquable, non-storefront, etc.)
 }) {
   if (!product) return null;
   const name = pickLang(product.name, lang) || product.name || "—";
@@ -41,17 +48,38 @@ export default function ProductCard({
   const rating = product.rating || product.aggregate_rating?.value;
   const reviewsCount = product.reviews_count || product.aggregate_rating?.count;
   const imageSrc = getPrimaryImage(product);
+  const isFeatured = !!product.featured;
+  const hasPromo = !!compareAt && compareAt > price;
+  const promoPct = hasPromo ? Math.round(((compareAt - price) / compareAt) * 100) : 0;
+
   const { primary, fontHeading, textMuted, textFaint } = designAccents(design);
-  const url = `/shop/${siteId}/product/${product.id}`;
+  const url = href || `/shop/${siteId}/product/${product.id}`;
+
+  const isCompact = variant === "compact";
+
+  // Sizing tokens — compact = plus petit (cross-sell, bundle)
+  const titleClass = isCompact
+    ? "text-[14px] md:text-[15px] leading-tight tracking-tight line-clamp-2"
+    : "text-[16px] md:text-[18px] leading-snug tracking-tight line-clamp-2";
+  const priceClass = isCompact
+    ? "text-[14px] md:text-[15px] font-semibold tabular-nums"
+    : "text-[17px] md:text-[18px] font-semibold tabular-nums";
+  const compareClass = isCompact ? "text-[12px] line-through" : "text-[13px] line-through";
+  const imageRadius = edgeToEdge
+    ? "rounded-none"
+    : isCompact
+    ? "rounded-xl"
+    : "rounded-2xl";
+  const wrapperPad = isCompact ? "pt-3" : "pt-4 md:pt-5";
 
   return (
     <Link
       to={url}
       data-testid={testId || `product-card-${product.id}`}
-      className={`group block ${className}`}
+      className={`group block focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2 ${className}`}
     >
       {/* IMAGE — aspect carré, fond ivoire, hover scale subtil */}
-      <div className="aspect-square relative overflow-hidden bg-[#F5F2EB]">
+      <div className={`aspect-square relative overflow-hidden bg-[#F5F2EB] ${imageRadius}`}>
         {imageSrc ? (
           <img
             src={imageSrc}
@@ -61,40 +89,66 @@ export default function ProductCard({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center" style={{ color: textFaint }}>
-            <ShoppingBagOpen size={56} weight="thin" />
+            <ShoppingBagOpen size={isCompact ? 44 : 56} weight="thin" />
           </div>
         )}
-        {/* Badge promo si compare_at > price */}
-        {compareAt && compareAt > price && (
-          <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-neutral-900">
-            -{Math.round(((compareAt - price) / compareAt) * 100)}%
+
+        {/* Badge featured (top-left) */}
+        {showFeaturedBadge && isFeatured && (
+          <div
+            className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm px-2.5 py-1 text-[10px] uppercase tracking-[0.22em] font-semibold rounded-full flex items-center gap-1"
+            style={{ color: primary }}
+          >
+            <Star size={9} weight="fill" style={{ color: "#F5B800" }} /> Phare
+          </div>
+        )}
+
+        {/* Badge promo (top-right) */}
+        {showPromoBadge && hasPromo && (
+          <div
+            className="absolute top-3 right-3 text-white text-[11px] font-semibold px-2 py-1 rounded-full tracking-tight"
+            style={{ background: "#1C1917" }}
+          >
+            −{promoPct}%
           </div>
         )}
       </div>
 
       {/* INFOS — typo Cormorant titre + Manrope prix */}
-      <div className="pt-5 px-1">
+      <div className={`${wrapperPad} px-1`}>
         <h3
-          className="text-[18px] md:text-[19px] leading-[1.25] tracking-[-0.005em] mb-2 line-clamp-2"
-          style={{ fontFamily: `"${fontHeading}", serif`, fontWeight: 400, color: "#1a1a1a" }}
+          className={titleClass}
+          style={{
+            fontFamily: `"${fontHeading}", serif`,
+            fontWeight: 500,
+            color: "#1a1a1a",
+          }}
         >
           {name}
         </h3>
+
         {/* Rating si disponible */}
-        {rating && (
-          <div className="flex items-center gap-1 mb-2 text-[12px]" style={{ color: textMuted }}>
-            <Star size={12} weight="fill" style={{ color: primary }} />
-            <span>{Number(rating).toFixed(1)}</span>
-            {reviewsCount && <span className="opacity-60">· {reviewsCount}</span>}
+        {showRating && rating && (
+          <div
+            className="flex items-center gap-1 mt-2 text-[12px]"
+            style={{ color: textMuted }}
+            data-testid={`product-rating-${product.id}`}
+          >
+            <Star size={12} weight="fill" style={{ color: "#F5B800" }} />
+            <span className="font-medium">{Number(rating).toFixed(1)}</span>
+            {reviewsCount ? (
+              <span className="opacity-60">· {reviewsCount} avis</span>
+            ) : null}
           </div>
         )}
+
         {/* Prix */}
-        <div className="flex items-baseline gap-2 mt-1">
-          <span className="text-[15px] font-medium" style={{ color: "#1a1a1a" }}>
+        <div className="flex items-baseline gap-2 mt-2">
+          <span className={priceClass} style={{ color: primary }}>
             {formatPrice(price, currency, lang)}
           </span>
-          {compareAt && compareAt > price && (
-            <span className="text-[13px] line-through" style={{ color: textFaint }}>
+          {hasPromo && (
+            <span className={compareClass} style={{ color: textFaint }}>
               {formatPrice(compareAt, currency, lang)}
             </span>
           )}

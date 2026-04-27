@@ -10,6 +10,7 @@ import SEOHead from "../components/SEOHead";
 import { pickLang, t } from "../lib/i18n";
 import { useSiteAndLang, designAccents, formatPrice, buildHreflangs, BACKEND_URL } from "../components/storefront/storefrontUtils";
 import { getPrimaryImage } from "../lib/productImage";
+import ProductCard from "../components/storefront/ProductCard";
 
 const SORT_OPTIONS = [
   { value: "featured", label: "Mis en avant" },
@@ -404,49 +405,15 @@ export function StorefrontCollection() {
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-8" data-testid="collection-grid">
             {products.map((p) => (
-              <Link
+              <ProductCard
                 key={p.id}
-                to={`/shop/${siteId}/product/${p.id}`}
-                data-testid={`collection-product-${p.id}`}
-                className="group block"
-              >
-                <div className="aspect-square bg-[#F5F2EB] rounded-2xl overflow-hidden relative mb-4">
-                  {(() => { const _src = getPrimaryImage(p); return _src ? (
-                    <img src={_src} alt={pickLang(p.name, lang)} loading="lazy" className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700 ease-out" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-neutral-300">
-                      <ShoppingBagOpen size={56} weight="thin" />
-                    </div>
-                  ); })()}
-                  {p.featured && (
-                    <div className="absolute top-4 left-4 text-white text-[10px] uppercase tracking-widest font-semibold px-3 py-1.5 rounded-full backdrop-blur-sm flex items-center gap-1"
-                         style={{ background: `${primary}dd` }}>
-                      <Star size={10} weight="fill" /> Phare
-                    </div>
-                  )}
-                  {p.compare_at_price && p.compare_at_price > p.price && (
-                    <div className="absolute top-4 right-4 text-white text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ background: "#1C1917" }}>
-                      -{Math.round((1 - p.price / p.compare_at_price) * 100)}%
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <div className="text-[15px] md:text-lg font-semibold leading-tight mb-1 group-hover:opacity-70 transition text-neutral-900"
-                       style={{ fontFamily: `${fontHeading}, serif` }}>
-                    {pickLang(p.name, lang)}
-                  </div>
-                  <div className="flex items-baseline gap-2 mt-2">
-                    <span className="text-lg md:text-xl font-semibold" style={{ color: primary }}>
-                      {formatPrice(p.price, p.currency, lang)}
-                    </span>
-                    {p.compare_at_price && p.compare_at_price > p.price && (
-                      <span className="text-sm line-through text-neutral-400">
-                        {formatPrice(p.compare_at_price, p.currency, lang)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </Link>
+                product={p}
+                siteId={siteId}
+                lang={lang}
+                design={design}
+                variant="default"
+                testId={`collection-product-${p.id}`}
+              />
             ))}
           </div>
         )}

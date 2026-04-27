@@ -4,6 +4,7 @@ import axios from "axios";
 import StorefrontLayout, { useSiteData } from "../components/StorefrontLayout";
 import { MagnifyingGlass } from "@phosphor-icons/react";
 import { getPrimaryImage } from "../lib/productImage";
+import ProductCard from "../components/storefront/ProductCard";
 
 const BACKEND = "";
 
@@ -59,17 +60,15 @@ export default function StorefrontSearch() {
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {results.map((p) => (
-            <Link to={`/shop/${siteId}/product/${p.id}`} key={p.id} data-testid={`search-result-${p.id}`}
-              className="group block bg-white border border-neutral-200 rounded-2xl overflow-hidden hover:border-neutral-900 transition">
-              <div className="aspect-[4/3] bg-neutral-100 overflow-hidden">
-                {(() => { const _src = getPrimaryImage(p); return _src ? <img src={_src} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-700" /> : null; })()}
-              </div>
-              <div className="p-5">
-                <h3 className="font-medium mb-1 line-clamp-2">{p.name}</h3>
-                {p.short_description && <p className="text-xs text-neutral-500 line-clamp-2 mb-2">{p.short_description}</p>}
-                <div className="font-semibold tabular-nums">{(p.price_eur || p.price || 0).toFixed(2)} €</div>
-              </div>
-            </Link>
+            <ProductCard
+              key={p.id}
+              product={p}
+              siteId={siteId}
+              lang="fr"
+              design={site.design}
+              variant="default"
+              testId={`search-result-${p.id}`}
+            />
           ))}
         </div>
       </div>

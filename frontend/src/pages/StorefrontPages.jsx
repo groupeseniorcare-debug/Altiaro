@@ -63,15 +63,18 @@ function MarkdownLite({ md }) {
 }
 
 function PageHero({ eyebrow, title, subtitle, design }) {
+  // Lot G Fix 13 — fond transparent (hérite du body) au lieu d'un bloc coloré.
+  // Le H1 reste premium en serif anthracite, eyebrow accent primary du site.
   const fontHeading = design?.brand?.font_heading || "Fraunces";
   const primary = design?.brand?.primary_color || "#B84B31";
-  const accent = design?.brand?.accent_color || "#F5F2EB";
   return (
-    <section className="border-b" style={{ background: accent, borderColor: "#E7E5E4" }}>
-      <div className="max-w-4xl mx-auto px-6 md:px-10 py-16 md:py-20">
-        <div className="text-[11px] uppercase tracking-[0.2em] mb-3 font-medium" style={{ color: primary }}>
-          {eyebrow}
-        </div>
+    <section className="border-b border-stone-200/60">
+      <div className="max-w-4xl mx-auto px-6 md:px-10 py-14 md:py-20">
+        {eyebrow && (
+          <div className="text-[11px] uppercase tracking-[0.2em] mb-3 font-medium" style={{ color: primary }}>
+            {eyebrow}
+          </div>
+        )}
         <h1
           className="text-4xl md:text-5xl lg:text-6xl leading-[1.05] tracking-tight text-neutral-900"
           style={{ fontFamily: `"${fontHeading}", serif` }}

@@ -17,8 +17,11 @@ import {
   ShieldCheck,
   Truck,
   Star,
+  ArrowsCounterClockwise,
+  Headphones,
 } from "@phosphor-icons/react";
 import SEOHead from "../components/SEOHead";
+import { getPrimaryImage, getProductGallery } from "../lib/productImage";
 
 import {
   BACKEND_URL,
@@ -153,7 +156,7 @@ export function StorefrontProduct() {
             ? `${window.location.origin}/shop/${siteId}/product/${p.id}`
             : undefined
         }
-        image={p.images?.[0]}
+        image={getPrimaryImage(p)}
         type="product"
         siteName={site?.name}
         keywords={
@@ -167,7 +170,7 @@ export function StorefrontProduct() {
             "@type": "Product",
             name: pickLang(p.name, lang),
             description: p.narrative?.subheadline || pickLang(p.description, lang),
-            image: p.images || [],
+            image: getProductGallery(p).slice(0, 6),
             sku: p.sku,
             mpn: p.sku,
             brand: { "@type": "Brand", name: site?.name },
@@ -272,9 +275,12 @@ export function StorefrontProduct() {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-6 md:px-10 pt-8 md:pt-12 pb-12">
+        <div className="max-w-7xl mx-auto px-6 md:px-10 pt-0 md:pt-12 pb-12">
+          {/* Lot G Fix 3 — breadcrumb caché en mobile pour que l'image soit
+              EDGE-TO-EDGE directement sous le header (premium type Apple).
+              Sur desktop, breadcrumb premium classique au-dessus de la grid. */}
           <nav
-            className="text-[11px] uppercase tracking-[0.25em] mb-10"
+            className="hidden md:block text-[11px] uppercase tracking-[0.25em] mb-10"
             style={{ color: "#737373" }}
             data-testid="product-breadcrumb"
           >
@@ -379,26 +385,44 @@ export function StorefrontProduct() {
                 </div>
               )}
 
+              {/* Lot G Fix 5 — 4 USPs premium (cards visuelles avec icône) au lieu
+                  de la carte grise highlights. Wording exact Altea (validation user
+                  2026-04-27). Lecture optionnelle de `design.usps` pour propagation
+                  multi-sites via helper Claude Haiku dans le pipeline launch.py. */}
               {(() => {
-                const highlights = (p.narrative?.benefits || p.highlights || [])
-                  .map((h) => (typeof h === "string" ? h : pickLang(h, lang) || h?.fr))
-                  .filter(Boolean).slice(0, 4);
-                const list = highlights.length ? highlights : [
-                  t(lang, "product_highlight_delivery_72h"),
-                  t(lang, "product_highlight_warranty_2y"),
-                  t(lang, "product_highlight_returns_14d"),
-                  t(lang, "product_highlight_support_7d"),
+                const ALTEA_USPS = [
+                  { Icon: Truck, label: "Livraison offerte", sub: "sous 72h" },
+                  { Icon: ShieldCheck, label: "Garantie 2 ans", sub: "incluse" },
+                  { Icon: ArrowsCounterClockwise, label: "Retour gratuit", sub: "14 jours" },
+                  { Icon: Headphones, label: "Support 7j/7", sub: "Conseillers experts" },
                 ];
+                const ICON_MAP = { truck: Truck, shield: ShieldCheck, returns: ArrowsCounterClockwise, support: Headphones, headphones: Headphones };
+                // Si pipeline a généré des USPs custom pour le site, les utiliser
+                const customUsps = Array.isArray(design?.usps) && design.usps.length === 4
+                  ? design.usps.map((u) => ({
+                      Icon: ICON_MAP[u.icon] || Truck,
+                      label: u.label || "",
+                      sub: u.sub || "",
+                    }))
+                  : null;
+                const usps = customUsps || ALTEA_USPS;
                 return (
                   <ul
-                    className="mt-8 p-5 space-y-2.5"
-                    style={{ background: "#F5F5F5", borderRadius: "2px" }}
-                    data-testid="product-highlights"
+                    className="mt-8 grid grid-cols-2 gap-2.5"
+                    data-testid="product-usps"
                   >
-                    {list.map((h, i) => (
-                      <li key={i} className="flex items-start gap-2.5 text-[13.5px] leading-snug" style={{ color: "#262626" }}>
-                        <Check size={14} weight="bold" className="mt-[3px] shrink-0" style={{ color: "#0A0A0A" }} />
-                        <span>{h}</span>
+                    {usps.map(({ Icon, label, sub }, i) => (
+                      <li
+                        key={i}
+                        className="flex items-start gap-3 px-4 py-3.5 bg-white border border-stone-200"
+                        style={{ borderRadius: "2px" }}
+                        data-testid={`product-usp-${i}`}
+                      >
+                        <Icon size={20} weight="regular" className="shrink-0 mt-0.5" style={{ color: "#0A0A0A" }} />
+                        <div className="min-w-0">
+                          <div className="text-[13px] font-semibold leading-tight" style={{ color: "#0A0A0A" }}>{label}</div>
+                          {sub && <div className="text-[11.5px] mt-0.5 leading-tight" style={{ color: "#737373" }}>{sub}</div>}
+                        </div>
                       </li>
                     ))}
                   </ul>

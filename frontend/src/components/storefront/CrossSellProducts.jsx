@@ -5,6 +5,7 @@ import { ArrowRight, ShoppingBagOpen, Star } from "@phosphor-icons/react";
 import { pickLang, t } from "../../lib/i18n";
 import { BACKEND_URL, designAccents, formatPrice } from "./storefrontUtils";
 import { getPrimaryImage } from "../../lib/productImage";
+import ProductCard from "./ProductCard";
 
 /**
  * Cross-sell — "Vous aimerez aussi" : 4 produits complémentaires.
@@ -54,33 +55,17 @@ export default function CrossSellProducts({ currentProduct, lang = "fr", design 
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
         {displayed.map((p) => (
-          <Link
+          <ProductCard
             key={p.id}
-            to={hasReal ? `/shop/${siteId}/product/${p.id}` : `/shop/${siteId}`}
-            data-testid={`xsell-${p.id}`}
-            className="group block"
-          >
-            <div className="aspect-square bg-[#F5F2EB] rounded-2xl overflow-hidden relative mb-3">
-              {(() => { const _src = getPrimaryImage(p); return _src ? (
-                <img src={_src} alt={pickLang(p.name, lang) || p.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-neutral-300">
-                  <ShoppingBagOpen size={48} weight="thin" />
-                </div>
-              ); })()}
-              {p.featured && (
-                <div className="absolute top-3 left-3 text-white text-[10px] uppercase tracking-widest font-semibold px-2 py-1 rounded-full flex items-center gap-1" style={{ background: `${primary}dd` }}>
-                  <Star size={9} weight="fill" /> Phare
-                </div>
-              )}
-            </div>
-            <div className="text-[14px] md:text-[15px] font-semibold leading-tight group-hover:opacity-70 transition text-neutral-900 line-clamp-2" style={{ fontFamily: `"${fontHeading}", serif` }}>
-              {pickLang(p.name, lang) || p.name}
-            </div>
-            <div className="text-base font-semibold mt-1.5" style={{ color: primary }}>
-              {formatPrice(p.price, p.currency, lang)}
-            </div>
-          </Link>
+            product={p}
+            siteId={siteId}
+            href={hasReal ? undefined : `/shop/${siteId}`}
+            lang={lang}
+            design={design}
+            variant="compact"
+            showRating={false}
+            testId={`xsell-${p.id}`}
+          />
         ))}
       </div>
     </section>
