@@ -578,3 +578,92 @@ async def admin_domain_status(
             out["ovh"] = {"error": str(e)[:200]}
 
     return out
+
+
+@router.post(
+    "/admin/domains/{domain_id}/force-complete",
+    tags=["domain-manual-purchase"],
+    summary="Admin : force la finalisation OVH d'un domaine (parade webhook preview down)",
+)
+async def admin_domain_force_complete(
+    domain_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Force le déclenchement de `complete_domain_purchase()` pour un record
+    `domains` donné, en parade au cas où Mollie n'a pas pu joindre le webhook
+    (preview Emergent down, etc.).
+
+    Sécurité :
+    - Réservé aux admins.
+    - Vérifie côté Mollie API que le paiement est bien `paid` avant de
+      déclencher l'achat OVH (pas de finalisation gratuite).
+    - Idempotent : si l'achat OVH est déjà fait, retourne le record tel quel.
+
+    Workflow attendu :
+    1. L'utilisateur paie via le checkout_url Mollie
+    2. Si le webhook ne déclenche pas (preview down) → admin appelle cet endpoint
+    3. On vérifie via API Mollie que le paiement est `paid`
+    4. On déclenche `complete_domain_purchase(payment_id, paid=True)` qui
+       appelle `_execute_ovh_purchase()` → cron auto-DNS finalise.
+    """
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Admin only")
+
+    record = await db.domains.find_one({"id": domain_id}, {"_id": 0})
+    if not record:
+        raise HTTPException(404, "Domaine inconnu")
+
+    # Idempotence
+    if record.get("status") in ("purchased", "dns_configured", "active"):
+        return {
+            "ok": True,
+            "already_done": True,
+            "status": record.get("status"),
+            "ovh_order_id": record.get("ovh_order_id"),
+        }
+
+    payment_id = record.get("mollie_payment_id")
+    if not payment_id:
+        raise HTTPException(400, "Aucun mollie_payment_id sur ce record.")
+
+    # Verify payment is actually paid via Mollie API (anti-fraud)
+    from routes.payments import _get_client as _mollie_client
+    try:
+        client, mode = _mollie_client()
+        payment = client.payments.get(payment_id)
+    except Exception as e:
+        raise HTTPException(502, f"Mollie API : {str(e)[:200]}")
+
+    is_paid = bool(payment.is_paid()) if hasattr(payment, "is_paid") else False
+    if not is_paid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Paiement Mollie non confirmé (status={getattr(payment, 'status', '?')}). "
+                   f"Refuse de finaliser l'achat OVH tant que le paiement n'est pas `paid`.",
+        )
+
+    # Trigger the same handler the webhook would have triggered
+    from routes.ovh_domains import complete_domain_purchase
+    try:
+        await complete_domain_purchase(payment_id, True)
+    except Exception as e:
+        logger.exception("force-complete: complete_domain_purchase failed")
+        raise HTTPException(502, f"OVH purchase failed : {str(e)[:200]}")
+
+    refreshed = await db.domains.find_one({"id": domain_id}, {"_id": 0})
+    logger.info(
+        f"[force-complete] admin {user.get('email')} forced completion "
+        f"for {refreshed.get('domain')} (record {domain_id}) → "
+        f"status={refreshed.get('status')} ovh_order={refreshed.get('ovh_order_id')}"
+    )
+    return {
+        "ok": True,
+        "forced": True,
+        "by": user.get("email"),
+        "mollie_payment_id": payment_id,
+        "mollie_status": getattr(payment, "status", None),
+        "domain": refreshed.get("domain"),
+        "status": refreshed.get("status"),
+        "ovh_order_id": refreshed.get("ovh_order_id"),
+        "ovh_error": refreshed.get("ovh_error"),
+    }
