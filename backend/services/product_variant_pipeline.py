@@ -49,7 +49,7 @@ from services.color_variant_images import (
 )
 from services.image_qa import (
     GEMINI_VISION_USD_PER_CALL,
-    analyze_source_product,
+    analyze_source_product_multi,
     qa_check_generated_image,
 )
 from services.llm_resilience import LLMUnavailableError, safe_nano_banana_bytes
@@ -81,10 +81,18 @@ IDENTITY_BLOCK = (
     "MUST be the SAME exact model, SAME exact finish, SAME exact proportions. "
     "Never substitute one material for another, never alter the silhouette, "
     "never add or remove buttons, seams, or technical features.\n\n"
+    "SILHOUETTE SIGNATURE LOCK — The product is uniquely identified by these "
+    "formal traits, ALL of which MUST be visible in the rendered image (where "
+    "the framing allows): {silhouette_signature}. If a trait is invisible due "
+    "to framing (e.g. base hidden by closeup), it is fine — but no trait may "
+    "be ALTERED, REPLACED or REMOVED. Number of armrests, number of cushions, "
+    "type of base/legs, headrest shape — all FIXED.\n\n"
+    "VISIBLE FEATURES — Where the framing shows them, these technical elements "
+    "must remain visible and IDENTICAL: {unique_features_visible}.\n\n"
     "MATERIAL LOCK — The upholstery / surface material is: {material}. "
-    "This material is FIXED across all 8 images. NEVER substitute leather "
-    "for fabric or fabric for leather. The texture, grain, weave and finish "
-    "must look IDENTICAL to the reference.\n\n"
+    "This material is FIXED across all 8 images. NEVER substitute one material "
+    "for another (leather <-> fabric <-> microsuede <-> velvet are all DIFFERENT). "
+    "The texture, grain, weave and finish must look IDENTICAL to the reference.\n\n"
     "COLOR LOCK — The exact color of the {product_kind} upholstery is: "
     "{color} (target color label: {color_label_en}). Identical undertone, "
     "identical finish (matte/satin/glossy as in reference) across all images.\n\n"
@@ -276,9 +284,15 @@ def build_style_prompt(
     material: str,
     color: str,
     color_label_en: str,
+    silhouette_signature: str = "",
+    unique_features_visible: str = "",
 ) -> str:
-    fmt = dict(product_kind=product_kind, material=material,
-               color=color, color_label_en=color_label_en)
+    fmt = dict(
+        product_kind=product_kind, material=material,
+        color=color, color_label_en=color_label_en,
+        silhouette_signature=silhouette_signature or "wide armrests, defined backrest, structured base",
+        unique_features_visible=unique_features_visible or "the product as shown in the reference",
+    )
     identity = IDENTITY_BLOCK.format(**fmt)
     scene = style["scene"].format(**fmt)
     negative = NEGATIVE_BLOCK.format(**fmt)
@@ -305,17 +319,21 @@ async def _generate_one_style(
     product_kind: str,
     material: str,
     color_descriptor: str,
+    silhouette_signature: str,
+    unique_features_visible: str,
     reference_image_b64: str,
     request_id_prefix: str,
     qa_enabled: bool = True,
     max_retries: int = 2,
 ) -> Optional[Dict[str, Any]]:
-    """Generate one style image. Runs Gemini Vision QA against the reference
-    + style brief. Retries up to `max_retries` (default 2) on QA failure.
-    Returns None on definitive failure (caller may flag the slot as
-    `failed_qa`)."""
+    """Generate one style image. Runs Gemini Vision QA (6 strict booleans)
+    against the reference + style brief + silhouette signature. Retries up
+    to `max_retries` (default 2) on QA failure. Returns None on definitive
+    failure (caller does not persist; storefront falls back to source AE)."""
     prompt = build_style_prompt(
         style, product_kind, material, color_descriptor, color_label_en,
+        silhouette_signature=silhouette_signature,
+        unique_features_visible=unique_features_visible,
     )
     last_qa: Optional[Dict[str, Any]] = None
 
@@ -365,9 +383,13 @@ async def _generate_one_style(
                     style_brief=style["scene"].format(
                         product_kind=product_kind, material=material,
                         color=color_descriptor, color_label_en=color_label_en,
+                        silhouette_signature=silhouette_signature or "",
+                        unique_features_visible=unique_features_visible or "",
                     ),
                     expected_material=material,
                     expected_color=color_descriptor,
+                    silhouette_signature=silhouette_signature,
+                    unique_features_visible=unique_features_visible,
                     request_id=f"qa-{request_id_prefix}-{style['slug']}-a{attempt}",
                 )
                 last_qa = qa
@@ -467,6 +489,8 @@ async def generate_full_variant_set(
         {
             "_id": 0, "id": 1, "name": 1, "variants": 1,
             "generated_images": 1, "generated_images_by_variant": 1,
+            "images": 1, "original_images": 1, "original_image": 1,
+            "source_vision_lock": 1,
         },
     )
     if not p:
@@ -511,26 +535,82 @@ async def generate_full_variant_set(
     request_id = request_id or f"vpipe-{product_id[:8]}-{color_slug}"
 
     # ---------------------------------------------------------------
-    # Phase 2.2 v2 — Source analysis : run Gemini Vision ONCE on the
-    # reference image to extract the locked material/color/product_kind
-    # descriptors that will be injected into every per-style prompt.
+    # Phase 2.2 v3 — Multi-image source analysis : run Gemini Vision
+    # ONCE on ALL the source AE/CJ photos (up to 6) to build a
+    # `source_vision_lock` dict with 5 sub-fields injected into every
+    # per-style prompt :
+    #   product_kind, material, color, silhouette_signature, unique_features_visible
+    # The lock is cached at product-level (invariant across variants),
+    # only the per-variant `color_descriptor` overrides the base color.
     # ---------------------------------------------------------------
-    try:
-        source = await analyze_source_product(ref_b64, request_id=f"{request_id}-source")
-        budget.add_source_analysis()
-        material = source["material"]
-        color_descriptor = source["color"]
-        # Use the Vision-detected product_kind if more specific (e.g.
-        # "lift recliner armchair" vs heuristic "armchair")
-        if source.get("product_kind") and len(source["product_kind"]) > len(product_kind):
-            product_kind = source["product_kind"]
-    except Exception as e:
-        logger.warning(
-            f"[variant-pipeline] {request_id} source analysis failed: {str(e)[:200]} "
-            "— falling back to generic material/color descriptors"
-        )
-        material = "fabric upholstery, woven texture"
-        color_descriptor = f"{target_color_en}, matte finish"
+    cached_lock = (p.get("source_vision_lock") or {}) if isinstance(p.get("source_vision_lock"), dict) else {}
+    source_lock: Dict[str, Any] = dict(cached_lock)
+    silhouette_signature = ""
+    unique_features_visible = ""
+
+    if not cached_lock or "silhouette_signature" not in cached_lock:
+        # Build the multi-image source set from `original_images` (best),
+        # else `images`, else fall back to the reference `ref_b64`.
+        source_urls: List[str] = []
+        for u in (p.get("original_images") or []):
+            if isinstance(u, str) and u and u not in source_urls:
+                source_urls.append(u)
+        if not source_urls:
+            for u in (p.get("images") or []):
+                if isinstance(u, str) and u and u not in source_urls:
+                    source_urls.append(u)
+        if not source_urls and p.get("original_image"):
+            source_urls.append(p["original_image"])
+        # Cap to 6
+        source_urls = source_urls[:6]
+
+        source_b64_list: List[str] = []
+        for u in source_urls:
+            try:
+                b = await _fetch_image_b64(u)
+                if b:
+                    source_b64_list.append(b)
+            except Exception as _e:
+                logger.warning(f"[variant-pipeline] {request_id}: source img fetch failed {u[:80]}: {str(_e)[:120]}")
+        if not source_b64_list:
+            source_b64_list = [ref_b64]
+
+        try:
+            source_lock_new = await analyze_source_product_multi(
+                source_b64_list,
+                color_hint=color_label,
+                request_id=f"{request_id}-source-multi",
+            )
+            budget.add_source_analysis()
+            source_lock = source_lock_new
+            # Persist at product-level for future runs (cache)
+            await db.products.update_one(
+                {"id": product_id},
+                {"$set": {
+                    "source_vision_lock": source_lock,
+                    "source_vision_lock_updated_at": datetime.now(timezone.utc).isoformat(),
+                    "source_vision_lock_n_images": len(source_b64_list),
+                }},
+            )
+        except Exception as e:
+            logger.warning(
+                f"[variant-pipeline] {request_id} multi-source analysis failed: {str(e)[:200]} "
+                "— falling back to generic descriptors"
+            )
+            source_lock = {
+                "product_kind":            product_kind,
+                "material":                "fabric upholstery, woven texture",
+                "color":                   f"{target_color_en}, matte finish",
+                "silhouette_signature":    "",
+                "unique_features_visible": "",
+            }
+
+    material = source_lock.get("material") or "fabric upholstery"
+    color_descriptor = source_lock.get("color") or f"{target_color_en}, matte finish"
+    if source_lock.get("product_kind") and len(source_lock["product_kind"]) > len(product_kind):
+        product_kind = source_lock["product_kind"]
+    silhouette_signature = source_lock.get("silhouette_signature") or ""
+    unique_features_visible = source_lock.get("unique_features_visible") or ""
 
     new_images: List[Dict[str, Any]] = []
     skipped: List[str] = []
@@ -568,6 +648,8 @@ async def generate_full_variant_set(
             product_kind=product_kind,
             material=material,
             color_descriptor=color_descriptor,
+            silhouette_signature=silhouette_signature,
+            unique_features_visible=unique_features_visible,
             reference_image_b64=ref_b64,
             request_id_prefix=request_id,
             qa_enabled=True,
@@ -608,6 +690,8 @@ async def generate_full_variant_set(
             "generated_images_locked_material": material,
             "generated_images_locked_color": color_descriptor,
             "generated_images_locked_product_kind": product_kind,
+            "generated_images_locked_silhouette": silhouette_signature,
+            "generated_images_locked_features": unique_features_visible,
         }},
     )
 
@@ -617,10 +701,13 @@ async def generate_full_variant_set(
         "color_slug": color_slug,
         "color_label": color_label,
         "locked": {
-            "material": material,
-            "color": color_descriptor,
-            "product_kind": product_kind,
+            "product_kind":            product_kind,
+            "material":                material,
+            "color":                   color_descriptor,
+            "silhouette_signature":    silhouette_signature,
+            "unique_features_visible": unique_features_visible,
         },
+        "source_vision_lock": source_lock,
         "images": final_for_color,
         "new_images_count": len(new_images),
         "skipped_styles": skipped,

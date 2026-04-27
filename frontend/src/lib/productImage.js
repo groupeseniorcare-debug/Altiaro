@@ -38,12 +38,17 @@ const GALLERY_EXCLUDED_STYLES = new Set(["wide_lifestyle", "studio_card"]);
 
 /**
  * Extrait l'URL d'un item generated_images (objet ou string).
+ * Phase 2.2 v3 : si `qa_passed === false`, l'image est REJETÉE
+ * (fallback sur l'image source AE plus loin dans la chaîne).
  * @param {object|string} item
  * @returns {string|null}
  */
 function _itemUrl(item) {
   if (!item) return null;
   if (typeof item === "string") return item;
+  // QA-failed images are skipped — the storefront will fall back to the
+  // supplier image rather than display a bad AI render.
+  if (item.qa_passed === false) return null;
   return item.url || item.image || item.src || null;
 }
 
