@@ -33,9 +33,16 @@ export default function ProductEditorialMosaic({ images = [], styledImages = [],
   if (pool.length < 2 && (!variantStyledImages || variantStyledImages.length < 2)) return null;
 
   // Smart assignment: prefer specific AI styles per tile when available.
+  // Lot I Phase 2.2 — `studio_main` est l'alias canonique de `studio`
+  // dans le nouveau pipeline 8-styles (cf. product_variant_pipeline.py).
+  const STYLE_ALIASES = { studio: ["studio", "studio_main"], studio_main: ["studio_main", "studio"] };
   const byStyle = (name) => {
-    const hit = (variantStyledImages || []).find((g) => g && g.style === name && g.url);
-    return hit ? hit.url : null;
+    const candidates = STYLE_ALIASES[name] || [name];
+    for (const c of candidates) {
+      const hit = (variantStyledImages || []).find((g) => g && g.style === c && g.url);
+      if (hit) return hit.url;
+    }
+    return null;
   };
   const closeup = byStyle("closeup");
   const studio = byStyle("studio");

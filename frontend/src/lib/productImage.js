@@ -27,7 +27,14 @@
 // la plus fidèle au produit (cohérence visuelle commerciale max), affichée
 // par défaut sur les cards de grille, fiches produit, hero, etc.
 // Le storefront product page peut afficher la galerie complète via `getProductGallery()`.
-const PREFERRED_STYLES = ["studio", "lifestyle", "closeup", "in_use", "detail"];
+//
+// Lot I Phase 2.2 (2026-04-27) — 8 styles fixes (cf. backend/services/product_variant_pipeline.py).
+// `studio_main` et `studio` sont équivalents (compat ascendante).
+// `wide_lifestyle` (16:9) et `studio_card` (1:1 vignette grille) sont
+// réservés à des emplacements dédiés (banner et grid card respectivement)
+// → exclus du pool de galerie pour éviter les doublons (Fix I5).
+const PREFERRED_STYLES = ["studio_main", "studio", "lifestyle", "closeup", "in_use", "detail", "side_profile"];
+const GALLERY_EXCLUDED_STYLES = new Set(["wide_lifestyle", "studio_card"]);
 
 /**
  * Extrait l'URL d'un item generated_images (objet ou string).
@@ -94,6 +101,10 @@ export function getPrimaryImage(product) {
 /**
  * Galerie complète (toutes images, IA d'abord, puis legacy).
  * Utile pour la page produit où on veut afficher TOUTES les images.
+ *
+ * Lot I Phase 2.2 — `wide_lifestyle` et `studio_card` sont **exclus**
+ * du pool car réservés à des emplacements dédiés (banner 16:9 et grid card).
+ *
  * @param {object} product
  * @returns {string[]}
  */
@@ -118,8 +129,9 @@ export function getProductGallery(product) {
         if (g && typeof g === "object" && g.style === style) push(_itemUrl(g));
       }
     }
-    // Items sans style ou hors préférence
+    // Items sans style ou hors préférence — exclude reserved styles
     for (const g of generated) {
+      if (g && typeof g === "object" && GALLERY_EXCLUDED_STYLES.has(g.style)) continue;
       const u = _itemUrl(g);
       if (u && !seen.has(u)) push(u);
     }
@@ -168,7 +180,9 @@ export function getProductGalleryForColor(product, colorSlug) {
       if (g && typeof g === "object" && g.style === style) push(_itemUrl(g));
     }
   }
+  // Items sans style ou hors préférence — exclude reserved styles (wide_lifestyle, studio_card)
   for (const g of variantImages) {
+    if (g && typeof g === "object" && GALLERY_EXCLUDED_STYLES.has(g.style)) continue;
     const u = _itemUrl(g);
     if (u && !seen.has(u)) push(u);
   }

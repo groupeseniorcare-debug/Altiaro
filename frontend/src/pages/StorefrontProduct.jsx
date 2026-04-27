@@ -53,6 +53,7 @@ import {
   LastUpdatedBadge,
 } from "../components/storefront/ProductSEOBlocks";
 import ProductUsps from "../components/storefront/ProductUsps";
+import WideLifestyleBanner from "../components/storefront/WideLifestyleBanner";
 
 export function StorefrontProduct() {
   const { siteId, productId } = useParams();
@@ -518,6 +519,11 @@ export function StorefrontProduct() {
               (BestForNotFor) qui a été retirée. Lecture stricte de `p.usps`
               généré par Haiku 4.5 dans `services/product_content_ai.py`. */}
           <ProductUsps usps={p.usps} design={design} lang={lang} />
+
+          {/* Lot I Fix I6 — Wide cinematic lifestyle banner (16:9). Variant-aware,
+              utilise `wide_lifestyle` généré par le pipeline I7. Si la couleur
+              sélectionnée n'a pas ce style → masqué proprement. */}
+          <WideLifestyleBanner product={p} productName={pickLang(p.name, lang)} design={design} />
 
           <ProductEditorialMosaic
             images={[...(p.generated_images || []).map(g => g.url).filter(Boolean), ...(p.images || [])]}

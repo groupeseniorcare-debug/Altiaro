@@ -1064,6 +1064,59 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                     if "402" in msg or "budget" in msg.lower():
                         budget_exhausted = True
 
+                # 8e) Lot I Fix I7 — 8-styles pipeline (Phase 2.2)
+                # Complète chaque variante couleur à 8 styles fixes premium :
+                # studio_main, studio_card, lifestyle, wide_lifestyle (16:9),
+                # closeup, detail, in_use, side_profile.
+                # Hard cap 5$ par site (cumulatif sur tous les produits).
+                # Idempotent : skip les styles déjà présents.
+                # Conformément à la décision user 2026-04-27 (Q4) : déclenché
+                # à l'étape 5 du Cockpit (= cette boucle de génération produit
+                # dans launch.py).
+                try:
+                    if budget_exhausted:
+                        pass
+                    else:
+                        from services.product_variant_pipeline import (  # noqa: PLC0415
+                            BudgetCap, generate_full_variant_set,
+                        )
+                        # Per-product budget = remaining of site cap divided by remaining products
+                        # MVP : simple per-product cap = 0.6$ to avoid one product eating it all.
+                        per_product_cap = float(os.environ.get("MAX_VARIANT_PIPELINE_USD_PER_PRODUCT", "0.8"))
+                        budget = BudgetCap(cap_usd=per_product_cap)
+                        # Re-fetch product to get fresh by_variant
+                        fresh_p = await db.products.find_one(
+                            {"id": p["id"]},
+                            {"_id": 0, "id": 1, "generated_images_by_variant": 1, "generated_images": 1},
+                        )
+                        by_variant = fresh_p.get("generated_images_by_variant") or {}
+                        if not by_variant and fresh_p.get("generated_images"):
+                            # Mono-variant product → still complete to 8 styles under "default" slug
+                            by_variant = {"default": fresh_p["generated_images"]}
+                        for color_slug in list(by_variant.keys()):
+                            if budget.exhausted():
+                                break
+                            try:
+                                await generate_full_variant_set(
+                                    db, p["id"], color_slug,
+                                    overwrite=False,
+                                    budget=budget,
+                                    request_id=f"launch-{site_id[:8]}-{p['id'][:8]}-{color_slug}",
+                                )
+                            except ValueError as e:
+                                logger.info(f"[launch] 8-styles {p['id'][:8]}/{color_slug}: {str(e)[:80]}")
+                            except Exception as e:
+                                msg = str(e)
+                                if "402" in msg or "budget" in msg.lower():
+                                    budget_exhausted = True
+                                    break
+                                logger.warning(f"[launch] 8-styles {p['id'][:8]}/{color_slug}: {msg[:120]}")
+                except Exception as e:
+                    msg = str(e)
+                    logger.warning(f"[launch] 8-styles outer {p['id']}: {msg[:120]}")
+                    if "402" in msg or "budget" in msg.lower():
+                        budget_exhausted = True
+
         # ── Phase C — Cohérence storefront enrichie ─────────────────────
         # Témoignages premium fictifs + portraits Nano Banana + pages CMS
         # (À propos / Contact) générées avec le narrative_angle.
