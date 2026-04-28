@@ -15,6 +15,7 @@ import {
   TestimonialsEditor,
 } from "../components/BrandingContent";
 import HomepageSectionsEditor from "../components/HomepageSectionsEditor";
+import AiTweakPanel from "../components/cockpit/AiTweakPanel";
 
 /**
  * Étape 5 — Identité & design.
@@ -345,6 +346,14 @@ export default function SiteBranding() {
             </div>
           </div>
         </div>
+
+        {/* Phase 2.5 (Tâche B) — AI tweak : zone libre IA pour modifier
+            design/palette/ton/navigation en langage naturel. Claude Sonnet 4.5
+            produit un diff ciblé sur une whitelist de champs (design.*, nav,
+            tone_voice) et l'applique en DB. Undo 48h via snapshot. */}
+        {hasDesign && (
+          <AiTweakPanel siteId={siteId} onApplied={() => load()} />
+        )}
 
         {/* Tab selector — Phase 2 unification : "Essentiel" (défaut, linéaire) vs "Avancé" (studio tabulé absorbé depuis l'ancien /design) */}
         <div

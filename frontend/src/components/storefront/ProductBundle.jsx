@@ -25,11 +25,14 @@ import { pickLang, t } from "../../lib/i18n";
 import { BACKEND_URL, designAccents, formatPrice } from "./storefrontUtils";
 import { addToCart } from "../../lib/cart";
 import { toast } from "sonner";
-import { getPrimaryImage } from "../../lib/productImage";
+import { getPrimaryImage, hasAiImage } from "../../lib/productImage";
 
 // Roles considered as "companion" products for bundling
 const COMPANION_ROLES = new Set(["upsell", "accessory", "accessoire", "addon"]);
 const isCompanion = (p) => COMPANION_ROLES.has((p?.role || "").toLowerCase());
+// Phase 2.5 Tâche F — filtre strict : un accessoire bundle doit avoir une
+// image IA Nano Banana (sinon on affiche une vignette AE watermarkée).
+const isPremiumCompanion = (p) => isCompanion(p) && hasAiImage(p);
 
 export default function ProductBundle({ currentProduct, lang = "fr", design }) {
   const { siteId } = useParams();
@@ -54,8 +57,8 @@ export default function ProductBundle({ currentProduct, lang = "fr", design }) {
             .catch(() => null)
         )
       ).then((res) => {
-        // Filter to keep only real companions even if the AI suggested a "main"
-        setAccessories(res.filter(Boolean).filter(isCompanion).slice(0, 2));
+        // Filter to keep only real companions WITH AI image (Phase 2.5 Tâche F).
+        setAccessories(res.filter(Boolean).filter(isPremiumCompanion).slice(0, 2));
         setLoaded(true);
       });
       return;
@@ -63,13 +66,15 @@ export default function ProductBundle({ currentProduct, lang = "fr", design }) {
 
     // Priority 2 : public upsells endpoint (filters role=upsell server-side,
     // includes role-aware fallback to any upsell of the site)
-    axios.get(`${BACKEND_URL}/api/public/sites/${siteId}/products/${currentProduct.id}/upsells?limit=4`)
+    axios.get(`${BACKEND_URL}/api/public/sites/${siteId}/products/${currentProduct.id}/upsells?limit=6`)
       .then(({ data }) => {
-        const filtered = (data || [])
-          .filter((p) => p.id !== currentProduct.id)
-          .filter(isCompanion)
-          .slice(0, 2);
-        setAccessories(filtered);
+        const candidates = (data || []).filter((p) => p.id !== currentProduct.id);
+        // Phase 2.5 Tâche F — préférer les companions avec image IA.
+        // Si <2 premium dispo → fallback sur les companions simples pour
+        // préserver la fonction bundle sur les sites en transition.
+        const premium = candidates.filter(isPremiumCompanion).slice(0, 2);
+        const fallback = candidates.filter(isCompanion).slice(0, 2);
+        setAccessories(premium.length >= 2 ? premium : fallback);
         setLoaded(true);
       })
       .catch(() => {
@@ -138,12 +143,18 @@ export default function ProductBundle({ currentProduct, lang = "fr", design }) {
           </h2>
         </div>
 
-        {/* Items row — 3 cards with "+" between them */}
-        <div className="flex items-center gap-3 md:gap-4 overflow-x-auto pb-2 -mx-6 px-6 md:mx-0 md:px-0">
+        {/* Items — Phase 2.5 Tâche D :
+            MOBILE (<md) → empilé verticalement, 1 card par ligne pleine largeur.
+            DESKTOP (>=md) → 3 cards alignées avec "+" entre elles. */}
+        <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
           {allItems.map((p, i) => (
             <React.Fragment key={p.id}>
               {i > 0 && (
-                <Plus size={22} weight="bold" className="shrink-0 text-neutral-400" />
+                <Plus
+                  size={22}
+                  weight="bold"
+                  className="shrink-0 text-neutral-400 self-center hidden md:block"
+                />
               )}
               <BundleItem
                 product={p}
@@ -191,7 +202,7 @@ function BundleItem({ product, isCurrent, checked, onToggle, lang, primary, font
   const src = getPrimaryImage(product);
   return (
     <div
-      className="flex items-center gap-3 bg-white rounded-2xl p-3 md:p-4 w-[220px] md:w-[260px] shrink-0"
+      className="flex items-center gap-3 bg-white rounded-2xl p-3 md:p-4 w-full md:w-[260px] md:shrink-0"
       data-testid={`bundle-item-${product.id}`}
     >
       <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl overflow-hidden bg-[#F5F2EB] shrink-0">

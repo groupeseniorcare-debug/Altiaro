@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import axios from "axios";
-import { ArrowRight, ShoppingBagOpen, Star } from "@phosphor-icons/react";
-import { pickLang, t } from "../../lib/i18n";
-import { BACKEND_URL, designAccents, formatPrice } from "./storefrontUtils";
-import { getPrimaryImage } from "../../lib/productImage";
+import { ArrowRight } from "@phosphor-icons/react";
+import { t } from "../../lib/i18n";
+import { BACKEND_URL, designAccents } from "./storefrontUtils";
 import ProductCard from "./ProductCard";
+import { hasAiImage } from "../../lib/productImage";
 
 /**
  * Cross-sell — "Vous aimerez aussi" : 4 produits complémentaires.
+ * Phase 2.5 Tâche F — utilise `<ProductCard variant="default">`, exactement
+ * le même composant que la Home, pour un rendu visuel strictement identique
+ * (proportions, typos, micro-animations, CTA double).
  * Même site, même category en priorité, sinon best-sellers globaux.
  */
 export default function CrossSellProducts({ currentProduct, lang = "fr", design }) {
@@ -23,21 +26,19 @@ export default function CrossSellProducts({ currentProduct, lang = "fr", design 
     params.set("sort", "featured");
     axios.get(`${BACKEND_URL}/api/public/sites/${siteId}/products?${params.toString()}`)
       .then(({ data }) => {
-        const filtered = (data || []).filter((p) => p.id !== currentProduct.id).slice(0, 4);
+        // Phase 2.5 Tâche F — filtre strict image IA (pas de watermark AE).
+        const filtered = (data || [])
+          .filter((p) => p.id !== currentProduct.id)
+          .filter(hasAiImage)
+          .slice(0, 3);
         setProducts(filtered);
       })
       .catch(() => setProducts([]));
   }, [siteId, currentProduct]);
 
-  // Demo fallback for template completeness
-  const demo = [
-    { id: "x-1", name: "Déambulateur 4 roues ultra-léger", price: 149, currency: "EUR", images: ["https://images.unsplash.com/photo-1584515933487-779824d29309?w=700&auto=format&fit=crop"] },
-    { id: "x-2", name: "Matelas médical à mémoire de forme", price: 599, currency: "EUR", images: ["https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=700&auto=format&fit=crop"] },
-    { id: "x-3", name: "Barres d'appui salle de bain (x2)", price: 59, currency: "EUR", images: ["https://images.unsplash.com/photo-1620626011761-996317b8d101?w=700&auto=format&fit=crop"] },
-    { id: "x-4", name: "Téléphone senior à grosses touches", price: 89, currency: "EUR", images: ["https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=700&auto=format&fit=crop"] },
-  ];
-  const hasReal = products.length > 0;
-  const displayed = hasReal ? products : demo;
+  // Phase 2.5 Tâche F — pas de demo fallback pour éviter les mix qualité IA / Unsplash.
+  // Si le site a <3 produits supplémentaires → section masquée proprement.
+  if (products.length < 2) return null;
 
   return (
     <section className="py-16 md:py-20 border-t" style={{ borderColor: "#E7E5E4" }} data-testid="product-cross-sell">
@@ -53,17 +54,15 @@ export default function CrossSellProducts({ currentProduct, lang = "fr", design 
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
-        {displayed.map((p) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
+        {products.map((p) => (
           <ProductCard
             key={p.id}
             product={p}
             siteId={siteId}
-            href={hasReal ? undefined : `/shop/${siteId}`}
             lang={lang}
             design={design}
-            variant="compact"
-            showRating={false}
+            variant="default"
             testId={`xsell-${p.id}`}
           />
         ))}

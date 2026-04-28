@@ -646,23 +646,112 @@ async def generate_product_faq(
         raise ValueError(f"Réponse Claude FAQ : {len(out)} items valides (min 3)")
     return out
 
-    items = data.get("usps") or data.get("items") or []
-    if not isinstance(items, list) or len(items) < 1:
-        raise ValueError("Réponse Claude USPs invalide (liste vide)")
 
-    cleaned_items: List[Dict[str, str]] = []
-    for it in items[:4]:
+# ---------------------------------------------------------------------------
+# 5) Editorial cards — 1 hero vertical + 3 short cards (Phase 2.5 / Tâche A)
+# ---------------------------------------------------------------------------
+async def generate_product_editorial_cards(
+    product: Dict[str, Any],
+    brand: Dict[str, Any],
+    *,
+    n_cards: int = 3,
+    request_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Generate one hero block + 3 short editorial cards for the product page.
+
+    Output shape :
+        {
+          "hero":  {"image_style": "wide_lifestyle"|"lifestyle",
+                    "title":       "<6-10 mots>",
+                    "description": "<1-2 phrases, ≤180 chars>"},
+          "cards": [
+            {"image_style": "closeup"|"detail"|"in_use"|...,
+             "title":       "<6-8 mots>",
+             "description": "<≤100 chars>"},
+            ... 3 items
+          ]
+        }
+
+    Les `image_style` sont sélectionnés parmi un pool canonical ; le frontend
+    pioche l'image correspondante depuis `generated_images_by_variant[color]`.
+    """
+    context = _product_context(product, brand)
+    allowed_hero = ["wide_lifestyle", "lifestyle"]
+    allowed_card = ["closeup", "detail", "in_use", "side_profile",
+                    "texture_closeup", "folded_display", "on_sofa",
+                    "on_bed", "on_chair", "stacked", "context_room"]
+
+    system = (
+        "Tu es directeur éditorial d'une marque premium (références Aesop, "
+        "Hermès, Le Labo). Tu écris en français des micro-essais produit "
+        "sobres, sensoriels et narratifs. Pas d'emoji, pas de ponctuation "
+        "excessive, ton poétique ancré sur la matière. JSON valide uniquement."
+    )
+    user = (
+        f"{context}\n\n"
+        f"TÂCHE : produis UN bloc hero (titre + 1-2 phrases) et "
+        f"EXACTEMENT {n_cards} cards (titre + 1 phrase), ancrés sur l'ANALYSE "
+        f"VISUELLE SOURCE.\n\n"
+        f"CONTRAINTES ABSOLUES :\n"
+        f"- hero.title       : 4-10 mots\n"
+        f"- hero.description : 1-2 phrases, ≤ 180 caractères\n"
+        f"- card.title       : 3-6 mots (≤ 40 chars)\n"
+        f"- card.description : 1 phrase, ≤ 110 caractères\n\n"
+        f"Associe chaque bloc à un image_style (pour que le front pioche "
+        f"l'image adéquate générée par le pipeline 8-styles) :\n"
+        f"- hero.image_style ∈ {allowed_hero}\n"
+        f"- card.image_style ∈ {allowed_card}\n"
+        f"(Privilégie closeup/detail/in_use si le produit est un fauteuil ; "
+        f"texture_closeup/folded_display/on_sofa si c'est du textile/couverture ; "
+        f"on_chair/stacked/texture_closeup si c'est un coussin.)\n\n"
+        f"FORMAT JSON STRICT (réponds UNIQUEMENT ceci) :\n"
+        f'{{\n'
+        f'  "hero":  {{"image_style": "<style>", "title": "<...>", "description": "<...>"}},\n'
+        f'  "cards": [\n'
+        f'    {{"image_style": "<style>", "title": "<...>", "description": "<...>"}},\n'
+        f'    ... ({n_cards} items)\n'
+        f'  ]\n'
+        f'}}\n'
+    )
+
+    raw = await safe_claude_text(
+        system=system, user=user,
+        quality_tier="standard", timeout=50.0, request_id=request_id,
+    )
+    cleaned = _strip_json_fence(raw or "")
+    try:
+        data = json.loads(cleaned)
+    except json.JSONDecodeError:
+        m = re.search(r"\{[\s\S]+\}", cleaned)
+        if not m:
+            raise ValueError("Réponse Claude editorial non parsable")
+        data = json.loads(m.group(0))
+
+    hero_raw = data.get("hero") or {}
+    hero = {
+        "image_style":
+            str(hero_raw.get("image_style") or "wide_lifestyle").strip().lower()
+            if str(hero_raw.get("image_style") or "").strip().lower() in allowed_hero
+            else "wide_lifestyle",
+        "title": _truncate_clean(str(hero_raw.get("title") or "").strip(), 90),
+        "description": _truncate_clean(str(hero_raw.get("description") or "").strip(), 200),
+    }
+    cards_raw = data.get("cards") or []
+    cards: List[Dict[str, str]] = []
+    for it in cards_raw[:n_cards]:
         if not isinstance(it, dict):
             continue
-        icon = str(it.get("icon") or "").strip()
-        title = str(it.get("title") or "").strip()
-        desc = str(it.get("description") or it.get("desc") or "").strip()
-        if not title:
+        style = str(it.get("image_style") or "detail").strip().lower()
+        if style not in allowed_card:
+            style = "detail"
+        t = _truncate_clean(str(it.get("title") or "").strip(), 42)
+        d = _truncate_clean(str(it.get("description") or "").strip(), 120)
+        if not t:
             continue
-        if icon not in ALLOWED_USP_ICONS:
-            ci = next((i for i in ALLOWED_USP_ICONS if i.lower() == icon.lower()), None)
-            icon = ci or "Sparkles"
-        cleaned_items.append({"icon": icon, "title": title, "description": desc})
-
-    return cleaned_items
+        cards.append({"image_style": style, "title": t, "description": d})
+    if len(cards) < 2:
+        raise ValueError(f"Editorial cards invalides ({len(cards)}/{n_cards})")
+    if not hero["title"]:
+        raise ValueError("Editorial hero title vide")
+    return {"hero": hero, "cards": cards}
 

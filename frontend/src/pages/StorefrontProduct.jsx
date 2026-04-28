@@ -40,9 +40,8 @@ import { ProductColorProvider } from "../lib/ProductColorContext";
 import ProductReviews from "../components/storefront/ProductReviews";
 import CrossSellProducts from "../components/storefront/CrossSellProducts";
 import UpsellsRecommendations from "../components/storefront/UpsellsRecommendations";
-import DeliveryEstimate from "../components/storefront/DeliveryEstimate";
+import DeliveryPaymentInfo from "../components/storefront/DeliveryPaymentInfo";
 import ProductBundle from "../components/storefront/ProductBundle";
-import PaymentOptions from "../components/storefront/PaymentOptions";
 import MobileStickyBuy from "../components/storefront/MobileStickyBuy";
 import VariantPicker from "../components/storefront/VariantPicker";
 import ProductEditorialMosaic from "../components/storefront/ProductEditorialMosaic";
@@ -54,6 +53,7 @@ import {
 } from "../components/storefront/ProductSEOBlocks";
 import ProductUsps from "../components/storefront/ProductUsps";
 import ProductHowTo from "../components/storefront/ProductHowTo";
+import ProductEditorialCards from "../components/storefront/ProductEditorialCards";
 import WideLifestyleBanner from "../components/storefront/WideLifestyleBanner";
 
 export function StorefrontProduct() {
@@ -528,9 +528,8 @@ export function StorefrontProduct() {
                 </button>
               </div>
 
-              <div className="mt-6 space-y-3">
-                <DeliveryEstimate design={design} />
-                <PaymentOptions price={p.price} currency={p.currency} design={design} lang={lang} />
+              <div className="mt-6">
+                <DeliveryPaymentInfo price={p.price} currency={p.currency} design={design} lang={lang} />
               </div>
 
               <div className="mt-8 grid grid-cols-2 gap-2.5" data-testid="product-trust-badges">
@@ -605,6 +604,18 @@ export function StorefrontProduct() {
               ces composants ne sont plus rendus sur la page produit. */}
 
           <TechSpecs specs={p.narrative?.tech_specs} design={design} />
+
+          {/* Phase 2.5 (Tâche A) — Editorial cards RESTAURÉS (version allégée)
+              1 hero image verticale + 3 cards horizontales (titre court + desc),
+              contenu Haiku 4.5 ancré Vision lock. Lit `p.editorial_cards`
+              généré par `services.product_content_ai.generate_product_editorial_cards`.
+              Masqué si champ absent → tout site existant avant Phase 2.5 est
+              silent no-op jusqu'à back-fill ou re-launch. */}
+          <ProductEditorialCards
+            product={p}
+            colorSlug={selectedColorSlug}
+            design={design}
+          />
 
           {/* Phase 2.3 (Lot I I12) — FAQ produit unique : priorité au champ
               `p.faq_product` (Haiku 4.5, 5 Q/R spécifiques au produit, sans

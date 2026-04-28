@@ -1022,6 +1022,33 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                             if "402" in msg or "budget" in msg.lower():
                                 budget_exhausted = True
 
+                    # 8a-cinq (Phase 2.5 / Tâche A) — Editorial cards (1 hero + 3 cards)
+                    if (overwrite or not fresh_p.get("editorial_cards")) and not budget_exhausted:
+                        try:
+                            from services.product_content_ai import generate_product_editorial_cards
+                            cards = await asyncio.wait_for(
+                                generate_product_editorial_cards(
+                                    fresh_p, brand_dict, n_cards=3,
+                                    request_id=f"launch-editorial-{p['id'][:8]}",
+                                ),
+                                timeout=50,
+                            )
+                            if cards and cards.get("hero") and cards.get("cards"):
+                                await db.products.update_one(
+                                    {"id": p["id"]},
+                                    {"$set": {
+                                        "editorial_cards": cards,
+                                        "editorial_cards_generated_at": datetime.now(timezone.utc).isoformat(),
+                                    }},
+                                )
+                        except asyncio.TimeoutError:
+                            logger.warning(f"[launch] editorial {p['id']} timed out")
+                        except Exception as e:
+                            msg = str(e)
+                            logger.warning(f"[launch] editorial {p['id']}: {msg[:120]}")
+                            if "402" in msg or "budget" in msg.lower():
+                                budget_exhausted = True
+
                 # 8b) 5 product hero images (use existing imported supplier images as base; add AI)
                 await _advance(
                     job_id,

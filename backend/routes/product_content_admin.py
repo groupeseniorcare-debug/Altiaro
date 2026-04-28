@@ -30,6 +30,7 @@ from services.product_content_ai import (
     generate_product_usps,
     generate_product_how_to,
     generate_product_faq,
+    generate_product_editorial_cards,
 )
 from services.product_variant_pipeline import (
     DEFAULT_BUDGET_CAP_USD,
@@ -422,3 +423,46 @@ async def admin_get_task_status(task_id: str, user: dict = Depends(require_admin
     if not task:
         raise HTTPException(404, "Tâche inconnue ou expirée")
     return task
+
+
+
+# ============================================================================
+# Phase 2.5 (Tâche A) — Editorial cards (1 hero + 3 cards, Aesop)
+# ============================================================================
+@router.post(
+    "/admin/products/{product_id}/regenerate-editorial-cards",
+    tags=["product-content-admin"],
+    summary="Regénère le bloc editorial (hero + 3 cards) d'un produit (Haiku 4.5)",
+)
+async def regenerate_product_editorial_cards_endpoint(
+    product_id: str,
+    user: dict = Depends(require_admin),
+):
+    product = await db.products.find_one({"id": product_id}, {"_id": 0})
+    if not product:
+        raise HTTPException(404, "Produit introuvable")
+    site = await db.sites.find_one({"id": product["site_id"]}, {"_id": 0, "design.brand": 1})
+    brand = ((site or {}).get("design") or {}).get("brand") or {}
+    try:
+        cards = await generate_product_editorial_cards(
+            product, brand, n_cards=3,
+            request_id=f"backfill-editorial-{product_id[:8]}",
+        )
+    except Exception as e:
+        logger.exception(f"[regenerate-editorial] {product_id} failed")
+        raise HTTPException(502, f"Génération IA échouée : {str(e)[:200]}")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.products.update_one(
+        {"id": product_id},
+        {"$set": {
+            "editorial_cards": cards,
+            "editorial_cards_generated_at": now_iso,
+            "updated_at": now_iso,
+        }},
+    )
+    logger.info(f"[regenerate-editorial] {product_id} hero+{len(cards.get('cards') or [])} cards")
+    return {
+        "ok": True, "product_id": product_id, "editorial_cards": cards,
+        "model": "claude-haiku-4-5", "cost_estimate_usd": 0.005,
+    }
