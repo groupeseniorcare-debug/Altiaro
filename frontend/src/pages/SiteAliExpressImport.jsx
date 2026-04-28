@@ -20,10 +20,18 @@ export default function SiteAliExpressImport() {
   const [error, setError] = useState("");
   const [importing, setImporting] = useState({}); // productId -> "loading" | "done" | "error"
   const [toast, setToast] = useState(null);
+  const [needsReconnect, setNeedsReconnect] = useState(false);  // Phase 2.7.4
 
   const showToast = (type, msg) => {
     setToast({ type, msg });
     setTimeout(() => setToast(null), 4000);
+  };
+
+  // Phase 2.7.4 — surface a clean banner instead of opaque 502 errors when
+  // the platform-level AE token is expired and refresh failed.
+  const detectReconnectError = (err) => {
+    const msg = typeof err === "string" ? err : JSON.stringify(err || "");
+    return /AE_RECONNECT_REQUIRED|IllegalAccessToken|IllegalRefreshToken|expired/i.test(msg);
   };
 
   const search = async (e) => {
@@ -31,6 +39,7 @@ export default function SiteAliExpressImport() {
     if (!keyword.trim()) return;
     setSearching(true);
     setError("");
+    setNeedsReconnect(false);
     setResults([]);
     const { data, error: err } = await apiCall(() =>
       api.post("/aliexpress/products/search", {
@@ -42,7 +51,12 @@ export default function SiteAliExpressImport() {
     );
     setSearching(false);
     if (err) {
-      setError(typeof err === "string" ? err : "Erreur lors de la recherche.");
+      if (detectReconnectError(err)) {
+        setNeedsReconnect(true);
+        setError("");
+      } else {
+        setError(typeof err === "string" ? err : "Erreur lors de la recherche.");
+      }
       return;
     }
     // AliExpress response shape varies — we dig through the wrapper keys.
@@ -58,7 +72,11 @@ export default function SiteAliExpressImport() {
     );
     if (err) {
       setImporting((p) => ({ ...p, [productId]: "error" }));
-      showToast("error", typeof err === "string" ? err : "Import échoué.");
+      if (detectReconnectError(err)) {
+        setNeedsReconnect(true);
+      } else {
+        showToast("error", typeof err === "string" ? err : "Import échoué.");
+      }
       return;
     }
     setImporting((p) => ({ ...p, [productId]: "done" }));
@@ -126,8 +144,39 @@ export default function SiteAliExpressImport() {
           </div>
         )}
 
+        {/* Phase 2.7.4 — banner clair quand AE doit être reconnecté */}
+        {needsReconnect && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-5 text-sm text-amber-950 flex items-start gap-3" data-testid="ali-reconnect-banner">
+            <Warning size={18} weight="fill" className="text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <div className="font-semibold mb-0.5">AliExpress doit être reconnecté</div>
+              <div className="text-amber-900 leading-relaxed">
+                Le jeton d'accès AliExpress de la plateforme a expiré (les tokens
+                AliExpress Dropshipping durent 24-48 h). Un admin doit reconnecter
+                l'intégration pour réactiver la recherche et l'import.
+              </div>
+              <div className="mt-3 flex gap-2">
+                <a
+                  href="/admin/integrations"
+                  data-testid="ali-reconnect-cta"
+                  className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-neutral-900 text-white text-xs font-medium hover:bg-neutral-800"
+                >
+                  → Admin · Intégrations
+                </a>
+                <a
+                  href="/api/admin/aliexpress/authorize-url"
+                  target="_blank" rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full border border-amber-300 text-amber-950 text-xs font-medium hover:bg-amber-100"
+                >
+                  Reconnecter directement
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Error */}
-        {error && !results.length && (
+        {error && !results.length && !needsReconnect && (
           <div className="bg-rose-50 border border-rose-200 rounded-2xl p-5 text-sm text-rose-900 flex items-start gap-3" data-testid="ali-search-error">
             <Warning size={18} weight="fill" className="text-rose-600 mt-0.5 flex-shrink-0" />
             <div>{error}</div>

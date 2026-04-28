@@ -367,21 +367,45 @@ async def _exchange_code_for_token(code: str) -> dict:
     return data
 
 
+async def _mark_disconnected(reason: str) -> None:
+    """Phase 2.7.4 — when AE rejects access OR refresh tokens, flip the
+    `connected` flag to False so the frontend can display a clear
+    "Reconnecter AliExpress" CTA instead of opaque 502 errors."""
+    await _set_platform_settings({
+        "connected": False,
+        "last_error": reason,
+        "disconnected_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
 async def _refresh_access_token() -> dict:
     pl = await _get_platform_settings()
     refresh_token = pl.get("refresh_token")
     if not refresh_token:
-        raise HTTPException(401, "Plateforme non connectée à AliExpress.")
-    resp = await _signed_post(REFRESH_URL, {"refresh_token": refresh_token}, need_access_token=False)
+        raise HTTPException(401, "AE_RECONNECT_REQUIRED: AliExpress non connecté. Reconnectez via Admin → Intégrations.")
+    try:
+        resp = await _signed_post(REFRESH_URL, {"refresh_token": refresh_token}, need_access_token=False)
+    except HTTPException as e:
+        # AliExpress 502 with IllegalRefreshToken → mark disconnected and surface a clean 401
+        msg = (e.detail or "") if isinstance(e.detail, str) else str(e.detail or "")
+        if "IllegalRefreshToken" in msg or "InvalidRefreshToken" in msg or "expired" in msg.lower():
+            await _mark_disconnected("refresh_token_expired")
+            raise HTTPException(401, "AE_RECONNECT_REQUIRED: refresh_token expiré. Reconnectez AliExpress via Admin → Intégrations.")
+        raise
     if not resp.get("access_token"):
-        raise HTTPException(502, f"AliExpress refresh failed : {resp}")
+        await _mark_disconnected("refresh_no_access_token")
+        raise HTTPException(401, f"AE_RECONNECT_REQUIRED: refresh AliExpress sans access_token ({resp}).")
     now = datetime.now(timezone.utc)
-    expires_at = now + timedelta(seconds=int(resp.get("expires_in") or 172800))
+    expires_at = now + timedelta(seconds=int(resp.get("expires_in") or 86400))
+    refresh_expires_at = now + timedelta(seconds=int(resp.get("refresh_expires_in") or 172800))
     await _set_platform_settings({
         "access_token": resp.get("access_token"),
         "refresh_token": resp.get("refresh_token") or refresh_token,
         "expires_at": expires_at.isoformat(),
+        "refresh_expires_at": refresh_expires_at.isoformat(),
         "last_refreshed_at": now.isoformat(),
+        "connected": True,
+        "last_error": None,
     })
     return resp
 
@@ -390,11 +414,14 @@ async def _get_valid_access_token(site_id: Optional[str] = None) -> str:
     """
     Returns a valid platform-level AliExpress access token. `site_id` is kept
     as a parameter for backward compat but the token is global.
+
+    Phase 2.7.4 — if the token is expired AND the refresh fails, surface a
+    401 AE_RECONNECT_REQUIRED so the frontend can show the reconnect banner.
     """
     pl = await _get_platform_settings()
     token = pl.get("access_token")
-    if not token:
-        raise HTTPException(401, "Plateforme non connectée à AliExpress. L'Admin doit connecter AliExpress dans Paramètres → Intégrations.")
+    if not token or pl.get("connected") is False:
+        raise HTTPException(401, "AE_RECONNECT_REQUIRED: AliExpress non connecté. Reconnectez via Admin → Intégrations.")
     expires_at = pl.get("expires_at")
     if expires_at:
         try:
@@ -402,6 +429,8 @@ async def _get_valid_access_token(site_id: Optional[str] = None) -> str:
             if dt < (datetime.now(timezone.utc) + timedelta(minutes=5)):
                 resp = await _refresh_access_token()
                 return resp.get("access_token")
+        except HTTPException:
+            raise
         except Exception:
             pass
     return token
@@ -435,8 +464,14 @@ def _extract_path_for_signing(url: str) -> str:
     return ""  # /sync → no path
 
 
-async def _signed_post(url: str, biz_params: dict, need_access_token: bool = True, site_id: Optional[str] = None) -> dict:
-    """Common signed request helper for AliExpress REST/SYNC APIs."""
+async def _signed_post(url: str, biz_params: dict, need_access_token: bool = True, site_id: Optional[str] = None, _retried: bool = False) -> dict:
+    """Common signed request helper for AliExpress REST/SYNC APIs.
+
+    Phase 2.7.4 — if AE returns IllegalAccessToken (token revoked or invalidated
+    server-side BEFORE our local `expires_at`), we proactively refresh once
+    and retry. If the refresh itself fails, _refresh_access_token() will
+    flip `connected:false` and raise 401 AE_RECONNECT_REQUIRED.
+    """
     if not APP_KEY or not APP_SECRET:
         raise HTTPException(503, "Intégration AliExpress non configurée côté serveur.")
     params = dict(biz_params)
@@ -452,6 +487,21 @@ async def _signed_post(url: str, biz_params: dict, need_access_token: bool = Tru
         r.raise_for_status()
         data = r.json()
     if isinstance(data, dict) and (data.get("error_response") or data.get("code") in {"401", "15"}):
+        # Detect server-side token invalidation and retry once after refresh.
+        err = data.get("error_response") or data
+        err_code = (err.get("code") or "")
+        err_msg  = (err.get("msg") or err.get("message") or "")
+        if (
+            need_access_token
+            and not _retried
+            and ("IllegalAccessToken" in err_code or "InvalidAccessToken" in err_msg or "expired" in err_msg.lower())
+        ):
+            try:
+                await _refresh_access_token()
+            except HTTPException:
+                # _refresh_access_token already mapped this to a clean 401.
+                raise
+            return await _signed_post(url, biz_params, need_access_token=True, site_id=site_id, _retried=True)
         raise HTTPException(502, f"AliExpress : {data}")
     return data
 

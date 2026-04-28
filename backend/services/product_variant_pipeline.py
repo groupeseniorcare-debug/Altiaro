@@ -704,13 +704,26 @@ async def generate_full_variant_set(
     skipped: List[str] = []
     failed_qa: List[str] = []
 
-    # Build the final image set : start with existing kept ones, then add new
+    # Build the final image set : start with existing kept ones, then add new.
+    # Phase 2.7.3 BUGFIX — when called with `only_styles=[…]` (single-style
+    # regeneration), we MUST keep all existing entries for the OTHER styles,
+    # otherwise the DB write below replaces the whole array and we lose the
+    # 4-7 other valid images. The previous behaviour wiped them out, causing
+    # the Brown variant to drop from 7 → 1 entry after a single in_use regen.
     final_for_color: List[Dict[str, Any]] = []
-    if not overwrite:
-        # Keep existing entries that match one of the selected slugs
+    if only_styles:
+        # Single-style mode : keep every existing entry NOT in only_styles.
+        # The targeted slug(s) will be overwritten further down the loop.
+        only_set = set(only_styles)
+        for img in existing_for_color:
+            if img.get("style") not in only_set:
+                final_for_color.append(img)
+    elif not overwrite:
+        # Normal partial mode : keep existing entries that match a selected slug
         for img in existing_for_color:
             if img.get("style") in selected_slugs:
                 final_for_color.append(img)
+    # else: full overwrite (legacy) → start from empty, regenerate everything
 
     for style in selected_styles:
         if not overwrite and style["slug"] in existing_styles:
