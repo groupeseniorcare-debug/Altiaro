@@ -521,6 +521,55 @@ async def startup():
             id="ae_tracking_sync", replace_existing=True, misfire_grace_time=3600,
         )
 
+        # Phase 2.7.4 — every 6 hours, proactively refresh the platform-level
+        # AliExpress access_token. AE access tokens last 24h and refresh
+        # tokens last only 48h ; with a 6h cycle we rotate the refresh token
+        # 8× before it can ever expire, so the platform stays connected
+        # forever without manual reconnect. If both tokens are dead, we drop
+        # an admin_notification so a human can re-OAuth.
+        async def _scheduled_ae_token_refresh():
+            try:
+                from routes.aliexpress import _refresh_access_token, _get_platform_settings
+                pl = await _get_platform_settings()
+                if not pl.get("refresh_token"):
+                    logger.info("[scheduler] AE token refresh skipped (no refresh_token)")
+                    return
+                resp = await _refresh_access_token()
+                logger.info(
+                    f"[scheduler] AE token refreshed OK — new expires_in={resp.get('expires_in')}s "
+                    f"refresh_expires_in={resp.get('refresh_expires_in')}s"
+                )
+            except Exception as e:
+                msg = str(e)[:200]
+                logger.error(f"[scheduler] AE token refresh FAILED : {msg}")
+                # Drop a single admin notification (idempotent on the day)
+                try:
+                    from datetime import datetime as _dt, timezone as _tz
+                    today = _dt.now(_tz.utc).date().isoformat()
+                    notif_id = f"ae-reconnect-needed-{today}"
+                    await db.admin_notifications.update_one(
+                        {"id": notif_id},
+                        {"$set": {
+                            "id": notif_id,
+                            "kind": "ae_reconnect_needed",
+                            "severity": "warning",
+                            "title": "AliExpress nécessite un reconnect manuel",
+                            "body": ("Le refresh proactif a échoué. Le refresh_token AE est "
+                                     "probablement mort. Allez dans Admin → Intégrations → "
+                                     f"Reconnecter AliExpress. Détail : {msg}"),
+                            "created_at": _dt.now(_tz.utc).isoformat(),
+                            "read": False,
+                        }},
+                        upsert=True,
+                    )
+                except Exception:
+                    logger.exception("[scheduler] failed to write ae_reconnect_needed notif")
+        scheduler.add_job(
+            _scheduled_ae_token_refresh,
+            CronTrigger(hour="*/6", minute=37),
+            id="ae_token_refresh_h6", replace_existing=True, misfire_grace_time=3600,
+        )
+
         # Every 2h — CJ Dropshipping tracking sync (faster than AE because CJ updates
         # statuses more granularly; keeps customer-facing tracking fresh).
         async def _scheduled_cj_tracking_sync():
