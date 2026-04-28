@@ -967,10 +967,13 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                                 budget_exhausted = True
 
                     # 8a-ter (Phase 2.3 / Lot I I11) — HowTo steps (3-4 étapes, ton premium)
+                    # Phase 2.6 Tâche C — retour passé en dict {section_title,
+                    # product_kind, steps}. On stocke aussi `how_to_steps_meta`
+                    # pour piloter le H2 frontend selon le type de produit.
                     if (overwrite or not fresh_p.get("how_to_steps")) and not budget_exhausted:
                         try:
                             from services.product_content_ai import generate_product_how_to
-                            steps = await asyncio.wait_for(
+                            howto = await asyncio.wait_for(
                                 generate_product_how_to(
                                     fresh_p, brand_dict,
                                     n_steps=4,
@@ -978,11 +981,17 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                                 ),
                                 timeout=45,
                             )
+                            steps = (howto or {}).get("steps") or []
                             if steps and len(steps) >= 3:
+                                meta = {
+                                    "section_title": (howto or {}).get("section_title") or {},
+                                    "product_kind":  (howto or {}).get("product_kind") or "generic",
+                                }
                                 await db.products.update_one(
                                     {"id": p["id"]},
                                     {"$set": {
                                         "how_to_steps": steps,
+                                        "how_to_steps_meta": meta,
                                         "how_to_steps_generated_at": datetime.now(timezone.utc).isoformat(),
                                     }},
                                 )
@@ -1226,6 +1235,157 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
         except Exception as e:
             logger.exception("[launch] cms_pages failed (non-blocking)")
             await _mark_degraded(job_id, "cms_pages", str(e)[:200])
+
+        # ── Phase 2.6 Tâche D — BrandStory (texte + visuel atelier) ─────
+        # Remplace l'ancienne section <FounderStory> "Camille Lefèvre"
+        # fictive par une section "Notre maison" qui parle de la marque
+        # comme entité (atelier, savoir-faire, ancrage France).
+        # Skip si déjà populé (sauf overwrite). Skip image si budget LLM
+        # cap atteint, mais le texte (Haiku) tente quand même.
+        try:
+            await _advance(job_id, "brand-story", "Notre maison (atelier + texte)…", 98)
+            fresh_brand = ((await db.sites.find_one(
+                {"id": site_id},
+                {"_id": 0, "design.brand": 1, "niche": 1, "design.cms_pages": 1},
+            )) or {})
+            brand_dict_bs = (fresh_brand.get("design") or {}).get("brand") or {}
+            niche_bs = fresh_brand.get("niche") or wizard.get("niche") or ""
+            existing_ws = bool(brand_dict_bs.get("workshop_story")) and bool(brand_dict_bs.get("workshop_image"))
+            if not overwrite and existing_ws:
+                logger.info("[launch] brand_story already populated, skipped")
+            else:
+                from services.brand_story import (
+                    generate_brand_story_text,
+                    generate_brand_workshop_image_bytes,
+                )
+                # 1) Texte (Haiku) — peut passer même budget tendu
+                story_set: dict = {}
+                if not budget_exhausted:
+                    try:
+                        bs_text = await asyncio.wait_for(
+                            generate_brand_story_text(brand_dict_bs, niche=niche_bs,
+                                                       request_id=f"launch-brandstory-{site_id[:8]}"),
+                            timeout=40,
+                        )
+                        if bs_text and isinstance(bs_text, dict):
+                            story_set["design.brand.workshop_story"] = bs_text
+                    except asyncio.TimeoutError:
+                        await _mark_degraded(job_id, "brand_story_text", "timeout 40s")
+                    except Exception as e:
+                        msg = str(e)
+                        await _mark_degraded(job_id, "brand_story_text", msg[:200])
+                        if "402" in msg or "budget" in msg.lower():
+                            budget_exhausted = True
+
+                # 2) Image atelier (Nano Banana) — skip dur si budget cap
+                if not budget_exhausted:
+                    try:
+                        img_bytes = await asyncio.wait_for(
+                            generate_brand_workshop_image_bytes(
+                                brand_dict_bs, niche=niche_bs,
+                                request_id=f"launch-workshop-img-{site_id[:8]}",
+                            ),
+                            timeout=130,
+                        )
+                        if img_bytes:
+                            # Persist sous /uploads/sites/{site_id}/brand/workshop_*.jpg
+                            from deps import UPLOAD_DIR
+                            out_dir = UPLOAD_DIR / "sites" / site_id / "brand"
+                            out_dir.mkdir(parents=True, exist_ok=True)
+                            fname = f"workshop_{uuid.uuid4().hex[:8]}.jpg"
+                            (out_dir / fname).write_bytes(img_bytes)
+                            url = f"/api/uploads/sites/{site_id}/brand/{fname}"
+                            story_set["design.brand.workshop_image"] = url
+                    except asyncio.TimeoutError:
+                        await _mark_degraded(job_id, "brand_story_image", "timeout 130s")
+                    except Exception as e:
+                        msg = str(e)
+                        await _mark_degraded(job_id, "brand_story_image", msg[:200])
+                        if "402" in msg or "budget" in msg.lower():
+                            budget_exhausted = True
+                else:
+                    await _mark_degraded(job_id, "brand_story_image",
+                                         "skipped: LLM budget cap reached")
+
+                if story_set:
+                    story_set["design.brand.workshop_generated_at"] = datetime.now(timezone.utc).isoformat()
+                    await db.sites.update_one({"id": site_id}, {"$set": story_set})
+                    logger.info(f"[launch] brand_story persisted: {list(story_set.keys())}")
+        except Exception as e:
+            logger.exception("[launch] brand_story failed (non-blocking)")
+            await _mark_degraded(job_id, "brand_story", str(e)[:200])
+
+        # ── Phase 2.6 Tâche E — Photos client lifestyle (pilote uniquement) ─
+        # Génère 4 photos lifestyle "client" Nano Banana pour le produit
+        # pilote (le 1er ou le `featured`). Cap budget : skip + degraded.
+        try:
+            await _advance(job_id, "review-photos", "Photos client (4 scènes lifestyle)…", 99)
+            # Pick pilot product : featured or first
+            pilot = await db.products.find_one(
+                {"site_id": site_id, "featured": True},
+                {"_id": 0, "id": 1, "name": 1, "source_vision_lock": 1, "review_photos": 1},
+            )
+            if not pilot:
+                pilot = await db.products.find_one(
+                    {"site_id": site_id, "role": "main"},
+                    {"_id": 0, "id": 1, "name": 1, "source_vision_lock": 1, "review_photos": 1},
+                    sort=[("created_at", 1)],
+                )
+            if not pilot:
+                logger.info("[launch] no pilot product, skip review_photos")
+            elif not overwrite and (pilot.get("review_photos") or []):
+                logger.info(f"[launch] review_photos already populated for {pilot['id']}, skipped")
+            elif budget_exhausted:
+                await _mark_degraded(job_id, "review_photos",
+                                     "skipped: LLM budget cap reached")
+            else:
+                from services.review_photos import generate_client_lifestyle_photo
+                from deps import UPLOAD_DIR
+                fresh_brand2 = ((await db.sites.find_one(
+                    {"id": site_id}, {"_id": 0, "design.brand": 1},
+                )) or {}).get("design") or {}
+                brand_dict_rp = fresh_brand2.get("brand") or {}
+                urls: list = []
+                out_dir = UPLOAD_DIR / "products_ai" / pilot["id"] / "reviews"
+                out_dir.mkdir(parents=True, exist_ok=True)
+                for i in range(4):
+                    if budget_exhausted:
+                        break
+                    try:
+                        bytes_ = await asyncio.wait_for(
+                            generate_client_lifestyle_photo(
+                                pilot, brand_dict_rp,
+                                scene_idx=i,
+                                request_id=f"launch-rp-{pilot['id'][:8]}-{i}",
+                            ),
+                            timeout=130,
+                        )
+                        if bytes_:
+                            fname = f"client_{i}_{uuid.uuid4().hex[:8]}.jpg"
+                            (out_dir / fname).write_bytes(bytes_)
+                            urls.append(f"/api/uploads/products_ai/{pilot['id']}/reviews/{fname}")
+                    except asyncio.TimeoutError:
+                        await _mark_degraded(job_id, f"review_photo_{i}", "timeout 130s")
+                    except Exception as e:
+                        msg = str(e)
+                        if "402" in msg or "budget" in msg.lower():
+                            budget_exhausted = True
+                            await _mark_degraded(job_id, "review_photos",
+                                                 "halted: budget cap mid-loop")
+                            break
+                        await _mark_degraded(job_id, f"review_photo_{i}", msg[:200])
+                if urls:
+                    await db.products.update_one(
+                        {"id": pilot["id"]},
+                        {"$set": {
+                            "review_photos": urls,
+                            "review_photos_generated_at": datetime.now(timezone.utc).isoformat(),
+                        }},
+                    )
+                    logger.info(f"[launch] review_photos persisted: {len(urls)} photos for {pilot['id']}")
+        except Exception as e:
+            logger.exception("[launch] review_photos failed (non-blocking)")
+            await _mark_degraded(job_id, "review_photos", str(e)[:200])
 
         # 9) Mark Étape 5 validated + unlock Étape 6 ---------------------
         await _advance(job_id, "finalize", "Finalisation & déblocage SEO", 98)

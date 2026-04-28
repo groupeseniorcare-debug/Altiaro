@@ -225,9 +225,14 @@ async def run():
         except Exception as e:
             print(f"  [2] ❌ USPs failed: {str(e)[:200]}")
 
-        # ========== STEP 3 : HowTo ==========
+        # ========== STEP 3 : HowTo (Phase 2.6 Tâche C — adaptatif kind) ==========
         try:
-            steps = await generate_product_how_to(fresh, brand, n_steps=4, request_id=f"x1-howto-{pid[:8]}")
+            howto = await generate_product_how_to(fresh, brand, n_steps=4, request_id=f"x1-howto-{pid[:8]}")
+            steps = (howto or {}).get("steps") or []
+            meta = {
+                "section_title": (howto or {}).get("section_title") or {},
+                "product_kind":  (howto or {}).get("product_kind") or "generic",
+            }
             if steps and len(steps) >= 3:
                 text_blob = " ".join(s.get("title", "") + " " + s.get("description", "") for s in steps).lower()
                 has_forbidden = any(f.lower() in text_blob for f in forbidden)
@@ -235,6 +240,7 @@ async def run():
                     {"id": pid},
                     {"$set": {
                         "how_to_steps": steps,
+                        "how_to_steps_meta": meta,
                         "how_to_steps_generated_at": datetime.now(timezone.utc).isoformat(),
                     }},
                 )
@@ -242,7 +248,8 @@ async def run():
                 row["cost"] += COST["haiku_howto"]
                 row["howto_ok"] = True
                 row["howto_forbidden"] = has_forbidden
-                print(f"  [3] HowTo: {len(steps)} steps, forbidden={has_forbidden}")
+                row["howto_kind"] = meta["product_kind"]
+                print(f"  [3] HowTo: {len(steps)} steps (kind={meta['product_kind']}), forbidden={has_forbidden}")
         except Exception as e:
             print(f"  [3] ❌ HowTo failed: {str(e)[:200]}")
 

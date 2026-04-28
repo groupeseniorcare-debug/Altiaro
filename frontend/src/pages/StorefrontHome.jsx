@@ -18,6 +18,7 @@ import { FAQSection } from "../components/storefront/FAQSection";
 import { FinalCTA } from "../components/storefront/FinalCTA";
 import ValuesSection from "../components/storefront/ValuesSection";
 import FounderStory from "../components/storefront/FounderStory";
+import BrandStory from "../components/storefront/BrandStory";
 import PressLogos from "../components/storefront/PressLogos";
 import NewsletterCTA from "../components/storefront/NewsletterCTA";
 import CollectionsShowcase from "../components/storefront/CollectionsShowcase";
@@ -262,7 +263,29 @@ function renderHomepageSections({ design, site, siteId, products, loading, lang 
         case "testimonials":
           return <Testimonials design={design} lang={lang} />;
         case "founder_story":
-          return <FounderStory story={design?.founder_story} lang={lang} design={design} />;
+        case "brand_story":
+          // Phase 2.6 Tâche D — privilégier <BrandStory> (atelier / maison)
+          // dès que `design.brand.workshop_story` ou `workshop_image` existe.
+          // Sinon fallback sur ancien <FounderStory> pour garder les sites
+          // antérieurs visuellement complets.
+          if (design?.brand?.workshop_story || design?.brand?.workshop_image) {
+            return (
+              <BrandStory
+                story={design.brand.workshop_story}
+                image={design.brand.workshop_image}
+                lang={lang}
+                design={design}
+                siteId={siteId}
+              />
+            );
+          }
+          // Si la marque a explicitement un founder_story, on le rend.
+          if (design?.founder_story) {
+            return <FounderStory story={design.founder_story} lang={lang} design={design} />;
+          }
+          // Aucun contenu spécifique → fallback BrandStory générique (jamais
+          // de personne fictive type "Camille Lefèvre").
+          return <BrandStory lang={lang} design={design} siteId={siteId} />;
         case "instagram":
           return <InstagramGrid instagram={design?.instagram} design={design} />;
         case "blog_teaser":

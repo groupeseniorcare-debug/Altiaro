@@ -4,8 +4,23 @@ import { designAccents } from "./storefrontUtils";
 import { t } from "../../lib/i18n";
 
 /**
- * Product reviews — monochrome editorial. Summary card grey, review list
- * with hairline dividers, "Achat vérifié" chip on neutral tones.
+ * Product reviews — monochrome editorial.
+ *
+ * Phase 2.6 Tâche E — enrichi avec :
+ *   - avatar (portrait IA Nano Banana) depuis `r.avatar_url` ou via mapping
+ *     sur `design.testimonials_premium` quand `product.reviews` n'a pas
+ *     d'avatars dédiés.
+ *   - photo lifestyle "client" via `r.photo_url` (scène domestique
+ *     Nano Banana, produit visible naturellement dans le décor).
+ *
+ * Source de données :
+ *   - product.reviews (priorité) — chaque review = {author, location, date,
+ *     rating, title, body, verified, avatar_url?, photo_url?}.
+ *   - product.review_photos = [url, url, ...] — pool des 4-6 photos lifestyle
+ *     générées par services/review_photos.py (utilisé en fallback si les
+ *     reviews n'ont pas de photo individuelle).
+ *   - design.testimonials_premium = [{name, avatar_url, ...}] — fallback
+ *     pool d'avatars (3 portraits IA générés au lancement).
  */
 export default function ProductReviews({ product, design, lang = "fr" }) {
   const [sort, setSort] = useState("recent");
@@ -18,7 +33,24 @@ export default function ProductReviews({ product, design, lang = "fr" }) {
     { author: "Jean-Paul M.", location: "Toulouse", date: "Il y a 2 mois", rating: 5, title: "Parfait pour mon papa", body: "Simple à utiliser, robuste, on sent qu'il est pensé pour durer. Pas de gadgets inutiles. Merci pour l'accompagnement.", verified: true },
   ];
 
-  const reviews = product?.reviews?.length ? product.reviews : fallbackReviews;
+  // Reviews source — limit to 6 max (Phase 2.6 Tâche E)
+  const baseReviews = (product?.reviews?.length ? product.reviews : fallbackReviews).slice(0, 6);
+
+  // Avatar pool (testimonials_premium) — pour reviews sans avatar dédié
+  const avatarPool = (design?.testimonials_premium || [])
+    .map((t) => t?.avatar_url || t?.photo_url)
+    .filter(Boolean);
+
+  // Lifestyle photo pool (product.review_photos) — pour enrichir 1 review/2
+  const photoPool = Array.isArray(product?.review_photos) ? product.review_photos : [];
+
+  const reviews = baseReviews.map((r, i) => ({
+    ...r,
+    avatar_url: r.avatar_url || avatarPool[i % Math.max(1, avatarPool.length)] || null,
+    // 1 photo lifestyle ~1 review sur 2 pour ne pas alourdir
+    photo_url: r.photo_url || (i % 2 === 0 ? photoPool[Math.floor(i / 2) % Math.max(1, photoPool.length)] : null) || null,
+  }));
+
   const ratingMeta = product?.rating || { score: 4.8, count: reviews.length };
 
   const dist = [5, 4, 3, 2, 1].map((stars) => {
@@ -106,9 +138,26 @@ export default function ProductReviews({ product, design, lang = "fr" }) {
                 style={{ borderBottom: `1px solid ${divider}` }}
                 data-testid={`review-${i}`}
               >
-                <div className="flex items-start justify-between gap-4 mb-3 flex-wrap">
-                  <div>
-                    <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-start gap-4 mb-3">
+                  {/* Phase 2.6 Tâche E — Avatar IA rond, fallback initiale */}
+                  {r.avatar_url ? (
+                    <img
+                      src={r.avatar_url}
+                      alt={r.author}
+                      loading="lazy"
+                      className="w-12 h-12 rounded-full object-cover shrink-0 ring-1"
+                      style={{ ringColor: divider }}
+                    />
+                  ) : (
+                    <div
+                      className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 text-[16px]"
+                      style={{ background: accent, color: primary, fontFamily: `"${fontHeading}", serif` }}
+                    >
+                      {(r.author || "?").charAt(0)}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
                       <div className="flex" style={{ color: "#F5B800" }}>
                         {[...Array(5)].map((_, j) => (
                           <Star key={j} size={14} weight={j < r.rating ? "fill" : "regular"} />
@@ -122,14 +171,30 @@ export default function ProductReviews({ product, design, lang = "fr" }) {
                           {t(lang, "review_verified_purchase")}
                         </span>
                       )}
+                      <div className="text-[11px] uppercase tracking-[0.25em] ml-auto shrink-0" style={{ color: textFaint }}>{r.date}</div>
                     </div>
                     <h4 className="text-[17px] md:text-[19px] leading-snug" style={{ fontFamily: `"${fontHeading}", serif`, color: primary }}>
                       {r.title}
                     </h4>
                   </div>
-                  <div className="text-[11px] uppercase tracking-[0.25em] shrink-0" style={{ color: textFaint }}>{r.date}</div>
                 </div>
                 <p className="text-[14.5px] leading-relaxed" style={{ color: textMuted }}>{r.body}</p>
+
+                {/* Phase 2.6 Tâche E — Photo lifestyle "client" (Nano Banana,
+                    scène domestique avec produit visible naturellement).
+                    1 photo ~1 review sur 2 pour aérer la page. */}
+                {r.photo_url ? (
+                  <div className="mt-5 max-w-md">
+                    <img
+                      src={r.photo_url}
+                      alt={`Photo client — ${r.author}`}
+                      loading="lazy"
+                      className="w-full aspect-[4/3] object-cover"
+                      style={{ borderRadius: "2px", border: `1px solid ${divider}` }}
+                    />
+                  </div>
+                ) : null}
+
                 <div className="text-[12px] mt-4 flex items-center gap-2" style={{ color: textMuted }}>
                   <span className="font-semibold" style={{ color: primary }}>{r.author}</span>
                   {r.location && <><span className="opacity-40">·</span><span>{r.location}</span></>}

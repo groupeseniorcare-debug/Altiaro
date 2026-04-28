@@ -39,16 +39,10 @@ import ProductGallery from "../components/storefront/ProductGallery";
 import { ProductColorProvider } from "../lib/ProductColorContext";
 import ProductReviews from "../components/storefront/ProductReviews";
 import CrossSellProducts from "../components/storefront/CrossSellProducts";
-import UpsellsRecommendations from "../components/storefront/UpsellsRecommendations";
 import DeliveryPaymentInfo from "../components/storefront/DeliveryPaymentInfo";
-import ProductBundle from "../components/storefront/ProductBundle";
 import MobileStickyBuy from "../components/storefront/MobileStickyBuy";
 import VariantPicker from "../components/storefront/VariantPicker";
-import ProductEditorialMosaic from "../components/storefront/ProductEditorialMosaic";
 import {
-  PeopleAlsoAsk,
-  UsageSteps,
-  RelatedQueries,
   LastUpdatedBadge,
 } from "../components/storefront/ProductSEOBlocks";
 import ProductUsps from "../components/storefront/ProductUsps";
@@ -331,10 +325,11 @@ export function StorefrontProduct() {
           </nav>
 
           <div className="grid grid-cols-1 md:grid-cols-[1.1fr_1fr] gap-8 lg:gap-16 mb-24 md:mb-32 items-start">
-            {/* Fix 4 — Mobile : galerie edge-to-edge (annule le px-6 du parent
-                via -mx-6) pour un rendu premium type Apple/Hermès. Desktop :
-                comportement normal (dans le grid). */}
-            <div className="-mx-6 md:mx-0">
+            {/* Phase 2.6 Tâche B — Galerie STICKY desktop pour éliminer le
+                vide blanc à gauche : l'image suit le scroll de la colonne
+                droite (info produit) qui est plus longue. Mobile : flow
+                normal edge-to-edge. */}
+            <div className="-mx-6 md:mx-0 md:sticky md:top-24 md:self-start">
               <ProductGallery
                 images={variantImages}
                 name={pickLang(p.name, lang)}
@@ -344,7 +339,7 @@ export function StorefrontProduct() {
               />
             </div>
 
-            <div className="md:pt-2 md:sticky md:top-28">
+            <div className="md:pt-2">
               <div className="flex items-center gap-3 mb-5">
                 <span className="h-px w-8" style={{ background: "#0A0A0A" }} />
                 <span className="text-[10px] uppercase tracking-[0.4em] font-medium" style={{ color: "#0A0A0A" }}>
@@ -575,63 +570,48 @@ export function StorefrontProduct() {
             </div>
           </div>
 
-          <ProductBundle currentProduct={p} lang={lang} design={design} />
+          {/* ════════════════════════════════════════════════════════════
+              Phase 2.6 — Trame officielle page produit (ordre strict).
+              Sections supprimées : ProductBundle, UpsellsRecommendations,
+              RelatedQueries, PeopleAlsoAsk, NarrativeSections, Mosaic.
+              Décision user 2026-04-28.
+              ════════════════════════════════════════════════════════════ */}
 
-          {/* Lot I Fix I3 — USPs narratifs amplifiés. Cards verticales fond ivoire,
-              icônes Lucide. Remplace l'ex-section "Est-ce fait pour vous"
-              (BestForNotFor) qui a été retirée. Lecture stricte de `p.usps`
-              généré par Haiku 4.5 dans `services/product_content_ai.py`. */}
-          <ProductUsps usps={p.usps} design={design} lang={lang} />
-
-          {/* Phase 2.3 (Lot I I11) — "Comment l'utiliser" infographique
-              (3-4 étapes premium Aesop). Lecture de `p.how_to_steps` généré
-              par Haiku via `services/product_content_ai.py::generate_product_how_to`.
-              JSON-LD HowTo posé dans `<SEOHead>` plus haut. */}
-          <ProductHowTo steps={p.how_to_steps} design={design} lang={lang} />
-
-          {/* Lot I Fix I6 — Wide cinematic lifestyle banner (16:9). Variant-aware,
-              utilise `wide_lifestyle` généré par le pipeline I7. Si la couleur
-              sélectionnée n'a pas ce style → masqué proprement. */}
+          {/* §2 — Image horizontale "En situation" (16:9 cinematic banner) */}
           <WideLifestyleBanner product={p} productName={pickLang(p.name, lang)} design={design} />
 
-          {/* Phase 2.4 — Sections éditoriales horizontales SUPPRIMÉES sur
-              décision user 2026-04-27 :
-              ❌ <ProductEditorialMosaic> ("La preuve en détail" + 3 blocs)
-              ❌ <NarrativeSections> (3 sections narratives image+texte)
-              Raison : redondance avec USPs + HowTo + WideLifestyle, et
-              alourdissement visuel de la page. La pipeline `launch.py` continue
-              de générer `p.narrative.sections` (utilisé par les pages CMS) mais
-              ces composants ne sont plus rendus sur la page produit. */}
+          {/* §3 — "Comment l'utiliser" — adaptive selon product_kind
+              (HowTo classique pour fauteuils, "Comment l'utiliser au quotidien"
+              pour blanket, "Trouver votre maintien" pour cushion, etc.).
+              Le titre H2 est piloté par `p.how_to_steps_meta.section_title`
+              (généré par Haiku adaptatif dans services/product_content_ai.py). */}
+          <ProductHowTo
+            steps={p.how_to_steps}
+            sectionTitle={p.how_to_steps_meta?.section_title}
+            design={design}
+            lang={lang}
+          />
 
-          <TechSpecs specs={p.narrative?.tech_specs} design={design} />
-
-          {/* Phase 2.5 (Tâche A) — Editorial cards RESTAURÉS (version allégée)
-              1 hero image verticale + 3 cards horizontales (titre court + desc),
-              contenu Haiku 4.5 ancré Vision lock. Lit `p.editorial_cards`
-              généré par `services.product_content_ai.generate_product_editorial_cards`.
-              Masqué si champ absent → tout site existant avant Phase 2.5 est
-              silent no-op jusqu'à back-fill ou re-launch. */}
+          {/* §4 — 3 images avec titre + sous-titre (editorial cards) */}
           <ProductEditorialCards
             product={p}
             colorSlug={selectedColorSlug}
             design={design}
           />
 
-          {/* Phase 2.3 (Lot I I12) — FAQ produit unique : priorité au champ
-              `p.faq_product` (Haiku 4.5, 5 Q/R spécifiques au produit, sans
-              questions livraison/retours/garantie). Fallback legacy
-              `p.narrative?.faq` si pas encore généré. La FAQ générique
-              livraison/retours/SAV est déplacée en footer (page CMS dédiée). */}
-          {/* Phase 2.4 — FAQ : on ferme le wrapper max-w-7xl pour laisser la
-              FAQ s'étaler pleine largeur sur desktop (px-6 md:px-16 lg:px-24). */}
+          {/* §5 — Caractéristiques produit */}
+          <TechSpecs specs={p.narrative?.tech_specs} design={design} />
+
+          {/* §6 — "Ce qui rend ce produit singulier" : USPs pleine largeur */}
+          <ProductUsps usps={p.usps} design={design} lang={lang} />
         </div>
       </div>
 
-      {/* Phase 2.4 (Lot I I12 v2) — FAQ produit unique, pleine largeur desktop.
-          Lit `p.faq_product` (priorité) → fallback legacy `p.narrative.faq`.
-          Le JSON-LD FAQPage est aligné UI ↔ SEO (cf <SEOHead> plus haut). */}
+      {/* §7 — FAQ produit unique, CENTRÉE desktop (max-w-3xl ≈ 768px),
+          pleine largeur mobile. Lit `p.faq_product` (priorité) → fallback
+          legacy `p.narrative.faq`. JSON-LD FAQPage aligné UI ↔ SEO. */}
       <section className="bg-white" data-testid="product-faq-section-fullwidth">
-        <div className="max-w-[1600px] mx-auto px-6 md:px-16 lg:px-24">
+        <div className="max-w-3xl mx-auto px-6 md:px-8">
           <ProductFAQ
             faq={p.faq_product?.length ? p.faq_product : p.narrative?.faq}
             design={design}
@@ -641,21 +621,14 @@ export function StorefrontProduct() {
 
       <div className="bg-white">
         <div className="max-w-7xl mx-auto px-6 md:px-10 pb-12">
-          {/* Phase 2.4 — <PeopleAlsoAsk> retiré sur décision user 2026-04-27 :
-              le H2 "Frequently asked questions" qu'il rendait apparaissait
-              comme une 2ème FAQ, ce qui contredit la consigne "FAQ produit
-              unique". Le `narrative.seo.people_also_ask` reste en DB et peut
-              être réutilisé ailleurs si besoin (ex: page CMS dédiée). */}
+          {/* §8 — Avis client avec photos (avatars + photos lifestyle).
+              Phase 2.6 Tâche E : enrichis via `design.testimonials_premium`
+              et `product.review_photos` (Nano Banana, scènes domestiques). */}
           <ProductReviews product={p} design={design} lang={lang} />
-          <RelatedQueries queries={p.narrative?.seo?.related_queries} design={design} />
-          <UpsellsRecommendations
-            mode="product"
-            productId={p.id}
-            lang={lang}
-            design={design}
-            onAddToCart={(u) => { try { window.altiaroTrack?.addToCart?.(u, 1, lang); } catch (_) { /* noop */ } }}
-          />
+
+          {/* §9 — "Dans la même collection" (cross-sell, design Home unifié) */}
           <CrossSellProducts currentProduct={p} lang={lang} design={design} />
+
           <LastUpdatedBadge date={p.narrative?.enriched_at || p.updated_at} design={design} />
         </div>
       </div>

@@ -201,7 +201,7 @@ async def regenerate_product_how_to_endpoint(
     site = await db.sites.find_one({"id": product["site_id"]}, {"_id": 0, "design.brand": 1})
     brand = ((site or {}).get("design") or {}).get("brand") or {}
     try:
-        steps = await generate_product_how_to(
+        howto = await generate_product_how_to(
             product, brand, n_steps=n_steps,
             request_id=f"backfill-howto-{product_id[:8]}",
         )
@@ -209,18 +209,25 @@ async def regenerate_product_how_to_endpoint(
         logger.exception(f"[regenerate-how-to] {product_id} failed")
         raise HTTPException(502, f"Génération IA échouée : {str(e)[:200]}")
 
+    steps = (howto or {}).get("steps") or []
+    meta = {
+        "section_title": (howto or {}).get("section_title") or {},
+        "product_kind":  (howto or {}).get("product_kind") or "generic",
+    }
     now_iso = datetime.now(timezone.utc).isoformat()
     await db.products.update_one(
         {"id": product_id},
         {"$set": {
             "how_to_steps": steps,
+            "how_to_steps_meta": meta,
             "how_to_steps_generated_at": now_iso,
             "updated_at": now_iso,
         }},
     )
-    logger.info(f"[regenerate-how-to] {product_id} → {len(steps)} steps")
+    logger.info(f"[regenerate-how-to] {product_id} → {len(steps)} steps (kind={meta['product_kind']})")
     return {
         "ok": True, "product_id": product_id, "how_to_steps": steps,
+        "how_to_steps_meta": meta,
         "model": "claude-haiku-4-5", "cost_estimate_usd": 0.004,
     }
 

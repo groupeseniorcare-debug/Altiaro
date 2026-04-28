@@ -468,6 +468,83 @@ async def _call_usps_llm(
 # ---------------------------------------------------------------------------
 # Phase 2.3 — Allowed icons for HowTo steps (subset, more action-oriented)
 # ---------------------------------------------------------------------------
+# Phase 2.6 Tâche C — Mapping product_kind → templates HowTo adaptatifs
+# ---------------------------------------------------------------------------
+HOWTO_SECTION_TITLES = {
+    "seated_furniture": {"fr": "Comment l'utiliser", "en": "How to use it"},
+    "blanket":          {"fr": "Comment l'utiliser au quotidien", "en": "Your daily ritual"},
+    "cushion":          {"fr": "Trouver votre maintien", "en": "Find your support"},
+    "soft_goods":       {"fr": "Installer en quelques gestes", "en": "Set up in a few gestures"},
+    "generic":          {"fr": "Bien commencer", "en": "Getting started"},
+}
+
+HOWTO_STEP_HINTS = {
+    "seated_furniture": (
+        "Étapes d'un rituel d'usage : 1) S'installer (s'asseoir, prendre la "
+        "place, sentir l'assise), 2) Régler (commande filaire, inclinaison, "
+        "lift), 3) Activer (massage, chauffage, USB selon les features réelles), "
+        "4) Profiter (relâcher, lecture, sieste, lever sans effort)."
+    ),
+    "blanket": (
+        "Étapes d'un rituel quotidien d'usage : 1) Choisir le réglage (chaleur, "
+        "minuterie), 2) Préparer pour la nuit (déplier, télécommande, position), "
+        "3) Entretenir (machine, sécheuse, séchage), 4) Conserver (plier, ranger "
+        "dans la housse fournie)."
+    ),
+    "cushion": (
+        "Étapes pour trouver le bon maintien : 1) Positionner (lombaire, "
+        "siège, dos), 2) Ajuster (sangle, hauteur, fermeté), 3) Tester (5 min "
+        "assis, écouter le corps), 4) Adapter selon l'activité (bureau, voyage, "
+        "soir)."
+    ),
+    "soft_goods": (
+        "Étapes pour installer en quelques gestes : 1) Préparer (mesurer le "
+        "fauteuil/lit, choisir la face), 2) Draper (couvrir, ajuster les coins), "
+        "3) Sécuriser (élastiques, sangles, agrafes), 4) Entretenir (lavage "
+        "machine, repassage doux)."
+    ),
+    "generic": (
+        "4 étapes adaptées en s'appuyant sur les features visibles "
+        "et les attributs réels du produit, sans inventer de fonctions absentes."
+    ),
+}
+
+
+def _detect_product_kind(product: Dict[str, Any]) -> str:
+    """Normalise la valeur `source_vision_lock.product_kind` vers un des
+    5 buckets de notre mapping HowTo (seated_furniture / blanket / cushion /
+    soft_goods / generic). Fait du **fuzzy match par contains** car le SVL
+    contient parfois des descriptions longues type "electric lift recliner
+    armchair with integrated cup holders" plutôt que des slugs courts.
+    """
+    svl = product.get("source_vision_lock") or {}
+    raw = (svl.get("product_kind") or "").strip().lower()
+    if not raw:
+        # Fallback secondaire : nom produit
+        name = product.get("name") or {}
+        if isinstance(name, dict):
+            name = name.get("fr") or name.get("en") or ""
+        raw = (str(name) or "").lower()
+
+    # Ordre IMPORTANT : blanket avant cover (sinon "cover" triggers soft_goods
+    # même si le produit est "blanket cover"); idem cushion avant chair.
+    keyword_buckets = [
+        ("blanket", ["blanket", "throw", "couverture", "plaid", "duvet"]),
+        ("cushion", ["cushion", "pillow", "lumbar", "coussin", "oreiller"]),
+        ("soft_goods", ["slipcover", "sofa cover", "chair cover", "housse", "cover"]),
+        ("seated_furniture", [
+            "recliner", "armchair", "lift chair", "rise chair", "chair",
+            "fauteuil", "siège", "seat",
+        ]),
+    ]
+    for bucket, kws in keyword_buckets:
+        for kw in kws:
+            if kw in raw:
+                return bucket
+    return raw if raw in HOWTO_SECTION_TITLES else "generic"
+
+
+# ---------------------------------------------------------------------------
 ALLOWED_HOWTO_ICONS = [
     "ArrowDownToLine", "Hand", "MousePointer2", "Settings2", "Move",
     "ChevronsRight", "Check", "Sparkles", "Gauge", "Headphones",
@@ -484,9 +561,22 @@ async def generate_product_how_to(
     *,
     n_steps: int = 4,
     request_id: Optional[str] = None,
-) -> List[Dict[str, str]]:
+) -> Dict[str, Any]:
     """Generate `n_steps` (default 4) actionable, sensorielle steps to use the
-    product. Output : list of {icon, title (≤32 chars), description (≤120 chars)}.
+    product.
+
+    Phase 2.6 Tâche C — retourne désormais un **dict** structuré :
+        {
+          "section_title": {"fr": "...", "en": "..."}  # adapté au product_kind
+          "product_kind": "blanket" | "cushion" | "seated_furniture" | ...
+          "steps": [{icon, title, description}, ...]
+        }
+
+    Le `section_title` est piloté par `source_vision_lock.product_kind` :
+    chaque "kind" a son titre éditorial (ex. "Trouver votre maintien" pour un
+    coussin, "Comment l'utiliser au quotidien" pour une couverture chauffante).
+    Le prompt Haiku reçoit aussi un *hint* pédagogique qui oriente les 4 étapes
+    sur l'usage réel du produit, et non sur des suppositions génériques.
 
     Lit `source_vision_lock` (matériau + features visibles) pour ancrer le
     contenu sur la réalité du produit, et non sur des suppositions génériques.
@@ -494,6 +584,11 @@ async def generate_product_how_to(
     n_steps = max(3, min(int(n_steps or 4), 5))
     context = _product_context(product, brand)
     icons = ", ".join(ALLOWED_HOWTO_ICONS)
+
+    # Phase 2.6 Tâche C — détection adaptative
+    pk = _detect_product_kind(product)
+    section_title = HOWTO_SECTION_TITLES.get(pk, HOWTO_SECTION_TITLES["generic"])
+    step_hint = HOWTO_STEP_HINTS.get(pk, HOWTO_STEP_HINTS["generic"])
 
     system = (
         "Tu es directeur éditorial d'une marque premium (références Aesop, "
@@ -508,8 +603,12 @@ async def generate_product_how_to(
     )
     user = (
         f"{context}\n\n"
+        f"TYPE PRODUIT (Vision lock) : {pk}\n"
+        f"GUIDE PÉDAGOGIQUE D'ÉTAPES POUR CE TYPE :\n  {step_hint}\n\n"
         f"TÂCHE : produis EXACTEMENT {n_steps} étapes d'utilisation, ton premium, "
-        f"ancrées sur le matériau et les features réellement visibles (ANALYSE VISUELLE SOURCE ci-dessus).\n\n"
+        f"ancrées sur le matériau et les features réellement visibles (ANALYSE VISUELLE SOURCE ci-dessus). "
+        f"Suis le GUIDE PÉDAGOGIQUE ci-dessus comme grille narrative ; n'invente "
+        f"jamais de fonctions absentes du produit.\n\n"
         f"FORMAT JSON STRICT (réponds UNIQUEMENT ceci, sans markdown) :\n"
         f'{{\n'
         f'  "steps": [\n'
@@ -558,7 +657,11 @@ async def generate_product_how_to(
         })
     if len(out) < 3:
         raise ValueError(f"Réponse Claude HowTo : {len(out)} étapes valides (min 3)")
-    return out
+    return {
+        "section_title": dict(section_title),
+        "product_kind": pk,
+        "steps": out,
+    }
 
 
 # ---------------------------------------------------------------------------

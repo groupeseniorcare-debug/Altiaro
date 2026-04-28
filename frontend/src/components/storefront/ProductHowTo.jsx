@@ -25,7 +25,7 @@ function StepIcon({ name, color }) {
   return <Cmp size={26} strokeWidth={1.4} color={color || "#0A0A0A"} />;
 }
 
-export default function ProductHowTo({ steps, design, lang = "fr" }) {
+export default function ProductHowTo({ steps, sectionTitle, design, lang = "fr" }) {
   if (!Array.isArray(steps) || steps.length < 3) return null;
 
   const accent = (design?.brand?.palette?.accent) || "#9F6E50";
@@ -33,8 +33,18 @@ export default function ProductHowTo({ steps, design, lang = "fr" }) {
     design?.brand?.font_pair?.heading ||
     "'Cormorant Garamond', 'Cormorant', serif";
 
-  const sectionLabel = lang === "en" ? "How to use it" : "Comment l'utiliser";
-  const sectionEyebrow = lang === "en" ? "RITUEL" : "RITUEL";
+  // Phase 2.6 Tâche C — sectionTitle est passé par StorefrontProduct.jsx
+  // depuis `product.how_to_steps_meta.section_title` (généré par Haiku
+  // adaptatif selon `source_vision_lock.product_kind`). Fallback au libellé
+  // statique "Comment l'utiliser" / "How to use it" si non généré.
+  const fallbackTitle = lang === "en" ? "How to use it" : "Comment l'utiliser";
+  const resolvedTitle =
+    (typeof sectionTitle === "string" && sectionTitle.trim())
+      ? sectionTitle.trim()
+      : (sectionTitle && typeof sectionTitle === "object"
+          ? (sectionTitle[lang] || sectionTitle.fr || sectionTitle.en || fallbackTitle)
+          : fallbackTitle);
+  const sectionEyebrow = "RITUEL";
 
   return (
     <section
@@ -54,7 +64,7 @@ export default function ProductHowTo({ steps, design, lang = "fr" }) {
           className="text-[34px] md:text-[44px] leading-[1.05] font-light"
           style={{ fontFamily: fontHeading, color: "#0A0A0A" }}
         >
-          {sectionLabel}
+          {resolvedTitle}
         </h2>
       </div>
 
