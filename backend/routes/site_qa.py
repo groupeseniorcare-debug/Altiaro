@@ -39,19 +39,28 @@ async def go_live(site_id: str, force: bool = Query(False), user: dict = Depends
     })
     # IndexNow + sitemap ping (best-effort)
     try:
-        from routes.indexnow import push_urls_for_site  # type: ignore
-        await push_urls_for_site(site_id)
+        from routes.indexnow import notify_indexnow
+        public_url = site.get("public_url") or site.get("custom_domain")
+        if public_url and not public_url.startswith("http"):
+            public_url = f"https://{public_url}"
+        if public_url:
+            await notify_indexnow([public_url, f"{public_url}/sitemap.xml"])
     except Exception:
         logger.exception("[go-live] indexnow push failed (non-blocking)")
     try:
-        from routes.emails import send_email  # type: ignore
-        await send_email(
-            to=site.get("operator_email") or "",
-            subject=f"🚀 {site.get('name','Site')} est en ligne",
-            html=f"<p>Votre site <strong>{site.get('name')}</strong> est désormais public. Bonnes ventes ✨</p>",
-        )
+        from routes.emails import send_email_via_resend
+        op = await db.users.find_one({"id": site.get("operator_id")}, {"_id": 0, "email": 1})
+        to = (op or {}).get("email") or ""
+        if to:
+            await send_email_via_resend(
+                to=to,
+                subject=f"🚀 {site.get('name','Site')} est en ligne",
+                html=f"<p>Votre site <strong>{site.get('name')}</strong> est désormais public. Bonnes ventes ✨</p>",
+                site=site,
+                tags=["go_live"],
+            )
     except Exception:
-        pass
+        logger.exception("[go-live] email failed (non-blocking)")
     logger.info(f"[go-live] site {site_id[:8]} → status=live")
     await db.sites.update_one({"id": site_id}, {"$set": {"last_indexnow_at": now}})
     return {"ok": True, "site_id": site_id, "status": "live", "went_live_at": now, "checklist": cl}

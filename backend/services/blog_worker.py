@@ -1,10 +1,11 @@
 """Worker async qui consomme `db.blog_jobs` (Phase A2). Appelé toutes
 les 30 s via APScheduler ; max 3 jobs concurrents globalement."""
 from __future__ import annotations
-import asyncio, logging
+import asyncio
+import logging
 from datetime import datetime, timezone
 from deps import db
-from services.llm_resilience import safe_claude_json, safe_haiku_text
+from services.llm_resilience import safe_claude_json
 
 logger = logging.getLogger("altiaro.blog_worker")
 MAX_CONCURRENT = 3
@@ -104,10 +105,9 @@ async def tick():
         if len(_running) >= MAX_CONCURRENT:
             return
         free = MAX_CONCURRENT - len(_running)
-        # Pick queued jobs (1 par site)
-        seen_sites = {db.blog_jobs.find_one for _ in []}  # placeholder
-        seen_sites = set()
-        candidates = []
+        # Pick queued jobs (1 par site, ordre FIFO)
+        seen_sites: set = set()
+        candidates: list = []
         async for j in db.blog_jobs.find({"status": "queued"}, {"_id": 0}).sort([("created_at", 1)]).limit(20):
             if j["site_id"] in seen_sites:
                 continue

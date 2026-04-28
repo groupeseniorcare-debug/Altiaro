@@ -1,10 +1,33 @@
 # Altiaro — Mémo technique de reprise (HANDOFF)
 
-> **Dernière mise à jour : 2026-04-24 (cascade Phases 5 → 6 → 7 livrée)**
+> **Dernière mise à jour : 2026-04-28 (mission Finalisation A2/B/C/D'/E' livrée one-shot)**
 >
 > Ce document est la source de vérité pour un nouvel intervenant (client, tech lead, agent IA)
 > qui se demande **ce qui marche, ce qui reste à faire, comment onboarder un concepteur**.
 > Il référence le code actuel ; il remplace les mémos antérieurs.
+
+---
+
+## 0 — Mission Finalisation 2026-04-28 (one-shot)
+
+| Phase | État | Détails |
+|---|---|---|
+| **A2** File d'attente blog | ✅ | `routes/blog_queue.py` + `services/blog_worker.py` + cron `blog_worker_tick` 30s + auto-pillar post-launch (3 articles) + UI panneau dans `pages/SiteBlogPosts.jsx` |
+| **B.1** JSON-LD multilingue | ✅ | `GET /api/public/sites/:id/seo/jsonld` ; service `seo_jsonld.py` (Org/WebSite/Product/Breadcrumb/FAQ/HowTo/Article+Speakable/LocalBusiness) |
+| **B.2** Hreflang `x-default` | ✅ | helper `hreflang_alternates()` + sitemap.xml |
+| **B.3** Sitemap multilingue + landings + db.blog_posts | ✅ | `routes/seo.py` |
+| **B.4** IndexNow daily resync | ✅ | cron 01h00 UTC |
+| **B.5** Maillage interne | ✅ pré-existant | `internal_linking_weekly` Mar 09h |
+| **B.6** Factory long-tail | ✅ | `routes/seo_factory.py` (4 endpoints) + cron `landing_pages_generation_daily` 02h30 + indexes |
+| **B.7** AEO | ✅ pré-existant | `routes/aeo.py`, `citation_tracker.py`, `llms.txt` |
+| **B.8** GEO `LocalBusiness` + `areaServed` | ✅ | dans /seo/jsonld |
+| **B.9** Cockpit Santé SEO enrichi | ✅ | `pages/SiteSEO.jsx` panel "Phase B · Factory long-tail" |
+| **C** QA + go-live | ✅ | `routes/site_qa.py`, `services/site_qa_checklist.py` (16 checks), `pages/SiteQA.jsx`, route `/sites/:id/qa` |
+| **D'** Géoloc & GBP 1:1 | ✅ | `routes/geo.py`, `geo_mapping.py`, `useGeo()`, `<Price>`, `UkWelcomeBanner` |
+| **E'** Purge matériaux | ✅ + appliqué | `scripts/purge_material_consistency.py` ; cron `material_consistency_check_weekly` ; rapport markdown |
+| **F** Hygiène | 🟡 partiel | bugs critiques fixés, refacto `design.py` reporté |
+
+Voir détail : `deliverables/finalisation_2026-04-28.md` + `memory/CHANGELOG.md` (entrée du 2026-04-28).
 
 ---
 
@@ -156,7 +179,7 @@ Quand le client déploie sur son infra OVH définitive :
 
 ---
 
-## 9 — Crons APScheduler actifs (20 jobs)
+## 9 — Crons APScheduler actifs (24 jobs · +4 livrés Mission 2026-04-28)
 
 ### Plateforme (11 crons historiques)
 
@@ -187,6 +210,15 @@ Quand le client déploie sur son infra OVH définitive :
 | `content_gap_monthly` | 15 du mois 11h UTC | 20 gaps concurrents/site |
 | `sitemap_republish_ondemand` | **Toutes 10 min** | Ping IndexNow quand dirty |
 | `seo_weekly_report` | Dim 20h UTC | Rapport hebdo consolidé |
+
+### Mission Finalisation 2026-04-28 (4 nouveaux crons)
+
+| Job | Fréquence | Rôle |
+|---|---|---|
+| `blog_worker_tick` | Toutes 30 s | consomme `db.blog_jobs` (max 3 globaux, 1/site, FIFO) |
+| `landing_pages_generation_daily` | 02h30 UTC | Génère 5 landings/site/jour (env `LANDINGS_PER_DAY_PER_SITE`) |
+| `indexnow_daily_resync` | 01h00 UTC | Resoumet home + sitemap des sites `live` |
+| `material_consistency_check_weekly` | Sam 12h UTC | Dry-run cohérence matériaux + log |
 
 ---
 

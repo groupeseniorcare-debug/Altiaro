@@ -8,6 +8,7 @@ import { getCustomer } from "../lib/customerAuth";
 import CartDrawer from "./CartDrawer";
 import StorefrontTracking from "./storefront/StorefrontTracking";
 import CookieConsentBanner from "./storefront/CookieConsentBanner";
+import UkWelcomeBanner from "./storefront/UkWelcomeBanner";
 import { sanitizeBrandText } from "../lib/brandText";
 import {
   ShoppingBag, Phone, ShieldCheck, Truck, MagnifyingGlass, User,
@@ -260,6 +261,7 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
 
       <StorefrontTracking site={site} />
       <CookieConsentBanner siteId={site?.id} />
+      <UkWelcomeBanner currentLang={lang} />
 
       {/* ================= TRUST BAR ================= */}
       <div className="text-white text-[12px] tracking-[0.01em]" style={{ background: textCol }}>

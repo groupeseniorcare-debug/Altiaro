@@ -4,8 +4,11 @@ from typing import List
 
 
 def _val(v, lang: str, fallback: str = "fr"):
+    """Picks the right language from a dict or returns the raw scalar."""
     if isinstance(v, dict):
-        return v.get(lang) or v.get(fallback) or v.get("en") or next(iter(v.values()), "") if v else ""
+        if not v:
+            return ""
+        return v.get(lang) or v.get(fallback) or v.get("en") or next(iter(v.values()), "")
     return v or ""
 
 

@@ -21,10 +21,16 @@ async def compute(site_id: str) -> dict:
     products_with_imgs = await db.products.count_documents({"site_id": site_id, "generated_images_by_variant": {"$exists": True}})
     available = site.get("available_langs") or []
     blog_n = await db.blog_posts.count_documents({"site_id": site_id})
-    landings_n = await db.landing_pages.count_documents({"site_id": site_id}) if "landing_pages" in await db.list_collection_names() else 0
+    try:
+        landings_n = await db.landing_pages.count_documents({"site_id": site_id})
+    except Exception:
+        landings_n = 0
     domain_doc = await db.domains.find_one({"site_id": site_id})
     mollie_pl = await db.platform_settings.find_one({"key": "mollie"}) or {}
-    gsc_doc = await db.gsc_oauth_states.find_one({"site_id": site_id}) if "gsc_oauth_states" in await db.list_collection_names() else None
+    try:
+        gsc_doc = await db.gsc_oauth_states.find_one({"site_id": site_id})
+    except Exception:
+        gsc_doc = None
     gmc = await db.platform_settings.find_one({"key": "merchant"}) or {}
     indexnow_recent = bool(site.get("last_indexnow_at") and datetime.fromisoformat(site["last_indexnow_at"].replace("Z", "+00:00")) > datetime.now(timezone.utc) - timedelta(days=7))
 

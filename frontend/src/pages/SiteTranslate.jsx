@@ -51,9 +51,23 @@ export default function SiteTranslate() {
       return;
     }
     const { task_id } = data;
-    // Poll status
+    // Poll status — auto-stop si 404 répétés (task perdu suite à restart backend)
+    let notFoundStreak = 0;
     const poll = async () => {
-      const { data: st } = await apiCall(() => api.get(`/sites/${siteId}/translate/status?task_id=${task_id}`));
+      const { data: st, status } = await apiCall(() =>
+        api.get(`/sites/${siteId}/translate/status?task_id=${task_id}`),
+      );
+      if (status === 404 || (!st && !status)) {
+        notFoundStreak += 1;
+        if (notFoundStreak >= 3) {
+          setRunning(false);
+          setTask({ status: "failed", error: "Tâche introuvable (serveur redémarré ?)" });
+          return;
+        }
+        setTimeout(poll, 5000);
+        return;
+      }
+      notFoundStreak = 0;
       setTask(st);
       if (st && (st.status === "completed" || st.status === "failed")) {
         setRunning(false);

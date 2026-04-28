@@ -30,6 +30,40 @@ export default function SiteBlogPosts() {
 
   useEffect(() => { load(); }, [siteId]);
 
+  // ===== Phase A2 — File d'attente blog (jobs asynchrones) =====
+  const [queueJobs, setQueueJobs] = useState([]);
+  const [queueCount, setQueueCount] = useState(3);
+  const [queuePillar, setQueuePillar] = useState("buying_guide");
+  const [enqueueBusy, setEnqueueBusy] = useState(false);
+
+  const loadQueueJobs = async () => {
+    const { data } = await apiCall(() =>
+      api.get(`/sites/${siteId}/blog/jobs?status=queued,running,completed,failed`),
+    );
+    setQueueJobs((data && data.items) || []);
+  };
+  useEffect(() => {
+    loadQueueJobs();
+    const t = setInterval(loadQueueJobs, 5000);
+    return () => clearInterval(t);
+  }, [siteId]);
+
+  const enqueueBlogJob = async () => {
+    setEnqueueBusy(true);
+    const { error } = await apiCall(() =>
+      api.post(`/sites/${siteId}/blog/jobs`, {
+        count: Math.max(1, Math.min(50, parseInt(queueCount) || 1)),
+        pillar: queuePillar,
+      }),
+    );
+    setEnqueueBusy(false);
+    if (error) return showToast("error", error);
+    showToast("ok", `${queueCount} article(s) ajoutés à la file. Le worker démarre dans 30 s max.`);
+    loadQueueJobs();
+    setTimeout(load, 5000);
+  };
+  // ============================================================
+
   const showToast = (type, msg) => {
     setToast({ type, msg });
     setTimeout(() => setToast(null), 5000);
@@ -241,6 +275,103 @@ export default function SiteBlogPosts() {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Phase A2 — File d'attente blog */}
+        <div
+          data-testid="blog-queue-panel"
+          className="mb-8 bg-white p-5 md:p-6"
+          style={{ border: "1px solid #E5E5E5", borderRadius: "4px" }}
+        >
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex-1 min-w-[280px]">
+              <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 mb-1.5 font-medium">
+                Phase A2 · File d'attente
+              </div>
+              <div className="text-[18px] text-neutral-900 leading-tight" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
+                Production blog asynchrone
+              </div>
+              <p className="text-[13px] text-neutral-600 mt-1.5 leading-[1.55] max-w-2xl">
+                Mettez plusieurs articles en file ; le worker en générera jusqu'à <b>3 en parallèle</b>
+                toutes les 30 s, sans bloquer votre interface. Idéal pour préparer 10 à 50 articles d'un coup.
+              </p>
+            </div>
+            <div className="flex items-end gap-2 flex-wrap">
+              <div>
+                <label className="block text-[10px] uppercase tracking-[0.2em] text-neutral-500 mb-1">Nombre</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={queueCount}
+                  onChange={(e) => setQueueCount(e.target.value)}
+                  className="h-11 w-20 px-3 rounded-xl bg-white border border-neutral-200 text-sm"
+                  data-testid="blog-queue-count"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-[0.2em] text-neutral-500 mb-1">Type</label>
+                <select
+                  value={queuePillar}
+                  onChange={(e) => setQueuePillar(e.target.value)}
+                  className="h-11 px-3 rounded-xl bg-white border border-neutral-200 text-sm"
+                  data-testid="blog-queue-pillar"
+                >
+                  <option value="buying_guide">Guide d'achat</option>
+                  <option value="comparison">Comparatif / critères</option>
+                  <option value="trends">Tendances</option>
+                </select>
+              </div>
+              <button
+                onClick={enqueueBlogJob}
+                disabled={enqueueBusy}
+                data-testid="blog-queue-enqueue"
+                className="h-11 px-4 rounded-xl bg-[#1C1917] hover:bg-[#0A0A0A] text-white text-sm font-medium flex items-center gap-2 transition disabled:opacity-60"
+              >
+                <Sparkle size={16} weight="fill" />
+                {enqueueBusy ? "Envoi…" : `Générer ${queueCount} article${queueCount > 1 ? "s" : ""}`}
+              </button>
+            </div>
+          </div>
+
+          {queueJobs.length > 0 && (
+            <div className="mt-5 border-t border-neutral-100 pt-4">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 mb-3">
+                Jobs récents ({queueJobs.length})
+              </div>
+              <div className="space-y-2 max-h-72 overflow-auto">
+                {queueJobs.slice(0, 20).map((j) => (
+                  <div
+                    key={j.id}
+                    data-testid={`blog-job-${j.status}`}
+                    className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-neutral-50 text-[12px]"
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span
+                        className={
+                          j.status === "completed"
+                            ? "h-2 w-2 rounded-full bg-emerald-500"
+                            : j.status === "running"
+                            ? "h-2 w-2 rounded-full bg-amber-500 animate-pulse"
+                            : j.status === "failed"
+                            ? "h-2 w-2 rounded-full bg-red-500"
+                            : "h-2 w-2 rounded-full bg-neutral-300"
+                        }
+                      />
+                      <span className="font-medium text-neutral-700 capitalize">{j.status}</span>
+                      <span className="text-neutral-500 truncate">
+                        · {j.pillar || "?"} · {j.articles_done || 0}/{j.articles_planned} articles
+                        {j.language ? ` · ${j.language}` : ""}
+                      </span>
+                    </div>
+                    <div className="text-neutral-400 text-[11px] tabular-nums whitespace-nowrap">
+                      {j.progress || 0}%
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex items-end justify-between gap-4 mb-8 flex-wrap">

@@ -3,6 +3,133 @@
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
+
+## 2026-04-28 (latest) · Mission Finalisation Altiaro — Phases A2 + B + C + D' + E'
+
+### Phase A2 · File d'attente blog asynchrone
+- **Backend** : `routes/blog_queue.py` branché. 4 endpoints :
+  - `POST /api/sites/{id}/blog/jobs` (enqueue N articles)
+  - `GET  /api/sites/{id}/blog/jobs?status=...` (liste)
+  - `GET  /api/sites/{id}/blog/jobs/{job_id}` (détail)
+  - `DELETE /api/sites/{id}/blog/jobs/{job_id}` (annulation des `queued`)
+- **Worker** : `services/blog_worker.py` consommé via APScheduler `blog_worker_tick`
+  toutes les 30 s, max 3 jobs concurrents globaux, 1 par site, génération via
+  `safe_claude_json` (tier `speed`).
+- **Auto-pillar post-launch** : `routes/launch.py` enqueue automatiquement
+  3 articles piliers (`buying_guide`, `comparison`, `trends`) à la fin de l'étape 5.
+- **Frontend** : `pages/SiteBlogPosts.jsx` ajoute un panneau "Phase A2 · File d'attente"
+  avec polling 5 s, sélecteur Nombre/Type, badge statut animé.
+- **Indexes Mongo** : `blog_jobs(status, created_at)`, `blog_jobs(site_id, created_at)`.
+
+### Phase B · SEO / AEO / GEO ULTRA
+- **B.1** Endpoint `GET /api/public/sites/{id}/seo/jsonld?lang=&product_id=&blog_slug=&landing_slug=&country=`
+  retourne tous les blocs JSON-LD : `Organization`, `WebSite`+`SearchAction`,
+  `LocalBusiness` (avec `areaServed` 11 pays), `Product`, `BreadcrumbList`,
+  `FAQPage`, `HowTo`, `Article` + `Speakable`. Service `services/seo_jsonld.py`.
+- **B.2** Hreflang strict + `x-default` exposé dans la même réponse, helper
+  `seo_jsonld.hreflang_alternates()` mutualisé.
+- **B.3** Sitemap multilingue enrichi (`routes/seo.py`) :
+  - `xhtml:link rel="alternate" hreflang="x-default"` ajouté à chaque URL
+  - articles de blog réels (`db.blog_posts`) inclus
+  - landing pages `db.landing_pages` (Phase B6) incluses
+  - `image:image` déjà présent
+- **B.4** IndexNow systématique :
+  - `go-live` push best-effort sur `home + sitemap`
+  - nouveau cron `indexnow_daily_resync` (01h00 UTC quotidien) sur tous les sites `live`
+- **B.5** Maillage interne — cron existant `internal_linking_weekly` (Mar 09h) confirmé
+- **B.6** Factory long-tail : `routes/seo_factory.py` branché, 4 endpoints :
+  - `POST /api/sites/{id}/seo/keywords/discover` (génère 30 kw via Claude)
+  - `POST /api/sites/{id}/seo/keywords/cluster` (clusters sémantiques)
+  - `POST /api/sites/{id}/seo/landings/generate` (5 landings/run)
+  - `GET  /api/sites/{id}/seo/factory/state` (compteurs)
+  - Cron `landing_pages_generation_daily` (02h30 UTC, plafonné via env
+    `LANDINGS_PER_DAY_PER_SITE` défaut `5`)
+  - Indexes Mongo idempotents : `keyword_universe(site_id, locale, keyword) UNIQUE`,
+    `keyword_clusters(site_id, locale)`, `landing_pages(site_id, slug)`,
+    `landing_pages(cluster_id)`.
+- **B.7** AEO : déjà couvert par `routes/aeo.py` (FAQ Q/R, citation tracker, llms.txt).
+- **B.8** GEO : `LocalBusiness` JSON-LD avec `areaServed` ; lecture
+  `CF-IPCountry` / `X-Geo-Country` / fallback `ip-api.com` (dans `routes/geo.py`).
+- **B.9** Cockpit Santé SEO : `pages/SiteSEO.jsx` enrichi d'une section "Phase B ·
+  Factory long-tail" — stats live, boutons Découvrir / Cluster / Générer 5
+  landings / Resoumettre IndexNow.
+- **B.10/B.11** Crons existants `gsc_position_alerts_daily` + `content_refresh_monthly`
+  confirmés actifs.
+
+### Phase C · QA + Mise en ligne
+- **Backend** : `routes/site_qa.py` branché.
+  - `GET  /api/sites/{id}/qa/checklist` → 16 checks (`branding_complete`,
+    `products_min`, `all_products_have_images`, `translations_min`,
+    `json_ld_valid`, `sitemap_published`, `domain_dns_ok`, `ssl_ok`,
+    `mollie_active`, `legal_pages`, `blog_min_3`, `landing_pages_min`,
+    `gsc_connected`, `merchant_connected`, `indexnow_recent`, `perf_ok`)
+    avec score 0-100 et flag `ready`.
+  - `POST /api/sites/{id}/go-live[?force=true]` → bascule `status=live`,
+    snapshot `site_snapshots`, push IndexNow + email Resend best-effort.
+- **Frontend** : `pages/SiteQA.jsx` (nouveau) + route `/sites/:id/qa`.
+  Score ring SVG, 16 cartes status (ok/warn/fail), bouton "Mettre en ligne"
+  désactivé tant que `ready=false`.
+- `routes/journey_gating.py` : étape `qa` déjà gérée, inchangée.
+
+### Phase D' · Géoloc & Devises 1:1
+- **Backend** : `routes/geo.py` + `geo_mapping.py`.
+  - `GET /api/geo/detect` lit `CF-IPCountry` > `X-Geo-Country` > `ip-api.com`
+    (cache mémoire 24h, timeout 1.5s, IPs privées ignorées).
+  - 1:1 EUR / GBP : si `country=GB`, `currency=GBP` avec **même nombre** que EUR.
+- **Frontend** :
+  - Hook `hooks/useGeo.js` (cache localStorage 12h)
+  - Composant `components/storefront/Price.jsx` : `<Price amount={10} />`
+    rend `10,00 €` ou `£10.00` selon `useGeo()`.
+  - Composant `components/storefront/UkWelcomeBanner.jsx` : bandeau
+    "🇬🇧 You're in the United Kingdom — prices in £ (GBP)…" affiché si
+    `country=GB` et `lang!=en`, fermable + persistance localStorage.
+  - `StorefrontLayout.jsx` injecte le bandeau juste après `CookieConsentBanner`.
+- **Hreflang** : `en-GB` distingué de `en-US` / `en-IE` côté sitemap (`?lang=en` +
+  `x-default`).
+- **Mollie GBP** : encore à brancher au checkout (TODO P2 — risque faible, à faire
+  quand le 1er site UK est prêt à encaisser).
+
+### Phase E' · Purge cohérence matériaux
+- **Script** `backend/scripts/purge_material_consistency.py` (mode `--dry-run`
+  par défaut, `--apply` pour persister, `--site SITE_ID` pour cibler).
+- **Taxonomie** 13 matériaux canoniques (leather, pu_leather, microsuede,
+  linen, cotton, wool, polyester, velvet, wood, metal, plastic, memory_foam,
+  latex) avec labels FR/EN.
+- **Détection** par regex sur titre, description, narrative, tags,
+  `attributes.material`, `aliexpress.attributes_material`.
+- **Résultats premier run sur Altea + Auralia** :
+  - Altea (9 produits) : 0 contradiction, 1 patch `material_canonical`
+  - Auralia (3 produits) : 0 contradiction, 0 patch
+- **Cron** `material_consistency_check_weekly` (samedi 12h UTC).
+- **Rapport** automatique `deliverables/material_consistency_report_<date>.md`.
+
+### Bugs fixés
+- **Polling translate/status loop 404** : `pages/SiteTranslate.jsx` arrête
+  désormais le polling après 3 réponses sans données consécutives, marque la
+  tâche `failed` avec message clair (cas redémarrage backend).
+- **Code mort `safe_haiku_text`** : import retiré de `services/blog_worker.py`.
+- **Placeholder bizarre** dans `blog_worker.tick()` (`{find_one for _ in []}`) corrigé.
+- **`_val()` dans seo_jsonld.py** : priorité d'opérateurs cassée (else lié au mauvais
+  niveau) corrigée.
+
+### Documentation
+- `memory/PRD.md` : compteurs mis à jour (76 routers / ~338 endpoints exposés via
+  OpenAPI), nouvelle section "Étapes 8/9/10 + géoloc + devises + factory".
+- `memory/HANDOFF.md` : crons APScheduler 24 (était 20), section dépendances
+  humaines remise à jour (AE re-OAuth, GSC OAuth, Merchant OAuth, Google Ads
+  Basic Access).
+- `memory/CHANGELOG.md` : présente entrée.
+- `deliverables/finalisation_2026-04-28.md` : rapport opérationnel final
+  (top-10 commandes curl, URLs preview, dépendances humaines).
+
+### Crons APScheduler — total 24 (vs 20 avant)
+| ID | Fréquence | Rôle |
+|---|---|---|
+| `blog_worker_tick` | toutes 30 s | consomme `blog_jobs` (max 3 // par site) |
+| `landing_pages_generation_daily` | 02h30 UTC | 5 landings/site/jour (env `LANDINGS_PER_DAY_PER_SITE`) |
+| `indexnow_daily_resync` | 01h00 UTC | resoumet home + sitemap des sites `live` |
+| `material_consistency_check_weekly` | sam 12h UTC | dry-run + log via script |
+
 ## 2026-04-24 (latest) · Étape 5 section 6 "Image footer" + HeroImageCard + test e2e
 
 ### Section 6 · Image de fond du footer (nouveau)

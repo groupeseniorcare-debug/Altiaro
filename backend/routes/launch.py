@@ -1398,6 +1398,55 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
         except Exception:
             pass
 
+        # 9.5) Phase A2 — Enqueue automatique de 3 articles piliers
+        # (guide d'achat, comparatif/critères, tendances/pourquoi maintenant).
+        # Le worker `blog_worker_tick` les générera de manière asynchrone.
+        try:
+            site_doc = await db.sites.find_one(
+                {"id": site_id},
+                {"_id": 0, "id": 1, "name": 1, "niche": 1, "available_langs": 1, "primary_lang": 1},
+            )
+            if site_doc:
+                primary_lang = site_doc.get("primary_lang") or (site_doc.get("available_langs") or ["fr"])[0]
+                niche = site_doc.get("niche", "produits premium")
+                pillar_briefs = [
+                    {
+                        "pillar": "buying_guide",
+                        "topic": f"Guide d'achat complet : comment bien choisir un produit en {niche}",
+                    },
+                    {
+                        "pillar": "comparison",
+                        "topic": f"Critères et comparatif : quels matériaux et quelles caractéristiques privilégier en {niche}",
+                    },
+                    {
+                        "pillar": "trends",
+                        "topic": f"Tendances {datetime.now(timezone.utc).year} en {niche} : pourquoi investir maintenant",
+                    },
+                ]
+                from uuid import uuid4 as _u4
+                for brief in pillar_briefs:
+                    await db.blog_jobs.insert_one({
+                        "id": str(_u4()),
+                        "site_id": site_id,
+                        "status": "queued",
+                        "progress": 0,
+                        "articles_planned": 1,
+                        "articles_done": 0,
+                        "topics": [brief["topic"]],
+                        "language": primary_lang,
+                        "pillar": brief["pillar"],
+                        "retries": 0,
+                        "max_retries": 3,
+                        "requested_by": "launch_auto",
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "started_at": None,
+                        "completed_at": None,
+                        "error": None,
+                    })
+                logger.info(f"[launch] enqueued 3 pillar blog jobs for site {site_id[:8]}")
+        except Exception:
+            logger.exception("[launch] pillar blog enqueue failed (non-blocking)")
+
         # Si des étapes sont en mode dégradé → status final
         # `completed_with_degraded` (le frontend pourra afficher un récap +
         # bouton "Relancer uniquement les étapes dégradées").

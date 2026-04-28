@@ -86,6 +86,8 @@ async def sitemap(site_id: str):
             f'<xhtml:link rel="alternate" hreflang="{lg}" href="{base}{path}?lang={lg}"/>'
             for lg in langs
         )
+        # x-default → langue principale (1ère de la liste)
+        alts += f'<xhtml:link rel="alternate" hreflang="x-default" href="{base}{path}?lang={langs[0]}"/>'
         return (f"<url><loc>{base}{path}</loc><lastmod>{now}</lastmod>"
                 f"<changefreq>{changefreq}</changefreq><priority>{prio}</priority>{alts}</url>")
 
@@ -96,6 +98,7 @@ async def sitemap(site_id: str):
             f'<xhtml:link rel="alternate" hreflang="{lg}" href="{base}{path}?lang={lg}"/>'
             for lg in langs
         )
+        alts += f'<xhtml:link rel="alternate" hreflang="x-default" href="{base}{path}?lang={langs[0]}"/>'
         pname_raw = p.get("name")
         pname = pname_raw if isinstance(pname_raw, str) else (
             (pname_raw or {}).get("fr") or next(iter((pname_raw or {}).values()), "")
@@ -139,6 +142,32 @@ async def sitemap(site_id: str):
         slug = b.get("slug") if isinstance(b, dict) else None
         if slug:
             urls.append(urlset(f"/blog/{slug}", "0.7", "monthly"))
+
+    # Phase B3 — articles de blog réels (db.blog_posts)
+    try:
+        db_posts = await db.blog_posts.find(
+            {"site_id": site_id, "status": "published"},
+            {"_id": 0, "slug": 1, "updated_at": 1, "created_at": 1},
+        ).to_list(2000)
+        for b in db_posts:
+            slug = b.get("slug")
+            if slug:
+                urls.append(urlset(f"/blog/{slug}", "0.7", "monthly"))
+    except Exception:
+        pass
+
+    # Phase B6 — landing pages SEO factory
+    try:
+        landings = await db.landing_pages.find(
+            {"site_id": site_id, "status": "published"},
+            {"_id": 0, "slug": 1, "locale": 1},
+        ).to_list(2000)
+        for ld in landings:
+            slug = ld.get("slug")
+            if slug:
+                urls.append(urlset(f"/landing/{slug}", "0.75", "monthly"))
+    except Exception:
+        pass
 
     xml = ('<?xml version="1.0" encoding="UTF-8"?>\n'
            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
@@ -650,3 +679,114 @@ async def merchant_feed(site_id: str, country: str = "FR"):
         "\n</channel>\n</rss>"
     )
     return Response(content=xml, media_type="application/xml")
+
+
+
+# ============================================================
+#  Phase B1 — JSON-LD agrégé multilingue (Organization, WebSite,
+#  Product, BreadcrumbList, FAQPage, HowTo, Article+Speakable,
+#  LocalBusiness)
+# ============================================================
+@router.get("/public/sites/{site_id}/seo/jsonld")
+async def public_jsonld(
+    site_id: str,
+    lang: str = "fr",
+    product_id: Optional[str] = None,
+    blog_slug: Optional[str] = None,
+    landing_slug: Optional[str] = None,
+    country: Optional[str] = None,
+):
+    """Retourne tous les blocs JSON-LD pertinents pour la page demandée.
+
+    Utilisé par <SEOHead> côté storefront pour injecter
+    <script type="application/ld+json">{...}</script>.
+    """
+    from services import seo_jsonld
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(404, "Site introuvable")
+    origin = _origin()
+    public_url = site.get("public_url") or f"{origin}/shop/{site_id}"
+    site = {**site, "public_url": public_url}
+    out: list[dict] = []
+
+    # 1) Organization + WebSite (toujours présents)
+    out.append(seo_jsonld.organization(site))
+    out.append(seo_jsonld.website(site))
+
+    # 2) LocalBusiness si site a un pays principal (Phase B8 — GEO)
+    countries = site.get("seo_countries") or []
+    if countries:
+        ar = countries[:11]
+        lb = {
+            "@context": "https://schema.org",
+            "@type": "LocalBusiness",
+            "name": (site.get("design") or {}).get("brand", {}).get("name") or site.get("name"),
+            "url": public_url,
+            "areaServed": [{"@type": "Country", "name": c} for c in ar],
+        }
+        out.append(lb)
+
+    # 3) Product
+    if product_id:
+        p = await db.products.find_one({"id": product_id, "site_id": site_id}, {"_id": 0})
+        if p:
+            currency = "GBP" if (country or "").upper() == "GB" else "EUR"
+            out.append(seo_jsonld.product(p, site, lang, currency=currency))
+            # Breadcrumb produit
+            name = p.get("name")
+            pname = name.get(lang) if isinstance(name, dict) else (name or "Produit")
+            out.append(seo_jsonld.breadcrumbs([
+                {"name": "Accueil", "url": public_url},
+                {"name": "Produits", "url": f"{public_url}/collections"},
+                {"name": pname, "url": f"{public_url}/product/{product_id}"},
+            ]))
+            # FAQ produit (narrative.faq)
+            faqs = (p.get("narrative") or {}).get("faq") or []
+            if faqs:
+                out.append(seo_jsonld.faq_page(faqs, lang))
+            # HowTo (narrative.how_to)
+            howto = (p.get("narrative") or {}).get("how_to") or []
+            if howto:
+                out.append(seo_jsonld.howto(howto, lang))
+
+    # 4) Article (blog) + Speakable
+    if blog_slug:
+        post = await db.blog_posts.find_one(
+            {"site_id": site_id, "slug": blog_slug}, {"_id": 0},
+        )
+        if post:
+            out.append(seo_jsonld.article(post, lang))
+            out.append(seo_jsonld.breadcrumbs([
+                {"name": "Accueil", "url": public_url},
+                {"name": "Blog", "url": f"{public_url}/blog"},
+                {"name": (post.get("title", {}) or {}).get(lang) or "Article",
+                 "url": f"{public_url}/blog/{blog_slug}"},
+            ]))
+
+    # 5) Landing page SEO Factory
+    if landing_slug:
+        lp = await db.landing_pages.find_one(
+            {"site_id": site_id, "slug": landing_slug}, {"_id": 0},
+        )
+        if lp:
+            out.append({
+                "@context": "https://schema.org", "@type": "WebPage",
+                "name": lp.get("h1") or lp.get("meta_title"),
+                "description": lp.get("meta_description"),
+                "url": f"{public_url}/landing/{landing_slug}",
+                "speakable": {"@type": "SpeakableSpecification", "cssSelector": ["h1", ".lead"]},
+            })
+
+    # 6) hreflang (en bonus, exposé dans la réponse pour SEOHead)
+    langs = sorted(get_seo_langs(site)) or ["fr"]
+    path = ""
+    if product_id:
+        path = f"/product/{product_id}"
+    elif blog_slug:
+        path = f"/blog/{blog_slug}"
+    elif landing_slug:
+        path = f"/landing/{landing_slug}"
+    alternates = seo_jsonld.hreflang_alternates(public_url, path, langs, default=langs[0])
+
+    return {"jsonld": out, "hreflang": alternates}

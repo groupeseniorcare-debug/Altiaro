@@ -32,6 +32,40 @@ export default function SiteSEO() {
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState("audit");
 
+  // Phase B6 — SEO Factory state
+  const [factoryState, setFactoryState] = useState(null);
+  const [factoryBusy, setFactoryBusy] = useState("");
+  const [factoryToast, setFactoryToast] = useState(null);
+
+  const showFactoryToast = (kind, msg) => {
+    setFactoryToast({ kind, msg });
+    setTimeout(() => setFactoryToast(null), 5000);
+  };
+  const loadFactoryState = useCallback(async () => {
+    const { data } = await apiCall(() => api.get(`/sites/${siteId}/seo/factory/state`));
+    if (data) setFactoryState(data);
+  }, [siteId]);
+  useEffect(() => { loadFactoryState(); }, [loadFactoryState]);
+
+  const factoryAction = async (kind) => {
+    setFactoryBusy(kind);
+    const map = {
+      discover:    { url: `/sites/${siteId}/seo/keywords/discover`,  body: { locale: "fr-FR", target_count: 30 }, label: "30 mots-clés générés" },
+      cluster:     { url: `/sites/${siteId}/seo/keywords/cluster`,   body: { locale: "fr-FR", max_clusters: 10 },  label: "Clusters créés" },
+      landings:    { url: `/sites/${siteId}/seo/landings/generate`,  body: { locale: "fr-FR", max_landings: 5 },    label: "Landings générées" },
+      indexnow:    { url: `/sites/${siteId}/indexnow-resubmit`,       body: {},                                        label: "URLs resoumises à IndexNow" },
+    }[kind];
+    if (!map) { setFactoryBusy(""); return; }
+    const { data, error } = await apiCall(() => api.post(map.url, map.body));
+    setFactoryBusy("");
+    if (error) {
+      showFactoryToast("error", error);
+      return;
+    }
+    showFactoryToast("ok", `${map.label}${data ? ` — ${JSON.stringify(data).slice(0, 80)}` : ""}`);
+    loadFactoryState();
+  };
+
   const load = useCallback(async (fromRefresh = false) => {
     fromRefresh ? setRefreshing(true) : setLoading(true);
     const { data } = await apiCall(() => api.get(`/sites/${siteId}/seo-audit`));
@@ -284,6 +318,83 @@ export default function SiteSEO() {
         </div>
           </>
         )}
+
+        {/* Phase B6 — SEO Factory : keywords + landings */}
+        <div
+          className="bg-white rounded-2xl border border-neutral-200 p-6 mt-6"
+          data-testid="seo-factory-panel"
+        >
+          <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-1.5 flex items-center gap-2">
+                <Sparkle size={12} weight="bold" /> Phase B · Factory long-tail
+              </div>
+              <div className="text-[20px] text-neutral-900" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
+                Mots-clés &amp; landing pages SEO
+              </div>
+              <p className="text-[13px] text-neutral-600 mt-1.5 leading-[1.55] max-w-2xl">
+                Découvre des centaines de requêtes long-tail à partir de ton catalogue,
+                regroupe-les en clusters sémantiques, puis génère automatiquement des
+                landing pages premium ciblées pour capter du trafic organique.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5" data-testid="factory-state">
+            <Stat label="Mots-clés découverts" value={factoryState?.keywords_total ?? "—"} testId="factory-stat-keywords" />
+            <Stat label="Clusters" value={factoryState?.clusters_total ?? "—"} testId="factory-stat-clusters" />
+            <Stat label="Landings publiées" value={factoryState?.landings_total ?? "—"} testId="factory-stat-landings" />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => factoryAction("discover")}
+              disabled={!!factoryBusy}
+              data-testid="factory-discover"
+              className="h-10 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium flex items-center gap-2 transition disabled:opacity-60"
+            >
+              {factoryBusy === "discover" ? "Découverte…" : "Découvrir 30 mots-clés"}
+            </button>
+            <button
+              onClick={() => factoryAction("cluster")}
+              disabled={!!factoryBusy}
+              data-testid="factory-cluster"
+              className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition disabled:opacity-60"
+            >
+              {factoryBusy === "cluster" ? "Clustering…" : "Regrouper en clusters"}
+            </button>
+            <button
+              onClick={() => factoryAction("landings")}
+              disabled={!!factoryBusy}
+              data-testid="factory-landings"
+              className="h-10 px-4 rounded-xl bg-[#1C1917] hover:bg-[#0A0A0A] text-white text-sm font-medium flex items-center gap-2 transition disabled:opacity-60"
+            >
+              <Sparkle size={14} weight="fill" />
+              {factoryBusy === "landings" ? "Génération…" : "Générer 5 landings"}
+            </button>
+            <button
+              onClick={() => factoryAction("indexnow")}
+              disabled={!!factoryBusy}
+              data-testid="factory-indexnow"
+              className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition disabled:opacity-60"
+            >
+              {factoryBusy === "indexnow" ? "Push…" : "Resoumettre à IndexNow"}
+            </button>
+          </div>
+
+          {factoryToast && (
+            <div
+              data-testid="factory-toast"
+              className={`mt-4 rounded-xl border px-4 py-3 text-sm ${
+                factoryToast.kind === "ok"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border-rose-200 bg-rose-50 text-rose-800"
+              }`}
+            >
+              {factoryToast.msg}
+            </div>
+          )}
+        </div>
 
         <NextStepCTA siteId={siteId} currentKey="seo" />
       </div>

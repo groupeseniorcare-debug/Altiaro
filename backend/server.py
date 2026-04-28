@@ -100,6 +100,10 @@ from routes import product_content_admin as product_content_admin_routes
 from routes import ai_tweak as ai_tweak_routes
 from routes import product_image_regen as product_image_regen_routes  # Phase 2.7.3 — régénération ciblée d'1 image
 from routes import translate as translate_routes  # Phase 3 — traduction multi-langue (étape 7)
+from routes import blog_queue as blog_queue_routes  # Phase A2 — file d'attente blog
+from routes import seo_factory as seo_factory_routes  # Phase B6 — factory mots-clés / landings
+from routes import site_qa as site_qa_routes  # Phase C — checklist QA + go-live
+from routes import geo as geo_routes_finalisation  # Phase D' — détection pays/devise
 
 logging.basicConfig(
     level=logging.INFO,
@@ -188,6 +192,10 @@ api.include_router(product_content_admin_routes.router)  # Lot I — admin back-
 api.include_router(ai_tweak_routes.router)  # Phase 2.5 (Tâche B) — AI tweak site design (Sonnet)
 api.include_router(product_image_regen_routes.router)  # Phase 2.7.3 — régénération ciblée d'1 image
 api.include_router(translate_routes.router)  # Phase 3 — traduction multi-langue (étape 7)
+api.include_router(blog_queue_routes.router)  # Phase A2 — file d'attente blog
+api.include_router(seo_factory_routes.router)  # Phase B6 — factory mots-clés / landings
+api.include_router(site_qa_routes.router)  # Phase C — checklist QA + go-live
+api.include_router(geo_routes_finalisation.router)  # Phase D' — détection pays/devise
 
 
 @app.on_event("startup")
@@ -709,6 +717,117 @@ async def startup():
             id="seo_weekly_report", replace_existing=True, misfire_grace_time=3600,
         )
 
+        # ==================================================================
+        #  Phase A2 + B6 + B7 + E' — Mission Finalisation Altiaro
+        # ==================================================================
+        # Indexes for new collections (idempotent)
+        try:
+            await db.blog_jobs.create_index([("status", 1), ("created_at", 1)])
+            await db.blog_jobs.create_index([("site_id", 1), ("created_at", -1)])
+            await db.keyword_universe.create_index([("site_id", 1), ("locale", 1), ("keyword", 1)], unique=True)
+            await db.keyword_universe.create_index([("site_id", 1), ("pillar_id", 1)])
+            await db.keyword_clusters.create_index([("site_id", 1), ("locale", 1)])
+            await db.landing_pages.create_index([("site_id", 1), ("slug", 1)])
+            await db.landing_pages.create_index([("cluster_id", 1)])
+            await db.aeo_pages.create_index([("site_id", 1), ("slug", 1)])
+        except Exception:
+            logger.exception("[startup] indexes blog_jobs/keyword_universe failed")
+
+        # Phase A2 — Worker blog : tick toutes les 30 s
+        from services.blog_worker import tick as _blog_worker_tick
+
+        async def _scheduled_blog_worker():
+            try:
+                await _blog_worker_tick()
+            except Exception:
+                logger.exception("[scheduler] blog_worker tick failed")
+
+        scheduler.add_job(
+            _scheduled_blog_worker,
+            "interval", seconds=30,
+            id="blog_worker_tick", replace_existing=True, misfire_grace_time=60,
+        )
+
+        # Phase B6 — Génération automatique de landing pages (limitée par budget)
+        async def _scheduled_landings_daily():
+            try:
+                from routes.seo_factory import generate_landings, LandingsInput
+                limit_per_site = int(os.environ.get("LANDINGS_PER_DAY_PER_SITE", "5"))
+                if limit_per_site <= 0:
+                    return
+                # Itère sur les sites validés/lives
+                async for s in db.sites.find(
+                    {"status": {"$in": ["live", "validated"]}},
+                    {"_id": 0, "id": 1, "operator_id": 1, "available_langs": 1},
+                ):
+                    site_id = s["id"]
+                    langs = s.get("available_langs") or ["fr"]
+                    primary = langs[0] if langs else "fr"
+                    locale = {"fr": "fr-FR", "en": "en-GB", "de": "de-DE",
+                              "nl": "nl-NL", "it": "it-IT", "es": "es-ES"}.get(primary, "fr-FR")
+                    fake_admin = {"role": "admin", "id": "scheduler"}
+                    try:
+                        await generate_landings(
+                            site_id,
+                            LandingsInput(locale=locale, max_landings=limit_per_site),
+                            user=fake_admin,
+                        )
+                    except Exception:
+                        logger.exception(f"[landings_daily] site={site_id[:8]} crashed")
+            except Exception:
+                logger.exception("[scheduler] landings_daily failed")
+
+        scheduler.add_job(
+            _scheduled_landings_daily,
+            CronTrigger(hour=2, minute=30),
+            id="landing_pages_generation_daily", replace_existing=True, misfire_grace_time=3600,
+        )
+
+        # Phase B4 — IndexNow daily resync à 1h00
+        async def _scheduled_indexnow_daily_resync():
+            try:
+                from routes.indexnow import notify_indexnow
+                async for s in db.sites.find(
+                    {"status": "live"},
+                    {"_id": 0, "id": 1, "public_url": 1, "custom_domain": 1},
+                ):
+                    base = s.get("public_url") or s.get("custom_domain") or ""
+                    if not base:
+                        continue
+                    if not base.startswith("http"):
+                        base = f"https://{base}"
+                    try:
+                        await notify_indexnow([base, f"{base}/sitemap.xml", f"{base}/blog"])
+                        await db.sites.update_one(
+                            {"id": s["id"]},
+                            {"$set": {"last_indexnow_at": datetime.now(timezone.utc).isoformat()}},
+                        )
+                    except Exception:
+                        logger.exception(f"[indexnow_daily] site {s['id'][:8]} failed")
+            except Exception:
+                logger.exception("[scheduler] indexnow_daily_resync failed")
+
+        scheduler.add_job(
+            _scheduled_indexnow_daily_resync,
+            CronTrigger(hour=1, minute=0),
+            id="indexnow_daily_resync", replace_existing=True, misfire_grace_time=3600,
+        )
+
+        # Phase E' — Material consistency check hebdomadaire (samedi 12h UTC)
+        async def _scheduled_material_consistency_check():
+            try:
+                from scripts.purge_material_consistency import scan_all_sites
+                result = await scan_all_sites(apply=False)
+                logger.info(f"[scheduler] material_consistency_check : {result}")
+            except Exception:
+                logger.exception("[scheduler] material_consistency_check failed")
+
+        scheduler.add_job(
+            _scheduled_material_consistency_check,
+            CronTrigger(day_of_week="sat", hour=12, minute=0),
+            id="material_consistency_check_weekly", replace_existing=True, misfire_grace_time=7200,
+        )
+
         # Every Monday at 08:00 UTC (09h CET) — Coach SEO weekly digest email
         async def _scheduled_weekly_seo_coach():
             logger.info("[scheduler] weekly SEO coach digest run start")
@@ -776,14 +895,16 @@ async def startup():
         scheduler.start()
         app.state.scheduler = scheduler
         logger.info(
-            "APScheduler started : 20 jobs · weekly_debits · bimonthly_payouts · "
+            "APScheduler started : 24 jobs · weekly_debits · bimonthly_payouts · "
             "reviews_check_due · ae_tracking_sync · cj_tracking_sync (2h) · "
             "opportunity_scan · dns_auto_config (5min) · "
             "weekly_seo_coach · citation_tracker_weekly · ae_deals_watch · "
             "merchant_daily_sync · [Phase 6] blog_auto_weekly_batch (Mon/Wed/Fri) · "
             "emerging_keywords_scan · content_refresh_monthly · internal_linking_weekly · "
             "gsc_position_alerts_daily · paa_faq_enrichment_weekly · content_gap_monthly · "
-            "sitemap_republish_ondemand (10min) · seo_weekly_report"
+            "sitemap_republish_ondemand (10min) · seo_weekly_report · "
+            "[Mission Final] blog_worker_tick (30s) · landing_pages_generation_daily · "
+            "indexnow_daily_resync · material_consistency_check_weekly"
         )
     except Exception:
         logger.exception("Failed to start APScheduler")

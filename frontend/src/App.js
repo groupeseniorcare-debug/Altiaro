@@ -25,6 +25,7 @@ import SiteBranding from "./pages/SiteBranding";
 import SitePages from "./pages/SitePages";
 import SiteFulfillment from "./pages/SiteFulfillment";
 import SiteAnalytics from "./pages/SiteAnalytics";
+import SiteQA from "./pages/SiteQA";
 import Sourcing from "./pages/Sourcing";
 import AdminIntegrations from "./pages/AdminIntegrations";
 import AdminReview from "./pages/AdminReview";
@@ -314,6 +315,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <SiteAnalytics />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites/:id/qa"
+            element={
+              <ProtectedRoute>
+                <SiteQA />
               </ProtectedRoute>
             }
           />
