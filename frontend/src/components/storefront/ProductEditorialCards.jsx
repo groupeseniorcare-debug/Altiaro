@@ -65,7 +65,12 @@ export default function ProductEditorialCards({ product, colorSlug, design }) {
     "'Cormorant Garamond', 'Cormorant', serif";
   const accent = design?.brand?.palette?.accent || "#9F6E50";
 
-  const heroImg = pickImageByStyle(product, colorSlug, ed.hero.image_style || "wide_lifestyle");
+  // Phase 2.7 #1 — l'image hero 16:9 a été RETIRÉE de ce composant car elle
+  // dupliquait le <WideLifestyleBanner> de la section #2 (deux grandes
+  // images horizontales consécutives entre HowTo et editorial cards).
+  // On garde le bloc texte (eyebrow + H2 + paragraphe) pour structurer
+  // la section, mais on n'affiche plus de grande image au-dessus des
+  // 3 cards. La 16:9 reste pilotée par <WideLifestyleBanner>.
 
   return (
     <section
@@ -73,45 +78,32 @@ export default function ProductEditorialCards({ product, colorSlug, design }) {
       data-testid="product-editorial-cards"
       aria-labelledby="editorial-hero-title"
     >
-      {/* Hero — 1 big vertical image + title + desc */}
-      {heroImg && (
-        <div className="relative overflow-hidden mb-16 md:mb-20" style={{ borderRadius: "2px" }}>
-          <div
-            className="w-full"
-            style={{
-              aspectRatio: "16 / 9",
-              background: `#F5F2EB url(${heroImg}) center/cover no-repeat`,
-              minHeight: 380,
-            }}
-            role="img"
-            aria-label={ed.hero.title}
-          />
-          <div className="mt-10 md:mt-12 max-w-3xl">
-            <div
-              className="text-[10.5px] uppercase tracking-[0.45em] mb-3"
-              style={{ color: "#9C8C7C" }}
-            >
-              Éditorial
-            </div>
-            <h2
-              id="editorial-hero-title"
-              className="text-[30px] md:text-[42px] leading-[1.08] font-light mb-4"
-              style={{ fontFamily: fontHeading, color: "#0A0A0A" }}
-            >
-              {ed.hero.title}
-            </h2>
-            {ed.hero.description && (
-              <p
-                className="text-[15px] md:text-[16.5px] leading-[1.65]"
-                style={{ color: "#525252" }}
-              >
-                {ed.hero.description}
-              </p>
-            )}
-          </div>
+      {/* Phase 2.7 #1 — Bloc intro éditorial : eyebrow + H2 + paragraphe.
+          Plus d'image 16:9 ici (déplacée en section #2 unique via
+          <WideLifestyleBanner>). */}
+      <div className="mb-12 md:mb-16 max-w-3xl">
+        <div
+          className="text-[10.5px] uppercase tracking-[0.45em] mb-3"
+          style={{ color: "#9C8C7C" }}
+        >
+          Éditorial
         </div>
-      )}
-
+        <h2
+          id="editorial-hero-title"
+          className="text-[30px] md:text-[42px] leading-[1.08] font-light mb-4"
+          style={{ fontFamily: fontHeading, color: "#0A0A0A" }}
+        >
+          {ed.hero.title}
+        </h2>
+        {ed.hero.description && (
+          <p
+            className="text-[15px] md:text-[16.5px] leading-[1.65]"
+            style={{ color: "#525252" }}
+          >
+            {ed.hero.description}
+          </p>
+        )}
+      </div>
       {/* 3 cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-7">
         {ed.cards.slice(0, 3).map((c, i) => {
