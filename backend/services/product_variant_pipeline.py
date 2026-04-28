@@ -714,6 +714,35 @@ async def generate_full_variant_set(
                 "not persisted (all 3 attempts rejected by Vision QA)"
             )
 
+    # Phase 2.7.1 — DEDUP par style avant écriture. Évite les append-only
+    # qui font cohabiter une entry legacy (qa=None) et une régénérée
+    # (qa=True) avec le même style → galerie qui pioche 4× lifestyle.
+    # Règle : 1 entry par style ; priorité qa_passed=True > None > False.
+    def _dedupe_by_style(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        best: Dict[str, Dict[str, Any]] = {}
+        order: List[str] = []
+        for it in items or []:
+            if not isinstance(it, dict):
+                continue
+            s = it.get("style")
+            url = it.get("url")
+            if not s or not url:
+                continue
+            qa = it.get("qa_passed")
+            score = 2 if qa is True else (1 if qa is None else 0)
+            cur = best.get(s)
+            if cur is None:
+                best[s] = it
+                order.append(s)
+            else:
+                cur_qa = cur.get("qa_passed")
+                cur_score = 2 if cur_qa is True else (1 if cur_qa is None else 0)
+                if score >= cur_score:
+                    best[s] = it  # garde le plus récent à score égal ou supérieur
+        return [best[s] for s in order]
+
+    final_for_color = _dedupe_by_style(final_for_color)
+
     by_variant[color_slug] = final_for_color
     await db.products.update_one(
         {"id": product_id},

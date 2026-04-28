@@ -173,27 +173,52 @@ export function getProductGalleryForColor(product, colorSlug) {
   }
   const out = [];
   const seen = new Set();
-  const push = (url) => {
+  const seenStyles = new Set();
+  const push = (url, style) => {
     if (url && !seen.has(url)) {
       seen.add(url);
       out.push(url);
+      if (style) seenStyles.add(style);
     }
   };
-  // Order by preferred style
+
+  // Phase 2.7.1 — DEDUP STRICT par style. Pour chaque style préféré, on
+  // prend AU PLUS 1 entry. Priorité : qa_passed === true > qa_passed === undefined > false.
+  // Évite d'afficher 4 fois "lifestyle" quand `generated_images_by_variant`
+  // est en append-only (legacy + régénération récente cohabitent).
+  const pickByStyle = (style) => {
+    const candidates = variantImages.filter(
+      (g) => g && typeof g === "object" && g.style === style && _itemUrl(g),
+    );
+    if (!candidates.length) return null;
+    // Priorité : qa_passed=true (le plus récent en bout de liste), puis qa_passed=null (legacy), puis qa_passed=false
+    const passed = candidates.filter((g) => g.qa_passed === true);
+    if (passed.length) return _itemUrl(passed[passed.length - 1]);
+    const noqa = candidates.filter((g) => g.qa_passed == null);
+    if (noqa.length) return _itemUrl(noqa[noqa.length - 1]);
+    return _itemUrl(candidates[candidates.length - 1]);
+  };
+
   for (const style of PREFERRED_STYLES) {
-    for (const g of variantImages) {
-      if (g && typeof g === "object" && g.style === style) push(_itemUrl(g));
-    }
+    if (seenStyles.has(style)) continue;
+    const u = pickByStyle(style);
+    if (u) push(u, style);
   }
   // Items sans style ou hors préférence — exclude reserved styles (wide_lifestyle, studio_card)
   for (const g of variantImages) {
-    if (g && typeof g === "object" && GALLERY_EXCLUDED_STYLES.has(g.style)) continue;
+    if (!g || typeof g !== "object") continue;
+    const s = g.style;
+    if (GALLERY_EXCLUDED_STYLES.has(s)) continue;
+    if (s && seenStyles.has(s)) continue; // déjà piqué via pickByStyle
     const u = _itemUrl(g);
-    if (u && !seen.has(u)) push(u);
+    if (u && !seen.has(u)) push(u, s);
   }
   // Fallback : ajoute les autres images du produit en queue (ex: photos AE backup)
   if (Array.isArray(product.images)) {
-    for (const i of product.images) push(_itemUrl(i));
+    for (const i of product.images) {
+      const u = _itemUrl(i);
+      if (u && !seen.has(u)) push(u);
+    }
   }
   return out;
 }
