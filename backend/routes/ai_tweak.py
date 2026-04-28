@@ -222,8 +222,18 @@ async def ai_tweak_undo(
     snap = await db.site_snapshots.find_one({"id": snapshot_id, "site_id": site_id})
     if not snap:
         raise HTTPException(404, "Snapshot introuvable ou expiré")
-    if snap.get("expires_at") and snap["expires_at"] < datetime.now(timezone.utc):
-        raise HTTPException(410, "Snapshot expiré")
+    # MongoDB retourne les datetimes en naive (tzinfo None). On normalise
+    # en UTC-aware avant comparaison pour éviter le TypeError
+    # `can't compare offset-naive and offset-aware datetimes`.
+    exp = snap.get("expires_at")
+    if exp is not None:
+        if getattr(exp, "tzinfo", None) is None:
+            try:
+                exp = exp.replace(tzinfo=timezone.utc)
+            except Exception:
+                exp = None
+        if exp is not None and exp < datetime.now(timezone.utc):
+            raise HTTPException(410, "Snapshot expiré")
     fields = snap.get("snapshot_fields") or {}
     if not fields:
         return {"ok": False, "reverted": 0}
