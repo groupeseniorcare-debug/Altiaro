@@ -122,8 +122,12 @@ VARIANT_STYLES: List[Dict[str, str]] = [
         "label_en": "main studio shot",
         "scene": (
             "Pure ivory studio background (#F5F2EB warm off-white seamless paper). "
-            "Three-quarter front view of the {product_kind}, shot at eye level, "
-            "soft diffused lighting from the upper left, no harsh shadows on the background. "
+            "STRICT three-quarter front view of the {product_kind} (camera at "
+            "approximately 30-40 degrees off-axis, NOT direct front, NOT side profile), "
+            "shot at eye level. Soft diffused lighting from the upper left, no harsh "
+            "shadows on the background. The {product_kind} is shown in its FULLY OPEN "
+            "RECLINED position with footrest extended (when applicable), so this shot "
+            "is visually distinct from studio_card and side_profile. "
             "The full {product_kind} is visible from headrest down to footrest base. "
             "Subtle ground shadow under the product. "
             "Vertical 4:5 framing with generous negative space above and below. "
@@ -136,9 +140,11 @@ VARIANT_STYLES: List[Dict[str, str]] = [
         "label_en": "square card shot",
         "scene": (
             "Same ivory #F5F2EB seamless studio background as the main shot. "
-            "Tighter framing — the {product_kind} occupies 70% of a square 1:1 frame, "
-            "perfectly centered. Same lighting and angle as studio_main. "
-            "Suitable as a product grid card thumbnail."
+            "STRICT direct front view (0 degrees, perfectly straight on, NOT 3/4 angle), "
+            "the {product_kind} occupies 70% of a square 1:1 frame, perfectly centered. "
+            "The {product_kind} is shown in its CLOSED upright position (no recline, no "
+            "footrest extended) so this shot is visually distinct from studio_main. "
+            "Soft frontal lighting, no harsh shadows. Suitable as a product grid card thumbnail."
         ),
     },
     {
@@ -146,14 +152,17 @@ VARIANT_STYLES: List[Dict[str, str]] = [
         "aspect": "4:5",
         "label_en": "lifestyle scene",
         "scene": (
-            "Premium Parisian Haussmannian apartment interior: oak parquet floor with "
-            "herringbone pattern, tall window with sheer linen curtains diffusing soft "
-            "afternoon daylight, white wall mouldings in the background. "
-            "The {product_kind} sits naturally in the room, slight side angle, "
-            "integrated as a real piece of furniture. NO PEOPLE in this shot. "
-            "Subtle props nearby: a stack of art books, a reading lamp, a cashmere throw. "
-            "Vertical 4:5 framing, depth of field bringing the {product_kind} forward. "
-            "High-end interior magazine editorial quality."
+            "MUST be a real interior environment, NOT a studio background. "
+            "Premium Parisian Haussmannian apartment interior visibly framing the shot: "
+            "oak parquet floor with herringbone pattern in the foreground, tall window "
+            "with sheer linen curtains diffusing soft afternoon daylight in the background, "
+            "white wall mouldings, an art book stack and a reading lamp on a side table "
+            "next to the {product_kind}. The room context MUST be clearly visible in the "
+            "frame (window or wall mouldings or floor or props). "
+            "The {product_kind} sits naturally in the room at a slight side angle. "
+            "NO PEOPLE in this shot. Vertical 4:5 framing, depth of field bringing the "
+            "{product_kind} forward. High-end interior magazine editorial quality. "
+            "If the output looks like a studio shot with neutral background, regenerate."
         ),
     },
     {
@@ -173,29 +182,33 @@ VARIANT_STYLES: List[Dict[str, str]] = [
     {
         "slug": "closeup",
         "aspect": "1:1",
-        "label_en": "macro material closeup",
+        "label_en": "macro upholstery texture",
         "scene": (
-            "Extreme macro close-up on the EXACT upholstery surface of THIS {product_kind} "
+            "EXTREME MACRO close-up on the upholstery TEXTURE of THIS {product_kind} "
             "(same chair as the reference, not a different one). "
-            "Show the texture of the {material} in {color}: weave, stitching, grain, "
-            "every fiber detail visible. "
-            "Shallow depth of field, beautiful natural light from a soft side window, warm tone. "
-            "1:1 square framing — only the rich textured surface fills the frame, "
-            "with at most a hint of the seam or armrest curve to anchor context. "
-            "Editorial textile photography style. NO PEOPLE."
+            "The fabric/leather surface in {material} {color} fills AT LEAST 85% of the frame: "
+            "you see weave, stitching, grain, individual fibers. "
+            "The {product_kind} as a whole MUST NOT be recognizable. At most a hint of a "
+            "seam, a piping, or a curved edge anchors context — the rest is pure surface "
+            "texture. Shallow depth of field (f/2.8 macro lens), beautiful natural soft "
+            "side light, warm tone. 1:1 square framing. Editorial textile photography style. "
+            "NO PEOPLE. If the output shows the full chair, regenerate."
         ),
     },
     {
         "slug": "detail",
         "aspect": "1:1",
-        "label_en": "technical detail",
+        "label_en": "technical hardware detail",
         "scene": (
-            "Macro detail shot of ONE specific technical feature of THIS {product_kind} "
-            "(same chair as reference): the recline mechanism articulation, the remote "
-            "control or recline lever, the motor housing, or the armrest joint. "
-            "Plain neutral light grey #E7E5E4 background, soft directional studio lighting "
-            "from the right. 1:1 square framing, the technical detail is the hero of the shot. "
-            "Conveys precision and quality engineering. NO PEOPLE, no text, no labels visible."
+            "Macro detail shot of ONE specific TECHNICAL hardware feature of THIS "
+            "{product_kind} (same chair as reference): zoom on the recline mechanism "
+            "articulation, the wired remote control with its buttons, the motor housing, "
+            "the armrest joint, or a hinge. The hardware element is the hero — NOT the "
+            "upholstery, NOT the full chair. Plain neutral light grey #E7E5E4 background "
+            "behind the hardware element, soft directional studio lighting from the right. "
+            "1:1 square framing, the technical detail occupies at least 60% of the frame. "
+            "Conveys precision and quality engineering. NO PEOPLE, no text, no labels visible. "
+            "If the output shows the full chair, regenerate."
         ),
     },
     {

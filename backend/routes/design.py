@@ -1607,12 +1607,46 @@ async def get_navigation(site_id: str, user: dict = Depends(get_current_user)):
     }
 
 
+# Phase 2.7.2 — Auto-fix des hrefs storefront pour matcher les vraies routes
+# React Router. Évite les "Mentions légales → vitrine Altiaro" au save.
+NAVIGATION_HREF_ALIASES = {
+    "/legal": "/mentions",
+    "/legals": "/mentions",
+    "/legal-notice": "/mentions",
+    "/imprint": "/mentions",
+    "/mentions-legales": "/mentions",
+    "/mentions_legales": "/mentions",
+    "/shipping": "/livraison",
+    "/delivery": "/livraison",
+    "/livraison-retours": "/livraison",
+    "/returns": "/retours",
+    "/return": "/retours",
+    "/refunds": "/retours",
+    "/terms": "/cgv",
+    "/conditions-generales": "/cgv",
+    "/conditions-generales-de-vente": "/cgv",
+    "/privacy": "/confidentialite",
+    "/policy": "/confidentialite",
+    "/politique-de-confidentialite": "/confidentialite",
+    "/a-propos": "/about",
+    "/qui-sommes-nous": "/about",
+    "/notre-histoire": "/about",
+}
+
+
+def _normalize_nav_item(it: dict) -> dict:
+    href = (it.get("href") or "").strip()
+    if href in NAVIGATION_HREF_ALIASES:
+        it["href"] = NAVIGATION_HREF_ALIASES[href]
+    return it
+
+
 @router.put("/sites/{site_id}/navigation")
 async def update_navigation(site_id: str, data: NavigationInput, user: dict = Depends(get_current_user)):
     await _check_site_access(site_id, user)
     clean = {
-        "header": [i.dict(exclude_none=True) for i in data.header][:12],
-        "footer": [i.dict(exclude_none=True) for i in data.footer][:12],
+        "header": [_normalize_nav_item(i.dict(exclude_none=True)) for i in data.header][:12],
+        "footer": [_normalize_nav_item(i.dict(exclude_none=True)) for i in data.footer][:12],
     }
     await db.sites.update_one(
         {"id": site_id},

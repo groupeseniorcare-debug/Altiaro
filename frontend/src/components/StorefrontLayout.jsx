@@ -172,6 +172,10 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
     "/mentions-legales": "/mentions",
     "/mentions_legales": "/mentions",
     "/mentions-legal": "/mentions",
+    "/legal": "/mentions",
+    "/legals": "/mentions",
+    "/legal-notice": "/mentions",
+    "/imprint": "/mentions",
     "/politique-de-confidentialite": "/confidentialite",
     "/politique-confidentialite": "/confidentialite",
     "/privacy": "/confidentialite",
@@ -882,12 +886,37 @@ function FooterCol({ title, items }) {
 export async function fetchPublicSite(identifier) {
   // Phase 4 fix-up : l'identifier peut être soit un UUID, soit un slug humain
   // (ex: `demo-altiaro`). On route vers le bon endpoint backend.
+  //
+  // Phase 2.7.2 fix : `/api/public/sites/{id}` ne retourne QUE les méta
+  // basiques (id, slug, name, niche, custom_domain) — pas le `design`.
+  // Du coup `<StorefrontLayout site={site}>` ne trouve pas `site.design.brand`
+  // sur les pages Track / Login / Account / Cart / etc., et tombe sur le
+  // fallback `logoText = "Maison"` + footer générique (= bug "logo + footer
+  // changent quand on clique sur Suivre ma commande").
+  // → On merge le design dans le même objet `site` pour que le layout ait
+  // tout en un.
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const path = UUID_RE.test(identifier)
+  const isUuid = UUID_RE.test(identifier);
+  const sitePath = isUuid
     ? `/api/public/sites/${identifier}`
     : `/api/public/sites/by-slug/${encodeURIComponent(identifier)}`;
-  const { data } = await axios.get(`${BACKEND_URL}${path}`);
-  return data;
+  const { data: meta } = await axios.get(`${BACKEND_URL}${sitePath}`);
+
+  // Récupérer aussi le design (depuis l'UUID résolu, jamais le slug).
+  const realId = meta?.id || (isUuid ? identifier : null);
+  if (realId) {
+    try {
+      const { data: designData } = await axios.get(
+        `${BACKEND_URL}/api/public/sites/${realId}/design`,
+      );
+      if (designData?.design) meta.design = designData.design;
+      if (designData?.published != null) meta.published = designData.published;
+    } catch (_) {
+      // Si le design ne charge pas (ex: site non publié), on laisse `meta`
+      // tel quel — le layout fera son fallback gracieux.
+    }
+  }
+  return meta;
 }
 
 export function useSiteData(siteId) {
