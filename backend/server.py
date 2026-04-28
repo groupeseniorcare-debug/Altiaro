@@ -99,6 +99,7 @@ from routes import legal as legal_routes
 from routes import product_content_admin as product_content_admin_routes
 from routes import ai_tweak as ai_tweak_routes
 from routes import product_image_regen as product_image_regen_routes  # Phase 2.7.3 — régénération ciblée d'1 image
+from routes import translate as translate_routes  # Phase 3 — traduction multi-langue (étape 7)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -186,6 +187,7 @@ api.include_router(legal_routes.admin_router)
 api.include_router(product_content_admin_routes.router)  # Lot I — admin back-fill tagline + USPs
 api.include_router(ai_tweak_routes.router)  # Phase 2.5 (Tâche B) — AI tweak site design (Sonnet)
 api.include_router(product_image_regen_routes.router)  # Phase 2.7.3 — régénération ciblée d'1 image
+api.include_router(translate_routes.router)  # Phase 3 — traduction multi-langue (étape 7)
 
 
 @app.on_event("startup")

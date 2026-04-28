@@ -29,7 +29,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 
 from deps import db, get_current_user, _check_site_access
@@ -1609,6 +1609,11 @@ Réponds UNIQUEMENT avec le JSON, sans rien autour."""
 @router.post("/sites/{site_id}/design/launch-auto", status_code=201)
 async def launch_site_auto(
     site_id: str,
+    auto_translate: bool = Query(
+        False,
+        description="Phase 3 — Si True, lance la traduction multi-langue automatique vers les "
+                    "pays cibles (`site.target_countries`) après l'étape 5. Cap 3 $/site.",
+    ),
     user: dict = Depends(get_current_user),
 ):
     """One-click full auto generation — Claude pré-remplit toute l'identité de
@@ -1719,11 +1724,57 @@ async def launch_site_auto(
 
     asyncio.create_task(_run_launch(job_id, site_id, user["id"], wizard_payload))
 
+    # Phase 3 — auto-traduction post-launch : si demandé, on enchaîne la
+    # traduction du site vers les langues correspondant aux pays cibles.
+    # Map ISO country → lang : DE→de, AT→de, BE→fr/nl, NL→nl, IT→it, ES→es,
+    # GB→en, IE→en, CH→fr/de, FR→fr, LU→fr (déjà traduit en source). Le hook
+    # tourne en background une fois `_run_launch` terminé (poll status).
+    if auto_translate:
+        target_countries = site.get("target_countries") or [site.get("country") or "FR"]
+        country_lang_map = {
+            "FR":"fr","BE":"fr","CH":"fr","LU":"fr",
+            "DE":"de","AT":"de",
+            "NL":"nl",
+            "IT":"it",
+            "ES":"es",
+            "GB":"en","IE":"en","UK":"en","US":"en",
+        }
+        primary = site.get("primary_lang") or "fr"
+        target_langs = sorted({
+            country_lang_map.get(c.upper())
+            for c in target_countries
+            if country_lang_map.get(c.upper()) and country_lang_map.get(c.upper()) != primary
+        })
+        if target_langs:
+            async def _wait_and_translate():
+                # Wait for launch to finish (poll status)
+                from routes.translate import _translate_site_async, TRANSLATE_TASKS
+                for _ in range(120):  # max ~30 min
+                    await asyncio.sleep(15)
+                    j = await db.launch_jobs.find_one({"id": job_id}, {"_id": 0, "status": 1})
+                    if not j or (j.get("status") or "").startswith("completed") or j.get("status") == "failed":
+                        break
+                # Now translate
+                t_id = uuid.uuid4().hex[:12]
+                TRANSLATE_TASKS[t_id] = {
+                    "task_id": t_id, "site_id": site_id,
+                    "source_lang": primary, "target_langs": target_langs,
+                    "overwrite": False, "status": "queued",
+                    "progress": {t: "queued" for t in target_langs},
+                    "spent_usd": 0.0, "totals": {},
+                    "started_at": datetime.now(timezone.utc).isoformat(),
+                    "triggered_by": f"launch-auto:{job_id}",
+                }
+                logger.info(f"[launch] auto-translate kicking {target_langs} for site {site_id[:8]}")
+                await _translate_site_async(site_id, target_langs, False, t_id)
+            asyncio.create_task(_wait_and_translate())
+
     return {
         "ok":         True,
         "job_id":     job_id,
         "status":     "running",
-        "auto_brand": parsed,  # le user voit ce que Claude a choisi
+        "auto_brand": parsed,
+        "auto_translate_queued": bool(auto_translate),
     }
 
 

@@ -46,6 +46,7 @@ import Opportunities from "./pages/Opportunities";
 import QuickScan from "./pages/QuickScan";
 import LaunchSite from "./pages/LaunchSite";
 import ProductImagesReview from "./pages/ProductImagesReview";
+import SiteTranslate from "./pages/SiteTranslate";
 import Landing from "./pages/Landing";
 import Legal from "./pages/Legal";
 import Signup from "./pages/Signup";
@@ -264,6 +265,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <ProductImagesReview />
+              </ProtectedRoute>
+            }
+          />
+          {/* Phase 3 — Étape 7 cockpit : traduction multi-langue */}
+          <Route
+            path="/sites/:id/translate"
+            element={
+              <ProtectedRoute>
+                <SiteTranslate />
               </ProtectedRoute>
             }
           />
