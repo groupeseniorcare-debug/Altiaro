@@ -286,6 +286,14 @@ export default function SiteProducts() {
             <div className="text-xs text-neutral-500">
               · Shopify / WooCommerce / sites structurés (JSON-LD, Open Graph)
             </div>
+            {/* Phase 2.7.3 — Lien rapide vers la revue/régénération d'images IA */}
+            <a
+              href={`/sites/${siteId}/images-review`}
+              data-testid="link-images-review"
+              className="ml-auto text-xs font-medium text-neutral-700 hover:text-neutral-900 underline underline-offset-4"
+            >
+              Réviser les images IA →
+            </a>
           </div>
           <div className="flex gap-2">
             <input

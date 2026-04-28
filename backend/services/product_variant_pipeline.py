@@ -225,7 +225,14 @@ VARIANT_STYLES: List[Dict[str, str]] = [
             "facial features). Casual elegant attire, 50-70 years old, relaxed posture. "
             "Warm cozy interior in soft golden afternoon light, an open book or a cup of tea "
             "as a subtle prop. Vertical 4:5 framing, natural authentic moment. "
-            "Editorial lifestyle photography."
+            "Editorial lifestyle photography. "
+            # Phase 2.7.3 — anti-glitch anatomique (Tâche 2)
+            "ANATOMY CONSTRAINTS: the person must be visible from chest up to thighs at minimum, "
+            "with anatomically correct proportions. NO body parts cut off awkwardly mid-limb, "
+            "NO floating hands, NO truncated torso, NO missing limbs, NO duplicated limbs, "
+            "NO extra fingers. The full visible body silhouette must be intact and coherent — "
+            "if the camera crops, it must crop at natural anatomical points (above the head, "
+            "below the knees, behind the chair). If anatomy looks broken, regenerate."
         ),
     },
     {
@@ -489,6 +496,8 @@ async def generate_full_variant_set(
     overwrite: bool = False,
     budget: Optional[BudgetCap] = None,
     request_id: Optional[str] = None,
+    only_styles: Optional[List[str]] = None,
+    extra_brief: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Generate the 8 fixed styles for one (product, color_slug) pair.
 
@@ -501,6 +510,14 @@ async def generate_full_variant_set(
     The reference image used for img-to-img is the FIRST image of the
     existing `generated_images_by_variant[color_slug]` (if any) or
     `generated_images[0]` of the product.
+
+    Phase 2.7.3 — Single-style regeneration mode :
+    - `only_styles=[slug]` filters generation to ONE style only and forces
+      `overwrite=True` for that slug (ignored for the others). Used by the
+      cockpit "Regenerate this image" feature.
+    - `extra_brief="…"` is appended to the per-style scene brief (lets the
+      concepteur inject natural-language constraints, e.g. "make sure the
+      person is older with grey hair").
     """
     p = await db.products.find_one(
         {"id": product_id},
@@ -657,6 +674,31 @@ async def generate_full_variant_set(
         f"[variant-pipeline] {request_id}: profile='{profile_key}' "
         f"styles={selected_slugs}"
     )
+
+    # Phase 2.7.3 — Single-style filter (cockpit "Régénérer cette image")
+    if only_styles:
+        wanted = {s for s in only_styles}
+        selected_styles = [s for s in selected_styles if s["slug"] in wanted]
+        if not selected_styles:
+            raise ValueError(
+                f"None of only_styles={only_styles} is in the active profile "
+                f"'{profile_key}' which exposes {selected_slugs}."
+            )
+        # In single-style mode we always overwrite the targeted slug(s).
+        overwrite = True
+        # Apply the optional natural-language addon to the scene brief.
+        if extra_brief:
+            extra = " " + extra_brief.strip()
+            patched: List[Dict[str, str]] = []
+            for s in selected_styles:
+                ns = dict(s)
+                ns["scene"] = (s.get("scene") or "") + extra
+                patched.append(ns)
+            selected_styles = patched
+        logger.info(
+            f"[variant-pipeline] {request_id}: single-style mode → "
+            f"{[s['slug'] for s in selected_styles]} (extra_brief={'yes' if extra_brief else 'no'})"
+        )
 
     new_images: List[Dict[str, Any]] = []
     skipped: List[str] = []

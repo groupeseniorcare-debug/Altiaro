@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import { MagnifyingGlass, ShieldCheck, Warning } from "@phosphor-icons/react";
-import StorefrontLayout, { useSiteData } from "../components/StorefrontLayout";
+import StorefrontLayout from "../components/StorefrontLayout";
+import { useSiteAndLang } from "../components/storefront/storefrontUtils";
 import OrderTimeline from "../components/storefront/OrderTimeline";
 
 const BACKEND = "";
@@ -29,8 +30,7 @@ function money(v, currency = "EUR") {
 }
 
 export default function StorefrontTrack() {
-  const { siteId } = useParams();
-  const site = useSiteData(siteId);
+  const { siteId, site, design, lang, setLang, availableLangs } = useSiteAndLang();
   const [orderNumber, setOrderNumber] = useState("");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -57,11 +57,11 @@ export default function StorefrontTrack() {
   };
 
   if (!site) return null;
-  const primary = site.design?.brand?.primary_color || "#B84B31";
-  const headingFont = site.design?.brand?.font_heading || "Fraunces, serif";
+  const primary = design?.brand?.primary_color || site.design?.brand?.primary_color || "#B84B31";
+  const headingFont = design?.brand?.font_heading || site.design?.brand?.font_heading || "Fraunces, serif";
 
   return (
-    <StorefrontLayout site={site}>
+    <StorefrontLayout site={site} design={design} lang={lang} setLang={setLang} availableLangs={availableLangs}>
       <div className="max-w-3xl mx-auto py-16 px-6">
         <div className="text-center mb-10">
           <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-3">Suivi de commande</div>

@@ -4,7 +4,8 @@ import axios from "axios";
 import {
   ArrowLeft, MapPin, Package, Star, ChatText, ArrowRight, Clock,
 } from "@phosphor-icons/react";
-import StorefrontLayout, { useSiteData } from "../components/StorefrontLayout";
+import StorefrontLayout from "../components/StorefrontLayout";
+import { useSiteAndLang } from "../components/storefront/storefrontUtils";
 import OrderTimeline from "../components/storefront/OrderTimeline";
 import { getToken, authHeaders } from "../lib/customerAuth";
 import { pickLang } from "../lib/i18n";
@@ -36,9 +37,9 @@ function money(v, currency = "EUR") {
 }
 
 export default function StorefrontOrderDetail() {
-  const { siteId, orderId } = useParams();
+  const { orderId } = useParams();
   const nav = useNavigate();
-  const site = useSiteData(siteId);
+  const { siteId, site, design, lang, setLang, availableLangs } = useSiteAndLang();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -66,11 +67,11 @@ export default function StorefrontOrderDetail() {
 
   if (!site) return null;
 
-  const primary = site.design?.brand?.primary_color || "#B84B31";
-  const headingFont = site.design?.brand?.font_heading || "Fraunces, serif";
+  const primary = design?.brand?.primary_color || site.design?.brand?.primary_color || "#B84B31";
+  const headingFont = design?.brand?.font_heading || site.design?.brand?.font_heading || "Fraunces, serif";
 
   return (
-    <StorefrontLayout site={site}>
+    <StorefrontLayout site={site} design={design} lang={lang} setLang={setLang} availableLangs={availableLangs}>
       <div className="max-w-4xl mx-auto py-12 px-6">
         <Link
           to={`/shop/${siteId}/account`}

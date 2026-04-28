@@ -772,36 +772,28 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
               </div>
             </div>
 
-            {/* Right column: 4 link groups */}
+            {/* Right column: 3 link groups simplifiés (Phase 2.7.3) — Boutique / Service / Légal.
+                Le bloc "Restons en contact" est déjà présent dans la colonne gauche
+                (newsletter + email + tel + social) → on supprime la 4e colonne redondante.
+                Liens supprimés : New arrivals, Bestsellers, Press, Journal, Our story
+                (déplacés en header). Médiation conservé en légal. */}
             <div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-10">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-10">
                 <FooterCol
                   title={t(lang, "footer_col_shop")}
                   items={[
                     { label: t(lang, "footer_all_products"),  href: `${shopRoot}` },
                     { label: t(lang, "nav_collections"),      href: `${shopRoot}/collections` },
-                    { label: t(lang, "footer_new_arrivals"),  href: `${shopRoot}?sort=new` },
-                    { label: t(lang, "footer_bestsellers"),   href: `${shopRoot}?sort=bestsellers` },
-                  ]}
-                />
-                <FooterCol
-                  title={t(lang, "footer_col_about")}
-                  items={[
-                    { label: t(lang, "footer_our_story"),     href: `${shopRoot}/about` },
-                    { label: t(lang, "nav_journal"),          href: `${shopRoot}/blog` },
-                    // Phase 2.7.2 — pas de page Press dédiée → on retombe sur le Journal
-                    { label: t(lang, "footer_press"),         href: `${shopRoot}/blog` },
-                    { label: t(lang, "nav_contact"),          href: `${shopRoot}/contact` },
                   ]}
                 />
                 <FooterCol
                   title={t(lang, "footer_col_service")}
                   items={[
-                    // Phase 2.7.2 — la page /faq existe (StorefrontFAQ), on évite le fragment mort
-                    { label: t(lang, "section_faq"),          href: `${shopRoot}/faq` },
+                    { label: t(lang, "footer_track_order"),   href: `${shopRoot}/track` },
                     { label: t(lang, "shipping"),             href: `${shopRoot}/livraison` },
                     { label: t(lang, "footer_returns"),       href: `${shopRoot}/retours` },
-                    { label: t(lang, "footer_track_order"),   href: `${shopRoot}/track` },
+                    { label: t(lang, "section_faq"),          href: `${shopRoot}/faq` },
+                    { label: t(lang, "nav_contact"),          href: `${shopRoot}/contact` },
                     { label: customer ? t(lang, "footer_my_account") : t(lang, "footer_login"),
                       href: customer ? `${shopRoot}/account` : `${shopRoot}/account/login` },
                   ]}
@@ -813,6 +805,7 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
                     { label: t(lang, "footer_legal_notice"),  href: `${shopRoot}/mentions` },
                     { label: t(lang, "footer_privacy"),       href: `${shopRoot}/confidentialite` },
                     { label: t(lang, "footer_cookies"),       href: `${shopRoot}/cookies` },
+                    { label: "Médiation",                     href: `${shopRoot}/mediation` },
                   ]}
                 />
               </div>

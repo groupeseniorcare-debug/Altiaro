@@ -2,14 +2,14 @@ import React, { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { setSession } from "../lib/customerAuth";
-import StorefrontLayout, { useSiteData } from "../components/StorefrontLayout";
+import StorefrontLayout from "../components/StorefrontLayout";
+import { useSiteAndLang } from "../components/storefront/storefrontUtils";
 
 const BACKEND = "";
 
 export default function StorefrontLogin() {
-  const { siteId } = useParams();
   const nav = useNavigate();
-  const site = useSiteData(siteId);
+  const { siteId, site, design, lang, setLang, availableLangs } = useSiteAndLang();
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -29,12 +29,13 @@ export default function StorefrontLogin() {
   };
 
   if (!site) return null;
-  const primary = site.design?.brand?.primary_color || "#1C1917";
+  const primary = design?.brand?.primary_color || site.design?.brand?.primary_color || "#1C1917";
+  const headingFont = design?.brand?.font_heading || site.design?.brand?.font_heading || "Fraunces, serif";
 
   return (
-    <StorefrontLayout site={site}>
+    <StorefrontLayout site={site} design={design} lang={lang} setLang={setLang} availableLangs={availableLangs}>
       <div className="max-w-md mx-auto py-16 px-6">
-        <h1 className="text-3xl mb-6" style={{ fontFamily: site.design?.brand?.font_heading || "Fraunces, serif" }}>
+        <h1 className="text-3xl mb-6" style={{ fontFamily: headingFont }}>
           Me connecter
         </h1>
         {err && <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">{err}</div>}

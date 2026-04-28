@@ -2,7 +2,8 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { getToken, getCustomer, clearSession, authHeaders } from "../lib/customerAuth";
-import StorefrontLayout, { useSiteData } from "../components/StorefrontLayout";
+import StorefrontLayout from "../components/StorefrontLayout";
+import { useSiteAndLang } from "../components/storefront/storefrontUtils";
 import { User, Receipt, SignOut, Package, CaretRight, FunnelSimple } from "@phosphor-icons/react";
 
 const BACKEND = "";
@@ -15,9 +16,8 @@ const STATUS_FILTERS = [
 ];
 
 export default function StorefrontAccount() {
-  const { siteId } = useParams();
   const nav = useNavigate();
-  const site = useSiteData(siteId);
+  const { siteId, site, design, lang, setLang, availableLangs } = useSiteAndLang();
   const [customer, setCustomer] = useState(getCustomer(siteId));
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -57,7 +57,8 @@ export default function StorefrontAccount() {
   }, [orders, filter]);
 
   if (!site || loading) return null;
-  const primary = site.design?.brand?.primary_color || "#1C1917";
+  const primary = design?.brand?.primary_color || site.design?.brand?.primary_color || "#1C1917";
+  const headingFont = design?.brand?.font_heading || site.design?.brand?.font_heading || "Fraunces, serif";
 
   const statusLabel = {
     pending_payment: { label: "En attente de paiement", color: "bg-amber-100 text-amber-800" },
@@ -69,12 +70,12 @@ export default function StorefrontAccount() {
   };
 
   return (
-    <StorefrontLayout site={site}>
+    <StorefrontLayout site={site} design={design} lang={lang} setLang={setLang} availableLangs={availableLangs}>
       <div className="max-w-4xl mx-auto py-16 px-6">
         <div className="flex items-center justify-between mb-10">
           <div>
             <div className="text-xs uppercase tracking-widest text-neutral-500 mb-1">Mon compte</div>
-            <h1 className="text-3xl" style={{ fontFamily: site.design?.brand?.font_heading || "Fraunces, serif" }}>
+            <h1 className="text-3xl" style={{ fontFamily: headingFont }}>
               Bonjour {customer?.first_name || ""}
             </h1>
           </div>

@@ -45,6 +45,7 @@ import AdminSiteGoogleAds from "./pages/AdminSiteGoogleAds";
 import Opportunities from "./pages/Opportunities";
 import QuickScan from "./pages/QuickScan";
 import LaunchSite from "./pages/LaunchSite";
+import ProductImagesReview from "./pages/ProductImagesReview";
 import Landing from "./pages/Landing";
 import Legal from "./pages/Legal";
 import Signup from "./pages/Signup";
@@ -254,6 +255,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <SiteBranding />
+              </ProtectedRoute>
+            }
+          />
+          {/* Phase 2.7.3 — Revue & régénération ciblée des images IA (cockpit étape 5) */}
+          <Route
+            path="/sites/:id/images-review"
+            element={
+              <ProtectedRoute>
+                <ProductImagesReview />
               </ProtectedRoute>
             }
           />
