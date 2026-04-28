@@ -789,14 +789,16 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
                   items={[
                     { label: t(lang, "footer_our_story"),     href: `${shopRoot}/about` },
                     { label: t(lang, "nav_journal"),          href: `${shopRoot}/blog` },
-                    { label: t(lang, "footer_press"),         href: `${shopRoot}#press` },
+                    // Phase 2.7.2 — pas de page Press dédiée → on retombe sur le Journal
+                    { label: t(lang, "footer_press"),         href: `${shopRoot}/blog` },
                     { label: t(lang, "nav_contact"),          href: `${shopRoot}/contact` },
                   ]}
                 />
                 <FooterCol
                   title={t(lang, "footer_col_service")}
                   items={[
-                    { label: t(lang, "section_faq"),          href: `${shopRoot}#faq` },
+                    // Phase 2.7.2 — la page /faq existe (StorefrontFAQ), on évite le fragment mort
+                    { label: t(lang, "section_faq"),          href: `${shopRoot}/faq` },
                     { label: t(lang, "shipping"),             href: `${shopRoot}/livraison` },
                     { label: t(lang, "footer_returns"),       href: `${shopRoot}/retours` },
                     { label: t(lang, "footer_track_order"),   href: `${shopRoot}/track` },

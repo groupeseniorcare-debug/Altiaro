@@ -1354,6 +1354,12 @@ async def ai_optimize_nav(site_id: str, user: dict = Depends(get_current_user)):
         for bucket in ("header", "footer"):
             for it in clean[bucket]:
                 it["external"] = bool(it.get("external"))
+        # Phase 2.7.2 — applique les alias hrefs aussi quand la nav est générée par
+        # `ai_optimize_nav` (pipeline launch-auto étape 5). Sans ça, Claude pouvait
+        # persister `/mentions-legales` ou `/legal` qui ne correspondent à aucune
+        # route React. Le frontend rewriteHref restait seul filet ; on durcit en DB.
+        for bucket in ("header", "footer"):
+            clean[bucket] = [_normalize_nav_item(it) for it in clean[bucket]]
         await db.sites.update_one(
             {"id": site_id},
             {"$set": {"design.navigation": clean, "design.updated_at": datetime.now(timezone.utc).isoformat()}},
