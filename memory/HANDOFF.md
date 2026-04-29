@@ -8,6 +8,62 @@
 
 ---
 
+## 0ter — Refonte UX 2026-04-30 (philosophie « usine zéro friction »)
+
+> Le concepteur clique 1 toggle ON. Tout tourne en arrière-plan. Il ne voit que le résultat.
+
+### Backend
+- Nouveau routeur `routes/automation.py` (3 endpoints) :
+  - `GET  /api/sites/{id}/automation` → `{content_enabled, seo_enabled, translation_enabled}`
+  - `POST /api/sites/{id}/automation/{category}` (`content|seo|translation`) avec body `{enabled}`
+  - `GET  /api/sites/{id}/automation/status` → vue agrégée pour le Cockpit (compteurs, prochaines runs, GSC connecté…)
+- `_validated_sites()` (crons SEO) **exclut maintenant** les sites où `automation.content_enabled = false`.
+- `routes/launch.py` : à la fin de l'étape 5 (launch-auto), force `automation.content_enabled / seo_enabled / translation_enabled = true` automatiquement. Le concepteur n'a même pas à cliquer le toggle.
+- Migration MongoDB : 4 sites existants migrés avec `automation = {…default…}` (script one-shot exécuté).
+- Nouvelle route admin `GET /api/admin/sites/gsc-status` → liste tous les sites accessibles avec leur état GSC `{connected, property_url, public_url}` (pour le panneau multi-sites).
+
+### Frontend — Refonte des pages cockpit
+- **`pages/SiteBlogPosts.jsx`** entièrement réécrite (727 → 376 lignes). Nouvelle structure :
+  1. Headline simple (« Contenu & SEO automatisé »)
+  2. Carte **Toggle Automatisation** (ON/OFF) avec switch animé + 4 puces explicatives
+  3. Carte **« Démarrer maintenant »** (visible uniquement si `<3` articles) — gros bouton "Générer mes 3 premiers articles"
+  4. Bandeau jobs en cours (uniquement si actifs)
+  5. Liste des contenus publiés (table simple : drapeau langue / titre / date)
+  6. `<details>` **Mode avancé** (collapse) : input N + bouton "Générer N articles", stats détaillées, jobs récents
+  - Mots techniques (`cluster`, `autopopulate`, `long-tail`, `briefs`, `queue`, `worker`, `factory state`) **bannis** de l'UI principale, planqués dans le mode avancé.
+- **`pages/SiteSEO.jsx`** entièrement réécrite (501 → 295 lignes). Nouvelle structure :
+  1. Headline (« Référencement automatisé »)
+  2. Carte **Score SEO global** (ring SVG) + 6 contrôles binaires (sitemap, JSON-LD, hreflang, IndexNow, GSC, Merchant)
+  3. Grille **Connexions Google** (GSC card avec OAuth bouton intégré + Merchant card avec compte connecté)
+  4. Carte **Performances 7j** (impressions/clics/position/CTR depuis GSC API ; placeholder gracieux si non connecté)
+  5. `<details>` **Mode avancé** : "Resoumettre sitemap à IndexNow", recommandations détaillées, `SeoStudioPanel` (AEO + citations).
+- **`pages/SiteQA.jsx`** : ajout de **boutons "Corriger en 1 clic →"** inline sous chaque check non-OK. Mapping vers la bonne page selon `c.id` (16 mappings : branding, products, translate, blog, seo, domain, mollie, merchant, gsc, etc.).
+- **`pages/AdminIntegrations.jsx`** : injection du nouveau composant `<GscMultiSitePanel />` au-dessus de la grille d'intégrations. Liste tous les sites + bouton "Connecter GSC" inline → ouvre l'OAuth Google pour ce site précis dans un nouvel onglet.
+
+### Nouveau composant `components/admin/GscMultiSitePanel.jsx`
+Tableau (Site / Domaine / Statut / Action). Bouton "Connecter GSC" appelle
+`GET /api/sites/{id}/gsc/connect` → ouvre `accounts.google.com/o/oauth2/...` dans
+un nouvel onglet. Refresh auto 30 s après pour voir la card passer "Connecté".
+
+### Tests live (smoke tests Phase Refonte)
+| Endpoint | Statut |
+|---|---|
+| `GET /api/sites/altea/automation` | ✅ `{content_enabled:true,…}` |
+| `POST /api/sites/altea/automation/content {enabled:false}` | ✅ persiste, exclut Altea de `_validated_sites()` |
+| `POST /api/sites/altea/automation/content {enabled:true}` | ✅ ré-inclut |
+| `GET /api/sites/altea/automation/status` | ✅ blog_total=1, languages=4, gsc_connected=false |
+| `GET /api/admin/sites/gsc-status` | ✅ 4 sites listés, configured=true |
+
+### Mots bannis (jargon technique) côté concepteur
+- `cluster` → "groupe de mots-clés" (caché)
+- `autopopulate` → "remplissage automatique" (caché)
+- `long-tail` → "mots-clés ciblés" (caché)
+- `briefs` → "consignes éditoriales" (caché)
+- `queue/job/worker` → "tâches en cours" (visible uniquement si jobs actifs)
+- `discovery/factory state` → mode avancé uniquement
+
+---
+
 ## 0bis — Mission post-finalisation 2026-04-29 (blocages utilisateur résolus)
 
 ### Ce que l'utilisateur a remonté ce matin

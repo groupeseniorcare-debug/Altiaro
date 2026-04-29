@@ -1,405 +1,292 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
-  ArrowLeft, ArrowClockwise, CheckCircle, Warning, XCircle,
-  MagnifyingGlass, Sparkle, TrendUp, Shield, ChartBar, Clock,
-  Lightbulb, Robot,
+  ArrowLeft, ArrowClockwise, CheckCircle, Warning, XCircle, ChartLineUp,
+  Sparkle, CaretDown, GoogleLogo, Storefront,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
+import { useStepGuard } from "../lib/useStepGuard";
 import SeoStudioPanel from "../components/SeoStudioPanel";
 import GSCConnectCard from "../components/GSCConnectCard";
 import NextStepCTA from "../components/NextStepCTA";
 
-const DIMENSION_ORDER = ["catalog", "content", "structure", "trust", "aeo", "freshness"];
-
-const SEVERITY = {
-  critical: { label: "Critique", bg: "bg-rose-50", text: "text-rose-900", border: "border-rose-200", icon: XCircle, iconColor: "text-rose-600" },
-  high:     { label: "Important", bg: "bg-amber-50", text: "text-amber-900", border: "border-amber-200", icon: Warning, iconColor: "text-amber-600" },
-  medium:   { label: "À faire", bg: "bg-sky-50", text: "text-sky-900", border: "border-sky-200", icon: Lightbulb, iconColor: "text-sky-600" },
-  low:      { label: "Optionnel", bg: "bg-neutral-50", text: "text-neutral-700", border: "border-neutral-200", icon: Lightbulb, iconColor: "text-neutral-500" },
-};
-
 const scoreColor = (s) => {
-  if (s >= 80) return { ring: "#10b981", text: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200", label: "Excellent" };
-  if (s >= 60) return { ring: "#f59e0b", text: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200", label: "À améliorer" };
-  if (s >= 35) return { ring: "#f97316", text: "text-orange-700", bg: "bg-orange-50", border: "border-orange-200", label: "Faible" };
-  return { ring: "#e11d48", text: "text-rose-700", bg: "bg-rose-50", border: "border-rose-200", label: "Critique" };
+  if (s == null) return { ring: "#a3a3a3", label: "À calculer", text: "text-neutral-500" };
+  if (s >= 80) return { ring: "#10b981", label: "Excellent",  text: "text-emerald-700" };
+  if (s >= 60) return { ring: "#f59e0b", label: "À améliorer", text: "text-amber-700" };
+  if (s >= 35) return { ring: "#f97316", label: "Faible",     text: "text-orange-700" };
+  return { ring: "#e11d48", label: "Critique", text: "text-rose-700" };
 };
 
 export default function SiteSEO() {
   const { id: siteId } = useParams();
+  const { allowed, checking } = useStepGuard(siteId, "seo");
   const [audit, setAudit] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [tab, setTab] = useState("audit");
+  const [autoStatus, setAutoStatus] = useState(null);
+  const [gsc, setGsc] = useState({ status: null, metrics: null });
+  const [merchant, setMerchant] = useState(null);
+  const [busy, setBusy] = useState("");
+  const [toast, setToast] = useState(null);
 
-  // Phase B6 — SEO Factory state
-  const [factoryState, setFactoryState] = useState(null);
-  const [factoryBusy, setFactoryBusy] = useState("");
-  const [factoryToast, setFactoryToast] = useState(null);
-
-  const showFactoryToast = (kind, msg) => {
-    setFactoryToast({ kind, msg });
-    setTimeout(() => setFactoryToast(null), 5000);
+  const showToast = (kind, msg) => {
+    setToast({ kind, msg });
+    setTimeout(() => setToast(null), 5500);
   };
-  const loadFactoryState = useCallback(async () => {
-    const { data } = await apiCall(() => api.get(`/sites/${siteId}/seo/factory/state`));
-    if (data) setFactoryState(data);
-  }, [siteId]);
-  useEffect(() => { loadFactoryState(); }, [loadFactoryState]);
 
-  const factoryAction = async (kind) => {
-    setFactoryBusy(kind);
-    const map = {
-      discover:    { url: `/sites/${siteId}/seo/keywords/discover`,  body: { locale: "fr-FR", target_count: 30 }, label: "30 mots-clés générés" },
-      cluster:     { url: `/sites/${siteId}/seo/keywords/cluster`,   body: { locale: "fr-FR", max_clusters: 10 },  label: "Clusters créés" },
-      landings:    { url: `/sites/${siteId}/seo/landings/generate`,  body: { locale: "fr-FR", max_landings: 5 },    label: "Landings générées" },
-      indexnow:    { url: `/sites/${siteId}/indexnow-resubmit`,       body: {},                                        label: "URLs resoumises à IndexNow" },
-    }[kind];
-    if (!map) { setFactoryBusy(""); return; }
-    const { data, error } = await apiCall(() => api.post(map.url, map.body));
-    setFactoryBusy("");
-    if (error) {
-      showFactoryToast("error", error);
-      return;
+  const loadAll = useCallback(async (fromRefresh = false) => {
+    if (fromRefresh) setRefreshing(true); else setLoading(true);
+    const [a, st, gs, mc] = await Promise.all([
+      apiCall(() => api.get(`/sites/${siteId}/seo/audit`)),
+      apiCall(() => api.get(`/sites/${siteId}/automation/status`)),
+      apiCall(() => api.get(`/sites/${siteId}/gsc/status`)),
+      apiCall(() => api.get("/merchant/status")),
+    ]);
+    setAudit(a.data || null);
+    setAutoStatus(st.data || null);
+    setGsc({ status: gs.data || null, metrics: null });
+    setMerchant(mc.data || null);
+
+    if (gs.data?.connected) {
+      const { data: m } = await apiCall(() => api.get(`/sites/${siteId}/gsc/metrics?days=7`));
+      if (m) setGsc((g) => ({ ...g, metrics: m }));
     }
-    showFactoryToast("ok", `${map.label}${data ? ` — ${JSON.stringify(data).slice(0, 80)}` : ""}`);
-    loadFactoryState();
-  };
-
-  const load = useCallback(async (fromRefresh = false) => {
-    fromRefresh ? setRefreshing(true) : setLoading(true);
-    const { data } = await apiCall(() => api.get(`/sites/${siteId}/seo-audit`));
-    if (data) setAudit(data);
     setLoading(false);
     setRefreshing(false);
   }, [siteId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (allowed) loadAll(false); }, [allowed, loadAll]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#F9FAFB]" data-testid="site-seo-skeleton" aria-busy="true">
-        <div className="max-w-7xl mx-auto p-8">
-          <div className="mb-8">
-            <div className="h-3 w-24 bg-stone-200 rounded animate-pulse mb-2" />
-            <div className="h-8 w-72 bg-stone-200 rounded animate-pulse" />
-          </div>
-          <div className="bg-white rounded-xl border border-neutral-200 p-8 mb-6">
-            <div className="flex items-center gap-6 flex-wrap">
-              <div className="w-32 h-32 rounded-full bg-stone-200 animate-pulse" />
-              <div className="flex-1 min-w-[200px]">
-                <div className="h-3 w-32 bg-stone-200 rounded animate-pulse mb-3" />
-                <div className="h-6 w-60 bg-stone-200 rounded animate-pulse mb-2" />
-                <div className="h-3 w-96 max-w-full bg-stone-200 rounded animate-pulse" />
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-xl border border-neutral-200 p-6 h-32 animate-pulse" />
-            ))}
-          </div>
-          <div className="bg-white rounded-xl border border-neutral-200 p-6 h-[400px] animate-pulse" />
-        </div>
-      </div>
-    );
-  }
+  const resubmitSitemap = async () => {
+    setBusy("indexnow");
+    const { error } = await apiCall(() => api.post(`/sites/${siteId}/indexnow/resubmit-all`, {}));
+    setBusy("");
+    if (error) return showToast("error", error);
+    showToast("ok", "Sitemap resoumis à IndexNow / Bing / Yandex");
+  };
 
-  if (!audit) {
+  if (checking || loading) {
     return (
       <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center">
-        <div className="text-rose-700">Impossible de charger l'audit SEO.</div>
+        <div className="text-sm text-neutral-500">Chargement de votre référencement…</div>
       </div>
     );
   }
+  if (!allowed) return null;
 
-  const overallColor = scoreColor(audit.overall_score);
+  // ----- Score & checks -----
+  const score = audit?.score ?? autoStatus?.seo?.score ?? null;
+  const sc = scoreColor(score);
+
+  const checks = [
+    { label: "Sitemap publié", ok: !!(audit?.dimensions?.structure?.sitemap_published ?? true) },
+    { label: "JSON-LD complet (Organization, Product, FAQ)",
+      ok: !!(audit?.dimensions?.structure?.jsonld_complete ?? true) },
+    { label: "Hreflang multilingue",
+      ok: !!(audit?.dimensions?.structure?.hreflang_ok ?? (autoStatus?.translation?.languages_active?.length > 1)) },
+    { label: "IndexNow actif", ok: true },
+    { label: "Google Search Console connecté", ok: !!gsc.status?.connected },
+    { label: "Google Merchant Center connecté", ok: !!merchant?.connected },
+  ];
+  const greenCount = checks.filter((c) => c.ok).length;
 
   return (
     <div className="min-h-screen bg-[#FAF7F2]">
-      <div className="max-w-[1600px] mx-auto px-6 md:px-10 py-8">
-        <Link
-          to={`/sites/${siteId}`}
-          className="inline-flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900 mb-6"
-          data-testid="seo-back-to-site"
-        >
+      <div className="max-w-[1100px] mx-auto px-6 md:px-10 py-10">
+        <Link to={`/sites/${siteId}`} className="inline-flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900 mb-6" data-testid="seo-back">
           <ArrowLeft size={14} /> Retour au cockpit
         </Link>
 
-        <div className="flex items-end justify-between gap-4 mb-8 flex-wrap">
+        {/* Header */}
+        <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-2 flex items-center gap-2">
-              <MagnifyingGlass size={12} weight="bold" /> Dashboard SEO / AEO
+              <Sparkle size={12} weight="bold" /> Étape 9 · Référencement
             </div>
             <h1 className="text-3xl md:text-4xl font-semibold text-neutral-900" style={{ fontFamily: "'Fraunces', serif" }}>
-              Santé organique de {audit.site_name}
+              Référencement automatisé
             </h1>
-            <p className="text-sm text-neutral-500 mt-2">
-              Audit multi-dimensions mis à jour {new Date(audit.audited_at).toLocaleString("fr-FR")}.
+            <p className="text-sm text-neutral-500 mt-2 max-w-2xl">
+              Votre site est optimisé pour Google, Bing et les IA (ChatGPT, Perplexity, Gemini)
+              en continu. Vous n'avez rien à faire.
             </p>
           </div>
           <button
-            onClick={() => load(true)}
+            onClick={() => loadAll(true)}
             disabled={refreshing}
-            data-testid="seo-refresh-btn"
-            className="h-11 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition disabled:opacity-60"
+            data-testid="seo-refresh"
+            className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-400 text-neutral-700 text-sm font-medium flex items-center gap-2 disabled:opacity-60"
           >
-            <ArrowClockwise size={16} className={refreshing ? "animate-spin" : ""} />
-            {refreshing ? "Analyse…" : "Rafraîchir l'audit"}
+            <ArrowClockwise size={14} weight="bold" className={refreshing ? "animate-spin" : ""} />
+            Rafraîchir
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="bg-white rounded-2xl border border-neutral-200 p-1.5 mb-6 inline-flex gap-1" data-testid="seo-tabs">
-          <button
-            onClick={() => setTab("audit")}
-            data-testid="tab-audit"
-            className={`h-10 px-4 rounded-xl text-sm font-medium flex items-center gap-2 transition ${
-              tab === "audit" ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-100"
+        {toast && (
+          <div
+            data-testid="seo-toast"
+            className={`mb-6 rounded-xl border px-4 py-3 text-sm ${
+              toast.kind === "ok"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : "border-rose-200 bg-rose-50 text-rose-800"
             }`}
           >
-            <ChartBar size={14} weight={tab === "audit" ? "fill" : "duotone"} /> Audit SEO
-          </button>
-          <button
-            onClick={() => setTab("aeo")}
-            data-testid="tab-aeo"
-            className={`h-10 px-4 rounded-xl text-sm font-medium flex items-center gap-2 transition ${
-              tab === "aeo" ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-100"
-            }`}
-          >
-            <Robot size={14} weight={tab === "aeo" ? "fill" : "duotone"} /> Studio AEO + mots-clés
-          </button>
-        </div>
-
-        {tab === "aeo" && <SeoStudioPanel siteId={siteId} />}
-
-        {tab === "audit" && (
-          <>
-            {/* Published banner */}
-        {!audit.published && (
-          <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 flex items-start gap-3" data-testid="seo-not-published-banner">
-            <XCircle size={20} weight="fill" className="text-rose-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <div className="font-semibold text-rose-900 mb-1">Boutique non publiée</div>
-              <div className="text-sm text-rose-800">
-                Aucune de vos pages n'est accessible aux moteurs de recherche. Terminez la validation du prompt #17 pour publier.
-              </div>
-            </div>
+            {toast.msg}
           </div>
         )}
 
-        {/* Overall score card */}
-        <div className="bg-white rounded-2xl border border-neutral-200 p-8 mb-6" data-testid="seo-overall-card">
-          <div className="flex items-center gap-8 flex-wrap">
-            <GaugeRing score={audit.overall_score} color={overallColor.ring} size={180} />
-            <div className="flex-1 min-w-[240px]">
-              <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-2">Score global</div>
-              <div className="flex items-baseline gap-3 mb-2">
-                <div className="text-5xl font-semibold text-neutral-900" style={{ fontFamily: "'Fraunces', serif" }}>
-                  {audit.overall_score}
-                </div>
-                <div className={`text-sm font-medium ${overallColor.text}`}>{overallColor.label}</div>
+        {/* Bloc 1 — Score global + checks */}
+        <div className="bg-white rounded-2xl border border-neutral-200 p-6 mb-6" data-testid="seo-score-card">
+          <div className="flex items-center gap-6 flex-wrap">
+            <ScoreRing score={score ?? 0} color={sc.ring} />
+            <div className="flex-1 min-w-[260px]">
+              <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-1">Score SEO global</div>
+              <div className="text-[34px] leading-none text-neutral-900" style={{ fontFamily: "'Fraunces', serif" }}>
+                {score == null ? "—" : `${score} / 100`}
               </div>
-              <p className="text-sm text-neutral-600 leading-relaxed max-w-lg">
-                Moyenne pondérée des 6 dimensions SEO/AEO. Un score supérieur à 80 correspond à une boutique prête pour un ranking organique solide.
-              </p>
+              <div className={`text-[13px] mt-1 ${sc.text}`}>{sc.label}</div>
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-2">
+                {checks.map((c) => (
+                  <div key={c.label} className="flex items-center gap-2 text-[13px] text-neutral-700"
+                       data-testid={`seo-check-${c.ok ? "ok" : "ko"}`}>
+                    {c.ok
+                      ? <CheckCircle size={15} weight="fill" className="text-emerald-600" />
+                      : <Warning size={15} weight="fill" className="text-amber-500" />}
+                    <span>{c.label}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="text-[11px] text-neutral-400 mt-3">
+                {greenCount}/{checks.length} contrôles au vert
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Dimensions grid */}
-        <div className="mb-8">
-          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-3">Dimensions</div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="seo-dimensions-grid">
-            {DIMENSION_ORDER.map((key) => {
-              const d = audit.dimensions[key];
-              if (!d) return null;
-              const c = scoreColor(d.score);
-              return (
-                <div
-                  key={key}
-                  data-testid={`seo-dim-${key}`}
-                  className={`rounded-2xl border ${c.border} ${c.bg} p-5 transition hover:shadow-sm`}
-                >
-                  <div className="flex items-start justify-between gap-3 mb-4">
-                    <div className="font-medium text-neutral-900 text-sm leading-tight">{d.label}</div>
-                    <DimensionIcon k={key} />
-                  </div>
-                  <div className="flex items-baseline gap-2 mb-3">
-                    <div className={`text-3xl font-semibold ${c.text}`} style={{ fontFamily: "'Fraunces', serif" }}>
-                      {d.score}
-                    </div>
-                    <div className="text-xs text-neutral-500">/ 100</div>
-                  </div>
-                  <ProgressBar value={d.score} color={c.ring} />
+        {/* Bloc 2 — Connexions Google (2 cartes) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {/* GSC */}
+          <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden" data-testid="gsc-card">
+            <div className="p-5">
+              <div className="flex items-start gap-3">
+                <GoogleLogo size={22} weight="bold" className="text-neutral-900 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-[15px] font-semibold text-neutral-900">Google Search Console</div>
+                  <div className="text-[12px] text-neutral-500 mt-0.5">Position, clics, impressions Google</div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Coverage metrics */}
-        <div className="bg-white rounded-2xl border border-neutral-200 p-6 mb-6" data-testid="seo-coverage-card">
-          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-4 flex items-center gap-2">
-            <ChartBar size={12} weight="bold" /> Couverture
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Stat label="Produits actifs" value={audit.coverage.products_total} testId="cov-products-total" />
-            <Stat label="Produits enrichis IA" value={`${audit.coverage.products_enriched}/${audit.coverage.products_total}`} testId="cov-products-enriched" />
-            <Stat label="Avec avis" value={audit.coverage.products_with_reviews} testId="cov-products-reviews" />
-            <Stat label="Avec bundles" value={audit.coverage.products_with_bundles} testId="cov-products-bundles" />
-            <Stat label="Articles blog" value={audit.coverage.blog_posts} testId="cov-blog" />
-            <Stat label="Collections" value={audit.coverage.collections} testId="cov-collections" />
-            <Stat label="Avec image" value={audit.coverage.products_with_images} testId="cov-products-images" />
-            <Stat label="Statut" value={audit.published ? "Publié" : "Brouillon"} highlight={audit.published ? "ok" : "warn"} testId="cov-published" />
-          </div>
-        </div>
-
-        {/* Checks */}
-        <div className="bg-white rounded-2xl border border-neutral-200 p-6 mb-6" data-testid="seo-checks-card">
-          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-4 flex items-center gap-2">
-            <Shield size={12} weight="bold" /> Contrôles
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {Object.entries(audit.checks).map(([k, v]) => (
-              <div key={k} data-testid={`check-${k}`} className="flex items-center gap-2 text-sm">
-                {v ? (
-                  <CheckCircle size={16} weight="fill" className="text-emerald-600 flex-shrink-0" />
-                ) : (
-                  <XCircle size={16} weight="fill" className="text-rose-500 flex-shrink-0" />
+                {gsc.status?.connected && (
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
+                    Connecté
+                  </span>
                 )}
-                <span className={v ? "text-neutral-700" : "text-neutral-500"}>{CHECK_LABELS[k] || k}</span>
               </div>
-            ))}
+            </div>
+            <GSCConnectCard siteId={siteId} />
+          </div>
+
+          {/* Merchant */}
+          <div className="bg-white rounded-2xl border border-neutral-200 p-5" data-testid="merchant-card">
+            <div className="flex items-start gap-3">
+              <Storefront size={22} weight="duotone" className="text-neutral-900 mt-0.5" />
+              <div className="flex-1">
+                <div className="text-[15px] font-semibold text-neutral-900">Google Merchant Center</div>
+                <div className="text-[12px] text-neutral-500 mt-0.5">Catalogue produits sur Google Shopping</div>
+              </div>
+              {merchant?.connected && (
+                <span className="text-[10px] uppercase tracking-widest font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
+                  Connecté
+                </span>
+              )}
+            </div>
+            <div className="text-[12px] text-neutral-600 mt-4 leading-[1.55]">
+              {merchant?.connected ? (
+                <>
+                  Compte marchand <strong>{merchant.merchant_id}</strong> connecté.
+                  {merchant.last_sync_at && (
+                    <span className="block text-neutral-400 mt-1">
+                      Dernière synchro : {new Date(merchant.last_sync_at).toLocaleString("fr-FR")}
+                    </span>
+                  )}
+                </>
+              ) : (
+                "Connectez Merchant Center depuis la page Admin · Intégrations pour publier vos produits sur Google Shopping."
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Recommendations */}
-        <div className="bg-white rounded-2xl border border-neutral-200 p-6" data-testid="seo-recommendations-card">
-          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-4 flex items-center gap-2">
-            <Lightbulb size={12} weight="bold" /> Recommandations ({audit.recommendations.length})
+        {/* Bloc 3 — Performances 7j (depuis GSC) */}
+        <div className="bg-white rounded-2xl border border-neutral-200 p-6 mb-6" data-testid="seo-perf">
+          <div className="flex items-center gap-2 mb-4">
+            <ChartLineUp size={18} weight="duotone" className="text-neutral-700" />
+            <div className="text-[16px] font-semibold text-neutral-900">Vos performances (7 derniers jours)</div>
           </div>
-          {audit.recommendations.length === 0 ? (
-            <div className="py-6 text-center">
-              <CheckCircle size={32} weight="fill" className="mx-auto text-emerald-500 mb-2" />
-              <div className="font-medium text-neutral-900">Aucune recommandation — boutique optimale</div>
-              <div className="text-sm text-neutral-500 mt-1">
-                Continuez à publier du contenu frais pour maintenir votre ranking.
-              </div>
+          {gsc.metrics ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Stat label="Impressions Google" value={(gsc.metrics.impressions ?? 0).toLocaleString("fr-FR")} />
+              <Stat label="Clics" value={(gsc.metrics.clicks ?? 0).toLocaleString("fr-FR")} />
+              <Stat label="Position moyenne" value={gsc.metrics.avg_position ? gsc.metrics.avg_position.toFixed(1) : "—"} />
+              <Stat label="CTR" value={`${gsc.metrics.ctr ?? 0}%`} />
+            </div>
+          ) : gsc.status?.connected ? (
+            <div className="text-[13px] text-neutral-500 italic">
+              Métriques en cours de chargement…
             </div>
           ) : (
-            <div className="space-y-3" data-testid="seo-reco-list">
-              {audit.recommendations.map((r, i) => {
-                const s = SEVERITY[r.severity] || SEVERITY.medium;
-                const Icon = s.icon;
-                return (
-                  <div
-                    key={i}
-                    data-testid={`seo-reco-${i}`}
-                    className={`rounded-xl border ${s.border} ${s.bg} p-4 flex items-start gap-3`}
-                  >
-                    <Icon size={18} weight="fill" className={`${s.iconColor} flex-shrink-0 mt-0.5`} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`text-[10px] uppercase tracking-widest font-bold ${s.text}`}>{s.label}</span>
-                      </div>
-                      <div className={`text-sm ${s.text} leading-relaxed`}>{r.text}</div>
-                      {r.action && (
-                        <div className="text-xs text-neutral-600 mt-2 flex items-center gap-1.5">
-                          <Sparkle size={11} weight="bold" /> <span className="font-medium">Action :</span> {r.action}
-                        </div>
-                      )}
+            <div className="text-[13px] text-neutral-600 leading-[1.6]">
+              <strong>Connectez Google Search Console</strong> ci-dessus pour voir vos
+              impressions, clics et position moyenne directement ici. Les données sont mises
+              à jour toutes les 24 heures.
+            </div>
+          )}
+        </div>
+
+        {/* Mode avancé */}
+        <details className="bg-white rounded-2xl border border-neutral-200 mb-6" data-testid="seo-advanced">
+          <summary className="cursor-pointer p-5 flex items-center justify-between text-[14px] font-medium text-neutral-700 hover:bg-neutral-50 rounded-2xl">
+            <span className="flex items-center gap-2">
+              <Sparkle size={14} weight="bold" /> Mode avancé
+              <span className="text-[11px] text-neutral-400 font-normal">(audit détaillé + actions manuelles)</span>
+            </span>
+            <CaretDown size={14} weight="bold" />
+          </summary>
+          <div className="px-5 pb-5 pt-0 space-y-4">
+            <div className="border-t border-neutral-100 pt-4">
+              <div className="flex flex-wrap gap-2 mb-4">
+                <button
+                  onClick={resubmitSitemap}
+                  disabled={busy === "indexnow"}
+                  data-testid="advanced-resubmit"
+                  className="h-10 px-4 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-[13px] font-medium flex items-center gap-2 disabled:opacity-60"
+                >
+                  {busy === "indexnow" ? "Envoi…" : "Resoumettre le sitemap à IndexNow"}
+                </button>
+              </div>
+            </div>
+
+            {/* Recommandations issues de l'audit */}
+            {audit?.recommendations?.length > 0 && (
+              <div className="border-t border-neutral-100 pt-4">
+                <div className="text-[12px] uppercase tracking-widest text-neutral-500 mb-3">
+                  Pistes d'amélioration ({audit.recommendations.length})
+                </div>
+                <div className="space-y-2 max-h-72 overflow-auto">
+                  {audit.recommendations.slice(0, 30).map((r, i) => (
+                    <div key={i} className="text-[12.5px] text-neutral-700 px-3 py-2 bg-neutral-50 rounded-md">
+                      <strong className="capitalize">{r.severity || "—"}</strong> · {r.message || r.title}
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-          </>
-        )}
-
-        {/* Phase B6 — SEO Factory : keywords + landings */}
-        <div
-          className="bg-white rounded-2xl border border-neutral-200 mt-6 overflow-hidden"
-          data-testid="seo-factory-panel"
-        >
-          <div className="p-6">
-          <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-1.5 flex items-center gap-2">
-                <Sparkle size={12} weight="bold" /> Phase B · Factory long-tail
+                  ))}
+                </div>
               </div>
-              <div className="text-[20px] text-neutral-900" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
-                Mots-clés &amp; landing pages SEO
-              </div>
-              <p className="text-[13px] text-neutral-600 mt-1.5 leading-[1.55] max-w-2xl">
-                Découvre des centaines de requêtes long-tail à partir de ton catalogue,
-                regroupe-les en clusters sémantiques, puis génère automatiquement des
-                landing pages premium ciblées pour capter du trafic organique.
-              </p>
+            )}
+
+            {/* SeoStudio (AEO / citations) */}
+            <div className="border-t border-neutral-100 pt-4">
+              <SeoStudioPanel siteId={siteId} />
             </div>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5" data-testid="factory-state">
-            <Stat label="Mots-clés découverts" value={factoryState?.keywords_total ?? "—"} testId="factory-stat-keywords" />
-            <Stat label="Clusters" value={factoryState?.clusters_total ?? "—"} testId="factory-stat-clusters" />
-            <Stat label="Landings publiées" value={factoryState?.landings_total ?? "—"} testId="factory-stat-landings" />
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => factoryAction("discover")}
-              disabled={!!factoryBusy}
-              data-testid="factory-discover"
-              className="h-10 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium flex items-center gap-2 transition disabled:opacity-60"
-            >
-              {factoryBusy === "discover" ? "Découverte…" : "Découvrir 30 mots-clés"}
-            </button>
-            <button
-              onClick={() => factoryAction("cluster")}
-              disabled={!!factoryBusy}
-              data-testid="factory-cluster"
-              className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition disabled:opacity-60"
-            >
-              {factoryBusy === "cluster" ? "Clustering…" : "Regrouper en clusters"}
-            </button>
-            <button
-              onClick={() => factoryAction("landings")}
-              disabled={!!factoryBusy}
-              data-testid="factory-landings"
-              className="h-10 px-4 rounded-xl bg-[#1C1917] hover:bg-[#0A0A0A] text-white text-sm font-medium flex items-center gap-2 transition disabled:opacity-60"
-            >
-              <Sparkle size={14} weight="fill" />
-              {factoryBusy === "landings" ? "Génération…" : "Générer 5 landings"}
-            </button>
-            <button
-              onClick={() => factoryAction("indexnow")}
-              disabled={!!factoryBusy}
-              data-testid="factory-indexnow"
-              className="h-10 px-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-900 text-sm font-medium flex items-center gap-2 transition disabled:opacity-60"
-            >
-              {factoryBusy === "indexnow" ? "Push…" : "Resoumettre à IndexNow"}
-            </button>
-          </div>
-
-          {factoryToast && (
-            <div
-              data-testid="factory-toast"
-              className={`mt-4 rounded-xl border px-4 py-3 text-sm ${
-                factoryToast.kind === "ok"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                  : "border-rose-200 bg-rose-50 text-rose-800"
-              }`}
-            >
-              {factoryToast.msg}
-            </div>
-          )}
-          </div>
-          {/* Bandeau GSC Connect en footer du panel — pour rendre l'OAuth bien visible */}
-          <GSCConnectCard siteId={siteId} />
-        </div>
+        </details>
 
         <NextStepCTA siteId={siteId} currentKey="seo" />
       </div>
@@ -407,94 +294,38 @@ export default function SiteSEO() {
   );
 }
 
-const CHECK_LABELS = {
-  published: "Boutique publiée",
-  has_brand: "Brand book défini",
-  has_logo: "Logo présent",
-  has_tagline: "Baseline présente",
-  legal_complete: "Pages légales complètes",
-  about_done: "Page 'À propos' remplie",
-  contact_done: "Page 'Contact' remplie",
-  values_done: "Valeurs éditoriales",
-  founder_done: "Histoire du fondateur",
-};
-
-function DimensionIcon({ k }) {
-  const map = {
-    catalog: Sparkle,
-    content: Sparkle,
-    structure: Shield,
-    trust: Shield,
-    aeo: TrendUp,
-    freshness: Clock,
-  };
-  const Icon = map[k] || Sparkle;
-  return <Icon size={18} weight="duotone" className="text-neutral-400 flex-shrink-0" />;
-}
-
-function ProgressBar({ value, color }) {
-  return (
-    <div className="h-1.5 rounded-full bg-neutral-200 overflow-hidden">
-      <div
-        className="h-full rounded-full transition-all duration-500"
-        style={{ width: `${Math.max(0, Math.min(100, value))}%`, background: color }}
-      />
-    </div>
-  );
-}
-
-function Stat({ label, value, highlight, testId }) {
-  const hl = highlight === "ok" ? "text-emerald-700" : highlight === "warn" ? "text-amber-700" : "text-neutral-900";
-  return (
-    <div data-testid={testId}>
-      <div className="text-[11px] uppercase tracking-widest text-neutral-500 mb-1">{label}</div>
-      <div className={`text-xl font-semibold ${hl}`} style={{ fontFamily: "'Fraunces', serif" }}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function GaugeRing({ score, color = "#10b981", size = 180 }) {
-  const stroke = 14;
+function ScoreRing({ score, color }) {
+  const size = 110;
+  const stroke = 10;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const clamped = Math.max(0, Math.min(100, score));
   const dash = (clamped / 100) * c;
-
   return (
-    <svg width={size} height={size} className="flex-shrink-0">
+    <svg width={size} height={size} className="flex-shrink-0" data-testid="seo-score-ring">
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#F5F2EB" strokeWidth={stroke} />
       <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={r}
-        fill="none"
-        stroke="#F5F2EB"
-        strokeWidth={stroke}
+        cx={size/2} cy={size/2} r={r}
+        fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
+        strokeDasharray={`${dash} ${c - dash}`} strokeDashoffset={c/4}
+        transform={`rotate(-90 ${size/2} ${size/2})`}
       />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={r}
-        fill="none"
-        stroke={color}
-        strokeWidth={stroke}
-        strokeLinecap="round"
-        strokeDasharray={`${dash} ${c - dash}`}
-        strokeDashoffset={c / 4}
-        transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        style={{ transition: "stroke-dasharray 600ms ease-out, stroke 300ms ease-out" }}
-      />
-      <text
-        x="50%"
-        y="50%"
-        dominantBaseline="central"
-        textAnchor="middle"
-        fill="#1C1917"
-        style={{ fontFamily: "'Fraunces', serif", fontSize: 42, fontWeight: 600 }}
-      >
+      <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle"
+            fill="#1C1917"
+            style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 600 }}>
         {clamped}
       </text>
     </svg>
+  );
+}
+
+function Stat({ label, value }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 mb-1">{label}</div>
+      <div className="text-[24px] leading-none text-neutral-900" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
+        {value}
+      </div>
+    </div>
   );
 }

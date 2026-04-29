@@ -144,16 +144,22 @@ async def _validated_sites() -> list[dict]:
     ['active', 'live']` est inclus (avant : exigeait les 10 étapes
     complétées, ce qui bloquait les sites en cours de validation comme
     Altea). Les crons restent idempotents et limitent par produit/article.
+
+    Refonte UX 2026-04-30 — exclut les sites où l'automatisation contenu
+    a été désactivée par le concepteur (`db.sites.{id}.automation.content_enabled = false`).
     """
-    from routes.journey_gating import compute_step_statuses  # noqa: F401
     sites: list[dict] = []
     async for s in db.sites.find(
         {"status": {"$in": ["active", "live", "validated"]}},
         {"_id": 0, "id": 1, "name": 1, "niche": 1,
          "selected_countries": 1, "seo_countries": 1,
          "operator_id": 1, "design": 1, "status": 1, "qa_audit": 1,
-         "available_langs": 1, "primary_lang": 1, "public_url": 1},
+         "available_langs": 1, "primary_lang": 1, "public_url": 1,
+         "automation": 1},
     ):
+        auto = s.get("automation") or {}
+        if auto.get("content_enabled", True) is False:
+            continue
         sites.append(s)
     return sites
 

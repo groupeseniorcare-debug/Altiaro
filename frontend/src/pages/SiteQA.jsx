@@ -139,6 +139,8 @@ export default function SiteQA() {
             {checks.map((c) => {
               const meta = STATUS_META[c.status] || STATUS_META.warn;
               const Icon = meta.icon;
+              const fix = FIX_LINKS(siteId)[c.id];
+              const showFix = c.status !== "ok" && fix;
               return (
                 <div
                   key={c.id}
@@ -153,6 +155,15 @@ export default function SiteQA() {
                     <div className="text-[11px] text-neutral-600 mt-0.5 truncate">
                       {c.detail}
                     </div>
+                    {showFix && (
+                      <Link
+                        to={fix.to}
+                        data-testid={`qa-fix-${c.id}`}
+                        className={`inline-flex items-center gap-1 mt-2 text-[11.5px] font-semibold underline ${meta.color}`}
+                      >
+                        Corriger en 1 clic →
+                      </Link>
+                    )}
                   </div>
                   <span className={`text-[10px] uppercase tracking-widest font-bold ${meta.color}`}>
                     {meta.label}
@@ -165,6 +176,41 @@ export default function SiteQA() {
           {!ready && (
             <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
               Certains contrôles ne sont pas au vert. Corrigez-les avant la mise en ligne, ou
+              demandez à un admin Altiaro un passage forcé.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ScoreRing({ score, color }) {
+  const size = 80;
+  const stroke = 8;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const clamped = Math.max(0, Math.min(100, score));
+  const dash = (clamped / 100) * c;
+  return (
+    <svg width={size} height={size} className="flex-shrink-0" data-testid="qa-score-ring">
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#F5F2EB" strokeWidth={stroke} />
+      <circle
+        cx={size / 2} cy={size / 2} r={r}
+        fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
+        strokeDasharray={`${dash} ${c - dash}`} strokeDashoffset={c / 4}
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+      <text
+        x="50%" y="50%" dominantBaseline="central" textAnchor="middle"
+        fill="#1C1917" style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 600 }}
+      >
+        {clamped}
+      </text>
+    </svg>
+  );
+}
+t. Corrigez-les avant la mise en ligne, ou
               demandez à un admin Altiaro un passage forcé.
             </div>
           )}

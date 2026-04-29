@@ -183,6 +183,43 @@ async def gsc_disconnect(site_id: str, user=Depends(get_current_user)):
     return {"ok": True}
 
 
+@router.get("/admin/sites/gsc-status", tags=["admin"])
+async def gsc_admin_multisite_status(user=Depends(get_current_user)):
+    """Refonte UX — retourne pour TOUS les sites accessibles à l'utilisateur :
+    `{site_id, name, public_url, custom_domain, connected, property_url}`.
+
+    Permet à l'admin (ou au concepteur multi-sites) de connecter GSC site
+    par site depuis `/admin/integrations` sans naviguer dans chaque cockpit.
+    """
+    is_admin = user.get("role") == "admin"
+    q: dict = {}
+    if not is_admin:
+        q["operator_id"] = user.get("id")
+    items: list[dict] = []
+    async for s in db.sites.find(
+        q,
+        {"_id": 0, "id": 1, "name": 1, "public_url": 1,
+         "custom_domain": 1, "design.gsc": 1, "status": 1},
+    ).sort("created_at", -1):
+        gsc = ((s.get("design") or {}).get("gsc")) or {}
+        items.append({
+            "site_id": s["id"],
+            "name": s.get("name"),
+            "public_url": s.get("public_url"),
+            "custom_domain": s.get("custom_domain"),
+            "status": s.get("status"),
+            "connected": bool(gsc.get("refresh_token")),
+            "property_url": gsc.get("property_url"),
+            "connected_at": gsc.get("connected_at"),
+        })
+    return {
+        "configured": _gsc_configured(),
+        "items": items,
+        "total": len(items),
+    }
+
+
+
 async def _refresh_access_token(refresh_token: str) -> str | None:
     """Exchange a long-lived refresh_token for a short-lived access_token."""
     if not _gsc_configured():

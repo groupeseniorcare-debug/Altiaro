@@ -14,6 +14,7 @@ import {
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import GscMultiSitePanel from "../components/admin/GscMultiSitePanel";
 
 /**
  * Admin · Santé de la plateforme (Phase 3).
@@ -258,6 +259,9 @@ export default function AdminIntegrations() {
             Chargement…
           </div>
         )}
+
+        {/* Refonte UX — Connexion GSC multi-sites depuis l'admin */}
+        <GscMultiSitePanel />
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {integrations.map((it) => (

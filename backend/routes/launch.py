@@ -1393,7 +1393,11 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
             await db.sites.update_one(
                 {"id": site_id},
                 {"$addToSet": {"validated_steps": 5},
-                 "$set": {"launch_generated_at": datetime.now(timezone.utc).isoformat()}},
+                 "$set": {"launch_generated_at": datetime.now(timezone.utc).isoformat(),
+                          # Refonte UX — automatisation activée par défaut
+                          "automation.content_enabled": True,
+                          "automation.seo_enabled": True,
+                          "automation.translation_enabled": True}},
             )
         except Exception:
             pass
