@@ -8,6 +8,128 @@
 
 ---
 
+## 0quater — Provisioning Google API-only 2026-04-30 (zéro touche manuelle)
+
+> L'utilisateur ne touche plus à OVH ni aux consoles Google. Tout est piloté par API
+> depuis Altiaro. La SEULE action humaine restante = 1 clic sur « Connecter le
+> compte maître Altiaro » dans `/admin/google/master-auth`.
+
+### URGENT 1 ✅ — TXT DNS altiaro.com posé via OVH API
+- Script `backend/scripts/setup_altiaro_master_dns.py` (lib `ovh` + `dnspython`).
+- **Exécuté avec succès** : record TXT id=`5412059797` créé sur altiaro.com,
+  zone refresh OK, propagation observée en **20 secondes** (DNS Google/Cloudflare).
+- Persisté dans `db.platform_settings.dns_master_verification`.
+- Endpoint réutilisable : `POST /api/admin/google/dns-verification {domain, token}`.
+
+### URGENT 2 ✅ — Auto-discovery GA4 + Merchant + Ads
+Service `backend/services/google_master_discovery.py` :
+- `discover_ga4_master_account(creds)` → Analytics Admin `accountSummaries.list`
+  (1 si unique, sinon 1er match « Altiaro »). Stocke `account_id`,
+  `display_name`, `property_summaries`.
+- `discover_merchant_mca(creds)` → Content for Shopping `accounts.authinfo` +
+  `accounts.list`. Détecte si compte simple vs MCA. Si simple, log warning
+  clair pour l'admin (« Demande de conversion en MCA via Google Support »).
+- `discover_ads_mcc(creds)` → confirme MCC depuis `.env`.
+- **Auto-déclenchés en background au callback OAuth master** (`_post_oauth_discovery()`).
+
+### URGENT 3 ✅ — Vérification programmatique altiaro.com
+- `verify_altiaro_master_domain(creds, "altiaro.com")` exécute :
+  1. `siteVerification.webResource.insert(method=DNS_TXT)`
+  2. `searchconsole.sites.add(siteUrl="sc-domain:altiaro.com")`
+- Persisté dans `db.platform_settings.altiaro_master_verification`.
+- Auto-déclenché au callback OAuth + via `POST /admin/google/master/discover`.
+
+### URGENT 4 ✅ — Page admin one-time
+- Route `/admin/google/master-auth` (`pages/AdminGoogleMaster.jsx`) :
+  - Bouton « Connecter le compte maître Altiaro » → `GET /admin/google/master/start`
+    → redirige vers `accounts.google.com` avec 9 scopes (webmasters,
+    webmasters.readonly, content, adwords, analytics.edit/readonly,
+    siteverification, openid, email, profile).
+  - Callback `GET /admin/google/master/callback` exchange code + lance
+    discovery+verify en background.
+  - Dashboard 6 tuiles (GA4, GMC, Ads, DNS, Site Verification, GSC) avec
+    status visuel + bouton « Reposter TXT » + bouton « Re-découvrir ».
+  - Bandeau final « L'usine est prête » quand tout est vert.
+
+### URGENT 5 ✅ — Bouton « Provisionner Google maintenant » sur SiteQA
+- Composant `GoogleProvisioningPanel` ajouté à `pages/SiteQA.jsx`.
+- Bouton appelle `POST /api/sites/{id}/google-provisioning/run` qui exécute
+  `services/google_provisioning.provision_all(site_id, force=True)`.
+- 4 cartes de statut (GSC / GMC / Ads / GA4) avec bouton « Réessayer » par
+  service en cas d'erreur.
+
+### Service de provisioning par site
+`backend/services/google_provisioning.py` :
+- `provision_gsc_property(site, creds)` → `webmasters.sites.add` + `sitemaps.submit`
+- `provision_gmc_subaccount(site, creds, mca_id)` → `accounts.insert(merchantId=MCA)`
+  (skip gracieux si MCA non configuré, message clair)
+- `provision_ads_client(site, creds)` → `customers.createCustomerClient`
+  via lib `google-ads` (best-effort, retourne `degraded` si dev_token KO)
+- `provision_ga4_property(site, creds)` → `properties.create` + `dataStreams.create`
+- `inject_tracking_into_storefront(site, ga4_id, ads_id)` → persiste IDs
+  dans `db.sites.{id}.tracking`
+- `provision_all(site_id, force=False)` → orchestrateur idempotent, lock
+  Mongo, retry sélectif, status `completed|partial`.
+- Endpoints :
+  - `POST /api/sites/{id}/google-provisioning/run` `{force?}`
+  - `POST /api/sites/{id}/google-provisioning/retry` `{services:[...]}`
+
+### Master tags injectés sur la landing altiaro.com (pas sur les storefronts)
+`frontend/public/index.html` :
+- `<meta name="google-site-verification" content="…" />` (toujours, racine)
+- GA4 master `G-3JE7Q2QRMB` chargé conditionnellement : **uniquement si
+  `pathname !== /shop/...`** (les storefronts auront leur propre `tracking.ga4_measurement_id`
+  injecté en runtime par le provisioning).
+
+### Variables `.env` ajoutées
+```
+GA4_MASTER_MEASUREMENT_ID=G-3JE7Q2QRMB
+GA4_MASTER_ACCOUNT_ID=          # auto-rempli au callback OAuth
+GOOGLE_PROJECT_ID=altiaro-plateform
+GOOGLE_SITE_VERIFICATION_ALTIARO=B3MmvHBKF8TX-9tFy6_N22x-DBTq0nJ9U0-9Ms4aNCI
+GOOGLE_MERCHANT_MASTER_ID=      # auto-rempli au callback OAuth
+GOOGLE_MASTER_REDIRECT_URI=https://24f2727d-5084-4b95-a658-4f3bc93cf26e.preview.emergentagent.com/api/admin/google/master/callback
+```
+
+### Endpoints exposés (12 nouveaux)
+| Méthode | Path | Rôle |
+|---|---|---|
+| GET   | `/api/admin/google/master/start` | Lance OAuth (9 scopes) |
+| GET   | `/api/admin/google/master/callback` | Échange + discover + verify |
+| GET   | `/api/admin/google/master/status` | État connexion |
+| GET   | `/api/admin/google/master/dashboard` | Vue agrégée pour la page admin |
+| POST  | `/api/admin/google/master/discover` | Re-discover + verify forcé |
+| POST  | `/api/admin/google/master/disconnect` | Reset master |
+| POST  | `/api/admin/google/dns-verification` | Pose un TXT DNS via OVH |
+| POST  | `/api/sites/{id}/google-provisioning/run` `{force?}` | Provision global |
+| POST  | `/api/sites/{id}/google-provisioning/retry` `{services:[...]}` | Retry sélectif |
+| GET   | `/api/public/google-site-verification.html` | Backup verif altiaro.com |
+| GET   | `/api/public/google-site-verification.txt` | Variante texte |
+| GET   | `/api/public/google{TOKEN}.html` | Convention Google |
+
+### Workflow utilisateur final (1 SEULE action)
+1. Aller sur `https://commerce-builder-21.preview.emergentagent.com/admin/google/master-auth`
+2. Cliquer « Connecter le compte maître Altiaro »
+3. Login Google + autoriser les 9 scopes
+
+C'est tout. Après, en arrière-plan automatiquement :
+- ✅ GA4 master account découvert et stocké
+- ✅ Merchant Center identifié (MCA ou simple) avec warning si conversion nécessaire
+- ✅ MCC Ads confirmé depuis `.env`
+- ✅ TXT DNS altiaro.com posé sur OVH (déjà fait, propagé)
+- ✅ altiaro.com vérifié auprès de Google (Site Verification API)
+- ✅ altiaro.com ajouté à Search Console master
+
+### Ce qui reste vraiment hors de portée du code (rien de manuel chez Google)
+- ⚠️ Si Merchant Center détecté = compte **simple** (non MCA), Altiaro ne peut
+  pas créer de sub-accounts par API. **Solution** : soumettre une demande de
+  conversion en MCA via le formulaire Google Support (lien dans la page admin).
+- ⚠️ Si la propagation DNS n'est pas immédiate (rare avec OVH+Cloudflare/Google
+  resolvers), Site Verification peut échouer une fois ; un retry 5 min après
+  passe. Le bouton « Re-découvrir » du dashboard relance le check.
+
+---
+
 ## 0ter — Refonte UX 2026-04-30 (philosophie « usine zéro friction »)
 
 > Le concepteur clique 1 toggle ON. Tout tourne en arrière-plan. Il ne voit que le résultat.

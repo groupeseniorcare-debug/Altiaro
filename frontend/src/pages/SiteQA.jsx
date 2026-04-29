@@ -180,9 +180,144 @@ export default function SiteQA() {
             </div>
           )}
         </div>
+
+        {/* Statut Google + bouton provisioning */}
+        <GoogleProvisioningPanel siteId={siteId} ready={ready} />
       </div>
     </div>
   );
+}
+
+function GoogleProvisioningPanel({ siteId, ready }) {
+  const [data, setData] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState(null);
+  const showToast = (kind, msg) => { setToast({ kind, msg }); setTimeout(() => setToast(null), 6500); };
+
+  const load = async () => {
+    const { data: d } = await apiCall(() => api.get(`/sites/${siteId}/automation/status`));
+    // /automation/status doesn't include google_provisioning, fallback : query the site
+    const { data: s } = await apiCall(() => api.get(`/sites/${siteId}`));
+    setData(s?.google_provisioning || null);
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [siteId]);
+
+  const run = async (force = false) => {
+    setBusy(true);
+    const { data: d, error } = await apiCall(() =>
+      api.post(`/sites/${siteId}/google-provisioning/run`, { force }),
+    );
+    setBusy(false);
+    if (error) return showToast("error", error);
+    setData(d || null);
+    if (d?.reason === "master_oauth_not_done") {
+      showToast("error", "Le compte maître Altiaro n'est pas connecté — va sur /admin/google/master-auth");
+      return;
+    }
+    showToast("ok", `Provisioning ${d?.status || "lancé"} : ${(d?.services_ok || []).length}/4 services OK`);
+  };
+
+  const retry = async (service) => {
+    setBusy(true);
+    await apiCall(() =>
+      api.post(`/sites/${siteId}/google-provisioning/retry`, { services: [service] }),
+    );
+    setBusy(false);
+    load();
+  };
+
+  const services = [
+    { key: "gsc",  label: "Search Console" },
+    { key: "gmc",  label: "Merchant Center" },
+    { key: "ads",  label: "Google Ads" },
+    { key: "ga4",  label: "Analytics 4" },
+  ];
+
+  return (
+    <div className="bg-white rounded-2xl border border-neutral-200 p-6 mt-6" data-testid="google-prov-panel">
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-1.5 flex items-center gap-2">
+            <Sparkle size={12} weight="bold" /> Statut Google
+          </div>
+          <div className="text-[18px] font-semibold text-neutral-900">
+            Provisioning automatique Google
+          </div>
+          <p className="text-[13px] text-neutral-600 mt-1.5 max-w-2xl leading-[1.55]">
+            Altiaro provisionne Search Console, Merchant Center, Ads et GA4 en arrière-plan.
+            Lancez manuellement le provisioning pour ce site (utile en démo / debug).
+          </p>
+        </div>
+        <button
+          onClick={() => run(true)}
+          disabled={busy}
+          data-testid="run-google-provisioning"
+          className="h-11 px-5 rounded-xl bg-[#1C1917] hover:bg-[#0A0A0A] text-white text-sm font-semibold flex items-center gap-2 disabled:opacity-60"
+        >
+          <Sparkle size={14} weight="fill" />
+          {busy ? "En cours…" : "Provisionner Google maintenant"}
+        </button>
+      </div>
+
+      {toast && (
+        <div className={`mb-4 rounded-xl border px-4 py-2.5 text-[12.5px] ${
+          toast.kind === "ok" ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                              : "border-rose-200 bg-rose-50 text-rose-800"
+        }`}>{toast.msg}</div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {services.map((s) => {
+          const r = (data || {})[s.key] || null;
+          const ok = !!(r && r.ok);
+          return (
+            <div key={s.key} data-testid={`google-prov-${s.key}`}
+                 className={`rounded-xl border ${ok ? "border-emerald-200 bg-emerald-50" : "border-neutral-200 bg-white"} p-3 flex items-start gap-3`}>
+              {ok ? <CheckCircle size={18} weight="fill" className="text-emerald-600 mt-0.5" />
+                  : <XCircle size={18} weight="fill" className="text-neutral-300 mt-0.5" />}
+              <div className="flex-1 min-w-0">
+                <div className={`text-[13px] font-medium ${ok ? "text-emerald-800" : "text-neutral-800"}`}>{s.label}</div>
+                <div className="text-[11.5px] text-neutral-600 mt-0.5">
+                  {ok
+                    ? formatProvSuccess(s.key, r)
+                    : (r?.error || r?.reason || (r?.warning) || "Pas encore provisionné")}
+                </div>
+                {!ok && data && (
+                  <button
+                    onClick={() => retry(s.key)}
+                    disabled={busy}
+                    className="mt-2 text-[11.5px] font-medium text-neutral-700 hover:text-neutral-900 underline disabled:opacity-60"
+                    data-testid={`retry-${s.key}`}
+                  >
+                    Réessayer
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {data?.status === "completed" && (
+        <div className="mt-4 text-[12px] text-emerald-700">
+          ✅ Provisioning terminé · {data.services_ok?.length || 0}/4 services OK
+        </div>
+      )}
+      {data?.status === "partial" && (
+        <div className="mt-4 text-[12px] text-amber-700">
+          ⚠️ Provisioning partiel · réessayez les services qui ont échoué.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatProvSuccess(kind, r) {
+  if (kind === "gsc") return `Site ajouté : ${r.site_url || "—"}`;
+  if (kind === "gmc") return `Sub-account : ${r.merchant_id || "—"} (MCA ${r.mca_id || "—"})`;
+  if (kind === "ads") return `Customer : ${r.ads_customer_id || "—"} sous MCC ${r.mcc_id || "—"}`;
+  if (kind === "ga4") return `Property ${r.ga4_property_id || "—"} · ${r.ga4_measurement_id || ""}`;
+  return "OK";
 }
 
 function ScoreRing({ score, color }) {

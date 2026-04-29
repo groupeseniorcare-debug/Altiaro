@@ -26,6 +26,7 @@ import SitePages from "./pages/SitePages";
 import SiteFulfillment from "./pages/SiteFulfillment";
 import SiteAnalytics from "./pages/SiteAnalytics";
 import SiteQA from "./pages/SiteQA";
+import AdminGoogleMaster from "./pages/AdminGoogleMaster";
 import Sourcing from "./pages/Sourcing";
 import AdminIntegrations from "./pages/AdminIntegrations";
 import AdminReview from "./pages/AdminReview";
@@ -323,6 +324,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <SiteQA />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/google/master-auth"
+            element={
+              <ProtectedRoute>
+                <AdminGoogleMaster />
               </ProtectedRoute>
             }
           />

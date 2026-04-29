@@ -105,6 +105,8 @@ from routes import seo_factory as seo_factory_routes  # Phase B6 — factory mot
 from routes import site_qa as site_qa_routes  # Phase C — checklist QA + go-live
 from routes import geo as geo_routes_finalisation  # Phase D' — détection pays/devise
 from routes import automation as automation_routes  # Refonte UX — toggles automatisation
+from routes import well_known as well_known_routes  # Google Site Verification (altiaro.com)
+from routes import google_master as google_master_routes  # Master OAuth + auto-provisioning
 
 logging.basicConfig(
     level=logging.INFO,
@@ -198,6 +200,8 @@ api.include_router(seo_factory_routes.router)  # Phase B6 — factory mots-clés
 api.include_router(site_qa_routes.router)  # Phase C — checklist QA + go-live
 api.include_router(geo_routes_finalisation.router)  # Phase D' — détection pays/devise
 api.include_router(automation_routes.router)  # Refonte UX — toggles automatisation
+api.include_router(well_known_routes.router)  # Google Site Verification (altiaro.com)
+api.include_router(google_master_routes.router)  # Master OAuth + auto-provisioning
 
 
 @app.on_event("startup")

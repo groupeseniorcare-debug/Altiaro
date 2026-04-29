@@ -17,6 +17,27 @@
         <link rel="canonical" href="https://altiaro.com" />
         <meta name="google" content="notranslate" />
         <meta http-equiv="Content-Language" content="fr" />
+
+        <!-- Site Verification Google (altiaro.com) — Master tag, ignoré par les storefronts (chargés sous /shop/...) -->
+        <meta name="google-site-verification" content="B3MmvHBKF8TX-9tFy6_N22x-DBTq0nJ9U0-9Ms4aNCI" />
+
+        <!-- GA4 Master altiaro.com — n'est chargé QUE sur les pages Altiaro (pas sur les storefronts /shop/) -->
+        <script>
+          (function () {
+            try {
+              var p = window.location.pathname || "";
+              if (p.indexOf("/shop/") === 0) return;     // Storefronts concepteur : leur propre GA4 sera injecté en runtime
+              var s = document.createElement("script");
+              s.async = true;
+              s.src = "https://www.googletagmanager.com/gtag/js?id=G-3JE7Q2QRMB";
+              document.head.appendChild(s);
+              window.dataLayer = window.dataLayer || [];
+              window.gtag = function () { dataLayer.push(arguments); };
+              window.gtag("js", new Date());
+              window.gtag("config", "G-3JE7Q2QRMB");
+            } catch (e) { /* silent */ }
+          })();
+        </script>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" rel="stylesheet" />
