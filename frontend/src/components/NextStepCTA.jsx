@@ -141,6 +141,42 @@ export default function NextStepCTA({ siteId, currentKey }) {
     );
   }
 
+  // Étape pas encore complétée mais soft-déverrouillée (workers async en
+  // arrière-plan, automation activée, etc.) → CTA actif vers la suivante,
+  // pas de "Verrouillé".
+  if (current.soft_unlocked === true && nextKey) {
+    const nextLabel = STEP_LABEL[nextKey] || nextKey;
+    const nextHref = links[nextKey];
+    return (
+      <div
+        className="mt-12 mb-2 p-6 rounded-2xl bg-white border border-neutral-200 shadow-sm flex items-start gap-4"
+        data-testid="cta-step-soft-unlocked"
+      >
+        <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center flex-shrink-0">
+          <Hourglass size={22} weight="duotone" className="text-amber-700" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 font-semibold mb-1">
+            Génération en cours en arrière-plan
+          </div>
+          <div className="text-sm text-neutral-900 leading-relaxed">
+            {current.reason || "Vos contenus sont en cours de production."}
+          </div>
+          <div className="text-[12px] text-neutral-500 mt-1.5">
+            Vous pouvez d'ores et déjà passer à <strong className="text-neutral-700">{nextLabel}</strong> — la production continue de tourner pendant ce temps.
+          </div>
+        </div>
+        <button
+          onClick={() => navigate(nextHref)}
+          data-testid={`cta-soft-goto-${nextKey}`}
+          className="h-12 px-6 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-semibold flex items-center gap-2 whitespace-nowrap shadow-sm hover:shadow transition"
+        >
+          Continuer vers {nextLabel} <ArrowRight size={18} weight="bold" />
+        </button>
+      </div>
+    );
+  }
+
   // Étape pas encore complétée → encart neutre informatif (pas un blocage UI)
   return (
     <div

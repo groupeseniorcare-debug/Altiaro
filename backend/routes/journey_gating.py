@@ -544,9 +544,13 @@ async def compute_step_statuses(site_id: str) -> list[dict]:
             # propage le previous_completed précédent
             pass
         else:
-            # Si l'étape est complétée OU soft-déverrouillée, l'étape
-            # suivante est accessible.
-            previous_completed = bool(s["completed"]) or soft_unlocked
+            # 2026-04-29 (hotfix UX) — La cascade vers l'étape SUIVANTE ne
+            # tient compte QUE de la complétion stricte. Le `soft_unlocked`
+            # permet à l'étape elle-même d'être ouverte sans bloquer le
+            # concepteur, mais ne doit pas faire croire que l'étape 10 (QA)
+            # est prête alors que les étapes 8 et 9 ne sont que partiellement
+            # avancées (workers async en cours).
+            previous_completed = bool(s["completed"])
     return statuses
 
 

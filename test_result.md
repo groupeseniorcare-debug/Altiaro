@@ -799,6 +799,7 @@ metadata:
 
 test_plan:
   current_focus:
+    - "Hotfix UX cockpit étape 8/9/10 (compteur, gating, copy) — 2026-04-29"
     - "Gating cockpit étape 9 (soft_unlocked sur content + seo) — 2026-04-29"
     - "GMC discovery relancée + sub-account Altea créé — 2026-04-29"
     - "Fallback HTML SSR /legal/* pour altiaro.com prod — 2026-04-29"
@@ -807,6 +808,166 @@ test_plan:
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Run hotfix 2026-04-29 — 4 bugs UX + 2 améliorations :
+      
+      Bug 1 (compteur 3 vs 0) : `routes/blog_posts.py::list_blog_posts`
+      lisait UNIQUEMENT `site.design.blog_posts` (array vide pour Altea)
+      au lieu de `db.blog_posts` (collection avec 3 articles publiés par
+      les workers async). Fix : merge des 2 sources avec dédoublonnage par
+      slug, source de vérité = collection. Normalise aussi `title` quand
+      le doc collection le stocke en dict i18n `{"fr": "..."}`. Validation :
+      `list_blog_posts(altea)` retourne maintenant 3 articles → la liste
+      "Vos contenus publiés (3)" affiche bien les 3, alignée avec le Stat.
+      
+      Bug 2 (étape 8 reste verrouillée) : `NextStepCTA.jsx` lisait UNIQUEMENT
+      `current.completed`. Fix : nouveau cas "soft_unlocked" → CTA actif vers
+      l'étape suivante avec message clair "Génération en cours en arrière-plan".
+      Validation : sur `/sites/Altea/blog-posts`, l'encart "Verrouillé" est
+      remplacé par un bouton ACTIF "Continuer vers Score SEO →".
+      
+      Bug 3 (étape 10 cliquable à tort) : `compute_step_statuses` faisait
+      `previous_completed = (s.completed) OR soft_unlocked` → la cascade
+      propageait le soft, débloquant artificiellement étape 10. Hotfix :
+      `previous_completed = bool(s["completed"])` STRICT. Le `soft_unlocked`
+      reste appliqué sur l'étape elle-même (pas blocked) mais ne propage
+      pas. Validation : Altea — étape 10 désormais
+      `blocked_by_previous=True` 🔒 (étapes 8 et 9 strictement non
+      complétées).
+      
+      Bug 4 (erreur sur étape 10) : avec le gating serré, l'étape n'est
+      plus accessible. Backend `qa_checklist` testé en direct → OK
+      (score 81 ready=true, pas d'exception). Bug se résout naturellement.
+      
+      UX 1 (panel automatisation mou) : `SiteBlogPosts.jsx` réécrit. 7
+      bullets ambitieux : "3 à 7 articles/sem", "50 pages atterrissage
+      SEO/jour", "200+ mots-clés long-tail/produit (FR + 5 langues)",
+      "FAQ Google PAA", "maillage", "Google/Bing/Yandex IndexNow",
+      "content gaps versus concurrents". Phrase de clôture italique
+      "Tout fonctionne en arrière-plan, 24/7, sans intervention".
+      
+      UX 2 (texte gating final) : `NextStepCTA.jsx` — nouveau cas
+      `soft_unlocked` actif avec icône Hourglass ambré, label "Génération
+      en cours en arrière-plan", reason de la check, et bouton noir
+      `Continuer vers {nextLabel} →` qui navigue directement. Plus de
+      bouton "VERROUILLÉ" qui prête à confusion.
+      
+      UX 3 (Google Ads multi-sites) : `AdminGoogleMaster.jsx` — bloc bleu
+      "Architecture Google Ads multi-sites" avec icône ShieldCheck,
+      explication 1 sous-compte/site sous MCC maître, mention que la
+      création auto requiert Developer Token basic/standard.
+      
+      Budget LLM (vérification) : `/api/platform/llm-health` →
+      `overall=healthy`, breakers `claude` et `nano_banana` CLOSED, 0
+      failures sur les 60 dernières secondes. Recharge confirmée par
+      l'utilisateur effective. `/api/platform/llm-status` →
+      `last_error_at=2026-04-27T07:23:38` (avant la recharge).
+      
+      Lint JS : 3 fichiers patchés clean. Lint Py : `blog_posts.py` et
+      `journey_gating.py` clean (E701 préexistantes hors patches).
+
+## Hotfix UX cockpit étape 8/9/10 + Google Ads explainer (2026-04-29)
+
+backend:
+  - task: "list_blog_posts merge collection + array (compteur 3 vs 0)"
+    implemented: true
+    working: true
+    file: "backend/routes/blog_posts.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Bug user : "Articles publiés = 3" en haut MAIS "Vos contenus
+          publiés (0)" en bas. Source du conflit : 2 sources de blog
+          posts en parallèle (collection `db.blog_posts` alimentée par
+          les workers, array `site.design.blog_posts` alimentée par CRUD
+          manuel). Le compteur lisait la collection (3 articles), la
+          liste lisait l'array (vide). Fix : `list_blog_posts` merge les
+          2 sources avec dédoublonnage par slug, source de vérité =
+          collection. Normalise les titres i18n (`{"fr": "..."}`).
+          Validé : 3 articles cohérents.
+
+  - task: "Cascade gating stricte (étape 10 verrouillée si étape 9 partielle)"
+    implemented: true
+    working: true
+    file: "backend/routes/journey_gating.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Bug user : "étape 10 cliquable alors que l'étape précédente
+          n'était pas valide". Hotfix : `previous_completed` propage
+          UNIQUEMENT la complétion stricte, pas le soft_unlocked. Le
+          soft_unlocked permet à l'étape elle-même d'être accessible
+          (anti-blocage workers async) mais ne déverrouille plus la
+          suivante. Test Altea : étape 8 et 9 cliquables (soft), étape
+          10 verrouillée (🔒 blocked_by_previous=True).
+
+frontend:
+  - task: "NextStepCTA — soft_unlocked CTA actif au lieu de Verrouillé"
+    implemented: true
+    working: true
+    file: "frontend/src/components/NextStepCTA.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Quand `current.soft_unlocked === true && nextKey`, on rend une
+          carte blanche bordée avec icône Hourglass ambré, eyebrow
+          "Génération en cours en arrière-plan", reason de la check, et
+          bouton primary noir `Continuer vers {nextLabel} →` qui navigue
+          directement. Plus de bouton "VERROUILLÉ" trompeur qui bloquait
+          l'utilisateur. Validé sur preview : `cta-step-soft-unlocked=1`,
+          `cta-step-pending=0`.
+
+  - task: "SiteBlogPosts — copy ambitieux 200+ mots-clés / IndexNow / content gaps"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/SiteBlogPosts.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Réécrit le panel "Automatisation active" avec 7 bullets
+          ambitieux : "3 à 7 articles/sem", "50 pages atterrissage
+          SEO/jour", "200+ mots-clés long-tail/produit FR + 5 langues",
+          "FAQ Google PAA", "maillage auto", "Google/Bing/Yandex
+          IndexNow", "content gaps versus concurrents". Closing en
+          italique "Tout fonctionne en arrière-plan, 24/7, sans
+          intervention". Validé visuellement : phrase clés visibles,
+          state=Active.
+
+  - task: "AdminGoogleMaster — bloc explainer Architecture Google Ads multi-sites"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/AdminGoogleMaster.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Réponse à la question concept user : ajout d'une carte bleue
+          claire qui explique le pattern 1 sous-compte Ads/site rattaché
+          au MCC maître. Mentionne que la création auto requiert un
+          Developer Token basic/standard (l'explorer ne lit qu'en
+          lecture). Carte data-testid="ads-architecture-info".
 
 agent_communication:
   - agent: "main"

@@ -188,11 +188,17 @@ export default function SiteBlogPosts() {
                 Quand l'automatisation est active, Altiaro :
               </p>
               <ul className="text-[13px] text-neutral-700 mt-2 space-y-1 leading-[1.55]">
-                <li>• Génère <strong>3 articles de blog</strong> par semaine</li>
-                <li>• Crée des <strong>pages SEO ciblées</strong> sur vos meilleurs mots-clés</li>
-                <li>• Enrichit les <strong>FAQ</strong> avec les questions populaires de Google</li>
+                <li>• Publie <strong>3 à 7 articles de blog</strong> par semaine selon votre niche</li>
+                <li>• Crée jusqu'à <strong>50 pages d'atterrissage SEO</strong> ciblées par jour</li>
+                <li>• Découvre <strong>200+ mots-clés long-tail</strong> par produit (français + 5 langues)</li>
+                <li>• Enrichit vos <strong>FAQ</strong> avec les questions populaires Google (PAA)</li>
                 <li>• <strong>Maille</strong> tout votre contenu automatiquement</li>
+                <li>• Soumet à <strong>Google, Bing, Yandex</strong> en continu (IndexNow)</li>
+                <li>• Détecte et comble les <strong>content gaps</strong> versus concurrents</li>
               </ul>
+              <p className="text-[12px] text-neutral-500 mt-3 italic">
+                Tout fonctionne en arrière-plan, 24/7, sans intervention.
+              </p>
             </div>
             <Switch
               enabled={isAutoOn}

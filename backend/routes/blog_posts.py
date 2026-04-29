@@ -73,11 +73,62 @@ def _ensure_site(site_id: str):
 
 @router.get("/sites/{site_id}/blog-posts")
 async def list_blog_posts(site_id: str, user=Depends(get_current_user)):
+    """Liste les articles d'un site.
+
+    Source de vérité (2026-04-29) : la **collection `db.blog_posts`** (où
+    le worker async pousse les articles générés par la factory). On y ajoute
+    les articles "manuels" stockés historiquement dans `site.design.blog_posts`
+    (CRUD direct), avec dédoublonnage par slug. Avant ce fix, l'endpoint
+    retournait UNIQUEMENT l'array embarqué dans le site → la liste était vide
+    alors que la collection contenait 3 articles publiés (incohérence avec
+    `automation/status::blog_total`).
+    """
     site = await _ensure_site(site_id)
     if not site:
         raise HTTPException(404, "Site introuvable")
-    posts = (site.get("design") or {}).get("blog_posts") or []
-    return posts
+    out: list[dict] = []
+    seen_slugs: set[str] = set()
+
+    # 1) Articles générés / publiés en collection (source de vérité worker async)
+    cursor = db.blog_posts.find({"site_id": site_id}, {"_id": 0}).sort(
+        [("published_at", -1), ("created_at", -1)]
+    )
+    async for p in cursor:
+        slug = p.get("slug") or p.get("id")
+        if not slug:
+            continue
+        # Normalise les champs pour le frontend (le doc collection peut
+        # avoir `title` en dict i18n {"fr": "..."}). On garde la version FR
+        # par défaut, fallback 1ère valeur disponible, fallback slug.
+        title = p.get("title")
+        if isinstance(title, dict):
+            title = title.get("fr") or title.get("en") or next(iter(title.values()), None) or slug
+        excerpt = p.get("excerpt") or p.get("summary")
+        if isinstance(excerpt, dict):
+            excerpt = excerpt.get("fr") or excerpt.get("en") or next(iter(excerpt.values()), None)
+        norm = {
+            "id": p.get("id") or slug,
+            "slug": slug,
+            "title": title or slug,
+            "excerpt": excerpt or "",
+            "language": p.get("language") or p.get("lang") or "fr",
+            "type": p.get("type") or p.get("role") or "article",
+            "status": p.get("status") or "published",
+            "published_at": p.get("published_at") or p.get("created_at"),
+            "created_at": p.get("created_at"),
+            "cover_image": p.get("cover_image") or p.get("hero_image") or p.get("image_url"),
+        }
+        out.append(norm)
+        seen_slugs.add(slug)
+
+    # 2) Articles manuels (legacy, stockés dans le doc site)
+    embedded = (site.get("design") or {}).get("blog_posts") or []
+    for p in embedded:
+        slug = p.get("slug") or p.get("id")
+        if not slug or slug in seen_slugs:
+            continue
+        out.append(p)
+    return out
 
 
 @router.post("/sites/{site_id}/blog-posts")

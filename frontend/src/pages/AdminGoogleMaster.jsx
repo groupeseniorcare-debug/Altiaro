@@ -208,6 +208,36 @@ export default function AdminGoogleMaster() {
           />
         </div>
 
+        {/* Architecture Google Ads multi-sites — explication produit */}
+        <div
+          className="bg-blue-50/60 border border-blue-200 rounded-2xl p-6 mb-6"
+          data-testid="ads-architecture-info"
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+              <ShieldCheck size={18} weight="duotone" className="text-blue-700" />
+            </div>
+            <div className="flex-1">
+              <div className="text-[15px] font-semibold text-blue-900 mb-1.5">
+                Architecture Google Ads multi-sites
+              </div>
+              <p className="text-[13px] text-blue-900/90 leading-[1.65]">
+                Altiaro crée automatiquement <strong>1 sous-compte Google Ads par site lancé</strong>,
+                rattaché à votre Manager Account (MCC) maître. Vous gérez tous les sites depuis
+                un seul dashboard, mais chaque site a son budget, ses campagnes, ses conversions
+                et ses audiences <strong>isolés</strong>.
+              </p>
+              <p className="text-[12.5px] text-blue-900/75 leading-[1.6] mt-2">
+                C'est l'architecture standard utilisée par les agences e-commerce et les
+                plateformes SaaS pour suivre la performance par boutique sans mélanger les
+                données. <em>Note :</em> la création automatique de sous-clients nécessite un
+                Developer Token Google Ads en accès « basic » ou « standard » (l'accès
+                « explorer » par défaut ne permet que la lecture).
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Conclusion */}
         {connected && (
           <div className="bg-gradient-to-br from-emerald-50 to-white border border-emerald-200 rounded-2xl p-6"
