@@ -799,13 +799,117 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Phase 2.5 Tâche D — ProductBundle responsive mobile vertical"
-    - "Phase 2.5 Tâche E — Refonte premium cartes Livraison + Paiement"
-    - "Phase 2.5 Tâche F — Unification design cards produit"
-    - "Phase 2.5 Tâche C — E2E launch-auto Altea audit"
+    - "Refonte UX cockpit /sites/:id (2026-04-29)"
+    - "5 pages légales plateforme /legal/* (2026-04-29)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Run 2026-04-29 — 2 livrables :
+      1) Refonte UX cockpit `pages/SiteDetail.jsx` :
+         - Layout 2 colonnes (sidebar 280px + main).
+         - Sidebar : logo site + nom + niche + domaine + pill statut + Score
+           global X/100 avec 10 dots + 7/10 étapes validées + Liens rapides.
+         - Main : carte "Prochaine action" mise en avant (Cormorant Garamond,
+           ambre #B8862E pour eyebrow), banner passif "Référencement Google
+           géré automatiquement par la plateforme · {google_email}" si master
+           OAuth connecté, CockpitJourney (10 étapes), CTA "Voir storefront"
+           + "QA & mise en ligne".
+         - **Supprimés** du cockpit : PulseSEOWidget, SEOCoachBell,
+           MerchantShoppingPanel, SiteQAPanel (déplacés dans leurs pages
+           d'étape respectives).
+         - Hook `hooks/useMasterGoogleStatus.js` : lit `/admin/google/master/status`,
+           retourne {connected, configured, services, googleEmail}. Sur 403
+           (operator), assume connected=true.
+         - `components/GSCConnectCard.jsx` patché : si master couvre GSC,
+           rend un bandeau passif "Search Console géré par la plateforme"
+           sans bouton "Connecter GSC". Cascade automatique à toutes les
+           pages qui montent ce composant.
+         - Charte ivoire #F5F2EB / cards blanches / accent vert #0F6E4D
+           (succès) / ambre #B8862E (action) / bordeaux disponible.
+      2) 5 pages légales plateforme Altiaro (débloque MCA Merchant) :
+         - `/legal/retours`, `/legal/livraison`, `/legal/cgv`,
+           `/legal/confidentialite`, `/legal/mentions` → toutes 200.
+         - `components/PlatformLegalLayout.jsx` : header propre, sidebar 5
+           sections, contenu blanc + bloc société en pied (SIREN, SIRET,
+           APE, adresse, contact, hébergement).
+         - `lib/altiaroLegal.js` : miroir frontend de
+           `backend/altiaro_legal.py::PLATFORM_COMPANY` (statique).
+         - `styles/legal.css` : H2/H3 Cormorant, p/ul/table juriste-pro.
+         - 5 pages : Retours (L221-18, 30 jours, médiation), Livraison
+           (zones, délais 1-30j L216-2, transporteurs), CGV (16 articles,
+           statut TVA art. 293 B), Confidentialité (RGPD complet, table
+           finalité/base légale/conservation, droits art. 15-22, CNIL),
+           Mentions (éditeur, hébergeur, propriété intellectuelle).
+      Validation :
+         - ESLint 0 issue sur les 11 fichiers touchés.
+         - Curl /legal/* → 5x 200.
+         - Screenshot cockpit : "Moteur éditorial"=0, "Connecter GSC"=0,
+           PulseSEOWidget=0, NextActionCard=1, ScoreCard=1,
+           MasterGoogleStatusBanner=1.
+         - Screenshot /legal/retours : Cormorant H1, sidebar 5 items,
+           item courant surligné, SIREN affiché, contenu lisible.
+      Backend non touché. Aucun mock.
+
+## Refonte UX cockpit + pages légales plateforme (2026-04-29)
+
+frontend:
+  - task: "Refonte UX SiteDetail — layout 2 cols, sidebar score, NextAction"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/SiteDetail.jsx + hooks/useMasterGoogleStatus.js + components/GSCConnectCard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Cockpit refondu UX 2 colonnes. Sidebar gauche sticky (logo +
+          nom + niche + domaine + status pill + Score global 70/100 avec
+          10 dots + Liens rapides : Storefront / Analytics / Réglages /
+          Domaine). Colonne principale : carte "Prochaine action" mise
+          en avant (Étape 8 Blog & contenu SEO pour Altea), banner
+          passif "Référencement Google géré automatiquement par la
+          plateforme · groupeseniorcare@gmail.com", parcours 10 étapes,
+          CTA storefront + QA. Charte ivoire #F5F2EB + Cormorant.
+          Hook useMasterGoogleStatus lit /admin/google/master/status
+          (403 = assume connected=true côté operator). GSCConnectCard
+          patché en cascade : statut passif quand master couvre GSC.
+          Supprimés du cockpit : PulseSEOWidget, SEOCoachBell,
+          MerchantShoppingPanel, SiteQAPanel (présents seulement dans
+          leurs pages d'étape).
+
+  - task: "5 pages légales plateforme Altiaro (/legal/*)"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/PlatformLegal{Retours,Livraison,Cgv,Confidentialite,Mentions}.jsx + components/PlatformLegalLayout.jsx + lib/altiaroLegal.js + styles/legal.css + App.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          5 pages plateforme indépendantes des storefronts clients,
+          créées pour débloquer la validation MCA Google Merchant Center.
+          Routes /legal/retours, /legal/livraison, /legal/cgv,
+          /legal/confidentialite, /legal/mentions toutes 200 (curl
+          validation OK). Layout commun : header sobre + sidebar 5
+          sections (item courant surligné) + carte blanche article +
+          bloc société en pied (SIREN 883 803 967, SIRET, APE 4782Z,
+          siège 4 IMP CLOS FLEURI 42320 FARNAY, contact@altiaro.com).
+          Données société sourcées de lib/altiaroLegal.js (miroir de
+          backend/altiaro_legal.py::PLATFORM_COMPANY). Style juriste-pro
+          via styles/legal.css scopé .legal-content. Charte premium
+          ivoire #F5F2EB + Cormorant Garamond. Mention "TVA non
+          applicable, art. 293 B du CGI" pour franchise en base.
+          Conformité RGPD complète (droits art. 15-22, CNIL, table
+          finalités/base légale/conservation), médiation L612-1,
+          rétractation L221-18, livraison L216-2.
 
 agent_communication:
   - agent: "main"

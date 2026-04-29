@@ -51,6 +51,11 @@ import ProductImagesReview from "./pages/ProductImagesReview";
 import SiteTranslate from "./pages/SiteTranslate";
 import Landing from "./pages/Landing";
 import Legal from "./pages/Legal";
+import PlatformLegalRetours from "./pages/PlatformLegalRetours";
+import PlatformLegalLivraison from "./pages/PlatformLegalLivraison";
+import PlatformLegalCgv from "./pages/PlatformLegalCgv";
+import PlatformLegalConfidentialite from "./pages/PlatformLegalConfidentialite";
+import PlatformLegalMentions from "./pages/PlatformLegalMentions";
 import Signup from "./pages/Signup";
 import VerifyEmail from "./pages/VerifyEmail";
 import StorefrontHome from "./pages/StorefrontHome";
@@ -137,6 +142,12 @@ function App() {
           <Route path="/cgu" element={<Legal slug="cgu" />} />
           <Route path="/confidentialite" element={<Legal slug="confidentialite" />} />
           <Route path="/cookies" element={<Legal slug="cookies" />} />
+          {/* Pages légales plateforme Altiaro — exigées par Google Merchant Center MCA */}
+          <Route path="/legal/retours" element={<PlatformLegalRetours />} />
+          <Route path="/legal/livraison" element={<PlatformLegalLivraison />} />
+          <Route path="/legal/cgv" element={<PlatformLegalCgv />} />
+          <Route path="/legal/confidentialite" element={<PlatformLegalConfidentialite />} />
+          <Route path="/legal/mentions" element={<PlatformLegalMentions />} />
           <Route
             path="/"
             element={<HomeRoute />}
