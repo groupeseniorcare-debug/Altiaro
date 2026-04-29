@@ -191,3 +191,12 @@ credentials.json
 # Allow .env.example files (templates for developers, no secrets)
 !.env.example
 !**/.env.example
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
