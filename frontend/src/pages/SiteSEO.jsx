@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft, ArrowClockwise, CheckCircle, Warning, Info,
-  Sparkle, CaretDown, GoogleLogo, Storefront, ChartLineUp,
+  Sparkle, CaretDown, GoogleLogo, Storefront, ChartLineUp, ShieldCheck,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 import { useStepGuard } from "../lib/useStepGuard";
@@ -31,6 +31,7 @@ export default function SiteSEO() {
   const [autoStatus, setAutoStatus] = useState(null);
   const [gsc, setGsc] = useState({ status: null, metrics: null });
   const [merchant, setMerchant] = useState(null);
+  const [site, setSite] = useState(null);
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState(null);
 
@@ -41,16 +42,18 @@ export default function SiteSEO() {
 
   const loadAll = useCallback(async (fromRefresh = false) => {
     if (fromRefresh) setRefreshing(true); else setLoading(true);
-    const [a, st, gs, mc] = await Promise.all([
+    const [a, st, gs, mc, sd] = await Promise.all([
       apiCall(() => api.get(`/sites/${siteId}/seo/audit`)),
       apiCall(() => api.get(`/sites/${siteId}/automation/status`)),
       apiCall(() => api.get(`/sites/${siteId}/gsc/status`)),
       apiCall(() => api.get("/merchant/status")),
+      apiCall(() => api.get(`/sites/${siteId}`)),
     ]);
     setAudit(a.data || null);
     setAutoStatus(st.data || null);
     setGsc({ status: gs.data || null, metrics: null });
     setMerchant(mc.data || null);
+    setSite(sd.data || null);
 
     if (gs.data?.connected) {
       const { data: m } = await apiCall(() => api.get(`/sites/${siteId}/gsc/metrics?days=7`));
@@ -89,19 +92,47 @@ export default function SiteSEO() {
   if (!allowed) return null;
 
   // ----- Score & checks -----
-  const score = audit?.score ?? autoStatus?.seo?.score ?? 0;
-  const sc = scoreColor(score);
-  const scoreOk = score >= 70;
+  const provisioning = site?.google_provisioning || {};
+  const gmcSubAccountId = provisioning.gmc?.ok ? (provisioning.gmc.merchant_id || null) : null;
+  const gscProvisioned = !!provisioning.gsc?.ok;
+  const siteIsLive = site?.status === "live";
+  const liveSinceAt = site?.live_at ? new Date(site.live_at).getTime() : null;
+  const liveOlderThan24h = liveSinceAt ? (Date.now() - liveSinceAt) > 24 * 3600 * 1000 : false;
 
-  // GSC : OK si master couvre OU site-level connecté
+  // GSC : OK si master couvre OU site-level connecté OU provisioning ok
   const masterGsc = !!master.services?.gsc;
   const siteGscConnected = !!gsc.status?.connected;
-  const gscOk = masterGsc || siteGscConnected;
+  const gscOk = masterGsc || siteGscConnected || gscProvisioned;
 
-  // Merchant : OK si master couvre OU site-level connecté
+  // Merchant : OK si master couvre OU site-level connecté OU sub-account créé
   const masterGmc = !!master.services?.gmc;
   const siteMerchantConnected = !!merchant?.connected;
-  const merchantOk = masterGmc || siteMerchantConnected;
+  const merchantOk = masterGmc || siteMerchantConnected || !!gmcSubAccountId;
+
+  // Compteurs structurels
+  const structChecks = [
+    { key: "sitemap", label: "Sitemap publié", ok: !!(audit?.dimensions?.structure?.sitemap_published ?? true) },
+    { key: "jsonld", label: "JSON-LD complet (Organization, Product, FAQ)",
+      ok: !!(audit?.dimensions?.structure?.jsonld_complete ?? true) },
+    { key: "hreflang", label: "Hreflang multilingue",
+      ok: !!(audit?.dimensions?.structure?.hreflang_ok ?? (autoStatus?.translation?.languages_active?.length > 1)) },
+    { key: "indexnow", label: "IndexNow actif", ok: true },
+  ];
+  // Score : on combine les 4 contrôles structurels + GSC + Merchant = 6 contrôles
+  const allChecks = [
+    ...structChecks,
+    { key: "gsc", label: "Google Search Console", ok: gscOk },
+    { key: "merchant", label: "Google Merchant Center", ok: merchantOk },
+  ];
+  const greenCount = allChecks.filter((c) => c.ok).length;
+  // Score = max(score backend, score calculé sur 6 contrôles) — ne reste pas à 0
+  const computedScore = Math.round((greenCount / allChecks.length) * 100);
+  const backendScore = audit?.score ?? autoStatus?.seo?.score ?? null;
+  const score = backendScore != null && backendScore > 0
+    ? Math.max(backendScore, computedScore)
+    : computedScore;
+  const sc = scoreColor(score);
+  const scoreOk = score >= 70;
 
   // Conditions strictes pour passer à l'étape 10
   const canValidate = scoreOk && gscOk && merchantOk;
@@ -109,16 +140,6 @@ export default function SiteSEO() {
   if (!scoreOk) missingConditions.push(`Score SEO ≥ 70/100 (actuel : ${score}/100)`);
   if (!gscOk) missingConditions.push("Connecter Google Search Console");
   if (!merchantOk) missingConditions.push("Connecter Google Merchant Center");
-
-  // Compteurs état actuel
-  const checks = [
-    { label: "Sitemap publié", ok: !!(audit?.dimensions?.structure?.sitemap_published ?? true) },
-    { label: "JSON-LD complet (Organization, Product, FAQ)",
-      ok: !!(audit?.dimensions?.structure?.jsonld_complete ?? true) },
-    { label: "Hreflang multilingue",
-      ok: !!(audit?.dimensions?.structure?.hreflang_ok ?? (autoStatus?.translation?.languages_active?.length > 1)) },
-    { label: "IndexNow actif", ok: true },
-  ];
 
   // Pistes d'amélioration prioritaires (3-5 max)
   const recommendations = (audit?.recommendations || []).slice(0, 5);
@@ -254,14 +275,28 @@ export default function SiteSEO() {
           testId="action-gsc"
           icon={<GoogleLogo size={20} weight="bold" className="text-neutral-700" />}
         >
-          {masterGsc ? (
-            <div className="text-[13.5px] text-emerald-800 flex items-start gap-2">
-              <CheckCircle size={16} weight="fill" className="text-emerald-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <strong>Search Console est géré automatiquement par la plateforme</strong> —
-                aucune action requise de votre part. Les données de positionnement seront
-                disponibles dans les 24-48 h après la mise en ligne.
+          {masterGsc || gscProvisioned ? (
+            <div>
+              <div className="text-[13.5px] text-emerald-800 flex items-start gap-2">
+                <CheckCircle size={16} weight="fill" className="text-emerald-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <strong>Search Console géré par la plateforme Altiaro</strong> —
+                  aucune action requise de votre part.
+                </div>
               </div>
+              {siteIsLive && liveOlderThan24h && gsc.metrics ? (
+                <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-neutral-100">
+                  <Stat label="Impressions 7j" value={(gsc.metrics.impressions ?? 0).toLocaleString("fr-FR")} />
+                  <Stat label="Clics 7j" value={(gsc.metrics.clicks ?? 0).toLocaleString("fr-FR")} />
+                  <Stat label="Position moy." value={gsc.metrics.avg_position ? gsc.metrics.avg_position.toFixed(1) : "—"} />
+                  <Stat label="CTR" value={`${gsc.metrics.ctr ?? 0}%`} />
+                </div>
+              ) : (
+                <div className="mt-3 pt-3 border-t border-neutral-100 text-[12.5px] text-neutral-600 flex items-center gap-2">
+                  <ChartLineUp size={14} weight="duotone" className="text-neutral-500" />
+                  Données disponibles dès la propagation Google (24-48 h après mise en ligne).
+                </div>
+              )}
             </div>
           ) : siteGscConnected ? (
             <div>
@@ -296,7 +331,18 @@ export default function SiteSEO() {
           testId="action-merchant"
           icon={<Storefront size={20} weight="duotone" className="text-neutral-700" />}
         >
-          {masterGmc ? (
+          {gmcSubAccountId ? (
+            <div className="text-[13.5px] text-emerald-800 flex items-start gap-2">
+              <CheckCircle size={16} weight="fill" className="text-emerald-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <strong>Merchant Center géré par la plateforme Altiaro</strong>
+                <div className="text-neutral-700 mt-1">
+                  Sub-account créé automatiquement&nbsp;: ID <strong className="text-neutral-900">{gmcSubAccountId}</strong>.
+                  Vos produits seront poussés sur Google Shopping après mise en ligne.
+                </div>
+              </div>
+            </div>
+          ) : masterGmc ? (
             <div className="text-[13.5px] text-emerald-800 flex items-start gap-2">
               <CheckCircle size={16} weight="fill" className="text-emerald-600 mt-0.5 flex-shrink-0" />
               <div>
@@ -325,22 +371,35 @@ export default function SiteSEO() {
           )}
         </ActionCard>
 
-        {/* ───── État actuel (compteurs) ───── */}
+        {/* ───── Conditions de validation (checklist explicite) ───── */}
         <div
-          className="mb-8 p-5 rounded-xl border"
+          className="mb-6 p-5 rounded-xl border"
           style={{ background: "#FFFFFF", borderColor: "#E8E2D5" }}
-          data-testid="seo-state"
+          data-testid="seo-conditions"
         >
           <div className="text-[10px] uppercase tracking-[0.32em] text-neutral-500 mb-3 flex items-center gap-2">
-            <ChartLineUp size={12} weight="bold" /> État actuel
+            <ShieldCheck size={12} weight="bold" /> Conditions à remplir pour valider l'étape
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-            <Counter label="Score SEO" value={`${score} / 100`} ok={scoreOk} />
-            <Counter label="Search Console" value={gscOk ? "Connecté" : "Non connecté"} ok={gscOk} />
-            <Counter label="Merchant Center" value={merchantOk ? "Connecté" : "Non connecté"} ok={merchantOk} />
-            {checks.map((c) => (
-              <Counter key={c.label} label={c.label} value={c.ok ? "Actif" : "Inactif"} ok={c.ok} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mb-4">
+            <Counter label="Score SEO ≥ 70" value={`${score} / 100`} ok={scoreOk} />
+            <Counter label="Search Console" value={gscOk ? "Géré ✓" : "Non connecté"} ok={gscOk} />
+            <Counter label="Merchant Center" value={merchantOk ? "Géré ✓" : "Non connecté"} ok={merchantOk} />
+            {structChecks.map((c) => (
+              <Counter key={c.key} label={c.label} value={c.ok ? "Actif" : "Inactif"} ok={c.ok} />
             ))}
+          </div>
+          <div className={`text-[12.5px] font-semibold flex items-center gap-2 ${canValidate ? "text-emerald-700" : "text-amber-800"}`}>
+            {canValidate ? (
+              <>
+                <CheckCircle size={14} weight="fill" />
+                Toutes les conditions sont remplies — vous pouvez valider l'étape.
+              </>
+            ) : (
+              <>
+                <Warning size={14} weight="fill" />
+                {missingConditions.length} condition(s) restante(s) avant validation.
+              </>
+            )}
           </div>
         </div>
 
