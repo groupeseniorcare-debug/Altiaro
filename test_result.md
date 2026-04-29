@@ -799,11 +799,150 @@ metadata:
 
 test_plan:
   current_focus:
+    - "Gating cockpit étape 9 (soft_unlocked sur content + seo) — 2026-04-29"
+    - "GMC discovery relancée + sub-account Altea créé — 2026-04-29"
+    - "Fallback HTML SSR /legal/* pour altiaro.com prod — 2026-04-29"
     - "Refonte UX cockpit /sites/:id (2026-04-29)"
     - "5 pages légales plateforme /legal/* (2026-04-29)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Run 2026-04-29 (suite) — 3 livrables :
+      1) **Gating cockpit étape 9 débloqué** :
+         - `routes/journey_gating.py::_check_content` accepte désormais des
+           soft signals : `db.blog_jobs.count >= 1` OU `db.blog_posts.count >= 1`
+           OU `automation.content_enabled = true` → `soft_unlocked=true`
+           même si la complétion stricte (1 pilier + 3 satellites) n'est pas
+           atteinte (les workers async produisent les articles en arrière-plan).
+         - `_check_seo` accepte `automation.seo_enabled = true` OU
+           `landing_pages.count >= 1` OU `keyword_universe.count >= 5` OU
+           `seo_score > 0` → soft unlock.
+         - `compute_step_statuses` : `blocked_by_previous = (not previous_completed)
+           AND (not soft_unlocked)` — une étape qui a son propre signal d'activité
+           n'est jamais bloquée artificiellement par la cascade.
+         - **Test concret Altea** : étapes 1-7 complétées, 8 (content) `completed=False soft_unlocked=True` (2 jobs en file + 3 articles publiés), 9 (seo) `completed=False soft_unlocked=True` (SEO auto activé), 10 (qa) `blocked_by_previous=False` ✅. L'utilisateur peut maintenant cliquer sur les étapes 8, 9, 10.
+
+      2) **GMC discovery relancée + sub-account Altea créé** :
+         - Avant : `gmc_master.account_id=5771753328 is_mca=False` (warning "compte simple").
+         - Après : `gmc_master.account_id=5776814991 is_mca=True total_subaccounts=1` ✅
+           (le MCA validé par Google ce matin a été pickup automatiquement
+           par `discover_merchant_mca()` via `accounts.authinfo`).
+         - `provision_all(altea, force=True)` :
+           ✅ GSC : property `https://altea-home.com/` créée.
+           ✅ GMC : sub-account `5777050708` créé sous le MCA `5776814991`.
+           ❌ Ads : `PERMISSION_DENIED` — Developer Token explorer access (action user).
+           ❌ GA4 : 403 sur `dataStreams.create` (j'ai fixé le bug `type: WEB_DATA_STREAM` manquant, l'erreur 400 est passée à 403 — propagation propriété + scope edit, action Google).
+         - GA4 + Ads sont 2 erreurs externes Google côté permissions.
+         - Bouton "Re-découvrir" déjà présent sur `/admin/google/master-auth`
+           (vérifié, ligne 129 de `pages/AdminGoogleMaster.jsx`).
+
+      3) **Fallback HTML SSR `/legal/*`** (débloque altiaro.com prod) :
+         - Diagnostic : altiaro.com sert un build React production figé
+           (`main.b83d175b.js`) qui ne contient pas les routes /legal/*
+           ajoutées récemment. Cloudflare devant + Emergent Native Deploy.
+           Backend altiaro.com est aussi sur Emergent Native Deploy gelé.
+           Pas de CF_API_TOKEN / VERCEL / NETLIFY dans .env. Pas de
+           pipeline CI/CD dans le repo.
+         - Solution : `routes/public_legal.py` (NEW) — 5 routes
+           `GET /legal/{retours,livraison,cgv,confidentialite,mentions}`
+           qui rendent du HTML pur premium (Cormorant Garamond via Google
+           Fonts CDN, ivoire #F5F2EB, sidebar 5 sections, bloc société pied,
+           CSS inline). Montées DIRECTEMENT sur `app.include_router(...)`
+           (pas dans le router /api).
+         - Sur preview Kubernetes : ingress route /legal/* au frontend port
+           3000 → SPA React continue de servir, ces routes backend ne sont
+           jamais appelées (cohabitation).
+         - Sur prod altiaro.com (FastAPI sert aussi le frontend statique) :
+           les routes FastAPI prennent priorité sur le static fallback,
+           garantissant un HTML 200 valide pour Google Merchant.
+         - 3 clés ajoutées dans `altiaro_legal.py::PLATFORM_COMPANY` :
+           `juridiction`, `dpo_email`, `mediateur_url`.
+         - **Validation curl** : 5x backend `/legal/*` → 200 + HTML valide
+           avec `<title>Politique de retour · Altiaro</title>` + sidebar +
+           SIREN 883 803 967 visible. 5x preview → 200 (SPA React).
+         - **Pour activer sur altiaro.com prod** : l'utilisateur doit
+           cliquer sur le bouton **Deploy** dans son panel Emergent pour
+           pousser le commit courant en production (front + back ensemble).
+           Aucun autre moyen automatisable depuis le sandbox.
+
+      Lint Python : `routes/public_legal.py` clean. Erreurs résiduelles
+      sur `journey_gating.py` lignes 103-105 préexistantes (E701) hors patches.
+
+## Gating + GMC + Fallback /legal SSR (2026-04-29 suite)
+
+backend:
+  - task: "Journey gating soft_unlocked sur content + seo (débloque étape 9)"
+    implemented: true
+    working: true
+    file: "backend/routes/journey_gating.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Bug user : étape 9 ne se débloquait pas après clic "Générer 3
+          articles" sur étape 8 (les workers async n'avaient pas encore
+          publié 1 pillar + 3 satellites). Fix : ajout d'un champ
+          `soft_unlocked` retourné par chaque checker. `_check_content`
+          OR sur `blog_jobs.count >= 1`, `blog_posts.count >= 1`, ou
+          `automation.content_enabled = true`. `_check_seo` OR sur
+          `automation.seo_enabled = true`, `landing_pages.count >= 1`,
+          `keyword_universe.count >= 5`, ou `seo_score > 0`.
+          `compute_step_statuses` : étape jamais blocked si
+          `soft_unlocked` même quand previous_completed=False. Test Altea
+          : 10 étapes accessibles, plus aucune `blocked_by_previous`.
+
+  - task: "GMC MCA discovery + provisioning Altea sub-account"
+    implemented: true
+    working: true
+    file: "backend/services/google_master_discovery.py + backend/services/google_provisioning.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Google a validé le compte MCA Altiaro ce matin. Re-run de
+          `discover_all(creds)` : `gmc_master.is_mca` passe de `False` à
+          `True`, `account_id` migre 5771753328 → 5776814991, warning
+          purgé. `provision_all(altea, force=True)` crée le sub-account
+          GMC `5777050708` rattaché au MCA. GSC ajouté avec
+          property `https://altea-home.com/`. Bug GA4 fix
+          (`type: WEB_DATA_STREAM` manquant dans `dataStreams.create`)
+          — passe l'erreur 400 → 403 (PERMISSION_DENIED scope, action
+          Google côté user). Ads : explorer access (action user côté
+          Google Ads developer console).
+
+  - task: "Fallback HTML SSR /legal/* pour altiaro.com prod"
+    implemented: true
+    working: true
+    file: "backend/routes/public_legal.py + backend/altiaro_legal.py + backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          5 routes `/legal/{retours,livraison,cgv,confidentialite,mentions}`
+          montées DIRECTEMENT sur `app` (pas /api), rendent du HTML pur
+          premium server-side (Cormorant + ivoire + sidebar 5 sections +
+          bloc société). Sur preview K8s, l'ingress route /legal/* au
+          frontend port 3000 (SPA React continue de servir, cohabitation
+          ok). Sur prod altiaro.com (Emergent Native Deploy où FastAPI
+          sert aussi le frontend statique), les routes FastAPI prendront
+          priorité sur le SPA fallback, garantissant un HTML 200 valide
+          pour Google Merchant Center MCA même si le bundle JS reste figé.
+          5x curl backend `/legal/*` → 200 + contenu valide. 5x curl
+          preview → 200 (SPA). Lint propre. Pour activer sur prod :
+          l'utilisateur clique sur Deploy dans Emergent.
 
 agent_communication:
   - agent: "main"

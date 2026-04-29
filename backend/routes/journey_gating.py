@@ -357,7 +357,15 @@ async def _check_pages(site_id: str, site: dict) -> dict:
 
 
 async def _check_content(site_id: str, site: dict) -> dict:
-    """≥1 pillar + ≥3 satellites dans blog_posts."""
+    """≥1 pillar + ≥3 satellites dans blog_posts.
+
+    Soft-unlock 2026-04-29 : dès que le concepteur a déclenché la génération
+    (file `db.blog_jobs` non vide OU `automation.content_enabled=true` OU au
+    moins 1 article publié dans `db.blog_posts`), l'étape suivante est
+    accessible MÊME si la complétion stricte (1 pilier + 3 satellites) n'est
+    pas encore atteinte. Sinon le concepteur reste bloqué pendant que les
+    workers async produisent les articles.
+    """
     posts = (site.get("design") or {}).get("blog_posts") or []
     pillars = [p for p in posts if (p.get("type") == "pillar" or p.get("role") == "pillar")]
     satellites = [p for p in posts if (p.get("type") == "satellite" or p.get("role") == "satellite")]
@@ -368,32 +376,90 @@ async def _check_content(site_id: str, site: dict) -> dict:
     pillar_ok = len(pillars) >= 1
     satellite_ok = len(satellites) >= 3
     completed = pillar_ok and satellite_ok
+
+    # Soft signals : génération déclenchée OU automation activée OU posts en DB
+    blog_jobs_count = await db.blog_jobs.count_documents({"site_id": site_id})
+    blog_posts_count = await db.blog_posts.count_documents({"site_id": site_id})
+    automation_on = bool(((site.get("automation") or {}).get("content_enabled")))
+    soft_unlocked = bool(
+        completed
+        or blog_jobs_count >= 1
+        or blog_posts_count >= 1
+        or automation_on
+    )
+
     reason = (
         f"{len(pillars)} pillar(s) + {len(satellites)} satellite(s)"
         if completed
-        else f"Requis : 1 pillar + 3 satellites · actuel : {len(pillars)} pillar / {len(satellites)} satellites"
+        else (
+            f"Génération en cours · {blog_jobs_count} job(s) en file, "
+            f"{blog_posts_count} article(s) déjà publié(s)"
+            if (blog_jobs_count or blog_posts_count or automation_on)
+            else f"Requis : 1 pillar + 3 satellites · actuel : {len(pillars)} pillar / {len(satellites)} satellites"
+        )
     )
     return {
         "key": "content",
         "label": STEP_LABELS["content"],
         "completed": completed,
+        "soft_unlocked": soft_unlocked,
         "reason": reason,
-        "counters": {"pillars": len(pillars), "satellites": len(satellites)},
+        "counters": {
+            "pillars": len(pillars),
+            "satellites": len(satellites),
+            "blog_jobs_count": blog_jobs_count,
+            "blog_posts_count": blog_posts_count,
+            "automation_on": automation_on,
+        },
     }
 
 
 async def _check_seo(site_id: str, site: dict) -> dict:
-    """SEO studio rempli (seo_score ≥ 70)."""
+    """SEO studio rempli (seo_score ≥ 70).
+
+    Soft-unlock 2026-04-29 : dès que le concepteur a (i) activé le SEO auto,
+    (ii) une factory de landings a tourné, ou (iii) son score est déjà calculé
+    (>0), l'étape suivante (qa) est accessible.
+    """
     score = int((site.get("design") or {}).get("seo_score") or 0)
     threshold = 70
     completed = score >= threshold
-    reason = f"Score SEO {score}/100 (seuil {threshold})"
+
+    automation_seo = bool(((site.get("automation") or {}).get("seo_enabled")))
+    landing_count = await db.landing_pages.count_documents({"site_id": site_id})
+    keyword_universe_count = await db.keyword_universe.count_documents({"site_id": site_id})
+    soft_unlocked = bool(
+        completed
+        or score > 0
+        or automation_seo
+        or landing_count >= 1
+        or keyword_universe_count >= 5
+    )
+
+    if completed:
+        reason = f"Score SEO {score}/100 (seuil {threshold})"
+    elif score > 0:
+        reason = f"Score SEO {score}/100 — continue d'enrichir le contenu pour atteindre {threshold}"
+    elif automation_seo or landing_count or keyword_universe_count:
+        reason = (
+            f"SEO auto activé · {landing_count} landing(s), "
+            f"{keyword_universe_count} mot(s)-clé(s) en file"
+        )
+    else:
+        reason = "Lance la santé SEO automatique (long-tail + landings)"
     return {
         "key": "seo",
         "label": STEP_LABELS["seo"],
         "completed": completed,
+        "soft_unlocked": soft_unlocked,
         "reason": reason,
-        "counters": {"score": score, "threshold": threshold},
+        "counters": {
+            "score": score,
+            "threshold": threshold,
+            "automation_seo": automation_seo,
+            "landing_count": landing_count,
+            "keyword_universe_count": keyword_universe_count,
+        },
     }
 
 
@@ -464,7 +530,13 @@ async def compute_step_statuses(site_id: str) -> list[dict]:
         checker = _CHECKERS[key]
         s = await checker(site_id, site)
         s["order"] = STEP_ORDER.index(key) + 1
-        s["blocked_by_previous"] = not previous_completed
+        # 2026-04-29 — Une étape qui a un signal d'activité propre
+        # (`soft_unlocked=True`) n'est jamais bloquée artificiellement par
+        # la cascade. Cela évite que le concepteur reste coincé à l'étape 9
+        # parce que les workers async n'ont pas encore fini de produire les
+        # 3 articles satellites de l'étape 8.
+        soft_unlocked = bool(s.get("soft_unlocked", False))
+        s["blocked_by_previous"] = (not previous_completed) and (not soft_unlocked)
         statuses.append(s)
         # Lot D — Une étape optionnelle ne bloque pas l'étape suivante :
         # même si `domain` n'est pas complété, `pages` reste accessible.
@@ -472,7 +544,9 @@ async def compute_step_statuses(site_id: str) -> list[dict]:
             # propage le previous_completed précédent
             pass
         else:
-            previous_completed = s["completed"]
+            # Si l'étape est complétée OU soft-déverrouillée, l'étape
+            # suivante est accessible.
+            previous_completed = bool(s["completed"]) or soft_unlocked
     return statuses
 
 

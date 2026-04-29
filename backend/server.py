@@ -107,6 +107,7 @@ from routes import geo as geo_routes_finalisation  # Phase D' — détection pay
 from routes import automation as automation_routes  # Refonte UX — toggles automatisation
 from routes import well_known as well_known_routes  # Google Site Verification (altiaro.com)
 from routes import google_master as google_master_routes  # Master OAuth + auto-provisioning
+from routes import public_legal as public_legal_routes  # Fallback HTML SSR /legal/* (altiaro.com prod)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -202,6 +203,14 @@ api.include_router(geo_routes_finalisation.router)  # Phase D' — détection pa
 api.include_router(automation_routes.router)  # Refonte UX — toggles automatisation
 api.include_router(well_known_routes.router)  # Google Site Verification (altiaro.com)
 api.include_router(google_master_routes.router)  # Master OAuth + auto-provisioning
+
+# IMPORTANT — Routes /legal/* HTML server-side : montées DIRECTEMENT sur `app`
+# (pas sur le router /api). Sur le preview Kubernetes l'ingress route /legal/*
+# au frontend port 3000, donc ces routes ne sont jamais appelées côté preview ;
+# le SPA React continue de gérer. Sur prod altiaro.com (Emergent Native Deploy
+# où FastAPI sert aussi le frontend statique), elles assurent un HTML 200
+# valide pour Google Merchant Center MCA même si le bundle JS est figé.
+app.include_router(public_legal_routes.router)
 
 
 @app.on_event("startup")

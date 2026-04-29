@@ -162,9 +162,11 @@ async def provision_ga4_property(site: dict, creds) -> dict:
         }
         prop = await asyncio.to_thread(svc.properties().create(body=prop_body).execute)
         prop_id = (prop.get("name") or "").split("/")[-1]
-        # Web stream
+        # Web stream — l'API Analytics Admin v1beta exige un champ `type`
+        # explicite (regression silencieuse depuis avril 2026).
         stream_body = {
             "displayName": f"{domain} web stream",
+            "type": "WEB_DATA_STREAM",
             "webStreamData": {"defaultUri": f"https://{domain}"},
         }
         stream = await asyncio.to_thread(

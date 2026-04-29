@@ -96,6 +96,10 @@ PLATFORM_COMPANY = {
     "hebergeur_nom":        PLATFORM_LEGAL_INFO["hebergeur_nom"],
     "hebergeur_adresse":    PLATFORM_LEGAL_INFO["hebergeur_adresse"],
     "site_web":             PLATFORM_LEGAL_INFO["platform_site_web"],
+    # Ajouts 2026-04-29 — pour les pages /legal/* server-side (public_legal.py)
+    "juridiction":          "Tribunal de commerce de Saint-Étienne",
+    "dpo_email":            PLATFORM_LEGAL_INFO["platform_email"],
+    "mediateur_url":        "https://www.economie.gouv.fr/mediation-conso",
 }
 
 
