@@ -106,7 +106,7 @@ async def master_start(user: dict = Depends(get_current_user)):
     return {"authorization_url": url, "state": state}
 
 
-@router.get("/admin/google/master/callback", include_in_schema=False)
+@router.get("/admin/google/master/callback")
 async def master_callback(
     code: Optional[str] = Query(None),
     state: Optional[str] = Query(None),

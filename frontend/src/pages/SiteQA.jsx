@@ -345,38 +345,3 @@ function ScoreRing({ score, color }) {
     </svg>
   );
 }
-t. Corrigez-les avant la mise en ligne, ou
-              demandez à un admin Altiaro un passage forcé.
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ScoreRing({ score, color }) {
-  const size = 80;
-  const stroke = 8;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const clamped = Math.max(0, Math.min(100, score));
-  const dash = (clamped / 100) * c;
-  return (
-    <svg width={size} height={size} className="flex-shrink-0" data-testid="qa-score-ring">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#F5F2EB" strokeWidth={stroke} />
-      <circle
-        cx={size / 2} cy={size / 2} r={r}
-        fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
-        strokeDasharray={`${dash} ${c - dash}`} strokeDashoffset={c / 4}
-        transform={`rotate(-90 ${size / 2} ${size / 2})`}
-      />
-      <text
-        x="50%" y="50%" dominantBaseline="central" textAnchor="middle"
-        fill="#1C1917" style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 600 }}
-      >
-        {clamped}
-      </text>
-    </svg>
-  );
-}
