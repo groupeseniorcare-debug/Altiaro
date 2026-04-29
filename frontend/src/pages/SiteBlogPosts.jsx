@@ -5,7 +5,6 @@ import {
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 import { useStepGuard } from "../lib/useStepGuard";
-import NextStepCTA from "../components/NextStepCTA";
 import { StepValidateCTA } from "../components/StepPageHeader";
 import { buildOnValidate } from "../lib/journeySteps";
 
@@ -400,9 +399,7 @@ export default function SiteBlogPosts() {
           </div>
         </details>
 
-        <NextStepCTA siteId={siteId} currentKey="content" />
-
-        {/* Validation finale étape 7 — Contenu SEO */}
+        {/* Validation finale étape 7 — Contenu SEO (UN SEUL CTA, pas de doublon) */}
         <StepValidateCTA
           currentStepKey="content"
           nextStepNumber={8}
