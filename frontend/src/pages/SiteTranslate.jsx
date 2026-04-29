@@ -11,6 +11,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle, Translate, ArrowsClockwise, Warning } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 import Layout from "../components/Layout";
+import { StepValidateCTA } from "../components/StepPageHeader";
+import { buildOnValidate } from "../lib/journeySteps";
 
 const FLAGS = { fr: "🇫🇷", en: "🇬🇧", de: "🇩🇪", nl: "🇳🇱", it: "🇮🇹", es: "🇪🇸" };
 
@@ -97,7 +99,7 @@ export default function SiteTranslate() {
         </button>
 
         <header className="mb-8">
-          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-2">Étape 7 · Traduction multi-langue</div>
+          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-2">Étape 8 · Traduction multi-langue</div>
           <h1 className="text-3xl md:text-4xl font-light text-neutral-900 tracking-tight">Traduire ce site</h1>
           <p className="text-sm text-neutral-600 max-w-2xl mt-3 leading-relaxed">
             Le site est rédigé en <span className="font-semibold">{FLAGS[primary_lang]} {lang_labels[primary_lang]}</span>.
@@ -203,6 +205,23 @@ export default function SiteTranslate() {
             </div>
           </div>
         )}
+
+        {/* Validation finale étape 8 — Traduction multilingue */}
+        <StepValidateCTA
+          currentStepKey="translate"
+          nextStepNumber={9}
+          nextStepLabel="Score SEO & connexions Google"
+          nextStepHref={`/sites/${siteId}/seo`}
+          canValidate={(available_langs || []).length >= 3}
+          missingConditions={
+            (available_langs || []).length >= 3
+              ? []
+              : [
+                  `Au moins 3 langues actives (actuel : ${(available_langs || []).length})`,
+                ]
+          }
+          onValidate={buildOnValidate(siteId, "translate", loadState)}
+        />
       </div>
     </Layout>
   );

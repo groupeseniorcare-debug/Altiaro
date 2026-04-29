@@ -9,6 +9,8 @@ import { useStepGuard } from "../lib/useStepGuard";
 import SeoStudioPanel from "../components/SeoStudioPanel";
 import GSCConnectCard from "../components/GSCConnectCard";
 import NextStepCTA from "../components/NextStepCTA";
+import { StepValidateCTA } from "../components/StepPageHeader";
+import { buildOnValidate } from "../lib/journeySteps";
 
 const scoreColor = (s) => {
   if (s == null) return { ring: "#a3a3a3", label: "À calculer", text: "text-neutral-500" };
@@ -289,6 +291,24 @@ export default function SiteSEO() {
         </details>
 
         <NextStepCTA siteId={siteId} currentKey="seo" />
+
+        {/* Validation finale étape 9 — Score SEO (manuelle possible) */}
+        <StepValidateCTA
+          currentStepKey="seo"
+          nextStepNumber={10}
+          nextStepLabel="QA & mise en ligne"
+          nextStepHref={`/sites/${siteId}/qa`}
+          canValidate={true}
+          missingConditions={
+            (audit?.score ?? 0) >= 70
+              ? []
+              : [
+                  `Score SEO actuel : ${audit?.score ?? 0}/100 (recommandé ≥ 70).`,
+                  "Vous pouvez quand même valider si vous estimez votre site prêt — l'optimisation continue de tourner en arrière-plan.",
+                ]
+          }
+          onValidate={buildOnValidate(siteId, "seo", () => loadAll(true))}
+        />
       </div>
     </div>
   );

@@ -47,9 +47,9 @@ const STEP_LINK = (siteId) => ({
   forecast: `/sites/${siteId}/forecast`,
   branding: `/sites/${siteId}/branding?step=5`,
   domain: `/sites/${siteId}/domains?step=6`,
-  translate: `/sites/${siteId}/translate?step=7`,
+  translate: `/sites/${siteId}/translate?step=8`,
   pages: `/sites/${siteId}/pages`,
-  content: `/sites/${siteId}/blog-posts?step=8`,
+  content: `/sites/${siteId}/blog-posts?step=7`,
   seo: `/sites/${siteId}/seo`,
   qa: `/sites/${siteId}/qa`,
 });

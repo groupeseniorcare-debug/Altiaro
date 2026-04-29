@@ -32,14 +32,13 @@ from deps import db, get_current_user, _check_site_access
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Ordre canonique des 10 étapes (mission Finalisation 2026-04-29 :
-# `translate` remplace `pages` à la position 7 — les pages essentielles sont
-# désormais générées automatiquement au launch-auto, donc plus besoin d'en
-# faire une étape Cockpit séparée. La traduction multilingue est en revanche
-# le point clé pour passer en GO sur 6 langues × 11 pays.)
+# Ordre canonique des 10 étapes (refonte 2026-04-29 :
+# inversion 7/8 → `content` AVANT `translate` car on génère blog + landings +
+# FAQ en langue primaire d'abord, puis on traduit TOUT d'un coup vers les
+# 5 langues supplémentaires. Plus besoin d'un soft_unlocked : gating strict.)
 STEP_ORDER = [
     "pricing", "import", "upsells", "forecast", "branding",
-    "domain", "translate", "content", "seo", "qa",
+    "domain", "content", "translate", "seo", "qa",
 ]
 
 STEP_LABELS = {
@@ -49,10 +48,24 @@ STEP_LABELS = {
     "forecast":  "Étude financière 30j",
     "branding":  "Identité & branding",
     "domain":    "Nom de domaine",
+    "content":   "Contenu SEO automatisé",
     "translate": "Traduction multilingue",
-    "content":   "Blog & contenu SEO",
-    "seo":       "Santé SEO / AEO",
+    "seo":       "Score SEO & connexions Google",
     "qa":        "QA & mise en ligne",
+}
+
+# Sous-titres explicatifs (utilisés sur les pages d'étape pour clarté UX)
+STEP_SUBTITLES = {
+    "pricing":   "Comparatif concurrentiel et fourchette de prix recommandée",
+    "import":    "Importer 5+ produits depuis votre source",
+    "upsells":   "Suggérer des accessoires pour augmenter le panier moyen",
+    "forecast":  "Prévisionnel financier sur 30 jours",
+    "branding":  "Logo, palette, ton de marque",
+    "domain":    "Domaine personnalisé + DNS automatique",
+    "content":   "Blog, pages d'atterrissage et FAQ — en langue primaire",
+    "translate": "Tout votre site en 5 langues supplémentaires",
+    "seo":       "Score SEO et activation du suivi Google",
+    "qa":        "Vérification finale avant mise en ligne publique",
 }
 
 
@@ -357,56 +370,74 @@ async def _check_pages(site_id: str, site: dict) -> dict:
 
 
 async def _check_content(site_id: str, site: dict) -> dict:
-    """≥1 pillar + ≥3 satellites dans blog_posts.
+    """≥1 pillar + ≥3 satellites dans blog_posts (collection ou array site).
 
-    Soft-unlock 2026-04-29 : dès que le concepteur a déclenché la génération
-    (file `db.blog_jobs` non vide OU `automation.content_enabled=true` OU au
-    moins 1 article publié dans `db.blog_posts`), l'étape suivante est
-    accessible MÊME si la complétion stricte (1 pilier + 3 satellites) n'est
-    pas encore atteinte. Sinon le concepteur reste bloqué pendant que les
-    workers async produisent les articles.
+    2026-04-29 (refonte UX strict) : on agrège la collection `db.blog_posts`
+    avec l'array historique `site.design.blog_posts`. Plus de `soft_unlocked` —
+    l'étape est `completed=True` UNIQUEMENT si on a réellement 1 pilier + 3
+    satellites publiés. Le concepteur peut sinon valider manuellement via
+    "Valider et passer à l'étape suivante".
     """
-    posts = (site.get("design") or {}).get("blog_posts") or []
-    pillars = [p for p in posts if (p.get("type") == "pillar" or p.get("role") == "pillar")]
-    satellites = [p for p in posts if (p.get("type") == "satellite" or p.get("role") == "satellite")]
-    # Fallback : si pas de type explicite, considère le 1er comme pillar
-    if not pillars and posts:
-        pillars = posts[:1]
-        satellites = posts[1:]
-    pillar_ok = len(pillars) >= 1
-    satellite_ok = len(satellites) >= 3
-    completed = pillar_ok and satellite_ok
-
-    # Soft signals : génération déclenchée OU automation activée OU posts en DB
+    embedded = (site.get("design") or {}).get("blog_posts") or []
     blog_jobs_count = await db.blog_jobs.count_documents({"site_id": site_id})
     blog_posts_count = await db.blog_posts.count_documents({"site_id": site_id})
     automation_on = bool(((site.get("automation") or {}).get("content_enabled")))
-    soft_unlocked = bool(
-        completed
-        or blog_jobs_count >= 1
-        or blog_posts_count >= 1
-        or automation_on
-    )
 
-    reason = (
-        f"{len(pillars)} pillar(s) + {len(satellites)} satellite(s)"
-        if completed
-        else (
-            f"Génération en cours · {blog_jobs_count} job(s) en file, "
-            f"{blog_posts_count} article(s) déjà publié(s)"
-            if (blog_jobs_count or blog_posts_count or automation_on)
-            else f"Requis : 1 pillar + 3 satellites · actuel : {len(pillars)} pillar / {len(satellites)} satellites"
-        )
+    # Total publié = collection + embedded (dédoublonné par slug)
+    seen_slugs: set[str] = set()
+    pillars = 0
+    satellites = 0
+    cursor = db.blog_posts.find(
+        {"site_id": site_id},
+        {"_id": 0, "slug": 1, "type": 1, "role": 1},
     )
+    async for p in cursor:
+        slug = p.get("slug")
+        if not slug or slug in seen_slugs:
+            continue
+        seen_slugs.add(slug)
+        kind = p.get("type") or p.get("role")
+        if kind == "pillar":
+            pillars += 1
+        else:
+            satellites += 1
+    for p in embedded:
+        slug = p.get("slug")
+        if not slug or slug in seen_slugs:
+            continue
+        seen_slugs.add(slug)
+        kind = p.get("type") or p.get("role")
+        if kind == "pillar":
+            pillars += 1
+        else:
+            satellites += 1
+    # Si total >= 1 mais aucun typage, considère le 1er comme pillar
+    if pillars == 0 and (pillars + satellites) >= 1:
+        pillars = 1
+        satellites = max(0, (pillars + satellites) - 1)
+
+    pillar_ok = pillars >= 1
+    satellite_ok = satellites >= 3
+    completed = pillar_ok and satellite_ok
+
+    if completed:
+        reason = f"{pillars} pillar(s) + {satellites} satellite(s) publié(s)"
+    elif blog_jobs_count or blog_posts_count or automation_on:
+        reason = (
+            f"Génération en cours · {blog_jobs_count} job(s) en file, "
+            f"{blog_posts_count} article(s) publié(s) — automatisation "
+            f"{'active' if automation_on else 'inactive'}"
+        )
+    else:
+        reason = "Lancez la génération de vos 3 premiers articles SEO"
     return {
         "key": "content",
         "label": STEP_LABELS["content"],
         "completed": completed,
-        "soft_unlocked": soft_unlocked,
         "reason": reason,
         "counters": {
-            "pillars": len(pillars),
-            "satellites": len(satellites),
+            "pillars": pillars,
+            "satellites": satellites,
             "blog_jobs_count": blog_jobs_count,
             "blog_posts_count": blog_posts_count,
             "automation_on": automation_on,
@@ -417,9 +448,9 @@ async def _check_content(site_id: str, site: dict) -> dict:
 async def _check_seo(site_id: str, site: dict) -> dict:
     """SEO studio rempli (seo_score ≥ 70).
 
-    Soft-unlock 2026-04-29 : dès que le concepteur a (i) activé le SEO auto,
-    (ii) une factory de landings a tourné, ou (iii) son score est déjà calculé
-    (>0), l'étape suivante (qa) est accessible.
+    2026-04-29 (refonte UX strict) : plus de soft_unlocked. L'étape est
+    completed UNIQUEMENT si score >= 70. Sinon le concepteur peut valider
+    manuellement via "Valider et passer à l'étape suivante" (override).
     """
     score = int((site.get("design") or {}).get("seo_score") or 0)
     threshold = 70
@@ -428,30 +459,22 @@ async def _check_seo(site_id: str, site: dict) -> dict:
     automation_seo = bool(((site.get("automation") or {}).get("seo_enabled")))
     landing_count = await db.landing_pages.count_documents({"site_id": site_id})
     keyword_universe_count = await db.keyword_universe.count_documents({"site_id": site_id})
-    soft_unlocked = bool(
-        completed
-        or score > 0
-        or automation_seo
-        or landing_count >= 1
-        or keyword_universe_count >= 5
-    )
 
     if completed:
         reason = f"Score SEO {score}/100 (seuil {threshold})"
     elif score > 0:
-        reason = f"Score SEO {score}/100 — continue d'enrichir le contenu pour atteindre {threshold}"
+        reason = f"Score SEO {score}/100 — continuez d'enrichir pour atteindre {threshold}"
     elif automation_seo or landing_count or keyword_universe_count:
         reason = (
             f"SEO auto activé · {landing_count} landing(s), "
-            f"{keyword_universe_count} mot(s)-clé(s) en file"
+            f"{keyword_universe_count} mot(s)-clé(s) découvert(s)"
         )
     else:
-        reason = "Lance la santé SEO automatique (long-tail + landings)"
+        reason = "Lancez la santé SEO automatique (long-tail + landings)"
     return {
         "key": "seo",
         "label": STEP_LABELS["seo"],
         "completed": completed,
-        "soft_unlocked": soft_unlocked,
         "reason": reason,
         "counters": {
             "score": score,
@@ -526,32 +549,45 @@ async def compute_step_statuses(site_id: str) -> list[dict]:
 
     statuses: list[dict] = []
     previous_completed = True  # première étape toujours accessible
+    # 2026-04-29 (refonte UX) — Gating STRICT, plus de soft_unlocked.
+    # Une étape est cliquable UNIQUEMENT si la précédente est completed.
+    # Une étape est completed UNIQUEMENT si tous ses checks data passent OU
+    # si l'utilisateur l'a explicitement marquée (manual_completed côté DB).
+    manual_overrides = await _load_manual_step_overrides(site_id)
     for key in STEP_ORDER:
         checker = _CHECKERS[key]
         s = await checker(site_id, site)
         s["order"] = STEP_ORDER.index(key) + 1
-        # 2026-04-29 — Une étape qui a un signal d'activité propre
-        # (`soft_unlocked=True`) n'est jamais bloquée artificiellement par
-        # la cascade. Cela évite que le concepteur reste coincé à l'étape 9
-        # parce que les workers async n'ont pas encore fini de produire les
-        # 3 articles satellites de l'étape 8.
-        soft_unlocked = bool(s.get("soft_unlocked", False))
-        s["blocked_by_previous"] = (not previous_completed) and (not soft_unlocked)
+        # Override manuel : si le concepteur a cliqué "Valider et passer
+        # à l'étape suivante", on force completed=True quel que soit le
+        # check data.
+        if manual_overrides.get(key) is True:
+            s["completed"] = True
+            s["manual_validated"] = True
+        else:
+            s["manual_validated"] = False
+        # On retire toute notion de soft_unlocked — l'utilisateur a demandé
+        # une logique strict on/off.
+        s.pop("soft_unlocked", None)
+        s["blocked_by_previous"] = not previous_completed
         statuses.append(s)
-        # Lot D — Une étape optionnelle ne bloque pas l'étape suivante :
-        # même si `domain` n'est pas complété, `pages` reste accessible.
         if s.get("optional"):
             # propage le previous_completed précédent
             pass
         else:
-            # 2026-04-29 (hotfix UX) — La cascade vers l'étape SUIVANTE ne
-            # tient compte QUE de la complétion stricte. Le `soft_unlocked`
-            # permet à l'étape elle-même d'être ouverte sans bloquer le
-            # concepteur, mais ne doit pas faire croire que l'étape 10 (QA)
-            # est prête alors que les étapes 8 et 9 ne sont que partiellement
-            # avancées (workers async en cours).
             previous_completed = bool(s["completed"])
     return statuses
+
+
+async def _load_manual_step_overrides(site_id: str) -> dict[str, bool]:
+    """Lit `db.sites.{id}.manual_step_overrides` (dict {step_key: bool})
+    qui mémorise les "Valider et passer à l'étape suivante" cliqués par le
+    concepteur. Permet de débloquer une étape même si les checks data
+    automatiques ne passent pas (ex: étape SEO score < 70 mais le
+    concepteur considère que c'est OK pour son cas).
+    """
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "manual_step_overrides": 1})
+    return (site or {}).get("manual_step_overrides") or {}
 
 
 # ────────── API publique ────────── #
@@ -624,18 +660,16 @@ async def get_journey(
 
     steps: list[dict] = []
     for i, s in enumerate(statuses):
-        # 2026-04-29 — `status` token logique :
-        #   - "complete"  : étape strict completed
-        #   - "locked"    : `blocked_by_previous=True` (cascade strict)
-        #   - "current"   : sinon (étape accessible : soit suivante naturelle,
-        #     soit déverrouillée par soft signal)
+        # 2026-04-29 (refonte UX strict) — `status` token simple :
+        #   - "complete"  : étape strict completed (ou manuellement validée)
+        #   - "locked"    : `blocked_by_previous=True`
+        #   - "current"   : étape suivante non bloquée
         if s["completed"]:
             status_token = "complete"
         elif s.get("blocked_by_previous"):
             status_token = "locked"
         else:
             status_token = "current"
-        soft_unlocked = bool(s.get("soft_unlocked", False))
         blocked = bool(s.get("blocked_by_previous", False))
         # `is_clickable` = explicite pour le frontend (single source of truth)
         is_clickable = (not blocked) or bool(s["completed"])
@@ -643,10 +677,10 @@ async def get_journey(
             "slug": SLUG_MAP.get(s["key"], s["key"]),
             "key": s["key"],
             "label": s["label"],
+            "subtitle": STEP_SUBTITLES.get(s["key"]),
             "status": status_token,
             "completed": s["completed"],
-            "soft_unlocked": soft_unlocked,
-            "soft_reason": s.get("reason") if soft_unlocked and not s["completed"] else None,
+            "manual_validated": bool(s.get("manual_validated", False)),
             "blocked_by_previous": blocked,
             "is_clickable": is_clickable,
             "reason": s.get("reason"),
@@ -775,25 +809,83 @@ async def require_step(site_id: str, prev_step: str) -> None:
         )
 
 
-# ────────── Compatibilité legacy : déprécier validate-step manuel ────────── #
+# ────────── Validation manuelle des étapes (refonte UX 2026-04-29) ────────── #
 
-@router.post("/sites/{site_id}/journey/validate-step", deprecated=True)
-async def deprecated_validate_step(
+
+@router.post("/sites/{site_id}/journey/validate-step")
+async def validate_step(
     site_id: str,
     user: dict = Depends(get_current_user),
     body: Optional[dict] = None,
 ) -> dict:
-    """DEPRECATED (Chantier 1) — La validation manuelle est supprimée.
+    """Marque une étape comme manuellement validée par le concepteur.
 
-    Retourne 410 Gone pour forcer le client frontend à basculer sur le nouvel
-    endpoint GET /sites/{id}/steps/status.
+    Body : `{"step_key": "content"}`. L'étape passe à `completed=true` quel
+    que soit le résultat des checks data automatiques. Persisté dans
+    `site.manual_step_overrides[step_key] = true`. Permet le pattern UX
+    "Valider et passer à l'étape suivante" depuis chaque page d'étape.
+
+    Sécurité : on n'autorise la validation que si l'étape n'est pas
+    `blocked_by_previous` (= étape précédente strict completed). Sinon 409.
     """
-    raise HTTPException(
-        status_code=410,
-        detail=(
-            "La validation manuelle des étapes est supprimée. "
-            "Les étapes sont désormais complétées automatiquement par les données "
-            "(ex: 5 produits importés, design publié, etc.). "
-            "Utilisez GET /api/sites/{site_id}/steps/status pour voir l'état."
-        ),
+    await _check_site_access(site_id, user)
+    if not body or "step_key" not in body:
+        raise HTTPException(400, "Body requis : {step_key: '<key>'}")
+    step_key = body["step_key"]
+    if step_key not in STEP_ORDER:
+        raise HTTPException(400, f"Étape inconnue : {step_key}")
+    statuses = await compute_step_statuses(site_id)
+    target = next((s for s in statuses if s["key"] == step_key), None)
+    if target and target.get("blocked_by_previous"):
+        raise HTTPException(
+            409,
+            f"Impossible de valider '{step_key}' : l'étape précédente n'est pas complétée.",
+        )
+    from datetime import datetime, timezone
+    await db.sites.update_one(
+        {"id": site_id},
+        {
+            "$set": {
+                f"manual_step_overrides.{step_key}": True,
+                f"manual_step_overrides_meta.{step_key}": {
+                    "validated_at": datetime.now(timezone.utc).isoformat(),
+                    "validated_by": user.get("id"),
+                    "validated_by_email": user.get("email"),
+                },
+            }
+        },
     )
+    # Recompute pour retourner l'état actualisé (next step accessible)
+    statuses = await compute_step_statuses(site_id)
+    return {
+        "ok": True,
+        "step_key": step_key,
+        "completed": True,
+        "next_step": next(
+            (s["key"] for s in statuses if not s["completed"] and not s.get("blocked_by_previous")),
+            None,
+        ),
+        "all_completed": all(s["completed"] for s in statuses),
+    }
+
+
+@router.delete("/sites/{site_id}/journey/validate-step/{step_key}")
+async def revoke_validate_step(
+    site_id: str,
+    step_key: str,
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Annule la validation manuelle d'une étape (admin / debug)."""
+    await _check_site_access(site_id, user)
+    if step_key not in STEP_ORDER:
+        raise HTTPException(400, f"Étape inconnue : {step_key}")
+    await db.sites.update_one(
+        {"id": site_id},
+        {
+            "$unset": {
+                f"manual_step_overrides.{step_key}": "",
+                f"manual_step_overrides_meta.{step_key}": "",
+            }
+        },
+    )
+    return {"ok": True, "step_key": step_key, "manual_validated": False}

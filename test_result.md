@@ -799,16 +799,179 @@ metadata:
 
 test_plan:
   current_focus:
+    - "Refonte UX strict 2026-04-29 : inversion 7/8 (content↔translate), suppression soft_unlocked, validation manuelle des étapes"
     - "Hotfix critique post-deploy : journey API expose is_clickable + soft_unlocked + HTML statiques /legal — 2026-04-29"
     - "Hotfix UX cockpit étape 8/9/10 (compteur, gating, copy) — 2026-04-29"
-    - "Gating cockpit étape 9 (soft_unlocked sur content + seo) — 2026-04-29"
     - "GMC discovery relancée + sub-account Altea créé — 2026-04-29"
-    - "Fallback HTML SSR /legal/* pour altiaro.com prod — 2026-04-29"
     - "Refonte UX cockpit /sites/:id (2026-04-29)"
     - "5 pages légales plateforme /legal/* (2026-04-29)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Refonte logique 2026-04-29 — gating strict + inversion 7/8 :
+      
+      1) **Inversion content ↔ translate** dans `STEP_ORDER` :
+         ancien : ... domain → translate(7) → content(8) → seo(9) → qa(10)
+         nouveau : ... domain → content(7) → translate(8) → seo(9) → qa(10)
+         Logique métier : on génère TOUT le contenu en langue primaire
+         (blog + landings + FAQ) AVANT de tout traduire d'un coup vers
+         5 langues. Plus efficace + plus cohérent. STEP_LABELS et
+         STEP_SUBTITLES réécrits (Cockpit affiche désormais "Contenu
+         SEO automatisé" / "Traduction multilingue").
+      
+      2) **Suppression complète de soft_unlocked** :
+         - `compute_step_statuses` : `previous_completed = bool(s["completed"])`
+           STRICT, pas d'OR sur soft_unlocked. Retire `soft_unlocked` de
+           tous les checks et du payload `/journey`.
+         - Une étape est `complete` (vert ✅), `current` (cliquable),
+           ou `locked` (grisé 🔒). Plus de zone grise ambré.
+         - Frontend `CockpitJourney` nettoyé : plus de badge "EN COURS",
+           plus de classes `bg-amber-50/40`, plus de `softUnlocked`.
+         - `NextStepCTA` nettoyé : plus de cas spécial soft_unlocked.
+      
+      3) **Validation manuelle des étapes** (le concepteur peut
+         override) :
+         - Backend `POST /sites/{id}/journey/validate-step` (body
+           `{step_key}`) → marque
+           `site.manual_step_overrides[step_key] = true`. Refus 409 si
+           l'étape précédente n'est pas completed (cohérence cascade).
+         - `DELETE /sites/{id}/journey/validate-step/{key}` pour revoke.
+         - `compute_step_statuses` lit `manual_step_overrides` et force
+           `completed=true` + `manual_validated=true` si override.
+         - Payload `/journey` expose `manual_validated` + `subtitle`.
+         - Frontend lib `lib/journeySteps.js` : helpers `validateStep()`
+           et `buildOnValidate()`.
+         - Composant `components/StepPageHeader.jsx` (NEW) :
+           a) `<StepPageHeader>` réutilisable (breadcrumb + Cormorant H1
+              + sous-titre + progress bar 10 dots + pill Validée/Verrouillée).
+           b) `<StepValidateCTA>` carte blanche en bas de page avec
+              conditions à remplir + bouton primary noir actif quand
+              `canValidate=true` (sinon disabled "Conditions non
+              remplies").
+         - Intégré dans : SiteBlogPosts (étape 7, conditions :
+           ≥3 articles + automation ON), SiteTranslate (étape 8,
+           ≥3 langues actives), SiteSEO (étape 9, manuelle toujours
+           possible avec score < 70 — étape indicative), SiteQA
+           (étape 10, garde son bouton "Mettre en ligne" existant).
+      
+      4) **Bug étape 10 redirige cockpit** : résolu naturellement par le
+         strict gating — étape 10 n'est plus cliquable depuis le cockpit
+         (cursor-not-allowed, sans anchor). Si l'utilisateur tape l'URL
+         directe, `useStepGuard("qa")` redirige vers `/sites/{id}/seo`
+         (étape précédente), pas vers le cockpit.
+      
+      Validation Altea : strict cascade respectée. Endpoint
+      validate-step testé : qa→409 (refusé), seo→ok next=qa.
+      Inversion testée : content (#7) auto-validée car 1 pillar + 3
+      satellites publiés. Translate (#8) auto-validée car 4 langues
+      actives. SEO (#9) CURRENT cliquable. QA (#10) LOCK 🔒.
+      ESLint clean sur tous les fichiers modifiés. Lint Python
+      `journey_gating.py` : valide après cleanup d'un orphelin de
+      search_replace.
+
+## Refonte UX strict + inversion 7/8 (2026-04-29)
+
+backend:
+  - task: "Inversion STEP_ORDER content↔translate + STEP_SUBTITLES"
+    implemented: true
+    working: true
+    file: "backend/routes/journey_gating.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          STEP_ORDER : `... domain → content(7) → translate(8) → seo(9)
+          → qa(10)`. STEP_LABELS mis à jour : "Contenu SEO automatisé"
+          / "Traduction multilingue". STEP_SUBTITLES (NEW) : sous-titre
+          explicatif par étape, exposé dans le payload /journey
+          (`subtitle`). Validation Altea : la cascade respecte la
+          nouvelle séquence.
+
+  - task: "Suppression soft_unlocked + endpoint validate-step manuel"
+    implemented: true
+    working: true
+    file: "backend/routes/journey_gating.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Strict gating : `previous_completed = bool(s["completed"])`,
+          plus d'OR sur soft_unlocked. `_check_content` et `_check_seo`
+          retournent uniquement {completed, reason, counters}. Endpoint
+          `POST /sites/{id}/journey/validate-step` (body {step_key}) qui
+          écrit `site.manual_step_overrides[key]=true`, refuse 409 si
+          previous pas completed. `DELETE` symétrique pour revoke.
+          Manual override testé : ok=true next=qa (cascade débloque la
+          suite immédiatement).
+
+frontend:
+  - task: "StepPageHeader + StepValidateCTA + lib/journeySteps"
+    implemented: true
+    working: true
+    file: "frontend/src/components/StepPageHeader.jsx + frontend/src/lib/journeySteps.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          `<StepPageHeader>` : breadcrumb + Cormorant H1 + sous-titre +
+          progress bar 10 dots + pills statut. `<StepValidateCTA>` :
+          carte blanche bordée avec conditions non-remplies + bouton
+          primary noir actif si canValidate=true (icône Sparkle), sinon
+          disabled (icône Lock + label "Conditions non remplies").
+          `lib/journeySteps.js` : `validateStep(siteId, stepKey)` qui
+          POST `/journey/validate-step` et `buildOnValidate()` qui
+          encapsule + callback success.
+
+  - task: "Intégration StepValidateCTA dans pages 7-8-9 + cleanup soft"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/SiteBlogPosts.jsx + SiteTranslate.jsx + SiteSEO.jsx + SiteDetail.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          SiteBlogPosts (étape 7) : conditions = ≥3 articles publiés ET
+          automation.content_enabled. Eyebrow "Étape 7 · Contenu" et
+          query string `?step=7`. SiteTranslate (étape 8) : conditions
+          = ≥3 langues actives. Eyebrow "Étape 8 · Traduction".
+          SiteSEO (étape 9) : canValidate toujours true (étape
+          indicative — l'utilisateur peut bypass score <70). SiteQA
+          (étape 10) : conserve son bouton "Mettre en ligne". Cockpit
+          STEP_LINK ajusté pour les query strings ?step=N corrects.
+          Tests : SiteBlogPosts a 1 step-validate-cta + 1 button.
+
+  - task: "CockpitJourney + NextStepCTA cleanup soft_unlocked"
+    implemented: true
+    working: true
+    file: "frontend/src/components/CockpitJourney.jsx + NextStepCTA.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Plus de badge "EN COURS", plus de classes ambrées
+          conditionnelles, plus de cas soft_unlocked. Trois états
+          simples : complete (vert), current (white), locked (gris
+          opacity-60 cursor-not-allowed). `journey-soft-{key}`=0,
+          `journey-done-{key}` exposé pour validation auto/manuelle.
 
 agent_communication:
   - agent: "main"

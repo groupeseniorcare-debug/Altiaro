@@ -6,6 +6,8 @@ import {
 import { api, apiCall } from "../lib/api";
 import { useStepGuard } from "../lib/useStepGuard";
 import NextStepCTA from "../components/NextStepCTA";
+import { StepValidateCTA } from "../components/StepPageHeader";
+import { buildOnValidate } from "../lib/journeySteps";
 
 const LANG_FLAGS = {
   fr: "🇫🇷", en: "🇬🇧", de: "🇩🇪", es: "🇪🇸", it: "🇮🇹", nl: "🇳🇱",
@@ -13,7 +15,7 @@ const LANG_FLAGS = {
 
 export default function SiteBlogPosts() {
   const [searchParams] = useSearchParams();
-  const fromStep = searchParams.get("step") === "8";
+  const fromStep = searchParams.get("step") === "7";
   const { id: siteId } = useParams();
   const { allowed, checking } = useStepGuard(siteId, "content");
 
@@ -138,7 +140,7 @@ export default function SiteBlogPosts() {
         {/* Header */}
         <div className="mb-8">
           <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-2 flex items-center gap-2">
-            <Sparkle size={12} weight="bold" /> Étape 8 · Contenu
+            <Sparkle size={12} weight="bold" /> Étape 7 · Contenu
           </div>
           <h1 className="text-3xl md:text-4xl font-semibold text-neutral-900" style={{ fontFamily: "'Fraunces', serif" }}>
             Contenu &amp; SEO automatisé
@@ -399,6 +401,27 @@ export default function SiteBlogPosts() {
         </details>
 
         <NextStepCTA siteId={siteId} currentKey="content" />
+
+        {/* Validation finale étape 7 — Contenu SEO */}
+        <StepValidateCTA
+          currentStepKey="content"
+          nextStepNumber={8}
+          nextStepLabel="Traduction multilingue"
+          nextStepHref={`/sites/${siteId}/translate?step=8`}
+          canValidate={
+            (status?.content?.blog_published ?? 0) >= 3 &&
+            !!auto?.content_enabled
+          }
+          missingConditions={[
+            ...((status?.content?.blog_published ?? 0) >= 3
+              ? []
+              : [`Au moins 3 articles publiés (actuel : ${status?.content?.blog_published ?? 0})`]),
+            ...(auto?.content_enabled
+              ? []
+              : ["Activer la publication automatique"]),
+          ]}
+          onValidate={buildOnValidate(siteId, "content", loadAll)}
+        />
       </div>
     </div>
   );
