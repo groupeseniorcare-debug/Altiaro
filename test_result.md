@@ -799,6 +799,7 @@ metadata:
 
 test_plan:
   current_focus:
+    - "Hotfix critique post-deploy : journey API expose is_clickable + soft_unlocked + HTML statiques /legal — 2026-04-29"
     - "Hotfix UX cockpit étape 8/9/10 (compteur, gating, copy) — 2026-04-29"
     - "Gating cockpit étape 9 (soft_unlocked sur content + seo) — 2026-04-29"
     - "GMC discovery relancée + sub-account Altea créé — 2026-04-29"
@@ -808,6 +809,126 @@ test_plan:
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Hotfix post-deploy 2026-04-29 — 2 bugs critiques :
+      
+      Bug 1 : altiaro.com/legal/* servait toujours le SPA vide après le
+      Deploy de l'utilisateur (le backend public_legal n'est probablement
+      pas pris en compte par l'infra prod). Solution : 5 fichiers HTML
+      statiques générés dans `frontend/public/legal/` (CRA les copie tels
+      quels à la racine du build). Chaque slug a 2 fichiers : avec `.html`
+      ET sans extension. Sidecar `frontend/public/_headers` pour forcer
+      le `Content-Type: text/html` sur les versions sans extension
+      (Cloudflare Pages compatible). Script `backend/scripts/generate_static_legal.py`
+      qui réutilise les builders de `routes/public_legal.py` pour générer
+      les fichiers (idempotent, à relancer si le contenu change).
+      Validation : `curl preview/legal/retours.html` → 200 + content-type
+      text/html + `<title>Politique de retour · Altiaro</title>`.
+      `curl preview/legal/retours` (sans .html) → 200 + même HTML
+      (11277 bytes). Après le prochain Deploy de l'utilisateur, ces
+      fichiers seront servis sur altiaro.com.
+      
+      Bug 2 : `GET /api/sites/:id/journey` ne sérialisait pas
+      `soft_unlocked`, `blocked_by_previous`, `is_clickable`. Le
+      frontend `CockpitJourney` consommait `step.blocked_by_previous`
+      qui était `undefined` → `locked = false` partout, étape 10
+      cliquable. Fix : ajouter ces 4 champs au payload `/journey` (et
+      `soft_reason` quand applicable). `status_token` revu :
+      `complete` si done, `locked` si blocked_by_previous, `current`
+      sinon (avant : `locked` pour toutes les étapes après la 1ère
+      non-completed, ce qui était faux). Frontend : `StepRow` consomme
+      `step.is_clickable` en priorité (fallback sur l'ancien
+      `blocked_by_previous && !completed`). Ajout d'un état visuel
+      ambré "EN COURS" quand `soft_unlocked=true`. Le tooltip explique
+      "Validez d'abord les étapes précédentes pour débloquer".
+      
+      Validation Altea via /journey :
+        # 1 pricing    status=complete   clickable=True
+        # 2 import     status=complete   clickable=True
+        ...
+        # 8 content    status=current    soft=True  clickable=True ← badge EN COURS
+        # 9 seo        status=current    soft=True  clickable=True ← badge EN COURS
+        #10 qa         status=locked     blocked=True clickable=False ← cursor-not-allowed
+      
+      Screenshot final desktop : carte "Prochaine action — Étape 08 Blog &
+      contenu SEO" + bouton "Continuer →" actif, banner master OAuth
+      passif, 7 étapes vertes + étape 8 ambré + EN COURS + Ouvrir
+      cliquable, étape 10 grisée (cursor-not-allowed, sans anchor).
+      Tests programmatiques : `journey-soft-content`=1, `journey-soft-seo`=1,
+      QA cursor-not-allowed=True, QA row contient anchor=False. ESLint
+      clean.
+
+## Hotfix critique post-deploy : journey API + HTML statiques (2026-04-29)
+
+backend:
+  - task: "GET /journey expose soft_unlocked + is_clickable + blocked_by_previous"
+    implemented: true
+    working: true
+    file: "backend/routes/journey_gating.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Le payload `/journey` ne sérialisait QUE `key, label, status,
+          completed, reason, order, counters` → le frontend ne pouvait
+          pas distinguer une étape "current" cliquable d'une étape
+          "locked". Fix : ajout de `soft_unlocked`, `blocked_by_previous`,
+          `is_clickable` (booléen explicite), `soft_reason` (texte
+          dédié). Logique status_token revue : complete > locked > current
+          (avant : current uniquement pour la 1ère non-complétée, locked
+          pour toutes les autres → faux positifs). Validation Altea : 1-7
+          complete, 8 et 9 current+soft+clickable, 10 locked+!clickable.
+
+frontend:
+  - task: "CockpitJourney consomme is_clickable + badge EN COURS + tooltip locked"
+    implemented: true
+    working: true
+    file: "frontend/src/components/CockpitJourney.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          `StepRow` consomme désormais `step.is_clickable` en priorité
+          (fallback sur l'ancien `blocked_by_previous && !completed` pour
+          la rétrocompatibilité). Nouvel état visuel ambré (`bg-amber-50/40
+          border-amber-200`) quand `soft_unlocked=true && !done && !locked`,
+          avec badge "EN COURS" (data-testid `journey-soft-{key}`) et
+          icône secondaire ambré. Tooltip "Validez d'abord les étapes
+          précédentes pour débloquer" sur les étapes locked. Screenshot
+          : 8 = ambré "EN COURS Ouvrir", 10 = grisé sans anchor.
+
+  - task: "5 fichiers HTML statiques /legal/* dans frontend/public/legal/"
+    implemented: true
+    working: true
+    file: "frontend/public/legal/* + frontend/public/_headers + backend/scripts/generate_static_legal.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Bug : altiaro.com prod servait toujours le SPA vide après le
+          Deploy car le backend public_legal n'est probablement pas
+          actif sur l'infra prod. Solution garantie : fichiers HTML
+          statiques copiés à la racine du build. 10 fichiers générés
+          (5 slugs × 2 versions : avec .html et sans extension). Sidecar
+          `_headers` Cloudflare Pages force `Content-Type: text/html`
+          sur les versions sans extension. Script idempotent
+          `backend/scripts/generate_static_legal.py` qui réutilise les
+          builders existants. Validation preview : `/legal/retours.html`
+          200 text/html + title correct, `/legal/retours` 200 + même
+          HTML (11277 bytes). Prochain Deploy utilisateur → actif sur
+          altiaro.com pour Google MCA.
 
 agent_communication:
   - agent: "main"

@@ -624,18 +624,31 @@ async def get_journey(
 
     steps: list[dict] = []
     for i, s in enumerate(statuses):
+        # 2026-04-29 — `status` token logique :
+        #   - "complete"  : étape strict completed
+        #   - "locked"    : `blocked_by_previous=True` (cascade strict)
+        #   - "current"   : sinon (étape accessible : soit suivante naturelle,
+        #     soit déverrouillée par soft signal)
         if s["completed"]:
             status_token = "complete"
-        elif i == current_idx:
-            status_token = "current"
-        else:
+        elif s.get("blocked_by_previous"):
             status_token = "locked"
+        else:
+            status_token = "current"
+        soft_unlocked = bool(s.get("soft_unlocked", False))
+        blocked = bool(s.get("blocked_by_previous", False))
+        # `is_clickable` = explicite pour le frontend (single source of truth)
+        is_clickable = (not blocked) or bool(s["completed"])
         steps.append({
             "slug": SLUG_MAP.get(s["key"], s["key"]),
             "key": s["key"],
             "label": s["label"],
             "status": status_token,
             "completed": s["completed"],
+            "soft_unlocked": soft_unlocked,
+            "soft_reason": s.get("reason") if soft_unlocked and not s["completed"] else None,
+            "blocked_by_previous": blocked,
+            "is_clickable": is_clickable,
             "reason": s.get("reason"),
             "order": s.get("order"),
             "counters": s.get("counters"),
