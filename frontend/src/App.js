@@ -50,7 +50,8 @@ import LaunchSite from "./pages/LaunchSite";
 import ProductImagesReview from "./pages/ProductImagesReview";
 import SiteTranslate from "./pages/SiteTranslate";
 import Landing from "./pages/Landing";
-import Legal from "./pages/Legal";
+// Legacy Legal page — remplacé par PlatformLegal*.jsx dans /legal/*
+// import Legal from "./pages/Legal";
 import PlatformLegalRetours from "./pages/PlatformLegalRetours";
 import PlatformLegalLivraison from "./pages/PlatformLegalLivraison";
 import PlatformLegalCgv from "./pages/PlatformLegalCgv";
@@ -137,12 +138,16 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
-          {/* Public platform pages — no auth required, crawlable by Google */}
-          <Route path="/mentions-legales" element={<Legal slug="mentions-legales" />} />
-          <Route path="/cgu" element={<Legal slug="cgu" />} />
-          <Route path="/confidentialite" element={<Legal slug="confidentialite" />} />
-          <Route path="/cookies" element={<Legal slug="cookies" />} />
-          {/* Pages légales plateforme Altiaro — exigées par Google Merchant Center MCA */}
+          {/* Legacy URLs → 301 vers la nouvelle structure /legal/* (canonique) */}
+          <Route path="/mentions-legales" element={<Navigate to="/legal/mentions" replace />} />
+          <Route path="/cgu" element={<Navigate to="/legal/cgv" replace />} />
+          <Route path="/confidentialite" element={<Navigate to="/legal/confidentialite" replace />} />
+          <Route path="/cookies" element={<Navigate to="/legal/confidentialite" replace />} />
+          {/* Pages légales plateforme Altiaro — exigées par Google Merchant Center MCA.
+              Côté prod (altiaro.com / Cloudflare Pages), ces URLs sont servies AVANT
+              le SPA via les fichiers statiques `frontend/public/legal/{slug}/index.html`.
+              Côté preview / dev, le SPA React prend le relais avec ces composants. */}
+          <Route path="/legal" element={<Navigate to="/legal/mentions" replace />} />
           <Route path="/legal/retours" element={<PlatformLegalRetours />} />
           <Route path="/legal/livraison" element={<PlatformLegalLivraison />} />
           <Route path="/legal/cgv" element={<PlatformLegalCgv />} />

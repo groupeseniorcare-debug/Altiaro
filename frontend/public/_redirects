@@ -1,10 +1,30 @@
 # Altiaro — pages légales plateforme
-# Rewrite (200) des URLs SANS extension vers les fichiers .html.
-# Cloudflare Pages applique ce fichier en prod ; le preview webpack-dev-server
-# ne le lit pas mais le SPA React (App.js) catch /legal/* via PlatformLegal*
-# components, donc le résultat est un HTML 200 dans tous les cas.
-/legal/retours            /legal/retours.html            200
-/legal/livraison          /legal/livraison.html          200
-/legal/cgv                /legal/cgv.html                200
-/legal/confidentialite    /legal/confidentialite.html    200
-/legal/mentions           /legal/mentions.html           200
+#
+# Structure servie par Cloudflare Pages :
+#   /legal/                       → public/legal/index.html               (hub)
+#   /legal/retours/               → public/legal/retours/index.html
+#   /legal/retours                → public/legal/retours/index.html       (idem, sans slash)
+#   /legal/livraison              → public/legal/livraison/index.html
+#   /legal/cgv                    → public/legal/cgv/index.html
+#   /legal/confidentialite        → public/legal/confidentialite/index.html
+#   /legal/mentions               → public/legal/mentions/index.html
+#
+# Cloudflare Pages sert automatiquement `index.html` dans les sous-dossiers
+# AVANT de tomber sur le fallback SPA `/index.html`. Aucun rewrite explicite
+# nécessaire pour les nouvelles URLs.
+#
+# Legacy → 301 vers la nouvelle structure (anciennes URLs présentes dans
+# l'index Google / liens externes).
+/mentions-legales       /legal/mentions             301
+/cgu                    /legal/cgv                  301
+/cgv                    /legal/cgv                  301
+/confidentialite        /legal/confidentialite      301
+/cookies                /legal/confidentialite      301
+
+# Anciennes URLs `.html` (générées par les versions précédentes du script) →
+# 301 vers la version sous-dossier propre.
+/legal/retours.html             /legal/retours              301
+/legal/livraison.html           /legal/livraison            301
+/legal/cgv.html                 /legal/cgv                  301
+/legal/confidentialite.html     /legal/confidentialite      301
+/legal/mentions.html            /legal/mentions             301

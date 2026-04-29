@@ -3,26 +3,27 @@ Générateur de fichiers HTML statiques pour les pages légales Altiaro.
 
 Usage : `python backend/scripts/generate_static_legal.py`
 
-Sortie :
-  frontend/public/legal/retours.html
-  frontend/public/legal/livraison.html
-  frontend/public/legal/cgv.html
-  frontend/public/legal/confidentialite.html
-  frontend/public/legal/mentions.html
-  + version SANS extension (pour matcher /legal/retours sans .html)
-    frontend/public/legal/retours
-    ...
+Sortie (sous-dossiers `index.html`, structure attendue par Cloudflare Pages
+qui sert `/legal/foo` via `/legal/foo/index.html` AVANT de tomber sur le
+fallback SPA `/index.html`) :
 
-Ces fichiers sont copiés à la racine du build CRA et servis en HTML statique.
-Avantage : aucun routing dynamique requis, tout hébergeur (Cloudflare Pages,
-nginx, Netlify, FastAPI static, etc.) sert correctement le HTML.
+  frontend/public/legal/index.html                    (hub d'accueil légal)
+  frontend/public/legal/retours/index.html
+  frontend/public/legal/livraison/index.html
+  frontend/public/legal/cgv/index.html
+  frontend/public/legal/confidentialite/index.html
+  frontend/public/legal/mentions/index.html
+
+Plus de doublons `.html` à la racine de `legal/` : c'est cette structure
+sous-dossier + `index.html` qui garantit que Cloudflare Pages les sert
+côté prod altiaro.com avant tout fallback SPA.
 
 ⚠️ À relancer manuellement à chaque mise à jour du contenu légal.
 """
 from __future__ import annotations
 
-import os
 import sys
+from datetime import date
 from pathlib import Path
 
 # Ajoute backend au sys.path pour importer les builders
@@ -50,57 +51,116 @@ PAGES = [
 ]
 
 
-def _adjust_links_for_static(html: str) -> str:
-    """Sur les fichiers statiques on a besoin que les liens entre pages
-    fonctionnent à la fois pour `/legal/cgv` (sans extension) et pour
-    `/legal/cgv.html`. On choisit la version sans extension partout
-    (couvre les 2 cas via les fichiers générés des 2 façons).
-    """
-    # Le builder utilise déjà des hrefs `/legal/{slug}` sans extension. Rien
-    # à faire pour le moment. Si on voulait pointer sur les .html on
-    # remplacerait ici.
-    return html
+def _extract_html(response) -> str:
+    raw = getattr(response, "body", None) or getattr(response, "_body", None)
+    if raw is None:
+        raise RuntimeError("Impossible d'extraire le body HTML")
+    return raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else str(raw)
+
+
+def _hub_body() -> str:
+    """Page d'accueil `/legal/` listant les 5 sous-pages."""
+    cards = [
+        ("mentions", "Mentions légales",
+         "Identité de l'éditeur Altiaro, hébergeur, contact DPO, juridiction compétente."),
+        ("cgv", "Conditions générales de vente",
+         "Cadre contractuel des sites e-commerce générés via la plateforme Altiaro : commande, livraison, paiement, droit de rétractation, garanties légales, médiation."),
+        ("confidentialite", "Politique de confidentialité",
+         "Données collectées, finalités, base légale RGPD, durées de conservation, sous-traitants, droits d'accès, rectification, opposition, suppression."),
+        ("livraison", "Politique de livraison",
+         "Zones desservies, délais indicatifs, frais, suivi colis, retards, livraisons partielles."),
+        ("retours", "Politique de retour",
+         "Délai de rétractation L221-18, état du produit, remboursement, frais de retour, contact service client."),
+    ]
+    items = "\n".join(
+        f'''<a class="legal-card" href="/legal/{slug}">
+              <h2>{title}</h2>
+              <p>{desc}</p>
+              <span class="cta">Lire la page →</span>
+            </a>'''
+        for slug, title, desc in cards
+    )
+    return f'''
+<section class="legal-hub">
+  <p class="hub-intro">Cet espace regroupe les pages légales encadrant l'usage de la plateforme Altiaro et des sites e-commerce qui en sont issus. Conformes au droit français et au RGPD, mises à jour le {date.today().strftime("%d/%m/%Y")}.</p>
+  <div class="hub-grid">
+    {items}
+  </div>
+</section>
+<style>
+.legal-hub {{ padding: 8px 0 32px; }}
+.hub-intro {{ font-size: 16px; color: #4A4A4A; max-width: 720px; margin: 0 0 32px; }}
+.hub-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }}
+.legal-card {{
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  background: #FDFCF9;
+  border: 1px solid #E8E2D5;
+  border-radius: 6px;
+  padding: 24px 22px;
+  transition: border-color .2s ease, transform .2s ease;
+}}
+.legal-card:hover {{ border-color: #0F6E4D; transform: translateY(-2px); }}
+.legal-card h2 {{
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 22px; font-weight: 500;
+  margin: 0 0 10px; color: #1A1A1A;
+}}
+.legal-card p {{ font-size: 14px; line-height: 1.6; margin: 0 0 14px; color: #555; }}
+.legal-card .cta {{ font-size: 13px; font-weight: 600; color: #0F6E4D; }}
+</style>
+'''
 
 
 def main() -> None:
     written: list[str] = []
+
+    # 1) Sous-pages : `legal/{slug}/index.html`
     for slug, title, builder in PAGES:
-        # Le _render renvoie un HTMLResponse FastAPI. On accède au body brut.
         response = _render(
             title=title,
             eyebrow="Altiaro · Légal",
             current_slug=slug,
             body_html=builder(),
         )
-        # Selon la version FastAPI, le body est en `body` (bytes) ou `_body`.
-        raw = getattr(response, "body", None) or getattr(response, "_body", None)
-        if raw is None:
-            raise RuntimeError(f"Impossible d'extraire le body HTML pour {slug}")
-        html = raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else str(raw)
-        html = _adjust_links_for_static(html)
+        html = _extract_html(response)
 
-        # Version avec extension .html (toujours servie en text/html par
-        # webpack-dev-server, nginx, Cloudflare Pages, FastAPI static, etc.).
-        path_html = OUT / f"{slug}.html"
-        path_html.write_text(html, encoding="utf-8")
-        written.append(str(path_html.relative_to(ROOT)))
+        sub_dir = OUT / slug
+        sub_dir.mkdir(parents=True, exist_ok=True)
+        path_index = sub_dir / "index.html"
+        path_index.write_text(html, encoding="utf-8")
+        written.append(str(path_index.relative_to(ROOT)))
 
-        # 2026-04-29 — On NE génère PLUS la version sans extension : sur
-        # webpack-dev-server elle sortait en `application/octet-stream`
-        # (problème pour Google MCA). À la place :
-        #   • prod Cloudflare Pages : `_redirects` rewrite `/legal/{slug}`
-        #     → `/legal/{slug}.html` (200, URL inchangée).
-        #   • preview : le SPA React (App.js) a les routes /legal/* via
-        #     les composants PlatformLegal* → 200 text/html garanti.
-        #   • prod FastAPI native : `routes/public_legal.py` répond directement.
+    # 2) Hub : `legal/index.html` listant les 5 pages
+    hub_response = _render(
+        title="Pages légales",
+        eyebrow="Altiaro · Légal",
+        current_slug="__hub__",  # aucun lien sidebar actif
+        body_html=_hub_body(),
+    )
+    hub_html = _extract_html(hub_response)
+    hub_path = OUT / "index.html"
+    hub_path.write_text(hub_html, encoding="utf-8")
+    written.append(str(hub_path.relative_to(ROOT)))
 
-    # 2026-04-29 — Plus besoin de sidecar `_headers` pour les versions sans
-    # extension : on ne les génère plus. Le rewrite Cloudflare Pages se fait
-    # dans `frontend/public/_redirects` (géré manuellement).
+    # 3) Nettoyage des anciens fichiers `.html` à la racine de `legal/`
+    legacy_files = [
+        OUT / f"{slug}.html" for slug, _, _ in PAGES
+    ]
+    removed: list[str] = []
+    for fp in legacy_files:
+        if fp.exists():
+            fp.unlink()
+            removed.append(str(fp.relative_to(ROOT)))
 
     print("✅ Fichiers HTML statiques générés :")
     for w in written:
         print(f"  • {w}")
+    if removed:
+        print("🗑️  Anciens fichiers supprimés :")
+        for r in removed:
+            print(f"  • {r}")
 
 
 if __name__ == "__main__":
