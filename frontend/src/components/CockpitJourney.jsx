@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import {
   CheckCircle, ArrowRight, CurrencyEur, ChartLineUp, Package, Stack,
   Sparkle, ShieldCheck, PaintBrush, Target, ClipboardText, Rocket, Warning, Lock,
-  Globe,
+  Globe, Translate,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 
@@ -19,31 +19,32 @@ import { api, apiCall } from "../lib/api";
  */
 
 const STEP_META = {
-  pricing:  { Icon: CurrencyEur,    subtitle: "Claude analyse le marché et décide si la niche est viable dans chaque pays" },
-  import:   { Icon: Package,        subtitle: "Recherche CJ + AliExpress · 5 produits minimum pour débloquer la suite" },
-  upsells:  { Icon: Stack,          subtitle: "Accessoires et upgrades · 3 minimum pour débloquer le prévisionnel" },
-  forecast: { Icon: ChartLineUp,    subtitle: "CA prévisionnel, marge, ROAS calculés sur ton vrai catalogue" },
-  branding: { Icon: PaintBrush,     subtitle: "Nom, logo IA, palette · publie le design pour valider cette étape" },
-  domain:   { Icon: Globe,          subtitle: "Choisis et achète ton nom de domaine (étape optionnelle, peut être skippée)" },
-  pages:    { Icon: ClipboardText,  subtitle: "Pages légales + about/FAQ/contact · tout doit être rempli" },
-  content:  { Icon: Sparkle,        subtitle: "Blog SEO : 1 article pilier + 3 satellites minimum" },
-  seo:      { Icon: Target,         subtitle: "Score SEO ≥70/100 pour valider" },
-  qa:       { Icon: ShieldCheck,    subtitle: "Soumission à la validation admin" },
+  pricing:   { Icon: CurrencyEur,    subtitle: "Claude analyse le marché et décide si la niche est viable dans chaque pays" },
+  import:    { Icon: Package,        subtitle: "Recherche CJ + AliExpress · 5 produits minimum pour débloquer la suite" },
+  upsells:   { Icon: Stack,          subtitle: "Accessoires et upgrades · 3 minimum pour débloquer le prévisionnel" },
+  forecast:  { Icon: ChartLineUp,    subtitle: "CA prévisionnel, marge, ROAS calculés sur ton vrai catalogue" },
+  branding:  { Icon: PaintBrush,     subtitle: "Nom, logo IA, palette · publie le design pour valider cette étape" },
+  domain:    { Icon: Globe,          subtitle: "Choisis et achète ton nom de domaine (étape optionnelle, peut être skippée)" },
+  translate: { Icon: Translate,      subtitle: "6 langues, hreflang automatique, JSON-LD localisé — au moins 1 traduction pour valider" },
+  pages:     { Icon: ClipboardText,  subtitle: "Pages légales + about/FAQ/contact · auto-générées au launch" },
+  content:   { Icon: Sparkle,        subtitle: "Blog SEO : 1 article pilier + 3 satellites minimum" },
+  seo:       { Icon: Target,         subtitle: "Score SEO ≥70/100 + landings long-tail" },
+  qa:        { Icon: ShieldCheck,    subtitle: "Checklist 16 points + bouton Mettre en ligne" },
 };
 
-// Fix 6 — mapping step → route. `domain` ajouté en position 6 (Lot D).
-// Les `?step=N` sont décalés de 1 pour les étapes après domain.
+// Mission Finalisation — `translate` ajouté en étape 7, route /sites/:id/translate
 const STEP_LINKS = (siteId) => ({
-  pricing:  `/sites/${siteId}/pricing`,
-  import:   `/sites/${siteId}/sourcing`,
-  upsells:  `/sites/${siteId}/upsells`,
-  forecast: `/sites/${siteId}/forecast`,
-  branding: `/sites/${siteId}/branding?step=5`,
-  domain:   `/sites/${siteId}/domains?step=6`,
-  pages:    `/sites/${siteId}/pages?step=7`,
-  content:  `/sites/${siteId}/blog-posts?step=8`,
-  seo:      `/sites/${siteId}/seo`,
-  qa:       "#site-qa-panel",
+  pricing:   `/sites/${siteId}/pricing`,
+  import:    `/sites/${siteId}/sourcing`,
+  upsells:   `/sites/${siteId}/upsells`,
+  forecast:  `/sites/${siteId}/forecast`,
+  branding:  `/sites/${siteId}/branding?step=5`,
+  domain:    `/sites/${siteId}/domains?step=6`,
+  translate: `/sites/${siteId}/translate?step=7`,
+  pages:     `/sites/${siteId}/pages`,        // back-compat
+  content:   `/sites/${siteId}/blog-posts?step=8`,
+  seo:       `/sites/${siteId}/seo`,
+  qa:        `/sites/${siteId}/qa`,
 });
 
 export default function CockpitJourney({ site, onRefresh }) {

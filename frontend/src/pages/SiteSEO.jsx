@@ -7,6 +7,7 @@ import {
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 import SeoStudioPanel from "../components/SeoStudioPanel";
+import GSCConnectCard from "../components/GSCConnectCard";
 import NextStepCTA from "../components/NextStepCTA";
 
 const DIMENSION_ORDER = ["catalog", "content", "structure", "trust", "aeo", "freshness"];
@@ -321,9 +322,10 @@ export default function SiteSEO() {
 
         {/* Phase B6 — SEO Factory : keywords + landings */}
         <div
-          className="bg-white rounded-2xl border border-neutral-200 p-6 mt-6"
+          className="bg-white rounded-2xl border border-neutral-200 mt-6 overflow-hidden"
           data-testid="seo-factory-panel"
         >
+          <div className="p-6">
           <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
             <div>
               <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-1.5 flex items-center gap-2">
@@ -394,6 +396,9 @@ export default function SiteSEO() {
               {factoryToast.msg}
             </div>
           )}
+          </div>
+          {/* Bandeau GSC Connect en footer du panel — pour rendre l'OAuth bien visible */}
+          <GSCConnectCard siteId={siteId} />
         </div>
 
         <NextStepCTA siteId={siteId} currentKey="seo" />

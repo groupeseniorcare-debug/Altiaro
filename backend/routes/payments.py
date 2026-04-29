@@ -173,7 +173,7 @@ async def create_payment(data: CreatePaymentInput, request: Request):
             "order_number": order.get("order_number"),
             "site_id": data.site_id,
         },
-        "locale": _locale_for_language(order.get("language")),
+        "locale": "en_GB" if currency == "GBP" else _locale_for_language(order.get("language")),
     }
 
     try:

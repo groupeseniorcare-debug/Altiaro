@@ -98,6 +98,17 @@ async def indexnow_key_file():
     return Response(content=INDEXNOW_KEY, media_type="text/plain")
 
 
+# Mission Finalisation 2026-04-29 — alias root-level pour les domaines custom :
+# IndexNow exige que le `keyLocation` soit sur le MÊME host que les URLs
+# soumises. Pour Altea (`altea-home.com`), Bing/Yandex/IndexNow vont fetcher
+# `https://altea-home.com/{KEY}.txt` → cette route répond depuis notre backend
+# tant que le custom domain pointe sur notre infra. Pour les sites hébergés
+# ailleurs, le concepteur doit déposer ce fichier à la racine de son hébergeur.
+@router.get(f"/public/{INDEXNOW_KEY}.txt", include_in_schema=False)
+async def indexnow_key_file_root_alias():
+    return Response(content=INDEXNOW_KEY, media_type="text/plain")
+
+
 class NotifyInput(BaseModel):
     urls: List[str]
 

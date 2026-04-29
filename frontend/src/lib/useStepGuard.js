@@ -18,15 +18,17 @@ import { toast } from "sonner";
 import { api, apiCall } from "./api";
 
 const STEP_PATHS = {
-  pricing:  (id) => `/sites/${id}/pricing`,
-  import:   (id) => `/sites/${id}/sourcing`,
-  upsells:  (id) => `/sites/${id}/upsells`,
-  forecast: (id) => `/sites/${id}/forecast`,
-  branding: (id) => `/sites/${id}/branding`,
-  pages:    (id) => `/sites/${id}/pages`,
-  content:  (id) => `/sites/${id}/blog-posts`,
-  seo:      (id) => `/sites/${id}/seo`,
-  qa:       (id) => `/sites/${id}`,
+  pricing:   (id) => `/sites/${id}/pricing`,
+  import:    (id) => `/sites/${id}/sourcing`,
+  upsells:   (id) => `/sites/${id}/upsells`,
+  forecast:  (id) => `/sites/${id}/forecast`,
+  branding:  (id) => `/sites/${id}/branding`,
+  domain:    (id) => `/sites/${id}/domains`,
+  translate: (id) => `/sites/${id}/translate`,
+  pages:     (id) => `/sites/${id}/pages`,
+  content:   (id) => `/sites/${id}/blog-posts`,
+  seo:       (id) => `/sites/${id}/seo`,
+  qa:        (id) => `/sites/${id}/qa`,
 };
 
 export function useStepGuard(siteId, stepKey) {

@@ -32,23 +32,27 @@ from deps import db, get_current_user, _check_site_access
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Ordre canonique des 10 étapes (Lot D — Domaine inséré entre branding et pages)
+# Ordre canonique des 10 étapes (mission Finalisation 2026-04-29 :
+# `translate` remplace `pages` à la position 7 — les pages essentielles sont
+# désormais générées automatiquement au launch-auto, donc plus besoin d'en
+# faire une étape Cockpit séparée. La traduction multilingue est en revanche
+# le point clé pour passer en GO sur 6 langues × 11 pays.)
 STEP_ORDER = [
     "pricing", "import", "upsells", "forecast", "branding",
-    "domain", "pages", "content", "seo", "qa",
+    "domain", "translate", "content", "seo", "qa",
 ]
 
 STEP_LABELS = {
-    "pricing":  "Analyse concurrence & pricing",
-    "import":   "Import du catalogue",
-    "upsells":  "Upsells & accessoires",
-    "forecast": "Étude financière 30j",
-    "branding": "Identité & branding",
-    "domain":   "Nom de domaine",
-    "pages":    "Pages essentielles (about, FAQ, CGV…)",
-    "content":  "Blog & contenu SEO",
-    "seo":      "Santé SEO / AEO",
-    "qa":       "QA automatique & soumission",
+    "pricing":   "Analyse concurrence & pricing",
+    "import":    "Import du catalogue",
+    "upsells":   "Upsells & accessoires",
+    "forecast":  "Étude financière 30j",
+    "branding":  "Identité & branding",
+    "domain":    "Nom de domaine",
+    "translate": "Traduction multilingue",
+    "content":   "Blog & contenu SEO",
+    "seo":       "Santé SEO / AEO",
+    "qa":        "QA & mise en ligne",
 }
 
 
@@ -298,6 +302,33 @@ def _page_has_content(page: dict) -> bool:
     return False
 
 
+async def _check_translate(site_id: str, site: dict) -> dict:
+    """Étape 7 — la traduction est validée dès qu'au moins 2 langues
+    sont activées (le site source + 1 traduction). Pour passer en go-live
+    on recommandera 4-6 langues, mais le cockpit débloque la suite dès 2.
+    """
+    available = site.get("available_langs") or []
+    primary = site.get("primary_lang") or (available[0] if available else "fr")
+    extra = [lg for lg in available if lg != primary]
+    completed = len(available) >= 2
+    reason = (
+        f"{len(available)} langues actives · principale : {primary} · +{len(extra)} traduction(s)"
+        if completed
+        else "Lance la traduction vers au moins 1 langue cible"
+    )
+    return {
+        "key": "translate",
+        "label": STEP_LABELS["translate"],
+        "completed": completed,
+        "reason": reason,
+        "counters": {
+            "available": available,
+            "primary": primary,
+            "extras_count": len(extra),
+        },
+    }
+
+
 async def _check_pages(site_id: str, site: dict) -> dict:
     """Pages légales (mentions, cgv, confidentialite, cookies) + 3 éditoriales
     (about, faq, contact) toutes non-vides."""
@@ -401,16 +432,17 @@ async def _check_qa(site_id: str, site: dict) -> dict:
 
 
 _CHECKERS = {
-    "pricing":  _check_pricing,
-    "import":   _check_import,
-    "upsells":  _check_upsells,
-    "forecast": _check_forecast,
-    "branding": _check_branding,
-    "domain":   _check_domain,  # Lot D — étape 6 (optional)
-    "pages":    _check_pages,
-    "content":  _check_content,
-    "seo":      _check_seo,
-    "qa":       _check_qa,
+    "pricing":   _check_pricing,
+    "import":    _check_import,
+    "upsells":   _check_upsells,
+    "forecast":  _check_forecast,
+    "branding":  _check_branding,
+    "domain":    _check_domain,        # Lot D — étape 6 (optional)
+    "translate": _check_translate,     # Mission Finalisation — étape 7 (remplace `pages`)
+    "pages":     _check_pages,         # déprécié mais conservé pour back-compat (route /sites/:id/pages)
+    "content":   _check_content,
+    "seo":       _check_seo,
+    "qa":        _check_qa,
 }
 
 

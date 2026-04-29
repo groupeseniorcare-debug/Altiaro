@@ -352,6 +352,17 @@ async def public_create_order(site_id: str, data: OrderCreateInput, request: Req
     now = datetime.now(timezone.utc)
     order_number = f"CF-{int(now.timestamp())}-{secrets.token_hex(2).upper()}"
 
+    # Phase D' — Devise selon pays détecté (Mollie GBP au checkout UK, parité 1:1).
+    # Priorité : 1) CF-IPCountry header (Cloudflare) 2) shipping_address.country
+    geo_country = (request.headers.get("CF-IPCountry") or "").upper().strip()
+    if not geo_country or geo_country == "XX":
+        try:
+            geo_country = (data.shipping_address.country or "").upper().strip()
+        except Exception:
+            geo_country = ""
+    base_currency = canonical_items[0]["currency"] if canonical_items else "EUR"
+    final_currency = "GBP" if geo_country == "GB" else base_currency
+
     doc = {
         "id": str(uuid.uuid4()),
         "site_id": site_id,
@@ -370,7 +381,8 @@ async def public_create_order(site_id: str, data: OrderCreateInput, request: Req
         "shipping_fee": shipping_fee,
         "tax": tax,
         "total": total,
-        "currency": canonical_items[0]["currency"] if canonical_items else "EUR",
+        "currency": final_currency,
+        "geo_country": geo_country or None,
         "status": "pending_payment",
         "payment_method": None,
         "status_history": [],

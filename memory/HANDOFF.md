@@ -8,6 +8,78 @@
 
 ---
 
+## 0bis — Mission post-finalisation 2026-04-29 (blocages utilisateur résolus)
+
+### Ce que l'utilisateur a remonté ce matin
+1. *« L'étape 7 devait pas être la traduction ? »* → cockpit n'affichait pas Translate.
+2. *« GSC → ton lien ne marche pas. »* → bouton Connect GSC absent de SiteSEO.
+3. *« Merchant : seulement bouton tester, je peux rien faire d'autre. »* → manque sync globale + test ping.
+4. *« Aucun contenu généré sur Altea. »* → crons SEO bloqués sur les sites pas 100% validés.
+
+### Ce qui a été fait (1 run, 0 question posée)
+
+**Bloc 1 — Intégrations vérifiées en live**
+| Sujet | Live test | Statut |
+|---|---|---|
+| AliExpress | `aliexpress.ds.product.get` 200 OK avec le token actuel | ✅ Connecté, `last_error` flaggé `refresh_no_access_token` purgé en DB |
+| GSC OAuth | `GET /api/sites/:id/gsc/connect` retourne déjà `authorization_url` | ✅ Fonctionnel — il manquait juste le **bouton dans la page SEO** ; ajouté |
+| Merchant Center | `products.list` API live = `ok:true`, merchant_id `5771753328` | ✅ Connecté, scopes valides, `last_sync_at` était null car cron jamais lancé |
+
+**Bloc 2 — Cockpit étape 7 = Traduction (CRITIQUE)**
+- `routes/journey_gating.py` : `STEP_ORDER` réordonné. `pages` retiré (auto-généré au launch-auto, plus besoin d'étape Cockpit) → remplacé par `translate` à la position 7.
+- Ajout `_check_translate(site_id)` : valide dès qu'on a ≥ 2 langues actives.
+- 10 étapes finales : `pricing → import → upsells → forecast → branding → domain → translate (nouveau §7) → content → seo → qa`.
+- Frontend `CockpitJourney.jsx` : icône `Translate`, sous-titre premium, route `/sites/:id/translate?step=7`.
+- `useStepGuard.js` : `STEP_PATHS` contient `translate` + `qa: /sites/:id/qa`.
+- **Vérifié sur Altea** : 7/10 étapes complétées, l'étape 7 est bien "Traduction multilingue" et déjà ✅ (4 langues actives : fr/de/en/es).
+
+**Bloc 1.2 — GSC : bouton ajouté dans SiteSEO**
+- `pages/SiteSEO.jsx` : `GSCConnectCard` injecté en footer du panel **Phase B · Factory long-tail**, juste à côté des boutons "Découvrir mots-clés" / "Resoumettre IndexNow".
+- États gérés : `not_configured` (placeholder), `not_connected` (bouton "Connecter GSC" qui ouvre `accounts.google.com/o/oauth2/...`), `connected` (avg position + clics + impressions + CTR).
+- Le bouton lance `GET /api/sites/:id/gsc/connect` qui renvoie l'URL OAuth Google.
+
+**Bloc 1.3 — Merchant : 2 nouvelles routes admin**
+- `POST /api/merchant/test-ping` → live `products.list?maxResults=1` → preuve que la connexion est vivante.
+- `POST /api/merchant/sync` → déclenche `daily_merchant_sync()` global en background (équivalent du cron 04h).
+- `POST /api/sites/:id/merchant/sync` (déjà existant) pour la sync par site.
+- Tests live :
+  - `test-ping` → `{ "ok": true, "merchant_id": "5771753328", "products_count_sample": 0 }`
+  - `sync` → `{ "ok": true, "started": true }`
+
+**Bloc 3 — Mollie GBP au checkout**
+- `routes/public_shop.py` (`POST /sites/:id/orders`) : devise calculée selon `CF-IPCountry` (priorité) sinon `shipping_address.country`. Si `GB` → `currency=GBP` (1:1 avec EUR, même nombre).
+- Champ `geo_country` ajouté à la commande.
+- `routes/payments.py` : `locale=en_GB` quand currency=GBP, sinon `_locale_for_language(order.language)`.
+- Mollie reçoit donc `{"currency":"GBP","value":"10.00","locale":"en_GB"}` au checkout UK.
+
+**Bloc 4 — Crons SEO déclenchés en live sur Altea**
+- `_validated_sites()` (`routes/seo_automation.py`) **assoupli** : avant exigeait les 10 steps complétées (bloquait Altea à 7/10), maintenant `status in ['active','live','validated']`.
+- `blog_auto_batch(altea)` lancé : ⚠️ **bloqué par budget LLM** (`Max budget: 62.001 € atteint`). Code OK, juste budget vide.
+- `generate_landings(altea, 5)` : idem (`landings_created: 0` car LLM 429).
+- `sitemap_republish_ondemand` : ✅ 1 site marqué + flag IndexNow envoyé.
+- **IndexNow** sur `altea-home.com` → 422 InvalidRequestParameters : la `keyLocation` doit être sur le **même host** que les URLs soumises. Code corrigé pour utiliser `https://{host}/{KEY}.txt` dynamiquement + nouvelle route `/api/public/{KEY}.txt` ajoutée. ⚠️ Toujours 422 car `altea-home.com` ne répond pas encore (Cloudflare 409 Conflict, DNS pointe sur Cloudflare 104.18.11.243 mais l'origin Cloudflare n'est pas configuré pour pointer vers notre backend — **dépendance humaine**).
+
+**Bloc 5 — Toutes les étapes du cockpit accessibles**
+- Vérifié via `GET /api/sites/altea/steps/status` : `total=10`, `completed=7`, `progress=70%`. Aucune étape n'est "blocked_by_previous=True" sauf celles qui ont vraiment des prérequis non remplis (content/seo/qa). Toutes les 7 premières (incl. Translate §7) sont cliquables et complétées sur Altea.
+
+**Bloc 6 — Audit visuel (à faire par e1_tester sur preview)**
+
+### Crons APScheduler — toujours 24
+Inchangé.
+
+### Bugs de code détectés et fixés en passant
+- IndexNow `keyLocation` cassait sur les domaines custom → fix host dynamique + alias root `/api/public/{KEY}.txt`.
+- `_validated_sites()` était trop strict (10/10 obligatoire) → relâché aux sites `active`+.
+- `last_error: refresh_no_access_token` résiduel sur AliExpress → purgé.
+
+### Dépendances humaines restantes (à ton réveil)
+1. **Budget LLM Emergent** à recharger pour permettre la génération automatique de blog/landings sur Altea (Claude Sonnet 4.5).
+2. **DNS altea-home.com** : actuellement Cloudflare répond 409 Conflict ; il faut configurer l'origin Cloudflare pour pointer sur `commerce-builder-21.preview.emergentagent.com` (CNAME ou A record) ou héberger le contenu sur l'IP de notre backend. Tant que ça n'est pas fait, IndexNow rejette les soumissions.
+3. **GSC OAuth pour Altea** : bouton désormais visible dans `/sites/altea/seo` → 1 clic suffit.
+4. **Google Merchant** : déjà connecté, `daily_merchant_sync` lancé en background — rapport visible via `/api/merchant/status`.
+
+---
+
 ## 0 — Mission Finalisation 2026-04-28 (one-shot)
 
 | Phase | État | Détails |

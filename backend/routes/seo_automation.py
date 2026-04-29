@@ -138,19 +138,23 @@ async def mark_sitemap_dirty(site_id: str) -> None:
 #  HELPERS
 # --------------------------------------------------------------------------
 async def _validated_sites() -> list[dict]:
-    """Sites dont les 9 steps du cockpit sont complétés (journey.all_completed).
-    Utilise `compute_step_statuses` de journey_gating pour la source de vérité."""
-    from routes.journey_gating import compute_step_statuses
+    """Sites éligibles à l'automatisation SEO.
+
+    Mission Finalisation 2026-04-29 — relâché : tout site en `status in
+    ['active', 'live']` est inclus (avant : exigeait les 10 étapes
+    complétées, ce qui bloquait les sites en cours de validation comme
+    Altea). Les crons restent idempotents et limitent par produit/article.
+    """
+    from routes.journey_gating import compute_step_statuses  # noqa: F401
     sites: list[dict] = []
-    async for s in db.sites.find({}, {"_id": 0, "id": 1, "name": 1, "niche": 1,
-                                       "selected_countries": 1, "seo_countries": 1,
-                                       "operator_id": 1, "design": 1, "status": 1, "qa_audit": 1}):
-        try:
-            steps = await compute_step_statuses(s["id"])
-            if steps and all(st.get("completed") for st in steps):
-                sites.append(s)
-        except Exception:
-            logger.exception(f"[seoauto] validation check failed for {s['id']}")
+    async for s in db.sites.find(
+        {"status": {"$in": ["active", "live", "validated"]}},
+        {"_id": 0, "id": 1, "name": 1, "niche": 1,
+         "selected_countries": 1, "seo_countries": 1,
+         "operator_id": 1, "design": 1, "status": 1, "qa_audit": 1,
+         "available_langs": 1, "primary_lang": 1, "public_url": 1},
+    ):
+        sites.append(s)
     return sites
 
 

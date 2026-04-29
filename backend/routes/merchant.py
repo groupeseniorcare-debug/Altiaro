@@ -634,6 +634,76 @@ async def disconnect(_admin: dict = Depends(require_admin)) -> dict:
     return {"ok": True}
 
 
+@router.post("/merchant/test-ping")
+async def test_ping(_admin: dict = Depends(require_admin)) -> dict:
+    """Phase Finalisation — Vérifie que la connexion Merchant Center est
+    réellement vivante en effectuant un appel `products.list?maxResults=1`.
+    """
+    settings = await _get_merchant_settings()
+    if not settings.get("refresh_token"):
+        raise HTTPException(400, "Merchant Center non connecté (pas de refresh_token)")
+    merchant_id = await _get_merchant_id_for_site("")
+    if not merchant_id:
+        raise HTTPException(400, "merchant_id non configuré (POST /api/merchant/merchant-id)")
+    try:
+        creds = await _get_creds()
+        if not creds:
+            raise HTTPException(500, "Impossible de reconstituer les credentials Google")
+        service = _service_for(creds)
+        import asyncio as _aio
+        resp = await _aio.to_thread(
+            lambda: service.products().list(merchantId=merchant_id, maxResults=1).execute(),
+        )
+        products = resp.get("resources") or []
+        return {
+            "ok": True,
+            "merchant_id": merchant_id,
+            "products_count_sample": len(products),
+            "first_offer_id": products[0].get("offerId") if products else None,
+        }
+    except Exception as e:
+        logger.exception("[merchant] test-ping failed")
+        raise HTTPException(502, f"Ping live échoué : {str(e)[:200]}")
+
+
+@router.post("/merchant/sync")
+async def admin_full_sync(
+    site_id: Optional[str] = None,
+    _admin: dict = Depends(require_admin),
+) -> dict:
+    """Déclenche la synchro Merchant Center.
+    - sans `site_id` → équivalent du cron 04h (tous les sites validés).
+    - avec `?site_id=...` → ne synchronise QUE ce site (recommandé pour tests).
+
+    Asynchrone : retourne immédiatement, le job tourne en background.
+    """
+    settings = await _get_merchant_settings()
+    if not settings.get("refresh_token"):
+        raise HTTPException(400, "Merchant Center non connecté")
+    import asyncio as _aio
+
+    async def _run_one_site(sid: str):
+        # Sync products of one site only
+        site = await db.sites.find_one({"id": sid}, {"_id": 0, "id": 1, "operator_id": 1, "name": 1})
+        if not site:
+            return
+        try:
+            async for p in db.products.find({"site_id": sid, "status": "active"}, {"_id": 0, "id": 1}):
+                try:
+                    await sync_product_if_connected(sid, p.get("id"))
+                except Exception:
+                    logger.exception(f"[merchant] sync product {p.get('id','?')[:8]} failed")
+        except Exception:
+            logger.exception(f"[merchant] sync site {sid} crashed")
+
+    if site_id:
+        _aio.create_task(_run_one_site(site_id))
+        return {"ok": True, "started": True, "scope": "site", "site_id": site_id}
+    _aio.create_task(daily_merchant_sync())
+    return {"ok": True, "started": True, "scope": "all_validated_sites",
+            "message": "Sync globale démarrée — voir /merchant/status pour suivre"}
+
+
 @router.post("/merchant/merchant-id")
 async def set_merchant_id(
     data: dict = Body(...),
