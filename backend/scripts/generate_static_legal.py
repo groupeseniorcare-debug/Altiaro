@@ -79,55 +79,24 @@ def main() -> None:
         html = raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else str(raw)
         html = _adjust_links_for_static(html)
 
-        # Version avec extension .html (toujours servie correctement)
+        # Version avec extension .html (toujours servie en text/html par
+        # webpack-dev-server, nginx, Cloudflare Pages, FastAPI static, etc.).
         path_html = OUT / f"{slug}.html"
         path_html.write_text(html, encoding="utf-8")
         written.append(str(path_html.relative_to(ROOT)))
 
-        # Version sans extension (pour /legal/{slug})
-        # CRA copie les fichiers tels quels ; serveurs statiques modernes
-        # détectent le content-type via le contenu (mais on ajoute un sidecar
-        # `_headers` Cloudflare Pages plus bas pour forcer text/html).
-        path_noext = OUT / slug
-        path_noext.write_text(html, encoding="utf-8")
-        written.append(str(path_noext.relative_to(ROOT)))
+        # 2026-04-29 — On NE génère PLUS la version sans extension : sur
+        # webpack-dev-server elle sortait en `application/octet-stream`
+        # (problème pour Google MCA). À la place :
+        #   • prod Cloudflare Pages : `_redirects` rewrite `/legal/{slug}`
+        #     → `/legal/{slug}.html` (200, URL inchangée).
+        #   • preview : le SPA React (App.js) a les routes /legal/* via
+        #     les composants PlatformLegal* → 200 text/html garanti.
+        #   • prod FastAPI native : `routes/public_legal.py` répond directement.
 
-    # Sidecar Cloudflare Pages : force le Content-Type sur les versions sans
-    # extension. Ignoré silencieusement par les autres hébergeurs.
-    headers_path = ROOT / "frontend" / "public" / "_headers"
-    headers_block = (
-        "# Force text/html pour les pages légales sans extension\n"
-        + "\n".join(
-            f"/legal/{slug}\n  Content-Type: text/html; charset=utf-8\n"
-            for slug, _, _ in PAGES
-        )
-    )
-    # On préserve le contenu existant si présent (autres règles).
-    existing = headers_path.read_text(encoding="utf-8") if headers_path.exists() else ""
-    marker = "# === ALTIARO LEGAL STATIC ==="
-    if marker in existing:
-        # Remplace la section existante
-        before = existing.split(marker)[0].rstrip() + "\n\n"
-        after_parts = existing.split(marker, 1)[1].split("# === END ALTIARO LEGAL STATIC ===", 1)
-        after = after_parts[1] if len(after_parts) > 1 else ""
-        new_content = (
-            before
-            + marker
-            + "\n"
-            + headers_block
-            + "\n# === END ALTIARO LEGAL STATIC ===\n"
-            + after
-        )
-    else:
-        new_content = (
-            (existing.rstrip() + "\n\n" if existing else "")
-            + marker
-            + "\n"
-            + headers_block
-            + "\n# === END ALTIARO LEGAL STATIC ===\n"
-        )
-    headers_path.write_text(new_content, encoding="utf-8")
-    written.append(str(headers_path.relative_to(ROOT)))
+    # 2026-04-29 — Plus besoin de sidecar `_headers` pour les versions sans
+    # extension : on ne les génère plus. Le rewrite Cloudflare Pages se fait
+    # dans `frontend/public/_redirects` (géré manuellement).
 
     print("✅ Fichiers HTML statiques générés :")
     for w in written:

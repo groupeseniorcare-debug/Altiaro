@@ -228,7 +228,12 @@ function StepRow({ step, meta, href }) {
   );
 
   return (
-    <div data-testid={`journey-row-${step.key}`}>
+    <div
+      data-testid={`journey-row-${step.key}`}
+      aria-disabled={locked ? "true" : undefined}
+      tabIndex={locked ? -1 : undefined}
+      title={locked ? "Validez d'abord l'étape précédente" : undefined}
+    >
       {locked ? pill : <Tag {...props} className="block">{pill}</Tag>}
     </div>
   );

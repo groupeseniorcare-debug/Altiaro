@@ -1,0 +1,10 @@
+# Altiaro — pages légales plateforme
+# Rewrite (200) des URLs SANS extension vers les fichiers .html.
+# Cloudflare Pages applique ce fichier en prod ; le preview webpack-dev-server
+# ne le lit pas mais le SPA React (App.js) catch /legal/* via PlatformLegal*
+# components, donc le résultat est un HTML 200 dans tous les cas.
+/legal/retours            /legal/retours.html            200
+/legal/livraison          /legal/livraison.html          200
+/legal/cgv                /legal/cgv.html                200
+/legal/confidentialite    /legal/confidentialite.html    200
+/legal/mentions           /legal/mentions.html           200

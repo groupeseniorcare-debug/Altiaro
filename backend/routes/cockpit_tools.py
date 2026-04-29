@@ -691,27 +691,10 @@ class StepValidateInput(BaseModel):
     validated: bool = True
 
 
-@router.post("/sites/{site_id}/journey/validate-step", deprecated=True)
-async def validate_journey_step(
-    site_id: str, body: StepValidateInput, user=Depends(get_current_user),
-):
-    """DEPRECATED (Chantier 1) — La validation manuelle est supprimée.
-
-    Les 9 étapes sont maintenant complétées automatiquement selon les données
-    en DB (5 produits importés = étape 2 OK, design publié = étape 5 OK, etc.).
-
-    Utilisez GET /api/sites/{site_id}/steps/status pour obtenir l'état auto.
-    Cet endpoint est conservé en 410 Gone pour forcer les clients frontend
-    obsolètes à basculer.
-    """
-    raise HTTPException(
-        status_code=410,
-        detail=(
-            "La validation manuelle des étapes est supprimée. "
-            "Les étapes sont désormais complétées automatiquement par les données. "
-            "Consultez GET /api/sites/{site_id}/steps/status pour voir l'état."
-        ),
-    )
+# 2026-04-29 — endpoint deprecated SUPPRIMÉ.
+# Le vrai endpoint vit dans `routes/journey_gating.py::validate_step`
+# (POST /sites/{id}/journey/validate-step body={"step_key": "..."}).
+# L'ancien doublon ici renvoyait 410 Gone et éclipsait le nouveau.
 
 
 @router.get("/sites/{site_id}/upsell-recommendations")

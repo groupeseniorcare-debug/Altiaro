@@ -1,18 +1,2 @@
-# === ALTIARO LEGAL STATIC ===
-# Force text/html pour les pages légales sans extension
-/legal/retours
-  Content-Type: text/html; charset=utf-8
-
-/legal/livraison
-  Content-Type: text/html; charset=utf-8
-
-/legal/cgv
-  Content-Type: text/html; charset=utf-8
-
-/legal/confidentialite
-  Content-Type: text/html; charset=utf-8
-
-/legal/mentions
-  Content-Type: text/html; charset=utf-8
-
-# === END ALTIARO LEGAL STATIC ===
+# Altiaro — _headers Cloudflare Pages
+# (vide pour le moment — le rewrite /legal/* est géré dans `_redirects`)
