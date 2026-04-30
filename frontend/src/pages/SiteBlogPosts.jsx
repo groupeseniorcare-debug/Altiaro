@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
-  Sparkle, ArrowLeft, CheckCircle, CaretDown, ArrowRight, Robot,
+  Sparkle, ArrowLeft, CheckCircle, ArrowRight, Robot,
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 import { useStepGuard } from "../lib/useStepGuard";
@@ -27,7 +27,6 @@ export default function SiteBlogPosts() {
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState(null);
-  const [advancedCount, setAdvancedCount] = useState(3);
 
   const showToast = (kind, msg) => {
     setToast({ kind, msg });
@@ -91,18 +90,6 @@ export default function SiteBlogPosts() {
     setBusy("");
     if (error) return showToast("error", error);
     showToast("ok", "Vos 3 premiers articles sont en cours de génération (5 min env.)");
-    loadAll();
-  };
-
-  const generateMore = async () => {
-    const n = Math.max(1, Math.min(50, parseInt(advancedCount) || 1));
-    setBusy("generate");
-    const { error } = await apiCall(() =>
-      api.post(`/sites/${siteId}/blog/jobs`, { count: n, pillar: "trends" }),
-    );
-    setBusy("");
-    if (error) return showToast("error", error);
-    showToast("ok", `${n} article(s) en file. Worker démarre dans 30 s max.`);
     loadAll();
   };
 
@@ -331,73 +318,6 @@ export default function SiteBlogPosts() {
             </div>
           )}
         </div>
-
-        {/* Mode avancé (collapse) */}
-        <details className="bg-white rounded-2xl border border-neutral-200 mb-6" data-testid="advanced-mode">
-          <summary className="cursor-pointer p-5 flex items-center justify-between text-[14px] font-medium text-neutral-700 hover:bg-neutral-50 rounded-2xl">
-            <span className="flex items-center gap-2">
-              <Sparkle size={14} weight="bold" /> Mode avancé
-              <span className="text-[11px] text-neutral-400 font-normal">(pour les power users)</span>
-            </span>
-            <CaretDown size={14} weight="bold" />
-          </summary>
-          <div className="px-5 pb-5 pt-0 space-y-4">
-            <div className="border-t border-neutral-100 pt-4">
-              <div className="text-[12px] text-neutral-600 mb-2">
-                Générer N articles supplémentaires maintenant :
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <input
-                  type="number"
-                  min={1}
-                  max={50}
-                  value={advancedCount}
-                  onChange={(e) => setAdvancedCount(e.target.value)}
-                  className="h-10 w-20 px-3 rounded-lg bg-white border border-neutral-200 text-sm"
-                  data-testid="advanced-count"
-                />
-                <button
-                  onClick={generateMore}
-                  disabled={busy === "generate"}
-                  data-testid="advanced-generate"
-                  className="h-10 px-4 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-[13px] font-medium flex items-center gap-2 disabled:opacity-60"
-                >
-                  {busy === "generate" ? "Envoi…" : `Générer ${advancedCount} article${advancedCount > 1 ? "s" : ""}`}
-                </button>
-              </div>
-            </div>
-
-            <div className="border-t border-neutral-100 pt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Stat label="Total articles" value={status?.content?.blog_total ?? posts.length} small />
-              <Stat label="Pages SEO publiées" value={status?.content?.landings_total ?? 0} small />
-              <Stat label="Jobs en file" value={queueJobs.filter((j) => j.status === "queued").length} small />
-              <Stat label="Jobs en cours" value={activeJobs.length} small />
-            </div>
-
-            {queueJobs.length > 0 && (
-              <div className="border-t border-neutral-100 pt-4">
-                <div className="text-[12px] text-neutral-600 mb-2">Tâches récentes :</div>
-                <div className="space-y-1.5 max-h-60 overflow-auto">
-                  {queueJobs.slice(0, 12).map((j) => (
-                    <div key={j.id} className="flex items-center gap-2 text-[12px] text-neutral-700 px-3 py-1.5 bg-neutral-50 rounded-md">
-                      <span
-                        className={
-                          j.status === "completed" ? "h-1.5 w-1.5 rounded-full bg-emerald-500" :
-                          j.status === "running"   ? "h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" :
-                          j.status === "failed"    ? "h-1.5 w-1.5 rounded-full bg-rose-500" :
-                                                     "h-1.5 w-1.5 rounded-full bg-neutral-300"
-                        }
-                      />
-                      <span className="capitalize font-medium">{j.status}</span>
-                      <span className="text-neutral-500">· {j.pillar || "?"} · {j.articles_done || 0}/{j.articles_planned}</span>
-                      <span className="ml-auto tabular-nums text-neutral-400">{j.progress || 0}%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </details>
 
         {/* Validation finale étape 7 — Contenu SEO (UN SEUL CTA, pas de doublon) */}
         <StepValidateCTA

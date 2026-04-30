@@ -31,6 +31,26 @@ const CHECK_LABELS = {
   perf_ok:                  "Performances Lighthouse correctes",
 };
 
+// Mapping check → route de correction en 1 clic (cockpit)
+const FIX_LINKS = (siteId) => ({
+  branding_complete:        { to: `/sites/${siteId}/branding` },
+  products_min:             { to: `/sites/${siteId}/products` },
+  all_products_have_images: { to: `/sites/${siteId}/images-review` },
+  translations_min:         { to: `/sites/${siteId}/translate` },
+  json_ld_valid:            { to: `/sites/${siteId}/seo` },
+  sitemap_published:        { to: `/sites/${siteId}/seo` },
+  domain_dns_ok:            { to: `/sites/${siteId}/domains` },
+  ssl_ok:                   { to: `/sites/${siteId}/domains` },
+  mollie_active:            { to: `/sites/${siteId}/integrations` },
+  legal_pages:              { to: `/sites/${siteId}/pages` },
+  blog_min_3:               { to: `/sites/${siteId}/blog-posts` },
+  landing_pages_min:        { to: `/sites/${siteId}/seo` },
+  gsc_connected:            { to: `/sites/${siteId}/seo` },
+  merchant_connected:       { to: `/sites/${siteId}/seo` },
+  indexnow_recent:          { to: `/sites/${siteId}/seo` },
+  perf_ok:                  { to: `/sites/${siteId}/qa` },
+});
+
 export default function SiteQA() {
   const { id: siteId } = useParams();
   const { allowed, checking } = useStepGuard(siteId, "qa");
