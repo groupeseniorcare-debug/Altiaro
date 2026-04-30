@@ -536,46 +536,66 @@ _CHECKERS = {
 
 
 async def compute_step_statuses(site_id: str) -> list[dict]:
-    """Calcule le statut des 10 étapes pour un site (Lot D — domain inséré).
-    Retourne la liste ordonnée [pricing, import, …, qa] avec
-    `blocked_by_previous` pour chaque étape.
+    """Calcule le statut des 10 étapes pour un site avec **gating en cascade STRICT**.
 
-    L'étape `domain` est marquée `optional: true` : elle ne bloque pas la
-    suite (le concepteur peut la skipper et utiliser le sous-domaine plateforme).
+    Règle unique (2026-04-30) :
+      Une étape N est débloquée UNIQUEMENT si l'étape N-1 est `completed`.
+      Si l'étape N-1 n'est pas completed, alors N, N+1, …, 10 sont TOUTES
+      `locked`, peu importe leurs signaux auto (domain, translate, etc.).
+
+    Une étape est completed si :
+      - `manual_step_overrides[key] == True` (cliqué "Valider et passer à l'étape suivante"), OU
+      - ses checks data automatiques passent (`completed=True` retourné par le checker),
+      MAIS en plus `blocked_by_previous=False` (chaîne intacte).
+
+    Plus de `soft_unlocked`, plus d'exception `optional` : la chaîne est stricte.
     """
     site = await db.sites.find_one({"id": site_id}, {"_id": 0})
     if not site:
         raise HTTPException(404, "Site introuvable")
 
     statuses: list[dict] = []
-    previous_completed = True  # première étape toujours accessible
-    # 2026-04-29 (refonte UX) — Gating STRICT, plus de soft_unlocked.
-    # Une étape est cliquable UNIQUEMENT si la précédente est completed.
-    # Une étape est completed UNIQUEMENT si tous ses checks data passent OU
-    # si l'utilisateur l'a explicitement marquée (manual_completed côté DB).
+    chain_broken = False  # dès qu'une étape n'est pas completed → tout ce qui suit est locked
     manual_overrides = await _load_manual_step_overrides(site_id)
+
     for key in STEP_ORDER:
         checker = _CHECKERS[key]
         s = await checker(site_id, site)
         s["order"] = STEP_ORDER.index(key) + 1
-        # Override manuel : si le concepteur a cliqué "Valider et passer
-        # à l'étape suivante", on force completed=True quel que soit le
-        # check data.
-        if manual_overrides.get(key) is True:
-            s["completed"] = True
-            s["manual_validated"] = True
-        else:
+        s.pop("soft_unlocked", None)  # plus de notion floue
+
+        # 1) Chain broken : cette étape et toutes les suivantes sont locked.
+        #    On force `completed=False` et `is_clickable=False` pour éviter que
+        #    les signaux auto (ex: domaine déjà créé) apparaissent comme
+        #    "auto-validées" avant que les étapes précédentes soient faites.
+        if chain_broken:
+            s["completed"] = False
             s["manual_validated"] = False
-        # On retire toute notion de soft_unlocked — l'utilisateur a demandé
-        # une logique strict on/off.
-        s.pop("soft_unlocked", None)
-        s["blocked_by_previous"] = not previous_completed
+            s["auto_validated"] = False
+            s["blocked_by_previous"] = True
+            s["is_clickable"] = False
+            s["status"] = "locked"
+            statuses.append(s)
+            continue
+
+        # 2) Chaîne intacte à ce stade.
+        is_manual = manual_overrides.get(key) is True
+        auto_completed = bool(s.get("completed"))
+        is_completed = is_manual or auto_completed
+
+        s["completed"] = is_completed
+        s["manual_validated"] = is_manual
+        s["auto_validated"] = auto_completed and not is_manual
+        s["blocked_by_previous"] = False
+        s["is_clickable"] = True
+        s["status"] = "complete" if is_completed else "current"
         statuses.append(s)
-        if s.get("optional"):
-            # propage le previous_completed précédent
-            pass
-        else:
-            previous_completed = bool(s["completed"])
+
+        # 3) Si cette étape n'est PAS completed, la chaîne est rompue :
+        #    toutes les suivantes seront locked.
+        if not is_completed:
+            chain_broken = True
+
     return statuses
 
 

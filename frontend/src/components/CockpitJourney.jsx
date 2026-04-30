@@ -202,7 +202,7 @@ function StepRow({ step, meta, href }) {
               className="text-[9px] uppercase tracking-widest bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded whitespace-nowrap font-semibold"
               data-testid={`journey-done-${step.key}`}
             >
-              {step.manual_validated ? "Validée manuellement" : "Auto-validée"}
+              Terminé
             </span>
           )}
         </div>

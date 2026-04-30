@@ -107,16 +107,43 @@ async def reset_site_to_step_5(
             "$unset": {
                 "ai_images_ready_at": "",
                 "narrative_generated_at": "",
+                "title_i18n": "",
+                "description_i18n": "",
+                "usps_i18n": "",
+                "faq_i18n": "",
+                "seo_title_i18n": "",
+                "seo_description_i18n": "",
+                "meta_i18n": "",
             },
         },
     )
     summary["products_reset"] = int(products_update.modified_count)
+
+    # 2bis) Site : wipe translations i18n + active_languages → [default]
+    default_lang = None
+    _site_full = await db.sites.find_one({"id": site_id}, {"_id": 0, "default_language": 1, "languages": 1})
+    if _site_full:
+        default_lang = _site_full.get("default_language") or (_site_full.get("languages") or ["fr"])[0]
+    await db.sites.update_one(
+        {"id": site_id},
+        {
+            "$set": {
+                "translations_i18n": {},
+                "active_languages": [default_lang or "fr"],
+            },
+            "$unset": {
+                "translation_last_run_at": "",
+                "translation_progress": "",
+            },
+        },
+    )
 
     # 3) Delete collections de génération (blog, landings, AEO, keywords, pages)
     for coll, filt in [
         ("blog_posts",       {"site_id": site_id}),
         ("blog_jobs",        {"site_id": site_id}),
         ("landing_pages",    {"site_id": site_id}),
+        ("pages",            {"site_id": site_id}),   # pages CMS (about, faq, contact, …)
         ("pages_jobs",       {"site_id": site_id}),
         ("aeo_jobs",         {"site_id": site_id}),
         ("keyword_universe", {"site_id": site_id}),
