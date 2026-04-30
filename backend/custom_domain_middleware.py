@@ -58,6 +58,33 @@ SKIP_PATH_PREFIXES = (
     "/shop/",  # déjà en forme canonique, ne pas toucher
 )
 
+# Sous un domaine custom (boutique concepteur), ces préfixes de path sont
+# des chemins plateforme (Cockpit, Admin, auth plateforme). On ne veut PAS
+# les exposer aux visiteurs du storefront : ils sont renvoyés vers la home
+# boutique (`/shop/{site_id}/`).
+PLATFORM_ONLY_PREFIXES = (
+    "/admin",
+    "/sites",          # Cockpit concepteur /sites/:id/...
+    "/concepteur",
+    "/signup",
+    "/login",
+    "/verify-email",
+    "/niche",
+    "/quick-scan",
+    "/analyzer",
+    "/opportunities",
+    "/sourcing",
+    "/finance",
+    "/billing",
+    "/orders",
+    "/users",
+    "/empire",
+    "/domains",
+    "/ads",
+    "/dashboard",
+    "/cockpit",
+)
+
 # Cache in-memory simple (hostname → site_id) pour éviter 1 query DB par requête.
 # 5 min TTL grossier : un admin qui change le domain d'un site aura un léger
 # délai avant le routing actif, acceptable.
@@ -110,25 +137,51 @@ def _path_skipped(path: str) -> bool:
     return False
 
 
+def _is_platform_only_path(path: str) -> bool:
+    """Chemins strictement plateforme (Cockpit, admin, auth) — interdits
+    sous un domaine custom de boutique."""
+    p = path or "/"
+    for pref in PLATFORM_ONLY_PREFIXES:
+        if p == pref or p.startswith(pref + "/") or p.startswith(pref + "?"):
+            return True
+    return False
+
+
 async def custom_domain_rewrite(request, call_next):
     """Middleware ASGI : réécrit le path des requêtes arrivant sur un
     domaine custom pour qu'elles soient servies par le router storefront.
 
     Avant : GET altea-home.com/ → scope.path="/"
     Après : GET altea-home.com/ → scope.path="/shop/{altea_id}/"
+
+    Sécurité : sous un domaine custom, les chemins plateforme (/admin, /sites,
+    /concepteur, /login, /signup, etc.) sont redirigés vers la home boutique.
+    Un visiteur de `altea-home.com` ne doit JAMAIS voir le Cockpit.
     """
     scope = request.scope
     host = request.headers.get("host", "") or ""
     path = scope.get("path", "/") or "/"
 
-    if not host or _host_is_platform(host) or _path_skipped(path):
+    # API et assets techniques : toujours servis tels quels (côté backend)
+    if _path_skipped(path):
         return await call_next(request)
 
-    # Host custom + path non exclu → tenter la résolution
+    # Host plateforme (altiaro.com, preview, localhost) : passthrough SPA
+    if not host or _host_is_platform(host):
+        return await call_next(request)
+
+    # Host custom (ex: altea-home.com) → tenter la résolution
     site_id = await _resolve_site_for_host(host)
     if not site_id:
         # Host inconnu : on laisse passer (le front SPA servira un 404 sobre)
         return await call_next(request)
+
+    # Garde-fou : sous un domaine boutique, les chemins plateforme sont
+    # silencieusement redirigés vers la home boutique.
+    if _is_platform_only_path(path):
+        from starlette.responses import RedirectResponse
+        logger.info(f"[custom-domain] {host}{path} → blocked (platform path), redirect /")
+        return RedirectResponse(url="/", status_code=302)
 
     # Réécriture du path : on préfixe /shop/{site_id}
     new_path = f"/shop/{site_id}{path if path != '/' else ''}"

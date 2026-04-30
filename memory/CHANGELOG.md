@@ -4,6 +4,60 @@ Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
 
+## 2026-04-30 · Phase 1 — Parcours E2E Altea + UX LaunchProgress + Host-routing
+
+### Host-routing custom domain (sécurité)
+- **`backend/custom_domain_middleware.py`** durci : sous un domaine boutique
+  (ex `altea-home.com`), les chemins plateforme (`/admin`, `/sites/*`,
+  `/concepteur`, `/login`, `/signup`, `/niche`, `/sourcing`, `/empire`, …)
+  sont désormais **redirigés en 302 vers `/`** (home boutique). Un visiteur
+  d'`altea-home.com` ne peut plus accéder au Cockpit.
+- Tests curl validés :
+  - `altiaro.com/admin` → 404 (passthrough SPA, middleware inactif) ✅
+  - `altea-home.com/admin` → 302 (bloqué par le middleware) ✅
+  - `altea-home.com/legal/mentions` → 200 SSR (pages légales cross-host) ✅
+  - `altea-home.com/api/health` → 200 (API toujours accessible) ✅
+
+### Parcours Altea E2E validé via API
+| Étape | Endpoint | Résultat |
+|---|---|---|
+| 1 Pricing | `POST /api/sites/{id}/pricing-analysis` | 200 — 6 concurrents, 3 fourchettes |
+| 2 Import | auto-valid (9 produits déjà sourcés) | 200 |
+| 3 Upsells | `POST /api/sites/{id}/upsells/suggest` | 200 — 10 suggestions Claude |
+| 4 Forecast | `POST /api/sites/{id}/financial-forecast` | 200 — verdict `healthy` |
+| 5 Branding | page débloquée (current) | prête pour launch UI |
+| 10 QA | `GET /api/sites/{id}/qa/checklist` | 200 — score 75, `FIX_LINKS` OK |
+
+### UX LaunchProgress — refonte Luxury Minimal
+- **`backend/routes/launch.py`** : endpoint `/design/launch-status` enrichi
+  de 7 nouveaux champs (`phase_label`, `phase_range`, `elapsed_seconds`,
+  `last_heartbeat_age_seconds`, `is_stale`, `items_done`, `items_total`,
+  `current_item_label`). Détection `is_stale` automatique côté backend
+  (heartbeat > 180 s).
+- **Nouvel endpoint** `POST /api/sites/{id}/design/launch-restart` :
+  clôt proprement les jobs running/queued zombies en `failed` puis
+  relance un auto-launch propre.
+- **`frontend/src/components/LaunchProgress.jsx`** réécrit :
+  - Fond ivoire `#F5F2EB`, titres Cormorant Garamond (premium).
+  - 6 phases nommées (Analyse niche → Identité marque → Images IA →
+    Descriptions → Assemblage storefront → Contrôle qualité).
+  - Compteur temps écoulé + estimation temps restant (règle de 3).
+  - Badge "IA active il y a Xs" pour rassurer.
+  - Micro-étape : "Image 4/8 · Produit 2 sur 9" (via `items_done/items_total`).
+  - Bandeau ambre si `is_stale=True` avec bouton "Relancer la génération"
+    → appelle `/launch-restart`.
+  - Plus de jargon technique (worker, cluster, dispatch supprimés).
+
+### Non traité dans cette phase (signalé honnêtement)
+- Erreur étape 3 signalée par l'utilisateur : **non reproduite** sur le site
+  Altea via API (200 OK). Probablement liée à une version ancienne côté
+  prod. À re-vérifier une fois Save to Github + Deploy effectués.
+- Bornes % des phases de l'endpoint enrichi : alignées sur le pipeline
+  réel mais le champ `step_progress.items_*` n'est pas encore écrit par
+  tous les workers (hero image, témoignages). À câbler côté `_run_launch`
+  dans une phase ultérieure pour les micro-étapes « Image 4/8 · Produit 2/9 ».
+
+
 ## 2026-04-28 (latest) · Mission Finalisation Altiaro — Phases A2 + B + C + D' + E'
 
 ### Phase A2 · File d'attente blog asynchrone

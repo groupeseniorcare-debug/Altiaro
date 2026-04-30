@@ -1531,7 +1531,16 @@ async def launch_status(
     job_id: Optional[str] = None,
     user: dict = Depends(get_current_user),
 ):
-    """Return the current progress of a launch job (latest if no job_id given)."""
+    """Return the current progress of a launch job (latest if no job_id given).
+
+    Enrichi avec :
+      - phase_label (FR premium, sans jargon)
+      - phase_range ({"min": int, "max": int})
+      - elapsed_seconds
+      - last_heartbeat_age_seconds (None si aucun heartbeat)
+      - is_stale (True si heartbeat > 180 s)
+      - items_done / items_total / current_item_label (depuis step_progress)
+    """
     await _check_site_access(site_id, user)
     query = {"site_id": site_id}
     if job_id:
@@ -1541,7 +1550,103 @@ async def launch_status(
     )
     if not doc:
         return {"status": "idle"}
+
+    # Phases premium — mapping aux bornes de progress du pipeline actuel
+    progress = int(doc.get("progress") or 0)
+    phases = [
+        (0,  10, "Analyse de votre niche et positionnement"),
+        (10, 25, "Génération de l'identité de marque (nom, baseline, palette, logo)"),
+        (25, 55, "Création des images IA produits — 8 styles par produit"),
+        (55, 75, "Rédaction des descriptions produits premium"),
+        (75, 90, "Assemblage du storefront (home, collections, pages)"),
+        (90, 100, "Contrôle qualité final et mise en ligne"),
+    ]
+    phase_label = phases[-1][2]
+    phase_range = {"min": 90, "max": 100}
+    for lo, hi, label in phases:
+        if lo <= progress < hi:
+            phase_label = label
+            phase_range = {"min": lo, "max": hi}
+            break
+
+    # Durée écoulée + fraîcheur heartbeat
+    from datetime import datetime as _dt, timezone as _tz
+    now = _dt.now(_tz.utc)
+
+    def _parse_iso(s):
+        if not s:
+            return None
+        try:
+            if isinstance(s, _dt):
+                return s if s.tzinfo else s.replace(tzinfo=_tz.utc)
+            return _dt.fromisoformat(str(s).replace("Z", "+00:00"))
+        except Exception:
+            return None
+
+    started = _parse_iso(doc.get("started_at") or doc.get("created_at"))
+    elapsed_s = int((now - started).total_seconds()) if started else None
+
+    hb = _parse_iso(doc.get("last_heartbeat") or doc.get("last_heartbeat_at"))
+    hb_age = int((now - hb).total_seconds()) if hb else None
+    is_stale = (
+        doc.get("status") == "running"
+        and hb_age is not None
+        and hb_age > 180
+    )
+
+    # Micro-étapes courantes (lues dans step_progress si présent)
+    step_progress = doc.get("step_progress") or {}
+    items_done = step_progress.get("items_done")
+    items_total = step_progress.get("items_total")
+    current_item_label = step_progress.get("current_item_label") or step_progress.get("current_label")
+
+    # Alias heartbeat pour le frontend (toujours exposé)
+    doc["phase_label"] = phase_label
+    doc["phase_range"] = phase_range
+    doc["elapsed_seconds"] = elapsed_s
+    doc["last_heartbeat_age_seconds"] = hb_age
+    doc["is_stale"] = bool(is_stale)
+    doc["items_done"] = items_done
+    doc["items_total"] = items_total
+    doc["current_item_label"] = current_item_label
     return doc
+
+
+@router.post("/sites/{site_id}/design/launch-restart", status_code=202)
+async def launch_restart(
+    site_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Marque le dernier job en running/queued comme `failed` (si stale),
+    puis relance un auto-launch propre.
+
+    Utile quand un job est zombie (heartbeat > 3 min) ou quand l'utilisateur
+    veut forcer une reprise après un crash/restart backend.
+    """
+    await _check_site_access(site_id, user)
+    from datetime import datetime as _dt, timezone as _tz
+    now_iso = _dt.now(_tz.utc).isoformat()
+
+    # 1) Clore proprement les jobs running/queued existants
+    r = await db.launch_jobs.update_many(
+        {"site_id": site_id, "status": {"$in": ["running", "queued"]}},
+        {
+            "$set": {
+                "status": "failed",
+                "error": "Relancé manuellement par l'utilisateur (job précédent interrompu)",
+                "finished_at": now_iso,
+            }
+        },
+    )
+    closed = int(r.modified_count)
+
+    # 2) Relancer via le endpoint auto-launch (réutilise toute la logique)
+    try:
+        resp = await launch_site_auto(site_id, user=user)  # type: ignore[name-defined]
+        return {"ok": True, "closed_previous_jobs": closed, "new_launch": resp}
+    except Exception as e:
+        logger.exception("launch_restart: relance échouée")
+        raise HTTPException(500, f"Relance impossible : {e}")
 
 
 # ------------------------------------------------------------------
