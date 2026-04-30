@@ -108,6 +108,7 @@ from routes import automation as automation_routes  # Refonte UX — toggles aut
 from routes import well_known as well_known_routes  # Google Site Verification (altiaro.com)
 from routes import google_master as google_master_routes  # Master OAuth + auto-provisioning
 from routes import public_legal as public_legal_routes  # Fallback HTML SSR /legal/* (altiaro.com prod)
+from routes import admin_reset as admin_reset_routes  # Reset site → étape 5 + launch instructions
 
 logging.basicConfig(
     level=logging.INFO,
@@ -203,6 +204,7 @@ api.include_router(geo_routes_finalisation.router)  # Phase D' — détection pa
 api.include_router(automation_routes.router)  # Refonte UX — toggles automatisation
 api.include_router(well_known_routes.router)  # Google Site Verification (altiaro.com)
 api.include_router(google_master_routes.router)  # Master OAuth + auto-provisioning
+api.include_router(admin_reset_routes.router)  # Admin reset + launch instructions
 
 # IMPORTANT — Routes /legal/* HTML server-side : montées DIRECTEMENT sur `app`
 # (pas sur le router /api). Sur le preview Kubernetes l'ingress route /legal/*
@@ -1035,6 +1037,11 @@ app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads"
 # CORS
 cors_origins_env = os.environ.get("CORS_ORIGINS", "")
 cors_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
+
+# Custom-domain host routing (altea-home.com & co → /shop/{site_id}/…)
+# Monté avant CORS pour que la réécriture de path se fasse au plus tôt.
+from custom_domain_middleware import custom_domain_rewrite  # noqa: E402
+app.middleware("http")(custom_domain_rewrite)
 
 # Wildcard mode with credentials: use allow_origin_regex to echo request origin
 # (Starlette refuses to send ACAO:<origin> when allow_origins=["*"] and credentials=True,

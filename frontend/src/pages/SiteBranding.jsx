@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, CheckCircle, Storefront as StoreIcon, Rocket, Palette, Sparkle, MagicWand } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, CheckCircle, Storefront as StoreIcon, Rocket, Palette, Sparkle, MagicWand, PencilSimple, Warning } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import NextStepCTA from "../components/NextStepCTA";
 import { api, apiCall } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import IdentityTab from "../components/site-design/IdentityTab";
 import LivePreview from "../components/site-design/LivePreview";
 import BrandWizard from "../components/BrandWizard";
@@ -89,6 +90,51 @@ export default function SiteBranding() {
 
   // ── Mode Auto-pilot : 1 clic full IA ultra premium ────────────────────
   const [launching, setLaunching] = useState(false);
+
+  // ── Consignes utilisateur avant lancement (passées à Claude/Nano Banana)
+  const [userInstructions, setUserInstructions] = useState("");
+  const [instructionsLoaded, setInstructionsLoaded] = useState(false);
+  const [instructionsSaving, setInstructionsSaving] = useState(false);
+  useEffect(() => {
+    (async () => {
+      const { data } = await apiCall(() => api.get(`/sites/${siteId}/launch-instructions`));
+      if (data) setUserInstructions(data.instructions || "");
+      setInstructionsLoaded(true);
+    })();
+  }, [siteId]);
+  const saveInstructions = async (value) => {
+    setInstructionsSaving(true);
+    await apiCall(() => api.patch(`/sites/${siteId}/launch-instructions`, { instructions: value }));
+    setInstructionsSaving(false);
+  };
+
+  // ── Admin-only : reset du site à l'état "post-étape-4" (test complet) ──
+  const { user } = useAuth() || {};
+  const isAdmin = (user || {}).role === "admin";
+  const [resetting, setResetting] = useState(false);
+  const resetToStep5 = async () => {
+    const confirmed = window.confirm(
+      "Cette action va supprimer le branding, les images IA, le blog, les traductions " +
+      "et les pages générées du site. Les produits, les upsells, le forecast et le domaine " +
+      "seront conservés. Confirmer ?"
+    );
+    if (!confirmed) return;
+    setResetting(true);
+    const { data, error } = await apiCall(() =>
+      api.post(`/admin/sites/${siteId}/reset-to-step-5`, { confirm: true }),
+    );
+    setResetting(false);
+    if (error) {
+      toast.error("Reset impossible", { description: error });
+      return;
+    }
+    toast.success("Site remis à l'étape 5", {
+      description: `Nettoyé : ${Object.entries(data?.summary || {}).map(([k, v]) => `${k}=${v}`).join(" · ") || "rien à nettoyer"}`,
+      duration: 8000,
+    });
+    await reload();
+  };
+
   const launchAuto = async () => {
     setLaunching(true);
     const { data, error } = await apiCall(
@@ -179,6 +225,66 @@ export default function SiteBranding() {
           </div>
 
           <div className="space-y-4">
+            {/* ── Consignes utilisateur (injectées dans Claude/Nano Banana) ── */}
+            <div
+              className="bg-[#FDFCF9] border border-[#E8E2D5] rounded-2xl p-5"
+              data-testid="launch-instructions-card"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <PencilSimple size={16} weight="duotone" className="text-neutral-700" />
+                <div className="text-[13px] font-semibold text-neutral-900">
+                  Vos consignes <span className="text-neutral-400 font-normal">(optionnel)</span>
+                </div>
+                {instructionsSaving && (
+                  <span className="text-[10px] uppercase tracking-widest text-neutral-400 ml-auto">
+                    enregistrement…
+                  </span>
+                )}
+              </div>
+              <textarea
+                value={userInstructions}
+                onChange={(e) => setUserInstructions(e.target.value)}
+                onBlur={(e) => saveInstructions(e.target.value)}
+                disabled={!instructionsLoaded || launching}
+                placeholder="Ex: garde le nom Altea, palette ivoire, audience femme 30-50 ans amateur de design d'intérieur, ton chaleureux et éditorial…"
+                rows={4}
+                maxLength={2000}
+                data-testid="launch-instructions-textarea"
+                className="w-full text-[13.5px] text-neutral-800 bg-white border border-neutral-200 rounded-lg p-3 leading-relaxed focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 disabled:opacity-60 resize-y"
+              />
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-[11.5px] text-neutral-500 leading-relaxed">
+                  Altiaro prendra ces consignes en compte pour générer votre site
+                  (nom de marque, style, palette, audience, ton éditorial…).
+                </p>
+                <span className="text-[10px] text-neutral-400 tabular-nums ml-3">
+                  {userInstructions.length}/2000
+                </span>
+              </div>
+            </div>
+
+            {/* ── Admin-only : Reset site à l'étape 5 (test complet) ── */}
+            {isAdmin && (
+              <div
+                className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3"
+                data-testid="admin-reset-card"
+              >
+                <Warning size={18} weight="duotone" className="text-rose-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 text-[13px] text-rose-900 leading-relaxed">
+                  <strong>Admin · Reset test</strong> — Remet ce site à l'état post-étape-4
+                  (garde produits/upsells/forecast/domaine, efface branding/images/blog/traductions).
+                </div>
+                <button
+                  onClick={resetToStep5}
+                  disabled={resetting || launching}
+                  data-testid="admin-reset-button"
+                  className="h-9 px-4 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[12px] font-semibold whitespace-nowrap disabled:opacity-60"
+                >
+                  {resetting ? "Reset…" : "Reset à l'étape 5"}
+                </button>
+              </div>
+            )}
+
             {/* Option A — HERO Auto IA */}
             <button
               onClick={launchAuto}

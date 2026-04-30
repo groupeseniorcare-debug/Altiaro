@@ -1567,21 +1567,38 @@ def _pick_text_simple(value):
     return ""
 
 
-async def _claude_brand_autoprefill(site_name: str, niche: str, products_titles: list[str]) -> dict:
+async def _claude_brand_autoprefill(
+    site_name: str,
+    niche: str,
+    products_titles: list[str],
+    user_instructions: str = "",
+) -> dict:
     """Demande à Claude de générer une identité de marque ultra-premium complète.
 
     Retourne un dict avec brand_name, tagline, mission, voice, mood, palette,
     font_pair, hero_concept, narrative_angle. Lève HTTPException(502) si Claude
     indispo ou JSON invalide.
+
+    Si `user_instructions` est non vide, elles sont injectées EN PRIORITÉ dans
+    le prompt : l'IA doit les respecter (nom de marque imposé, style dicté,
+    audience cible, etc.).
     """
     products_block = "\n".join(f"- « {t} »" for t in products_titles[:5] if t) or "(catalogue vide)"
+    instr = (user_instructions or "").strip()
     system_msg = (
         "Tu es directeur artistique senior d'agence de luxe (Apple, Hermès, Aesop, Dyson, "
         "Loro Piana). Tu réponds UNIQUEMENT en JSON valide, sans texte avant/après, sans "
         "markdown fence."
     )
+    priority_block = ""
+    if instr:
+        priority_block = (
+            "\n⚠️ CONSIGNES UTILISATEUR PRIORITAIRES (À RESPECTER ABSOLUMENT, "
+            "prévaut sur les règles ci-dessous en cas de conflit) :\n"
+            f"« {instr[:1500]} »\n"
+        )
     user_prompt = f"""Crée l'identité de marque ULTRA-PREMIUM pour cette boutique e-commerce.
-
+{priority_block}
 Contexte :
 - Nom du site : {site_name or "(non défini)"}
 - Niche : {niche}
@@ -1725,9 +1742,10 @@ async def launch_site_auto(
         or "premium e-commerce"
     )
     site_name = site.get("name") or ""
+    user_instructions = (site.get("launch_instructions") or "").strip()
 
-    # 1) Demande à Claude l'identité complète
-    parsed = await _claude_brand_autoprefill(site_name, niche, products_titles)
+    # 1) Demande à Claude l'identité complète (avec consignes user si fournies)
+    parsed = await _claude_brand_autoprefill(site_name, niche, products_titles, user_instructions)
 
     # 2) Construit le payload Wizard equivalent (réutilise WizardInput pour
     #    rester compatible avec _run_launch sans modifier ce dernier).
@@ -1746,6 +1764,7 @@ async def launch_site_auto(
         # — pas de breaking change)
         "hero_concept":    parsed.get("hero_concept", ""),
         "narrative_angle": parsed.get("narrative_angle", ""),
+        "user_instructions": user_instructions,  # propagées à chaque sous-étape IA
         "premium_mode":    True,
     }
 
