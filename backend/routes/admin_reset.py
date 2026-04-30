@@ -72,13 +72,17 @@ async def reset_site_to_step_5(
     summary: dict[str, int] = {}
 
     # 1) Reset du document site (branding/design/status/overrides/went_live)
+    # NB: on met `brand` et `design` à des DICTS VIDES (pas None) pour que
+    # les futurs `$set: {"design.<k>": ...}` / `$set: {"brand.<k>": ...}`
+    # effectués par les routes (ex: cockpit_tools.pricing_analysis) puissent
+    # écrire sans lever "Cannot create field in element {design: null}".
     site_update_result = await db.sites.update_one(
         {"id": site_id},
         {
             "$set": {
                 "status": "staging",
-                "brand": None,
-                "design": None,
+                "brand": {},
+                "design": {},
                 "logo_url": None,
                 "hero_image_url": None,
                 "manual_step_overrides": {},
