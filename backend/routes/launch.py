@@ -1552,7 +1552,9 @@ async def launch_status(
         return {"status": "idle"}
 
     # Phases premium — mapping aux bornes de progress du pipeline actuel
-    progress = int(doc.get("progress") or 0)
+    # NB: la vraie valeur vit dans `progress_pct` côté DB (écrit par _run_launch).
+    # L'ancien champ `progress` reste toléré pour compat mais n'est plus peuplé.
+    progress = int(doc.get("progress_pct") or doc.get("progress") or 0)
     phases = [
         (0,  10, "Analyse de votre niche et positionnement"),
         (10, 25, "Génération de l'identité de marque (nom, baseline, palette, logo)"),
@@ -1601,6 +1603,8 @@ async def launch_status(
     current_item_label = step_progress.get("current_item_label") or step_progress.get("current_label")
 
     # Alias heartbeat pour le frontend (toujours exposé)
+    doc["progress"] = progress  # normalisé (= progress_pct)
+    doc["progress_pct"] = progress
     doc["phase_label"] = phase_label
     doc["phase_range"] = phase_range
     doc["elapsed_seconds"] = elapsed_s

@@ -106,7 +106,7 @@ export default function LaunchProgress({ siteId, jobId, onDone, onFailed, onAbor
     } finally { setRestarting(false); }
   };
 
-  const pct = Math.max(1, Math.min(100, Number(job?.progress ?? job?.progress_pct ?? 1)));
+  const pct = Math.max(1, Math.min(100, Number(job?.progress_pct ?? job?.progress ?? 1)));
   const status = job?.status || "running";
   const phaseLabel = job?.phase_label || "Démarrage de la génération…";
   const phaseRange = job?.phase_range || { min: 0, max: 100 };
