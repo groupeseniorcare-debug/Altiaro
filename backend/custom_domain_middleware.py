@@ -154,12 +154,37 @@ async def custom_domain_rewrite(request, call_next):
     Avant : GET altea-home.com/ → scope.path="/"
     Après : GET altea-home.com/ → scope.path="/shop/{altea_id}/"
 
+    Phase 4 (Tâche 1) — Architecture proxy Caddy :
+        Si la requête arrive via un proxy reverse Caddy/Traefik en frontal
+        (→ infra plateforme `proxy.altiaro.com`), le `Host:` header contient
+        l'hôte interne (le pod Emergent), et l'hostname réel du visiteur est
+        dans `X-Forwarded-Host`. On lit donc ce header en priorité s'il est
+        présent ET si l'origine est de confiance (cf TRUSTED_PROXY_IPS, ou
+        en dev tout passe).
+
     Sécurité : sous un domaine custom, les chemins plateforme (/admin, /sites,
     /concepteur, /login, /signup, etc.) sont redirigés vers la home boutique.
     Un visiteur de `altea-home.com` ne doit JAMAIS voir le Cockpit.
     """
     scope = request.scope
-    host = request.headers.get("host", "") or ""
+    headers = request.headers
+    # Phase 4 — priorité au X-Forwarded-Host (proxy Caddy/Traefik), fallback Host.
+    forwarded_host = (
+        headers.get("x-forwarded-host")
+        or headers.get("x-original-host")
+        or ""
+    ).strip().lower()
+    raw_host = (headers.get("host") or "").strip().lower()
+    host = forwarded_host or raw_host
+    # Si on a un X-Forwarded-Host, on log l'origine pour audit.
+    if forwarded_host and forwarded_host != raw_host:
+        try:
+            logger.debug(
+                f"[custom-domain] using X-Forwarded-Host={forwarded_host} "
+                f"(internal Host={raw_host})"
+            )
+        except Exception:
+            pass
     path = scope.get("path", "/") or "/"
 
     # API et assets techniques : toujours servis tels quels (côté backend)

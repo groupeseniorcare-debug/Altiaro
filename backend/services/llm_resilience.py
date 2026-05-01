@@ -328,11 +328,13 @@ async def safe_llm_text(
 
     async def _do() -> str:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from services.llm_async import send_message_threaded
         chat = (
             LlmChat(api_key=EMERGENT_LLM_KEY, session_id=sid, system_message=system)
             .with_model(provider, model)
         )
-        raw = await chat.send_message(UserMessage(text=user))
+        # Phase 4.b — exécution dans un thread pour ne pas bloquer l'event loop
+        raw = await send_message_threaded(chat, UserMessage(text=user))
         return raw if isinstance(raw, str) else str(raw)
 
     breaker_name = "claude" if provider == "anthropic" else provider
@@ -374,11 +376,13 @@ async def safe_claude_text(
     async def _do() -> str:
         # Local import = avoid hard dep on emergentintegrations at module load
         from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from services.llm_async import send_message_threaded
         kwargs = {"api_key": EMERGENT_LLM_KEY, "session_id": sid, "system_message": system}
         if initial_messages:
             kwargs["initial_messages"] = initial_messages
         chat = LlmChat(**kwargs).with_model("anthropic", resolved_model)
-        raw = await chat.send_message(UserMessage(text=user))
+        # Phase 4.b — exécution dans un thread pour ne pas bloquer l'event loop
+        raw = await send_message_threaded(chat, UserMessage(text=user))
         text = raw if isinstance(raw, str) else str(raw)
         # Cost tracking auto-record (no-op si aucun job_id n'est dans le contexte)
         try:
@@ -465,6 +469,7 @@ async def safe_nano_banana_bytes(
     async def _do() -> Optional[bytes]:
         import base64 as _b64
         from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+        from services.llm_async import send_multimodal_threaded
         chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=sid,
                        system_message=system or "")
         chat.with_model("gemini", NANO_MODEL).with_params(modalities=["image", "text"])
@@ -473,7 +478,8 @@ async def safe_nano_banana_bytes(
         if reference_image_b64:
             file_contents.append(ImageContent(image_base64=reference_image_b64))
         msg = UserMessage(text=prompt, file_contents=file_contents)
-        _, images = await chat.send_message_multimodal_response(msg)
+        # Phase 4.b — exécution dans un thread pour ne pas bloquer l'event loop
+        _, images = await send_multimodal_threaded(chat, msg)
         if not images:
             return None
         first = images[0]
@@ -517,9 +523,11 @@ async def safe_nano_banana(
 
     async def _do() -> Optional[str]:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from services.llm_async import send_message_threaded
         chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=sid, system_message="")
         chat = chat.with_model("gemini", NANO_MODEL).with_params(modalities=["image", "text"])
-        reply = await chat.send_message(UserMessage(text=prompt))
+        # Phase 4.b — exécution dans un thread pour ne pas bloquer l'event loop
+        reply = await send_message_threaded(chat, UserMessage(text=prompt))
         # The integrations layer returns either a URL string, a dict with "image_url"/"url",
         # or a base64 data URI. We tolerate all 3 to remain forward-compatible.
         url = None

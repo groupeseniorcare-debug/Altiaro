@@ -40,10 +40,16 @@ async def list_products(site_id: str, user: dict = Depends(get_current_user)):
 async def create_product(site_id: str, data: ProductCreateInput, user: dict = Depends(get_current_user)):
     await _check_site_access(site_id, user)
     now = datetime.now(timezone.utc).isoformat()
+    payload = data.model_dump()
+    # Phase 4 fix — slug à l'import (idempotent : ne touche pas si déjà fourni).
+    if not payload.get("slug"):
+        from services.slugify import slugify, _pick_text as _slug_pick
+        nm = payload.get("name") or payload.get("title") or ""
+        payload["slug"] = slugify(_slug_pick(nm))
     doc = {
         "id": str(uuid.uuid4()),
         "site_id": site_id,
-        **data.model_dump(),
+        **payload,
         "created_at": now,
         "updated_at": now,
         "created_by": user["id"],

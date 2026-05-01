@@ -590,6 +590,12 @@ async def aliexpress_product_import(data: ProductImportInput, user=Depends(get_c
     # Our internal product schema mirrors what SiteProducts.jsx expects.
     product_id_internal = f"ae-{data.product_id}"
     now_iso = datetime.now(timezone.utc).isoformat()
+    # Phase 4 fix — slug à l'import (indépendant du LLM).
+    # Nécessaire pour que les PDP soient adressables même si le launch
+    # n'a pas encore tourné, et pour que les futurs sites custom-domain
+    # aient des URLs propres dès l'arrivée du concepteur étape 5.
+    from services.slugify import slugify, _pick_text as _slug_pick
+    _slug = slugify(_slug_pick(title) or f"produit-{data.product_id}")
     product_doc = {
         "id": product_id_internal,
         "site_id": data.site_id,
@@ -599,6 +605,7 @@ async def aliexpress_product_import(data: ProductImportInput, user=Depends(get_c
         "supplier": "AliExpress",
         "supplier_url": f"https://www.aliexpress.com/item/{data.product_id}.html",
         "name": {"fr": title, "en": title},
+        "slug": _slug,
         "description": {"fr": "", "en": ""},
         "price": round(min_price or 0.0, 2),
         "currency": currency,

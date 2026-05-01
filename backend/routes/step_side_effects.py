@@ -360,10 +360,12 @@ Uniquement le JSON."""
             if price > 0:
                 margin_pct = round(((price - supplier) / price) * 100, 1)
             pid = str(uuid.uuid4())
+            from services.slugify import slugify
             doc = {
                 "id": pid,
                 "site_id": step["site_id"],
                 "name": str(p["name"])[:120],
+                "slug": slugify(str(p["name"])),
                 "description": str(p.get("description") or "")[:6000],
                 "short_description": str(p.get("short_description") or "")[:300],
                 "price_eur": price,

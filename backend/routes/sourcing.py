@@ -764,10 +764,14 @@ async def import_product(site_id: str, data: ImportInput, user: dict = Depends(g
         if i and i not in images:
             images.append(i)
 
+    # Phase 4 fix — slug à l'import, indépendant du LLM.
+    from services.slugify import slugify, _pick_text as _slug_pick
+    _slug = slugify(_slug_pick(name_dict) or (data.title if hasattr(data, "title") else "") or pid)
     doc = {
         "id": pid,
         "site_id": site_id,
         "name": name_dict,
+        "slug": _slug,
         "description": desc_dict,
         "price": round(data.price_eur, 2),
         "cost_price_ht": round(data.cost_eur, 2),

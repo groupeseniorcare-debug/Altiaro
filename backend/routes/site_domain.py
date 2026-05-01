@@ -209,6 +209,36 @@ async def verify_domain(site_id: str, user: dict = Depends(get_current_user)):
             "custom_domain_last_check_reason": reason,
         }}
     )
+    # Phase 4 (Tâche 1) — provisioning automatique sur le proxy Caddy.
+    # Best-effort : si le proxy n'est pas configuré (env PROXY_ADMIN_URL
+    # absent), on log et on continue sans bloquer la vérif DNS.
+    proxy_result = None
+    if verified:
+        try:
+            from services.proxy_provisioning import (
+                add_domain as _proxy_add,
+                is_proxy_configured,
+            )
+            if is_proxy_configured():
+                proxy_result = await _proxy_add(domain)
+                logger.info(
+                    f"[site-domain] proxy provisioning {domain}: {proxy_result}"
+                )
+                # Persist le statut TLS pour suivi côté admin / Cockpit.
+                await db.sites.update_one(
+                    {"id": site_id},
+                    {"$set": {
+                        "custom_domain_proxy_status": proxy_result,
+                        "custom_domain_proxy_updated_at": now,
+                    }},
+                )
+            else:
+                logger.warning(
+                    f"[site-domain] PROXY_ADMIN_URL non configuré, "
+                    f"déclaration manuelle requise pour {domain}"
+                )
+        except Exception as _e:
+            logger.exception(f"[site-domain] proxy provisioning failed for {domain}: {_e}")
     return {
         "domain": domain,
         "verified": verified,
@@ -216,6 +246,7 @@ async def verify_domain(site_id: str, user: dict = Depends(get_current_user)):
         "cname_found": cname,
         "cname_target": target_norm,
         "checked_at": now,
+        "proxy": proxy_result,
     }
 
 
@@ -442,3 +473,65 @@ async def public_resolve_domain(host: str):
     if not site:
         raise HTTPException(status_code=404, detail="Aucun site vérifié pour ce domaine.")
     return {"site_id": site["id"], "site_name": site["name"], "host": host}
+
+
+# -------------------------------------------------------------------- #
+# Phase 4 (Tâche 1) — Admin endpoints for proxy provisioning
+# -------------------------------------------------------------------- #
+@router.post("/admin/sites/{site_id}/domain/proxy-add", tags=["admin"])
+async def admin_proxy_add_domain(
+    site_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Force le provisioning du domaine custom du site sur le proxy Caddy.
+
+    Utile pour Altea / migrations où la vérification DNS a déjà été faite
+    mais le proxy n'avait pas encore le hostname.
+    """
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(status_code=404, detail="Site introuvable")
+    domain = site.get("custom_domain") or site.get("domain")
+    if not domain:
+        raise HTTPException(status_code=400, detail="Site sans domaine custom")
+    from services.proxy_provisioning import (
+        add_domain as _proxy_add,
+        is_proxy_configured,
+    )
+    if not is_proxy_configured():
+        return {
+            "ok": False,
+            "error": "PROXY_ADMIN_URL non configuré côté backend",
+            "fallback": "manual",
+        }
+    res = await _proxy_add(domain)
+    from datetime import datetime, timezone
+    await db.sites.update_one(
+        {"id": site_id},
+        {"$set": {
+            "custom_domain_proxy_status": res,
+            "custom_domain_proxy_updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    return res
+
+
+@router.delete("/admin/sites/{site_id}/domain/proxy-remove", tags=["admin"])
+async def admin_proxy_remove_domain(
+    site_id: str,
+    user: dict = Depends(get_current_user),
+):
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(status_code=404, detail="Site introuvable")
+    domain = site.get("custom_domain") or site.get("domain")
+    if not domain:
+        raise HTTPException(status_code=400, detail="Site sans domaine custom")
+    from services.proxy_provisioning import remove_domain as _proxy_rm
+    res = await _proxy_rm(domain)
+    return res
+
