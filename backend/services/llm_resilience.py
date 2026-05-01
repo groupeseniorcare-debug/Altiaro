@@ -379,7 +379,22 @@ async def safe_claude_text(
             kwargs["initial_messages"] = initial_messages
         chat = LlmChat(**kwargs).with_model("anthropic", resolved_model)
         raw = await chat.send_message(UserMessage(text=user))
-        return raw if isinstance(raw, str) else str(raw)
+        text = raw if isinstance(raw, str) else str(raw)
+        # Cost tracking auto-record (no-op si aucun job_id n'est dans le contexte)
+        try:
+            from services.cost_tracker import (
+                record_text, get_current_job_id, get_current_bucket,
+            )
+            record_text(
+                get_current_job_id(),
+                model=resolved_model,
+                input_text=(system or "") + "\n" + (user or ""),
+                output_text=text,
+                bucket=get_current_bucket(),
+            )
+        except Exception:
+            pass
+        return text
 
     return await safe_llm_call(_do, provider="claude", request_id=request_id, timeout=timeout)
 
@@ -464,7 +479,13 @@ async def safe_nano_banana_bytes(
         first = images[0]
         # The integrations layer returns either {data: <base64>} or {url: ...}
         if isinstance(first, dict) and first.get("data"):
-            return _b64.b64decode(first["data"])
+            payload = _b64.b64decode(first["data"])
+            try:
+                from services.cost_tracker import record_image, get_current_job_id
+                record_image(get_current_job_id(), n=1, bucket="images")
+            except Exception:
+                pass
+            return payload
         return None
 
     return await safe_llm_call(_do, provider="nano_banana",
@@ -507,6 +528,12 @@ async def safe_nano_banana(
                 url = reply
         elif isinstance(reply, dict):
             url = reply.get("image_url") or reply.get("url") or reply.get("path")
+        if url:
+            try:
+                from services.cost_tracker import record_image, get_current_job_id
+                record_image(get_current_job_id(), n=1, bucket="images")
+            except Exception:
+                pass
         return url
 
     return await safe_llm_call(_do, provider="nano_banana",

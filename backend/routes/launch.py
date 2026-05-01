@@ -577,6 +577,45 @@ async def _generate_color_variant_images_for_product(
 # ------------------------------------------------------------------
 async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
     """Long-running background task. Updates launch_jobs doc as it progresses."""
+    # Phase 4 — instrumentation cost tracker
+    from services import cost_tracker as _ct
+    _ct.start_job(job_id)
+    # Capture snapshot Emergent budget AVANT (delta après = coût réel facturé)
+    try:
+        snap = await db.platform_health.find_one({"key": "llm_budget"}, {"_id": 0})
+        if snap and snap.get("used_usd") is not None:
+            _ct.attach_emergent_before(job_id, float(snap["used_usd"]))
+    except Exception:
+        pass
+
+    with _ct.job_context(job_id):
+        await _run_launch_inner(job_id, site_id, user_id, wizard)
+
+    # Persiste le coût final dans launch_jobs.cost_summary
+    summary = _ct.end_job(job_id)
+    if summary:
+        try:
+            snap = await db.platform_health.find_one({"key": "llm_budget"}, {"_id": 0})
+            if snap and snap.get("used_usd") is not None:
+                summary.emergent_used_usd_after = float(snap["used_usd"])
+        except Exception:
+            pass
+        try:
+            await db.launch_jobs.update_one(
+                {"id": job_id},
+                {"$set": {"cost_summary": summary.to_dict()}},
+            )
+            logger.info(
+                f"[launch:{job_id[:8]}] cost_summary persisted: "
+                f"total=${summary.total_usd:.4f} ({summary.claude_calls} Claude / "
+                f"{summary.image_calls} images)"
+            )
+        except Exception as e:
+            logger.warning(f"[launch:{job_id[:8]}] cost_summary persist failed: {e}")
+
+
+async def _run_launch_inner(job_id: str, site_id: str, user_id: str, wizard: dict):
+    """Long-running background task. Updates launch_jobs doc as it progresses."""
     try:
         # ---------- Deferred imports to avoid circular deps at startup ----------
         from routes import design as design_routes
@@ -602,6 +641,8 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
         overwrite = bool(wizard.get("overwrite_all"))
 
         # 1) Brand identity & palette -------------------------------------
+        from services import cost_tracker as _ct
+        _ct._current_bucket.set("brand")
         await _advance(job_id, "brand", "Identité de marque & palette", 5)
         # Sanitize brand name coming from the wizard (user may have typed "Test409" or
         # pasted markdown by mistake).
@@ -770,6 +811,8 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
 
         for section_key, label, pct in content_steps:
             await _advance(job_id, f"content-{section_key}", label, pct)
+            # Switch bucket to "content" pour cette phase (idempotent).
+            _ct._current_bucket.set("content")
             if budget_exhausted:
                 logger.info(f"[launch] skip {section_key}: budget already flagged")
                 continue
@@ -911,6 +954,9 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
         )
 
         # 8) Products — narrative + images (biggest step) ------------------
+        # Phase 4 — bucket : on tagge "content" pour copywriting et "images"
+        # pour les générations Nano Banana (basculé inline ci-dessous).
+        _ct._current_bucket.set("content")
         products = await db.products.find(
             {"site_id": site_id, "status": {"$ne": "deleted"}},
             {"_id": 0, "id": 1, "name": 1, "images": 1, "narrative": 1, "generated_images": 1},
@@ -974,6 +1020,7 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                     logger.warning(f"[launch] backup original_image p={p['id']} failed (non-blocking)")
 
                 # 8a) narrative (if missing or overwrite)
+                _ct._current_bucket.set("content")
                 await _advance(
                     job_id,
                     f"product-{idx}-copy",
@@ -1152,6 +1199,8 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                                 budget_exhausted = True
 
                 # 8b) Product images — parallélisées via sémaphore global Nano Banana.
+                # Bucket switch → "images"
+                _ct._current_bucket.set("images")
                 # Avant : 3 styles × 60-90 s = 180-270 s en série.
                 # Après : ≤ N concurrents → temps ~max(image) = 60-90 s.
                 await _advance(
@@ -1753,6 +1802,15 @@ async def launch_status(
     doc["items_done"] = items_done
     doc["items_total"] = items_total
     doc["current_item_label"] = current_item_label
+    # Phase 4 — Live cost summary (si le tracker tourne encore en mémoire)
+    try:
+        from services.cost_tracker import get_job as _ct_get
+        live = _ct_get(doc.get("id"))
+        if live is not None and not doc.get("cost_summary"):
+            doc["cost_summary"] = live.to_dict()
+            doc["cost_summary"]["live"] = True
+    except Exception:
+        pass
     return doc
 
 
@@ -1993,57 +2051,79 @@ async def launch_site_auto(
     site_name = site.get("name") or ""
     user_instructions = (site.get("launch_instructions") or "").strip()
 
-    # 1) Demande à Claude l'identité complète (avec consignes user si fournies)
-    parsed = await _claude_brand_autoprefill(site_name, niche, products_titles, user_instructions)
-
-    # 2) Construit le payload Wizard equivalent (réutilise WizardInput pour
-    #    rester compatible avec _run_launch sans modifier ce dernier).
-    wizard_payload = {
-        "brand_name":      _sanitize_brand_text(parsed["brand_name"]),
-        "tagline":         parsed["tagline"],
-        "mission":         parsed["mission"],
-        "voice":           parsed["voice"],
-        "mood":            "Éditorial",  # mapping vers les 4 valeurs internes connues
-        "palette_choice":  parsed["palette"],
-        "font_pair":       parsed["font_pair"],
-        "homepage_preset": "default_template",
-        "overwrite_all":   True,
-        "logo_style":      "horizontal_premium",
-        # Hints supplémentaires pour _run_launch (ignorés s'il ne les lit pas
-        # — pas de breaking change)
-        "hero_concept":    parsed.get("hero_concept", ""),
-        "narrative_angle": parsed.get("narrative_angle", ""),
-        "user_instructions": user_instructions,  # propagées à chaque sous-étape IA
-        "premium_mode":    True,
-    }
-
-    # Mapping mood Claude → mood interne
-    mood_map = {
-        "luxury_minimal": "Minimaliste",
-        "warm_premium":   "Chaleureux",
-        "editorial":      "Éditorial",
-        "scandinavian":   "Moderne",
-    }
-    wizard_payload["mood"] = mood_map.get(parsed["mood"], "Éditorial")
-
-    # 3) Spawn le job (même infra que /design/launch)
+    # Phase 4.a — réponse HTTP immédiate (<1s). L'appel Claude
+    # `_claude_brand_autoprefill` (~10s) est déplacé dans la task background.
     job_id = str(uuid.uuid4())
     await db.launch_jobs.insert_one({
         "id":              job_id,
         "site_id":         site_id,
         "user_id":         user["id"],
         "status":          "running",
-        "progress_pct":    0,
-        "current_step":    "start",
-        "current_label":   "Conception de l'identité de marque…",
-        "wizard":          wizard_payload,
+        "progress_pct":    1,
+        "current_step":    "auto_prefill",
+        "current_label":   "Conception de l'identité de marque (Claude Sonnet)…",
+        "wizard":          {},  # rempli après autoprefill
         "auto_mode":       True,
         "premium_mode":    True,
-        "auto_brand":      parsed,  # exposé au frontend pour affichage live
+        "auto_brand":      None,
         "created_at":      datetime.now(timezone.utc).isoformat(),
     })
 
-    asyncio.create_task(_run_launch(job_id, site_id, user["id"], wizard_payload))
+    async def _autoprefill_and_run():
+        from services import cost_tracker as _ct
+        # Init du tracker tôt pour capturer le coût de l'autoprefill aussi.
+        _ct.start_job(job_id)
+        try:
+            with _ct.job_context(job_id), _ct.bucket_context("brand"):
+                parsed = await _claude_brand_autoprefill(
+                    site_name, niche, products_titles, user_instructions,
+                )
+        except Exception as e:
+            logger.warning(f"[launch-auto] autoprefill failed for {site_id}: {e}")
+            await _update_job(job_id, {
+                "status": "failed",
+                "error": f"Autoprefill brand failed: {str(e)[:200]}",
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            })
+            return
+
+        wizard_payload = {
+            "brand_name":      _sanitize_brand_text(parsed["brand_name"]),
+            "tagline":         parsed["tagline"],
+            "mission":         parsed["mission"],
+            "voice":           parsed["voice"],
+            "mood":            "Éditorial",
+            "palette_choice":  parsed["palette"],
+            "font_pair":       parsed["font_pair"],
+            "homepage_preset": "default_template",
+            "overwrite_all":   True,
+            "logo_style":      "horizontal_premium",
+            "hero_concept":    parsed.get("hero_concept", ""),
+            "narrative_angle": parsed.get("narrative_angle", ""),
+            "user_instructions": user_instructions,
+            "premium_mode":    True,
+        }
+        mood_map = {
+            "luxury_minimal": "Minimaliste",
+            "warm_premium":   "Chaleureux",
+            "editorial":      "Éditorial",
+            "scandinavian":   "Moderne",
+        }
+        wizard_payload["mood"] = mood_map.get(parsed["mood"], "Éditorial")
+
+        await db.launch_jobs.update_one(
+            {"id": job_id},
+            {"$set": {
+                "wizard":      wizard_payload,
+                "auto_brand":  parsed,
+                "current_label": "Démarrage de la génération…",
+                "updated_at":  datetime.now(timezone.utc).isoformat(),
+            }},
+        )
+
+        await _run_launch(job_id, site_id, user["id"], wizard_payload)
+
+    asyncio.create_task(_autoprefill_and_run())
 
     # Phase 3 — auto-traduction post-launch : si demandé, on enchaîne la
     # traduction du site vers les langues correspondant aux pays cibles.
@@ -2094,7 +2174,7 @@ async def launch_site_auto(
         "ok":         True,
         "job_id":     job_id,
         "status":     "running",
-        "auto_brand": parsed,
+        "auto_brand": None,  # Phase 4.a — autoprefill is done in background, poll launch-status
         "auto_translate_queued": bool(auto_translate),
     }
 
