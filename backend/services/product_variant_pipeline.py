@@ -36,9 +36,42 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+import os
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+# ---------------------------------------------------------------------------
+# Vision QA tuning (env-overridable, applied 2026-05-01 to unblock Altea)
+# ---------------------------------------------------------------------------
+# Default retries dropped from 3 to 1 (see brief). After N failed attempts we
+# still persist the LEAST BAD image (fail-soft) with `qa_passed=False` so the
+# storefront has something rather than an empty slot.
+IMAGE_QA_MAX_RETRIES = max(0, int(os.environ.get("IMAGE_QA_MAX_RETRIES", "1")))
+
+# Soft-fail switch: keep best image even when no QA pass (default ON).
+IMAGE_QA_FAIL_SOFT = (os.environ.get("IMAGE_QA_FAIL_SOFT", "1").lower()
+                      in ("1", "true", "yes", "on"))
+
+# Global cumulative cap on QA failures across a single launch. Once reached,
+# we degrade to "no QA" mode (accept anything) for the rest of the run.
+MAX_TOTAL_QA_RETRIES_PER_LAUNCH = int(
+    os.environ.get("MAX_TOTAL_QA_RETRIES_PER_LAUNCH", "20")
+)
+
+# Skip `style_brief_respected` when the brief enumerates micro-features that
+# Nano Banana can't reliably reproduce (numbered USB ports, cup-holders, …).
+_MICRO_FEATURE_RE = re.compile(
+    r"\b\d+\s*(?:port|usb|cup[- ]?holder|holder|button)s?\b",
+    re.IGNORECASE,
+)
+
+
+def _has_micro_features(text: str) -> bool:
+    if not text:
+        return False
+    return bool(_MICRO_FEATURE_RE.search(text))
 
 from deps import UPLOAD_DIR
 from services.color_variant_images import (
@@ -269,6 +302,9 @@ class BudgetCap:
         self.images_failed = 0
         self.qa_calls = 0
         self.source_analyses = 0
+        # 2026-05-01 — global QA-failure counter (kill-switch for Vision QA).
+        self.qa_failures = 0
+        self.qa_disabled_after_threshold = False
 
     def add_image(self, success: bool = True) -> None:
         self.spent_usd += NANO_BANANA_USD_PER_IMAGE
@@ -296,6 +332,8 @@ class BudgetCap:
             "images_generated": self.images_generated,
             "images_failed": self.images_failed,
             "qa_calls": self.qa_calls,
+            "qa_failures": self.qa_failures,
+            "qa_disabled_after_threshold": self.qa_disabled_after_threshold,
             "source_analyses": self.source_analyses,
         }
 
@@ -349,18 +387,47 @@ async def _generate_one_style(
     reference_image_b64: str,
     request_id_prefix: str,
     qa_enabled: bool = True,
-    max_retries: int = 2,
+    max_retries: Optional[int] = None,
+    budget: Optional[BudgetCap] = None,
 ) -> Optional[Dict[str, Any]]:
-    """Generate one style image. Runs Gemini Vision QA (6 strict booleans)
-    against the reference + style brief + silhouette signature. Retries up
-    to `max_retries` (default 2) on QA failure. Returns None on definitive
-    failure (caller does not persist; storefront falls back to source AE)."""
+    """Generate one style image. Runs Gemini Vision QA against the reference +
+    style brief. Behaviour (2026-05-01 hardening) :
+
+    - `max_retries` defaults to env `IMAGE_QA_MAX_RETRIES` (default 1, was 3).
+    - If `IMAGE_QA_FAIL_SOFT=1` (default), after all retries fail, persist the
+      LEAST-BAD image (most QA checks passing) instead of returning None.
+    - If `MAX_TOTAL_QA_RETRIES_PER_LAUNCH` is exceeded across the launch, QA
+      is disabled for the rest of the run (the very first generated image is
+      kept as-is).
+    - `style_brief_respected` is auto-skipped when the brief enumerates
+      micro-features (e.g. "two USB ports") that Nano Banana can't reproduce.
+    """
+    if max_retries is None:
+        max_retries = IMAGE_QA_MAX_RETRIES
+
+    # Auto-disable the brittle `style_brief_respected` check on micro-features.
+    skip_brief_check = _has_micro_features(unique_features_visible) or _has_micro_features(
+        style.get("scene", "").format(
+            product_kind=product_kind, material=material,
+            color=color_descriptor, color_label_en=color_label_en,
+            silhouette_signature=silhouette_signature or "",
+            unique_features_visible=unique_features_visible or "",
+        )
+    )
+
+    # Kill-switch — if total QA failures already exceeded threshold, just keep
+    # the first non-empty image we get.
+    effective_qa = qa_enabled
+    if budget and budget.qa_disabled_after_threshold:
+        effective_qa = False
+
     prompt = build_style_prompt(
         style, product_kind, material, color_descriptor, color_label_en,
         silhouette_signature=silhouette_signature,
         unique_features_visible=unique_features_visible,
     )
     last_qa: Optional[Dict[str, Any]] = None
+    best_attempt: Optional[Dict[str, Any]] = None  # {data, qa, score, attempt}
 
     for attempt in range(max_retries + 1):
         try:
@@ -397,56 +464,103 @@ async def _generate_one_style(
         if not data:
             continue
 
+        if not effective_qa:
+            return _persist_image(
+                data, product_id, color_slug, color_label,
+                style, attempt,
+                {"vision_qa_skipped": "qa_disabled_after_threshold"},
+            )
+
         # QA Vision check against reference + style brief
-        if qa_enabled:
-            try:
-                gen_b64 = base64.b64encode(data).decode()
-                qa = await qa_check_generated_image(
-                    generated_b64=gen_b64,
-                    reference_b64=reference_image_b64,
-                    style_slug=style["slug"],
-                    style_brief=style["scene"].format(
-                        product_kind=product_kind, material=material,
-                        color=color_descriptor, color_label_en=color_label_en,
-                        silhouette_signature=silhouette_signature or "",
-                        unique_features_visible=unique_features_visible or "",
-                    ),
-                    expected_material=material,
-                    expected_color=color_descriptor,
-                    silhouette_signature=silhouette_signature,
-                    unique_features_visible=unique_features_visible,
-                    request_id=f"qa-{request_id_prefix}-{style['slug']}-a{attempt}",
-                )
-                last_qa = qa
-                if qa.get("all_pass"):
-                    return _persist_image(
-                        data, product_id, color_slug, color_label,
-                        style, attempt, qa,
-                    )
-                else:
-                    failed = [k for k, v in (qa.get("checks") or {}).items() if not v]
-                    logger.warning(
-                        f"[variant-pipeline] QA FAILED {style['slug']} a{attempt}: "
-                        f"failed={failed} issues={qa.get('issues', [])[:3]}"
-                    )
-                    # On retry, the prompt stays the same — but Nano Banana is stochastic
-                    # so a fresh attempt may pass. (Optionally we could mutate prompt.)
-                    continue
-            except Exception as e:
-                logger.warning(
-                    f"[variant-pipeline] QA exception {style['slug']} a{attempt}: {str(e)[:200]} "
-                    "— accepting image (fail-open)"
-                )
+        try:
+            gen_b64 = base64.b64encode(data).decode()
+            qa = await qa_check_generated_image(
+                generated_b64=gen_b64,
+                reference_b64=reference_image_b64,
+                style_slug=style["slug"],
+                style_brief=style["scene"].format(
+                    product_kind=product_kind, material=material,
+                    color=color_descriptor, color_label_en=color_label_en,
+                    silhouette_signature=silhouette_signature or "",
+                    unique_features_visible=unique_features_visible or "",
+                ),
+                expected_material=material,
+                expected_color=color_descriptor,
+                silhouette_signature=silhouette_signature,
+                unique_features_visible=unique_features_visible,
+                request_id=f"qa-{request_id_prefix}-{style['slug']}-a{attempt}",
+            )
+            last_qa = qa
+
+            # Apply micro-feature skip: drop `style_brief_respected` from the
+            # set of blocking checks.
+            checks = dict(qa.get("checks") or {})
+            if skip_brief_check and "style_brief_respected" in checks:
+                checks.pop("style_brief_respected", None)
+            qa_pass = bool(checks) and all(checks.values())
+            score = sum(1 for v in checks.values() if v)
+
+            if qa_pass:
                 return _persist_image(
                     data, product_id, color_slug, color_label,
-                    style, attempt,
-                    {"vision_qa_skipped": True, "issues": [str(e)[:120]]},
+                    style, attempt, qa,
                 )
-        else:
-            return _persist_image(data, product_id, color_slug, color_label, style, attempt, None)
 
-    # All retries exhausted with QA failures — return None to signal failure.
-    # Caller will not persist the slot, only log.
+            # Track best attempt for fail-soft
+            if best_attempt is None or score > best_attempt["score"]:
+                best_attempt = {
+                    "data": data,
+                    "qa": qa,
+                    "score": score,
+                    "attempt": attempt,
+                }
+
+            failed = [k for k, v in checks.items() if not v]
+            logger.warning(
+                f"[variant-pipeline] QA FAILED {style['slug']} a{attempt}: "
+                f"failed={failed} score={score} issues={qa.get('issues', [])[:2]} "
+                f"skip_brief={skip_brief_check}"
+            )
+
+            # Track global QA failures and trip the kill-switch if needed.
+            if budget is not None:
+                budget.qa_failures += 1
+                if (
+                    not budget.qa_disabled_after_threshold
+                    and budget.qa_failures >= MAX_TOTAL_QA_RETRIES_PER_LAUNCH
+                ):
+                    budget.qa_disabled_after_threshold = True
+                    logger.warning(
+                        f"[variant-pipeline] QA failure threshold "
+                        f"({MAX_TOTAL_QA_RETRIES_PER_LAUNCH}) reached — disabling QA "
+                        f"for the rest of the run."
+                    )
+
+            continue
+
+        except Exception as e:
+            logger.warning(
+                f"[variant-pipeline] QA exception {style['slug']} a{attempt}: {str(e)[:200]} "
+                "— accepting image (fail-open)"
+            )
+            return _persist_image(
+                data, product_id, color_slug, color_label,
+                style, attempt,
+                {"vision_qa_skipped": True, "issues": [str(e)[:120]]},
+            )
+
+    # All retries exhausted with QA failures.
+    if IMAGE_QA_FAIL_SOFT and best_attempt is not None:
+        logger.warning(
+            f"[variant-pipeline] {style['slug']} fail-soft: persisting best of "
+            f"{max_retries + 1} attempts (score={best_attempt['score']}) for "
+            f"{product_id[:8]}/{color_slug}"
+        )
+        return _persist_image(
+            best_attempt["data"], product_id, color_slug, color_label,
+            style, best_attempt["attempt"], best_attempt["qa"],
+        )
+
     logger.error(
         f"[variant-pipeline] {style['slug']} FAILED ALL {max_retries + 1} "
         f"attempts for {product_id[:8]}/{color_slug}. Last QA: {last_qa}"
@@ -754,7 +868,8 @@ async def generate_full_variant_set(
             reference_image_b64=ref_b64,
             request_id_prefix=request_id,
             qa_enabled=True,
-            max_retries=2,
+            max_retries=None,  # use IMAGE_QA_MAX_RETRIES env (default 1)
+            budget=budget,
         )
         # Crude budget accounting : we don't know exactly how many attempts
         # _generate_one_style made; we assume successful = 1 image + 1 QA,
