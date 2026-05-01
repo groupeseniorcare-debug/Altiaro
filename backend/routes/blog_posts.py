@@ -717,7 +717,32 @@ async def auto_plan_blog(
 
     pool = _pick_informational_keywords(site, body.country or "FR", limit=8)
     if not pool and not body.override_pillar_keyword:
-        raise HTTPException(400, "Aucun mot-clé informationnel disponible. Lance d'abord l'étape 8 (SEO) ou fournis un keyword.")
+        # Phase 4 — Fix 2 : déliaison Blog/SEO.
+        # Plus d'erreur si l'étape 9 n'a pas tourné. On dérive un seed
+        # de mots-clés informationnels depuis la niche + brand du site.
+        # Permet au concepteur de générer son blog sans dépendance à
+        # /seo/keywords/discover.
+        niche = (site.get("niche") or site.get("niche_label") or
+                 site.get("category") or "").strip()
+        brand_name = (site.get("design", {}).get("brand", {}).get("name")
+                      or site.get("name") or "").strip()
+        seed_topic = niche or "produit premium"
+        # Génération heuristique simple sans LLM (zéro coût)
+        derived_pool = [
+            {"keyword": f"comment choisir un {seed_topic}", "intent": "info"},
+            {"keyword": f"guide d'achat {seed_topic}", "intent": "info"},
+            {"keyword": f"meilleurs {seed_topic} 2026", "intent": "info"},
+            {"keyword": f"avantages d'un {seed_topic}", "intent": "info"},
+            {"keyword": f"comparatif {seed_topic}", "intent": "info"},
+            {"keyword": f"entretien et durée de vie {seed_topic}", "intent": "info"},
+            {"keyword": f"installation {seed_topic} : étapes", "intent": "info"},
+            {"keyword": f"{seed_topic} pas cher vs premium", "intent": "info"},
+        ]
+        pool = derived_pool
+        logger.info(
+            f"[blog-auto-plan] {site_id}: SEO step skipped, derived {len(pool)} "
+            f"keywords from niche='{niche}' brand='{brand_name}'"
+        )
 
     max_sat = max(1, min(5, int(body.max_satellites or 3)))
     pillar_kw = body.override_pillar_keyword or pool[0]["keyword"]

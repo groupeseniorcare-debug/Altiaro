@@ -984,6 +984,38 @@ async def _run_launch_inner(job_id: str, site_id: str, user_id: str, wizard: dic
                         f"{total_products - idx} produits restants à enrichir lorsque le budget IA sera renouvelé",
                     )
                     break
+                name = p.get("name", {})
+                if isinstance(name, dict):
+                    label_name = name.get("fr") or name.get("en") or "(produit)"
+                else:
+                    label_name = str(name)
+
+                # Phase 4 — Fix resume idempotent : early-skip si déjà enrichi.
+                # On lit `generated_images` (champ persisté sur le doc produit) et
+                # `narrative` pour décider. MIN_IMAGES_THRESHOLD=3 + narrative
+                # complète = produit considéré "OK", on ne reboucle plus dessus.
+                MIN_IMAGES_THRESHOLD = 3
+                existing_imgs_count = len(p.get("generated_images") or [])
+                _narr = p.get("narrative") or {}
+                has_narrative = bool(
+                    (_narr.get("sections") if isinstance(_narr, dict) else None)
+                    or (_narr.get("long_text") if isinstance(_narr, dict) else None)
+                )
+                if (
+                    not overwrite
+                    and existing_imgs_count >= MIN_IMAGES_THRESHOLD
+                    and has_narrative
+                ):
+                    logger.info(
+                        f"[launch] skip product {p['id'][:8]} "
+                        f"(already enriched: {existing_imgs_count} imgs + narrative)"
+                    )
+                    await _set_items_progress(
+                        job_id, idx + 1, total_products,
+                        f"Fiche {idx+1}/{total_products} — déjà enrichie, skip",
+                    )
+                    continue
+                    break
                 pct_now = 65 + per_step * idx
                 name = p.get("name", {})
                 if isinstance(name, dict):
