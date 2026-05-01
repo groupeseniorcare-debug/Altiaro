@@ -24,7 +24,7 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from altiaro_legal import PLATFORM_COMPANY
 
@@ -709,6 +709,57 @@ tribunal compétent ({c['juridiction']}).</p>
 
 
 # ──────────────────────────── Routes ──────────────────────────── #
+
+
+# Legacy URLs (slugs francisés longs) → 301 vers la nouvelle structure /legal/*.
+# Permet aux moteurs de recherche et aux backlinks externes pointant vers
+# `/legal/mentions-legales` (etc.) de ne jamais retourner un 404. Servi aussi
+# sous host custom (altea-home.com → backend FastAPI) car le middleware
+# `custom_domain_middleware.py` court-circuite explicitement `/legal/*`.
+_LEGAL_LEGACY_REDIRECTS = {
+    "/legal/mentions-legales": "/legal/mentions",
+    "/legal/conditions-generales": "/legal/cgv",
+    "/legal/conditions-generales-de-vente": "/legal/cgv",
+    "/legal/politique-confidentialite": "/legal/confidentialite",
+    "/legal/politique-de-confidentialite": "/legal/confidentialite",
+    "/legal/politique-de-retour": "/legal/retours",
+    "/legal/politique-de-livraison": "/legal/livraison",
+}
+
+
+@router.get("/legal/mentions-legales", include_in_schema=False)
+async def legal_redirect_mentions_legales():
+    return RedirectResponse(url="/legal/mentions", status_code=301)
+
+
+@router.get("/legal/conditions-generales", include_in_schema=False)
+async def legal_redirect_conditions_generales():
+    return RedirectResponse(url="/legal/cgv", status_code=301)
+
+
+@router.get("/legal/conditions-generales-de-vente", include_in_schema=False)
+async def legal_redirect_conditions_generales_de_vente():
+    return RedirectResponse(url="/legal/cgv", status_code=301)
+
+
+@router.get("/legal/politique-confidentialite", include_in_schema=False)
+async def legal_redirect_politique_confidentialite():
+    return RedirectResponse(url="/legal/confidentialite", status_code=301)
+
+
+@router.get("/legal/politique-de-confidentialite", include_in_schema=False)
+async def legal_redirect_politique_de_confidentialite():
+    return RedirectResponse(url="/legal/confidentialite", status_code=301)
+
+
+@router.get("/legal/politique-de-retour", include_in_schema=False)
+async def legal_redirect_politique_de_retour():
+    return RedirectResponse(url="/legal/retours", status_code=301)
+
+
+@router.get("/legal/politique-de-livraison", include_in_schema=False)
+async def legal_redirect_politique_de_livraison():
+    return RedirectResponse(url="/legal/livraison", status_code=301)
 
 
 @router.get("/legal/retours", response_class=HTMLResponse)

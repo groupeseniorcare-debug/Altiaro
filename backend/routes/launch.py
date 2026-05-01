@@ -747,6 +747,21 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
         # l'opérateur ou l'admin légitime au moment du POST).
         fake_user = {"id": user_id, "role": "admin"}
         budget_exhausted = False
+        # Phase 3 bis — Parallélisation Nano Banana
+        # Les générations d'images IA (hero + sections) sont lancées en
+        # parallèle via asyncio.gather, mais bornées par un Semaphore global
+        # à `LAUNCH_IMAGE_CONCURRENCY` (default 4) pour ne pas saturer
+        # l'API et préserver le worker uvicorn (chaque image bloque ~60-90 s).
+        try:
+            _img_concurrency = int(os.environ.get("LAUNCH_IMAGE_CONCURRENCY", "4"))
+        except (TypeError, ValueError):
+            _img_concurrency = 4
+        _img_concurrency = max(1, min(_img_concurrency, 8))
+        _IMG_SEM = asyncio.Semaphore(_img_concurrency)
+        # Dict mutable partagé entre coroutines parallèles pour propager
+        # l'épuisement budget (asyncio.gather n'autorise pas `nonlocal` simple
+        # sur un bool depuis une closure définie dans la boucle).
+        nonlocal_budget = {"exhausted": False}
 
         async def _check_budget_health() -> bool:
             """Re-read platform_health; if _claude_json just flagged budget_exhausted, stop."""
