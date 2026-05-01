@@ -209,22 +209,40 @@ async def verify_domain(site_id: str, user: dict = Depends(get_current_user)):
             "custom_domain_last_check_reason": reason,
         }}
     )
-    # Phase 4 (Tâche 1) — provisioning automatique sur le proxy Caddy.
-    # Best-effort : si le proxy n'est pas configuré (env PROXY_ADMIN_URL
-    # absent), on log et on continue sans bloquer la vérif DNS.
+    # Phase 4 (Tâche 1+2) — provisioning automatique côté CDN.
+    # Stratégie : Cloudflare for SaaS (préféré, scalable) → fallback Caddy proxy.
+    # Best-effort : si rien n'est configuré, on log et on continue.
     proxy_result = None
+    cf_result = None
     if verified:
+        # 1) Cloudflare for SaaS — méthode principale
+        try:
+            from services.cloudflare_saas import (
+                add_custom_hostname as _cf_add,
+                is_configured as _cf_ready,
+            )
+            if _cf_ready():
+                cf_result = await _cf_add(domain, site_id=site_id)
+                logger.info(f"[site-domain] CF for SaaS {domain}: {cf_result}")
+                await db.sites.update_one(
+                    {"id": site_id},
+                    {"$set": {
+                        "custom_domain_cloudflare": cf_result,
+                        "custom_domain_cf_updated_at": now,
+                    }},
+                )
+        except Exception as e:
+            logger.exception(f"[site-domain] CF for SaaS failed for {domain}: {e}")
+        # 2) Caddy proxy — fallback si CF n'est pas configuré ou a échoué
         try:
             from services.proxy_provisioning import (
                 add_domain as _proxy_add,
                 is_proxy_configured,
             )
-            if is_proxy_configured():
+            should_use_caddy = (not cf_result or not cf_result.get("ok")) and is_proxy_configured()
+            if should_use_caddy:
                 proxy_result = await _proxy_add(domain)
-                logger.info(
-                    f"[site-domain] proxy provisioning {domain}: {proxy_result}"
-                )
-                # Persist le statut TLS pour suivi côté admin / Cockpit.
+                logger.info(f"[site-domain] Caddy fallback {domain}: {proxy_result}")
                 await db.sites.update_one(
                     {"id": site_id},
                     {"$set": {
@@ -232,13 +250,13 @@ async def verify_domain(site_id: str, user: dict = Depends(get_current_user)):
                         "custom_domain_proxy_updated_at": now,
                     }},
                 )
-            else:
+            elif not cf_result and not is_proxy_configured():
                 logger.warning(
-                    f"[site-domain] PROXY_ADMIN_URL non configuré, "
-                    f"déclaration manuelle requise pour {domain}"
+                    f"[site-domain] Aucun proxy configuré pour {domain} "
+                    f"(ni CLOUDFLARE_API_TOKEN ni PROXY_ADMIN_URL)"
                 )
         except Exception as _e:
-            logger.exception(f"[site-domain] proxy provisioning failed for {domain}: {_e}")
+            logger.exception(f"[site-domain] Caddy fallback failed for {domain}: {_e}")
     return {
         "domain": domain,
         "verified": verified,
@@ -246,6 +264,7 @@ async def verify_domain(site_id: str, user: dict = Depends(get_current_user)):
         "cname_found": cname,
         "cname_target": target_norm,
         "checked_at": now,
+        "cloudflare": cf_result,
         "proxy": proxy_result,
     }
 
@@ -534,4 +553,63 @@ async def admin_proxy_remove_domain(
     from services.proxy_provisioning import remove_domain as _proxy_rm
     res = await _proxy_rm(domain)
     return res
+
+
+# -------------------------------------------------------------------- #
+# Phase 4 (Tâche 2) — Cloudflare for SaaS admin endpoints
+# -------------------------------------------------------------------- #
+@router.post("/admin/sites/{site_id}/domain/cf-add", tags=["admin"])
+async def admin_cf_add_hostname(site_id: str, user: dict = Depends(get_current_user)):
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(status_code=404, detail="Site introuvable")
+    domain = site.get("custom_domain") or site.get("domain")
+    if not domain:
+        raise HTTPException(status_code=400, detail="Site sans domaine custom")
+    from services.cloudflare_saas import add_custom_hostname, is_configured
+    if not is_configured():
+        return {
+            "ok": False,
+            "error": "CLOUDFLARE_API_TOKEN/CLOUDFLARE_ZONE_ID non configurés",
+        }
+    res = await add_custom_hostname(domain, site_id=site_id)
+    from datetime import datetime, timezone
+    await db.sites.update_one(
+        {"id": site_id},
+        {"$set": {
+            "custom_domain_cloudflare": res,
+            "custom_domain_cf_updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    return res
+
+
+@router.get("/admin/sites/{site_id}/domain/cf-status", tags=["admin"])
+async def admin_cf_status(site_id: str, user: dict = Depends(get_current_user)):
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(status_code=404, detail="Site introuvable")
+    domain = site.get("custom_domain") or site.get("domain")
+    if not domain:
+        raise HTTPException(status_code=400, detail="Site sans domaine custom")
+    from services.cloudflare_saas import get_hostname_status
+    return await get_hostname_status(domain)
+
+
+@router.delete("/admin/sites/{site_id}/domain/cf-remove", tags=["admin"])
+async def admin_cf_remove(site_id: str, user: dict = Depends(get_current_user)):
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+    if not site:
+        raise HTTPException(status_code=404, detail="Site introuvable")
+    domain = site.get("custom_domain") or site.get("domain")
+    if not domain:
+        raise HTTPException(status_code=400, detail="Site sans domaine custom")
+    from services.cloudflare_saas import remove_custom_hostname
+    return await remove_custom_hostname(domain)
 
