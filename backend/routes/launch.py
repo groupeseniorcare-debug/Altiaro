@@ -1136,7 +1136,9 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                             if "402" in msg or "budget" in msg.lower():
                                 budget_exhausted = True
 
-                # 8b) 5 product hero images (use existing imported supplier images as base; add AI)
+                # 8b) Product images — parallélisées via sémaphore global Nano Banana.
+                # Avant : 3 styles × 60-90 s = 180-270 s en série.
+                # Après : ≤ N concurrents → temps ~max(image) = 60-90 s.
                 await _advance(
                     job_id,
                     f"product-{idx}-images",
@@ -1160,56 +1162,78 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                 elif overwrite or existing_ai_count < target_ai_count:
                     needed = target_ai_count if overwrite else max(0, target_ai_count - existing_ai_count)
                     styles_to_gen = full_preset_order[:needed]
-                for style in styles_to_gen:
-                    if budget_exhausted:
-                        break
-                    try:
-                        await asyncio.wait_for(
-                            pimg_routes.generate_product_image(
-                                product_id=p["id"],
-                                data=pimg_routes.GenProductImgInput(style=style, tweak="", replace_main=False),
-                                user={"id": user_id, "role": "admin"},
-                            ),
-                            timeout=120,
-                        )
-                    except asyncio.TimeoutError:
-                        logger.warning(f"[launch] img {style} {p['id']} timed out")
-                    except Exception as e:
-                        msg = str(e)
-                        logger.warning(f"[launch] img {style} {p['id']}: {msg[:120]}")
-                        if "402" in msg or "budget" in msg.lower():
-                            budget_exhausted = True
 
-                # 8c) 2 narrative-section images (embedded in detail page)
-                try:
-                    fresh = await db.products.find_one({"id": p["id"]}, {"_id": 0, "narrative.sections": 1})
-                    narr_sections = ((fresh or {}).get("narrative") or {}).get("sections") or []
-                    for sec_idx in range(min(2, len(narr_sections))):
+                async def _gen_one_hero(style):
+                    if budget_exhausted:
+                        return
+                    async with _IMG_SEM:
                         if budget_exhausted:
-                            break
-                        sec = narr_sections[sec_idx]
-                        if not overwrite and sec.get("image"):
-                            continue
+                            return
                         try:
                             await asyncio.wait_for(
-                                pimg_routes.generate_narrative_section_image(
+                                pimg_routes.generate_product_image(
                                     product_id=p["id"],
-                                    data=pimg_routes.GenSectionImgInput(
-                                        section_index=sec_idx,
-                                        style="in_use" if sec_idx == 0 else "closeup",
-                                        tweak="",
-                                    ),
+                                    data=pimg_routes.GenProductImgInput(style=style, tweak="", replace_main=False),
                                     user={"id": user_id, "role": "admin"},
                                 ),
                                 timeout=120,
                             )
+                            await _heartbeat(job_id)
                         except asyncio.TimeoutError:
-                            logger.warning(f"[launch] section-img p={p['id']} i={sec_idx} timed out")
+                            logger.warning(f"[launch] img {style} {p['id']} timed out")
                         except Exception as e:
                             msg = str(e)
-                            logger.warning(f"[launch] section-img p={p['id']} i={sec_idx}: {msg[:120]}")
+                            logger.warning(f"[launch] img {style} {p['id']}: {msg[:120]}")
                             if "402" in msg or "budget" in msg.lower():
-                                budget_exhausted = True
+                                nonlocal_budget["exhausted"] = True
+                if styles_to_gen and not budget_exhausted:
+                    await asyncio.gather(*[_gen_one_hero(s) for s in styles_to_gen], return_exceptions=True)
+                if nonlocal_budget["exhausted"]:
+                    budget_exhausted = True
+
+                # 8c) 2 narrative-section images (parallèles)
+                try:
+                    fresh = await db.products.find_one({"id": p["id"]}, {"_id": 0, "narrative.sections": 1})
+                    narr_sections = ((fresh or {}).get("narrative") or {}).get("sections") or []
+                    sec_targets = []
+                    for sec_idx in range(min(2, len(narr_sections))):
+                        sec = narr_sections[sec_idx]
+                        if not overwrite and sec.get("image"):
+                            continue
+                        sec_targets.append(sec_idx)
+
+                    async def _gen_one_section(sec_idx):
+                        if budget_exhausted:
+                            return
+                        async with _IMG_SEM:
+                            if budget_exhausted:
+                                return
+                            try:
+                                await asyncio.wait_for(
+                                    pimg_routes.generate_narrative_section_image(
+                                        product_id=p["id"],
+                                        data=pimg_routes.GenSectionImgInput(
+                                            section_index=sec_idx,
+                                            style="in_use" if sec_idx == 0 else "closeup",
+                                            tweak="",
+                                        ),
+                                        user={"id": user_id, "role": "admin"},
+                                    ),
+                                    timeout=120,
+                                )
+                                await _heartbeat(job_id)
+                            except asyncio.TimeoutError:
+                                logger.warning(f"[launch] section-img p={p['id']} i={sec_idx} timed out")
+                            except Exception as e:
+                                msg = str(e)
+                                logger.warning(f"[launch] section-img p={p['id']} i={sec_idx}: {msg[:120]}")
+                                if "402" in msg or "budget" in msg.lower():
+                                    nonlocal_budget["exhausted"] = True
+
+                    if sec_targets and not budget_exhausted:
+                        await asyncio.gather(*[_gen_one_section(s) for s in sec_targets], return_exceptions=True)
+                    if nonlocal_budget["exhausted"]:
+                        budget_exhausted = True
                 except Exception as e:
                     logger.warning(f"[launch] section-loop {p['id']}: {e}")
 
