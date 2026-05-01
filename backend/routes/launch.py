@@ -79,7 +79,12 @@ DEFAULT_LAUNCH_HOMEPAGE_ORDER = [
 # Job tracking helpers
 # ------------------------------------------------------------------
 async def _update_job(job_id: str, patch: dict):
-    patch["updated_at"] = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    patch["updated_at"] = now_iso
+    # Heartbeat universel : tout update du job rafraîchit `last_heartbeat_at`.
+    # Le frontend peut donc détecter `is_stale` même quand on n'est pas dans
+    # une boucle items (phases d'initialisation, brand, content, etc.).
+    patch.setdefault("last_heartbeat_at", now_iso)
     await db.launch_jobs.update_one({"id": job_id}, {"$set": patch})
 
 
@@ -102,19 +107,77 @@ async def _advance(job_id: str, step_key: str, label: str, progress_pct: int):
     )
 
 
-async def _mark_degraded(job_id: str, step_key: str, reason: str):
+async def _mark_degraded(job_id: str, step_key: str, reason: str, message: str = ""):
     """Marque une sous-étape comme dégradée (LLM down, budget, parse, etc.)
     pour qu'elle soit affichée en orange dans le LaunchProgress et puisse être
-    relancée à part."""
+    relancée à part.
+
+    Args:
+        reason: code machine ("llm_budget_cap", "api_error", "timeout", ...).
+        message: libellé FR premium pour l'utilisateur. Si vide, dérivé de `reason`.
+    """
+    pretty_reasons = {
+        "llm_budget_cap": "Plafond IA atteint pour aujourd'hui",
+        "api_error":      "Service IA temporairement indisponible",
+        "timeout":        "Délai dépassé sur cette étape",
+        "parse_error":    "Réponse IA non exploitable, sera relancée",
+    }
+    msg = message or pretty_reasons.get((reason or "").lower(), reason or "non disponible")
     await db.launch_jobs.update_one(
         {"id": job_id, "degraded_steps.step": {"$ne": step_key}},
         {"$push": {"degraded_steps": {
-            "step":   step_key,
-            "reason": (reason or "")[:200],
-            "ts":     datetime.now(timezone.utc).isoformat(),
+            "step":       step_key,
+            "reason":     (reason or "")[:80],
+            "message":    msg[:240],
+            "skipped_at": datetime.now(timezone.utc).isoformat(),
+            "ts":         datetime.now(timezone.utc).isoformat(),
         }}},
     )
-    logger.warning(f"[launch:{job_id}] step={step_key} → DEGRADED ({reason})")
+    logger.warning(f"[launch:{job_id}] step={step_key} → DEGRADED ({reason}: {msg[:80]})")
+
+
+async def _set_items_progress(
+    job_id: str,
+    items_done: int,
+    items_total: int,
+    current_item_label: str = "",
+    *,
+    reset: bool = False,
+):
+    """Écrit la micro-progression d'une boucle (images, narrative, pages…) +
+    refresh `last_heartbeat_at` pour neutraliser la détection `is_stale`.
+
+    Usage :
+        await _set_items_progress(job_id, 0, 9, "", reset=True)   # init boucle
+        for i, p in enumerate(products):
+            await _set_items_progress(job_id, i, 9, f"Produit {p.name}…")
+            # ... travail …
+            await _set_items_progress(job_id, i + 1, 9, f"Produit {p.name} terminé")
+    """
+    label = (current_item_label or "")[:160]
+    now_iso = datetime.now(timezone.utc).isoformat()
+    patch = {
+        "step_progress.items_done":          int(items_done),
+        "step_progress.items_total":         int(items_total),
+        "step_progress.current_item_label":  label,
+        "step_progress.updated_at":          now_iso,
+        "last_heartbeat_at":                 now_iso,
+        "updated_at":                        now_iso,
+    }
+    if reset:
+        # Permet au frontend de remettre le compteur à 0 quand on change de phase
+        patch["step_progress.phase_started_at"] = now_iso
+    await db.launch_jobs.update_one({"id": job_id}, {"$set": patch})
+
+
+async def _heartbeat(job_id: str):
+    """Mini-helper : ne touche que le heartbeat. À appeler dans les longues
+    sous-tâches (Nano Banana 60-120 s) pour rassurer le frontend."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.launch_jobs.update_one(
+        {"id": job_id},
+        {"$set": {"last_heartbeat_at": now_iso, "updated_at": now_iso}},
+    )
 
 
 async def _mark_failed_resumable(job_id: str, step_key: str, reason: str):
@@ -846,9 +909,19 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                 await _advance(job_id, "products-skip", "Aucun produit importé à enrichir", 95)
         else:
             per_step = max(1, (95 - 65) // max(1, total_products))
+            # Init micro-progression : 0/N, label vide
+            await _set_items_progress(
+                job_id, 0, total_products,
+                "Préparation des fiches produits…", reset=True,
+            )
             for idx, p in enumerate(products):
                 if budget_exhausted:
                     logger.info("[launch] skip remaining products (budget)")
+                    await _mark_degraded(
+                        job_id, f"products-remaining-{idx}",
+                        "llm_budget_cap",
+                        f"{total_products - idx} produits restants à enrichir lorsque le budget IA sera renouvelé",
+                    )
                     break
                 pct_now = 65 + per_step * idx
                 name = p.get("name", {})
@@ -856,11 +929,16 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                     label_name = name.get("fr") or name.get("en") or "(produit)"
                 else:
                     label_name = str(name)
+                # Avance globale (% pipeline) + micro-progression (items_done/total)
                 await _advance(
                     job_id,
                     f"product-{idx}",
                     f"Fiche produit {idx+1}/{total_products} — {label_name[:32]}",
                     min(95, pct_now),
+                )
+                await _set_items_progress(
+                    job_id, idx, total_products,
+                    f"Fiche {idx+1}/{total_products} — {label_name[:60]}",
                 )
 
                 # Backup l'image fournisseur d'origine AVANT toute régénération
@@ -1209,32 +1287,54 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
                     if "402" in msg or "budget" in msg.lower():
                         budget_exhausted = True
 
+                # Fin d'itération produit : on incrémente le compteur global
+                # de la phase Produits (et on rafraîchit le heartbeat).
+                await _set_items_progress(
+                    job_id, idx + 1, total_products,
+                    f"{idx+1}/{total_products} produits enrichis",
+                )
+
         # ── Phase C — Cohérence storefront enrichie ─────────────────────
         # Témoignages premium fictifs + portraits Nano Banana + pages CMS
         # (À propos / Contact) générées avec le narrative_angle.
         # Bloc 1 sous-chantier 1c — skip si déjà présents (sauf overwrite).
+        await _set_items_progress(
+            job_id, 0, 4,
+            "Assemblage du storefront (témoignages, pages éditoriales)",
+            reset=True,
+        )
         fresh_design = ((await db.sites.find_one({"id": site_id}, {"_id": 0, "design.testimonials_premium": 1, "design.cms_pages": 1})) or {}).get("design") or {}
         existing_tp = fresh_design.get("testimonials_premium") or []
         existing_cms = fresh_design.get("cms_pages") or {}
         try:
             await _advance(job_id, "testimonials", "Témoignages clients (3 portraits IA)…", 95)
+            await _set_items_progress(job_id, 1, 4, "Témoignages clients (3 portraits IA)…")
             if not overwrite and isinstance(existing_tp, list) and len(existing_tp) >= 3:
                 logger.info(f"[launch] testimonials_premium already populated ({len(existing_tp)} items), skipped")
             else:
                 await _generate_premium_testimonials(site_id, wizard, budget_exhausted, job_id=job_id)
         except Exception as e:
             logger.exception("[launch] premium_testimonials failed (non-blocking)")
-            await _mark_degraded(job_id, "testimonials_premium", str(e)[:200])
+            await _mark_degraded(
+                job_id, "testimonials_premium",
+                "llm_budget_cap" if "402" in str(e) or "budget" in str(e).lower() else "api_error",
+                f"Témoignages premium reportés ({str(e)[:120]})",
+            )
 
         try:
             await _advance(job_id, "cms-pages", "Pages À propos / Contact éditoriales…", 97)
+            await _set_items_progress(job_id, 2, 4, "Pages éditoriales (À propos, Contact)…")
             if not overwrite and existing_cms.get("about") and existing_cms.get("contact"):
                 logger.info("[launch] cms_pages already populated (about+contact), skipped")
             else:
                 await _generate_premium_cms_pages(site_id, wizard, job_id=job_id)
         except Exception as e:
             logger.exception("[launch] cms_pages failed (non-blocking)")
-            await _mark_degraded(job_id, "cms_pages", str(e)[:200])
+            await _mark_degraded(
+                job_id, "cms_pages",
+                "llm_budget_cap" if "402" in str(e) or "budget" in str(e).lower() else "api_error",
+                f"Pages éditoriales reportées ({str(e)[:120]})",
+            )
 
         # ── Phase 2.6 Tâche D — BrandStory (texte + visuel atelier) ─────
         # Remplace l'ancienne section <FounderStory> "Camille Lefèvre"
@@ -1244,6 +1344,7 @@ async def _run_launch(job_id: str, site_id: str, user_id: str, wizard: dict):
         # cap atteint, mais le texte (Haiku) tente quand même.
         try:
             await _advance(job_id, "brand-story", "Notre maison (atelier + texte)…", 98)
+            await _set_items_progress(job_id, 3, 4, "Notre maison (atelier + texte)…")
             fresh_brand = ((await db.sites.find_one(
                 {"id": site_id},
                 {"_id": 0, "design.brand": 1, "niche": 1, "design.cms_pages": 1},
@@ -1979,6 +2080,29 @@ async def abort_launch_job(
         }},
     )
     return {"ok": True, "matched": res.matched_count, "modified": res.modified_count}
+
+
+@router.post("/sites/{site_id}/design/launch-resume-degraded", tags=["launch-resilience"])
+async def resume_last_degraded(
+    site_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Alias pratique : relance les étapes dégradées du DERNIER job
+    `completed_with_degraded` ou `failed` sans avoir à connaître le job_id.
+
+    Utilisé par l'encart "Relancer les étapes reportées" du LaunchProgress.
+    """
+    await _check_site_access(site_id, user)
+    job = await db.launch_jobs.find_one(
+        {"site_id": site_id, "status": {"$in": ["completed_with_degraded", "failed"]}},
+        {"_id": 0},
+        sort=[("created_at", -1)],
+    )
+    if not job:
+        raise HTTPException(404, "Aucun job avec étapes dégradées à relancer.")
+    if not (job.get("degraded_steps") or []):
+        raise HTTPException(400, "Aucune étape reportée à relancer pour ce site.")
+    return await resume_launch_job(site_id, job["id"], user)
 
 
 @router.post("/sites/{site_id}/design/launch-jobs/{job_id}/resume", tags=["launch-resilience"])

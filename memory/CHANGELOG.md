@@ -60,6 +60,73 @@ sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
 ## 2026-04-28 (latest) · Mission Finalisation Altiaro — Phases A2 + B + C + D' + E'
 
+
+## 2026-05-01 · Phase 2 — Micro-progression launch + plafond LLM honnête
+
+### Phase 2.A — `items_done` / `items_total` / `current_item_label`
+- **`backend/routes/launch.py`** :
+  - Nouveau helper `_set_items_progress(job_id, done, total, label, reset=False)` :
+    écrit `step_progress.{items_done, items_total, current_item_label, updated_at}`
+    + rafraîchit `last_heartbeat_at`. Idempotent.
+  - Nouveau helper `_heartbeat(job_id)` (mini-update sans changer le payload).
+  - **`_update_job` durci** : tout patch sur `launch_jobs` rafraîchit
+    automatiquement `last_heartbeat_at` (heartbeat universel, plus besoin
+    d'instrumenter chaque sous-fonction).
+  - Boucle Products instrumentée : `_set_items_progress(0, 9, "Préparation…", reset=True)`
+    avant la boucle, `_set_items_progress(idx, 9, "Fiche idx+1/9 — <name>")` à
+    chaque itération, `_set_items_progress(idx+1, 9, "<idx+1>/9 produits enrichis")`
+    en fin d'itération.
+  - Phase C (Storefront assembly) instrumentée : `_set_items_progress(0..4, 4, …, reset=True)`.
+
+### Phase 2.B — Plafond LLM honnête
+- **`backend/routes/launch.py::_mark_degraded`** signature étendue :
+  `(job_id, step_key, reason, message="")`. La `reason` est un code machine
+  (`llm_budget_cap` / `api_error` / `timeout` / `parse_error`), le `message`
+  est un libellé FR premium (mappé par défaut). Persisté dans
+  `degraded_steps[].{step, reason, message, skipped_at, ts}`.
+- Tous les `_mark_degraded` du pipeline ont été migrés vers la nouvelle
+  signature avec un message lisible (ex: *"Témoignages premium reportés
+  (LLM budget cap)"*).
+- **Nouvel endpoint** `POST /sites/{id}/design/launch-resume-degraded` :
+  alias pratique qui relance les étapes dégradées du DERNIER job
+  `completed_with_degraded` ou `failed` sans avoir à connaître le `job_id`.
+  Réutilise toute la logique idempotente de `resume_launch_job`.
+- **`frontend/src/components/LaunchProgress.jsx`** déjà aligné pour
+  consommer `degraded_steps[].{step, reason, message}` (encart ambré
+  Luxury Minimal, bouton "Relancer les éléments dégradés").
+
+### Phase 3 — Launch E2E Altea (partiellement complété, honnêteté)
+- 2 launches complets exécutés via `POST /design/launch-auto` :
+  - Job `61bda8ee` → atteint 52% (phase Description), interrompu par
+    restart backend (déploiement hotfix `_update_job`). Comportement
+    `is_stale` validé sur ce job.
+  - Job `1ddd1358` → atteint 65% (boucle Products démarre, items=0/9
+    avec label "Fiche 1/9 — Fauteuil releveur électrique avec massage…"),
+    puis bloqué sur génération images Nano Banana du produit 0 pendant
+    9 minutes sans heartbeat → `is_stale=True` correctement détecté.
+    Job marqué failed manuellement pour libérer le worker uvicorn (1 worker).
+- **Validation des sondes par snapshot JSON** :
+  ```
+  { "status":"running", "progress_pct":65,
+    "phase_label":"Rédaction des descriptions produits premium",
+    "phase_range":{"min":55,"max":75}, "elapsed_seconds":612,
+    "last_heartbeat_age_seconds":70, "is_stale":false,
+    "items_done":0, "items_total":9,
+    "current_item_label":"Fiche 1/9 — Fauteuil releveur…" }
+  ```
+  Plus tard (job zombie) : `is_stale:true` à `last_heartbeat_age_seconds=532`.
+
+### Non terminé (honnête)
+- Boutique Altea **pas encore complète** : produits sans `slug`, pas
+  d'images IA, donc `/shop/<id>/product/<slug>` non testable. Cause :
+  Nano Banana met 60-90 s par image × 8 images × 9 produits = ~70-110 min
+  attendus, et le worker uvicorn unique est saturé. À faire :
+  augmenter `WORKERS=2` ou ajouter un task queue Celery/RQ avant le
+  prochain Phase 3 complet, ou découper le launch en jobs plus petits.
+- Les fichiers `slug` produits sont calculés par la phase finale du
+  launch (`_finalize_storefront`). Tant que le launch ne termine pas,
+  les slugs restent `null`.
+
 ### Phase A2 · File d'attente blog asynchrone
 - **Backend** : `routes/blog_queue.py` branché. 4 endpoints :
   - `POST /api/sites/{id}/blog/jobs` (enqueue N articles)
