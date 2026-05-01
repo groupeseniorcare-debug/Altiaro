@@ -1,5 +1,50 @@
 # Altiora — CHANGELOG
 
+
+## 2026-05-01 · Custom Domains via Approximated.app (live `altea-home.com`)
+
+### Custom Domains — pivot final vers Approximated
+- **Nouveau service `backend/services/approximated_provisioning.py`** : client API
+  Approximated (header `Api-Key`, base `https://cloud.approximated.app/api`).
+  Méthodes : `create_vhost` (idempotent), `get_vhost_status` (avec `force_check`),
+  `delete_vhost`, `get_dns_targets`, `list_vhosts`. Extrait l'IP cluster du
+  `user_message` au passage et la cache (`_CACHED_CLUSTER_IPS`).
+- **Nouveau service `backend/services/ovh_dns.py`** : helpers OVH génériques
+  (list/delete records, create A, refresh zone, `replace_with_a_records`)
+  utilisables sur n'importe quelle zone OVH (pas uniquement les domaines
+  achetés via Altiaro).
+- **`backend/routes/site_domain.py` réécrit** :
+  - `_provision_approximated(site_id, domain)` — orchestrateur idempotent :
+    create vhost → push A records OVH (apex + www) → refresh zone → poller async.
+  - `_poll_until_ready` — coroutine background, polle toutes les 60 s pendant
+    15 min ; flip `custom_domain_verified=True` + step `domain.completed` dès
+    que `apx_hit && is_resolving && has_ssl`.
+  - Hook étape 6 (`POST /sites/{id}/domain/verify`) appelle directement
+    `_provision_approximated` puis renvoie un statut Approximated.
+  - 2 nouveaux endpoints admin :
+    - `POST /api/admin/sites/{id}/domain/approximated-provision`
+    - `GET  /api/admin/sites/{id}/domain/approximated-status?force=1`
+  - Retrait des endpoints legacy `cf-add | cf-remove | cf-status |
+    proxy-add | proxy-remove`.
+- **Code mort supprimé** : `services/cloudflare_saas.py` (214 l.) et
+  `services/proxy_provisioning.py` (245 l.).
+- **`backend/.env`** : ajout des variables Approximated.
+- **`.env.example`** : sections Cloudflare/Caddy retirées, section Approximated ajoutée.
+- **`memory/CUSTOM_DOMAIN_SETUP.md`** : entièrement réécrit pour Approximated.
+
+### Migration `altea-home.com` (E2E)
+- Vhost Approximated `altea-home.com` créé (id `1298354`) puis statut sondé.
+- 2 anciens records A OVH (apex + www → Cloudflare `104.18.10.243`) supprimés.
+- 2 nouveaux records A OVH (apex + www → cluster Approximated `213.188.213.253`)
+  créés ; zone OVH refresh.
+- Cert SSL Let's Encrypt émis (valide jusqu'au **2026-07-30**).
+- Vhost additionnel `www.altea-home.com` créé en redirect 301 vers l'apex.
+- Tests externes (curl sans `-k`, ssl_verify=0) : `/api/health`, `/legal/mentions`,
+  `/`, `/shop/{site_id}/` → tous **200**, IP `213.188.213.253`.
+- Status final Approximated : `ACTIVE_SSL`, `apx_hit=true, is_resolving=true,
+  has_ssl=true, dns_pointed_at=213.188.213.253`.
+
+
 Historique des sprints de développement. Le PRD.md reste la source de vérité
 sur les exigences produit ; ce fichier trace uniquement ce qui a été livré.
 
