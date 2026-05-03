@@ -15,6 +15,7 @@ import hashlib
 import logging
 import os
 import time
+import json
 import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -90,16 +91,37 @@ class TrackInput(BaseModel):
 
 
 @router.post("/public/sites/{site_id}/track", status_code=http_status.HTTP_202_ACCEPTED)
-async def track_event(site_id: str, body: TrackInput, request: Request):
+async def track_event(site_id: str, request: Request):
     """Endpoint public (pas d'auth). Ingère un event storefront.
 
     Rate-limit : `RATE_LIMIT_MAX` req/IP sur `RATE_LIMIT_WINDOW_SEC` secondes → 429.
     Site inconnu → 404. Event inconnu → 400.
     Aucune IP brute stockée (hash journalier → RGPD friendly).
+
+    2026-05-03 : accepte aussi les bodies envoyés avec Content-Type
+    `text/plain` (et autres) pour permettre aux storefronts en custom domain
+    d'éviter le pré-flight CORS — l'infra Cloudflare/Emergent en front du pod
+    intercepte les pré-flights et renvoie `ACAO=*` qui casse `credentials`.
+    Avec `text/plain` (CORS-safelisted), aucun pré-flight n'est émis.
     """
     ip = _client_ip(request)
     if _rate_limited(ip):
         raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
+    # Parse body tolerantly (accept JSON via any Content-Type).
+    try:
+        raw = await request.body()
+        if not raw:
+            raise HTTPException(status_code=400, detail="Empty body")
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError) as e:
+            raise HTTPException(status_code=400, detail=f"Invalid JSON body: {e}")
+        body = TrackInput(**payload)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid payload: {e}")
 
     if body.event not in ALLOWED_EVENTS:
         raise HTTPException(status_code=400, detail=f"Unknown event '{body.event}'")

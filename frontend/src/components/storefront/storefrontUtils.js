@@ -65,9 +65,9 @@ function _postLanguageChange(siteId, fromLang, toLang) {
       meta: { language_change: true, from: fromLang, to: toLang },
     });
     if (navigator?.sendBeacon) {
-      navigator.sendBeacon(url, new Blob([body], { type: "application/json" }));
+      navigator.sendBeacon(url, new Blob([body], { type: "text/plain;charset=UTF-8" }));
     } else {
-      fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true, mode: "cors", credentials: "omit" }).catch(() => {});
+      fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=UTF-8" }, body, keepalive: true, mode: "cors", credentials: "omit" }).catch(() => {});
     }
   } catch (_) { /* best-effort */ }
 }

@@ -54,15 +54,18 @@ function postEvent(siteId, payload) {
     referrer: document?.referrer || "",
     ...payload,
   });
+  // 2026-05-03 — use `text/plain` (CORS-safelisted) so cross-origin requests
+  // from custom-domain storefronts (altea-home.com → preview pod) skip the
+  // CORS pre-flight that Cloudflare/Emergent ingress otherwise hijacks with
+  // ACAO=*. The backend parses the body tolerantly.
   try {
-    // Prefer sendBeacon for "unload" reliability; fallback to fetch keepalive
     if (navigator?.sendBeacon) {
-      const blob = new Blob([body], { type: "application/json" });
+      const blob = new Blob([body], { type: "text/plain;charset=UTF-8" });
       if (navigator.sendBeacon(url, blob)) return;
     }
     fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "text/plain;charset=UTF-8" },
       body,
       keepalive: true,
       mode: "cors",
