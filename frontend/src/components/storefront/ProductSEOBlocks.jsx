@@ -6,6 +6,7 @@ import {
 } from "@phosphor-icons/react";
 import { designAccents } from "./storefrontUtils";
 import { t } from "../../lib/i18n";
+import { useShopSiteId } from "../../lib/shopSiteId";
 
 /**
  * SEO/AEO enrichment blocks for Product pages.
@@ -180,7 +181,7 @@ export function RelatedQueries({ queries, design }) {
   // Code conservé pour réactivation future via `?showRelated=1` ou flag admin.
   return null;
   // eslint-disable-next-line no-unreachable
-  const { siteId } = useParams();
+  const siteId = useShopSiteId();
   if (!queries || queries.length === 0) return null;
   const { primary, fontHeading } = designAccents(design);
   return (

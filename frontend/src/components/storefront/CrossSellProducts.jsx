@@ -6,6 +6,7 @@ import { t } from "../../lib/i18n";
 import { BACKEND_URL, designAccents } from "./storefrontUtils";
 import ProductCard from "./ProductCard";
 import { hasAiImage } from "../../lib/productImage";
+import { useShopSiteId } from "../../lib/shopSiteId";
 
 /**
  * Cross-sell — "Vous aimerez aussi" : 4 produits complémentaires.
@@ -15,7 +16,7 @@ import { hasAiImage } from "../../lib/productImage";
  * Même site, même category en priorité, sinon best-sellers globaux.
  */
 export default function CrossSellProducts({ currentProduct, lang = "fr", design }) {
-  const { siteId } = useParams();
+  const siteId = useShopSiteId();
   const { primary, fontHeading } = designAccents(design);
   const [products, setProducts] = useState([]);
 

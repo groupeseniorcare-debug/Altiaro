@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import axios from "axios";
 import StorefrontLayout, { fetchPublicSite } from "../components/StorefrontLayout";
 import SEOHead from "../components/SEOHead";
+import { useShopSiteId } from "../lib/shopSiteId";
 import {
   Heart, Users, ShieldCheck, HandHeart, Leaf, Star,
   EnvelopeSimple, Phone, MapPin, Clock, CheckCircle,
@@ -12,7 +13,7 @@ import {
 const BACKEND_URL = "";
 
 function useSiteDesign() {
-  const { siteId } = useParams();
+  const siteId = useShopSiteId();
   const [site, setSite] = useState(null);
   const [design, setDesign] = useState(null);
   const storageKey = `cf_lang_${siteId}`;

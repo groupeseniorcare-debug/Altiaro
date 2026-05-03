@@ -430,8 +430,51 @@ async def safe_claude_json(
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError as e:
+        # Tolerant fallback: extract the first balanced JSON object/array. Useful
+        # when Claude appends extra commentary or trailing newlines after the
+        # JSON payload (observed on long replies, e.g. SEO discover).
+        extracted = _extract_first_json(cleaned)
+        if extracted is not None:
+            try:
+                return json.loads(extracted)
+            except json.JSONDecodeError:
+                pass
         logger.warning(f"[claude-json] parse failed: {cleaned[:200]}")
         raise ValueError(f"Réponse Claude mal formée (JSON invalid): {e}") from e
+
+
+def _extract_first_json(text: str) -> Optional[str]:
+    """Return the first balanced JSON object or array embedded in `text`."""
+    if not text:
+        return None
+    s = text.strip()
+    # Find the first '{' or '['
+    for i, ch in enumerate(s):
+        if ch in "{[":
+            opener, closer = ch, "}" if ch == "{" else "]"
+            depth = 0
+            in_str = False
+            esc = False
+            for j in range(i, len(s)):
+                c = s[j]
+                if in_str:
+                    if esc:
+                        esc = False
+                    elif c == "\\":
+                        esc = True
+                    elif c == '"':
+                        in_str = False
+                else:
+                    if c == '"':
+                        in_str = True
+                    elif c == opener:
+                        depth += 1
+                    elif c == closer:
+                        depth -= 1
+                        if depth == 0:
+                            return s[i : j + 1]
+            return None
+    return None
 
 
 async def safe_nano_banana_bytes(

@@ -49,9 +49,10 @@ import ProductUsps from "../components/storefront/ProductUsps";
 import ProductHowTo from "../components/storefront/ProductHowTo";
 import ProductEditorialCards from "../components/storefront/ProductEditorialCards";
 import WideLifestyleBanner from "../components/storefront/WideLifestyleBanner";
+import { useShopSiteId } from "../lib/shopSiteId";
 
 export function StorefrontProduct() {
-  const { siteId, productId } = useParams();
+  const siteId = useShopSiteId(); const { productId } = useParams();
   const { site, design, lang, setLang, availableLangs } = useSiteAndLang();
   const navigate = useNavigate();
   const [p, setP] = useState(null);

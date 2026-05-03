@@ -26,6 +26,7 @@ import { BACKEND_URL, designAccents, formatPrice } from "./storefrontUtils";
 import { addToCart } from "../../lib/cart";
 import { toast } from "sonner";
 import { getPrimaryImage, hasAiImage } from "../../lib/productImage";
+import { useShopSiteId } from "../../lib/shopSiteId";
 
 // Roles considered as "companion" products for bundling
 const COMPANION_ROLES = new Set(["upsell", "accessory", "accessoire", "addon"]);
@@ -35,7 +36,7 @@ const isCompanion = (p) => COMPANION_ROLES.has((p?.role || "").toLowerCase());
 const isPremiumCompanion = (p) => isCompanion(p) && hasAiImage(p);
 
 export default function ProductBundle({ currentProduct, lang = "fr", design }) {
-  const { siteId } = useParams();
+  const siteId = useShopSiteId();
   const { primary, fontHeading } = designAccents(design);
   const [accessories, setAccessories] = useState([]);
   const [selected, setSelected] = useState({});

@@ -2,13 +2,14 @@ import React from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowRight, Clock } from "@phosphor-icons/react";
 import { pickLang } from "../../lib/i18n";
+import { useShopSiteId } from "../../lib/shopSiteId";
 
 /**
  * Blog / Journal teaser — 3 derniers articles mis en avant.
  * design.blog_posts = [{ slug, title, excerpt, image, category, read_minutes, published_at }]
  */
 export default function BlogTeaser({ posts, lang = "fr", design }) {
-  const { siteId } = useParams();
+  const siteId = useShopSiteId();
   const primary = design?.brand?.primary_color || "#B84B31";
   const accent = design?.brand?.accent_color || "#F5F2EB";
   const fontHeading = design?.brand?.font_heading || "Fraunces";

@@ -2,6 +2,7 @@ import React from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowRight } from "@phosphor-icons/react";
 import { pickLang, t } from "../../lib/i18n";
+import { useShopSiteId } from "../../lib/shopSiteId";
 
 /**
  * Lifestyle editorial — section full-bleed avec grande image + texte éditorial superposé à côté.
@@ -10,7 +11,7 @@ import { pickLang, t } from "../../lib/i18n";
  * design.editorial = { image, eyebrow, title, body, cta_label, cta_href }
  */
 export default function LifestyleEditorial({ editorial, lang = "fr", design }) {
-  const { siteId } = useParams();
+  const siteId = useShopSiteId();
   const primary = design?.brand?.primary_color || "#B84B31";
   const fontHeading = design?.brand?.font_heading || "Fraunces";
 

@@ -5,11 +5,12 @@ import StorefrontLayout, { useSiteData } from "../components/StorefrontLayout";
 import { MagnifyingGlass } from "@phosphor-icons/react";
 import { getPrimaryImage } from "../lib/productImage";
 import ProductCard from "../components/storefront/ProductCard";
+import { useShopSiteId } from "../lib/shopSiteId";
 
 const BACKEND = "";
 
 export default function StorefrontSearch() {
-  const { siteId } = useParams();
+  const siteId = useShopSiteId();
   const site = useSiteData(siteId);
   const [params] = useSearchParams();
   const nav = useNavigate();

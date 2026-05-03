@@ -6,6 +6,7 @@ import StorefrontLayout, { fetchPublicSite } from "../components/StorefrontLayou
 import SEOHead from "../components/SEOHead";
 import { pickLang } from "../lib/i18n";
 import { buildHreflangs, designAccents } from "../components/storefront/storefrontUtils";
+import { useShopSiteId } from "../lib/shopSiteId";
 
 const BACKEND_URL = "";
 
@@ -118,7 +119,7 @@ Si 2 critères sont cochés, il est temps de changer.`
 ];
 
 function useSiteDesign() {
-  const { siteId } = useParams();
+  const siteId = useShopSiteId();
   const [site, setSite] = useState(null);
   const [design, setDesign] = useState(null);
   const storageKey = `cf_lang_${siteId}`;
@@ -250,7 +251,7 @@ export function StorefrontBlog() {
  * BLOG POST — /shop/:siteId/blog/:slug
  * ========================================================= */
 export function StorefrontBlogPost() {
-  const { siteId, slug } = useParams();
+  const siteId = useShopSiteId(); const { slug } = useParams();
   const { site, design, lang, setLang, availableLangs } = useSiteDesign();
   const posts = getPosts(design);
   const post = posts.find((p) => p.slug === slug);

@@ -4,6 +4,7 @@ import axios from "axios";
 import { useParams } from "react-router-dom";
 import { designAccents } from "./storefrontUtils";
 import { t } from "../../lib/i18n";
+import { useShopSiteId } from "../../lib/shopSiteId";
 
 const BACKEND = "";
 
@@ -12,7 +13,7 @@ const BACKEND = "";
  * a poised heading on the left and the email form on the right.
  */
 export default function NewsletterCTA({ design, lang = "fr" }) {
-  const { siteId } = useParams();
+  const siteId = useShopSiteId();
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);

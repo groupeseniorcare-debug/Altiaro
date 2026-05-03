@@ -3,11 +3,12 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { setSession } from "../lib/customerAuth";
 import StorefrontLayout, { useSiteData } from "../components/StorefrontLayout";
+import { useShopSiteId } from "../lib/shopSiteId";
 
 const BACKEND = "";
 
 export default function StorefrontRegister() {
-  const { siteId } = useParams();
+  const siteId = useShopSiteId();
   const nav = useNavigate();
   const site = useSiteData(siteId);
   const [form, setForm] = useState({ email: "", password: "", first_name: "", last_name: "", phone: "" });

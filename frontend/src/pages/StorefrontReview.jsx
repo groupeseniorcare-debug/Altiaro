@@ -4,11 +4,12 @@ import axios from "axios";
 import { Star, CheckCircle, Warning } from "@phosphor-icons/react";
 import StorefrontLayout, { fetchPublicSite } from "../components/StorefrontLayout";
 import SEOHead from "../components/SEOHead";
+import { useShopSiteId } from "../lib/shopSiteId";
 
 const BACKEND_URL = "";
 
 export default function StorefrontReview() {
-  const { siteId, token } = useParams();
+  const siteId = useShopSiteId(); const { token } = useParams();
   const [site, setSite] = useState(null);
   const [design, setDesign] = useState(null);
   const [invitation, setInvitation] = useState(null);

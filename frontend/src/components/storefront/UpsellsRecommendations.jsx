@@ -6,6 +6,7 @@ import { t } from "../../lib/i18n";
 import { BACKEND_URL, designAccents } from "./storefrontUtils";
 import ProductCard from "./ProductCard";
 import { hasAiImage } from "../../lib/productImage";
+import { useShopSiteId } from "../../lib/shopSiteId";
 
 /**
  * Upsells : accessoires complémentaires sélectionnés à l'étape 3 du cockpit
@@ -28,7 +29,7 @@ export default function UpsellsRecommendations({
   design = null,
   onAddToCart = null,     // eslint-disable-line no-unused-vars
 }) {
-  const { siteId } = useParams();
+  const siteId = useShopSiteId();
   const { primary, fontHeading } = designAccents(design);
   const [items, setItems] = useState([]);
 

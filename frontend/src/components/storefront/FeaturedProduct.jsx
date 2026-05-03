@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowRight, CheckCircle, Star } from "@phosphor-icons/react";
 import { pickLang, t } from "../../lib/i18n";
 import { formatPrice } from "./storefrontUtils";
+import { useShopSiteId } from "../../lib/shopSiteId";
 
 /**
  * Featured Product — spotlight sur le produit hero de la boutique.
@@ -10,7 +11,7 @@ import { formatPrice } from "./storefrontUtils";
  * Si aucun produit, la section ne s'affiche pas.
  */
 export default function FeaturedProduct({ products, design, lang = "fr" }) {
-  const { siteId } = useParams();
+  const siteId = useShopSiteId();
   const primary = design?.brand?.primary_color || "#B84B31";
   const accent = design?.brand?.accent_color || "#F5F2EB";
   const fontHeading = design?.brand?.font_heading || "Fraunces";

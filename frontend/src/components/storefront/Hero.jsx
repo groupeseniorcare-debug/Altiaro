@@ -6,6 +6,7 @@ import { designText, designAccents } from "./storefrontUtils";
 import { t, pickLang } from "../../lib/i18n";
 import { sanitizeBrandText } from "../../lib/brandText";
 import { getPrimaryImage } from "../../lib/productImage";
+import { useShopSiteId } from "../../lib/shopSiteId";
 
 /**
  * Hero — MONOCHROME editorial magazine. Pure white, black ink, gray cards.
@@ -15,7 +16,7 @@ import { getPrimaryImage } from "../../lib/productImage";
  *                caption card, side chapter marker and a thin scroll indicator.
  */
 export function Hero({ site, design, lang, products }) {
-  const { siteId } = useParams();
+  const siteId = useShopSiteId();
   const { primary, accent, divider, textMuted, brandAccent, fontHeading } = designAccents(design);
   const brand = design?.brand || {};
 

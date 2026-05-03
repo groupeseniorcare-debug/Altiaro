@@ -18,6 +18,7 @@ import axios from "axios";
 import { ArrowRight } from "@phosphor-icons/react";
 import { pickLang, t } from "../../lib/i18n";
 import { BACKEND_URL, designAccents } from "./storefrontUtils";
+import { useShopSiteId } from "../../lib/shopSiteId";
 
 function CollectionCard({ c, primary, fontHeading, lang, siteId, big = false }) {
   const title = pickLang(c.title || c.name, lang) || c.title || c.name || c.slug;
@@ -67,7 +68,7 @@ function CollectionCard({ c, primary, fontHeading, lang, siteId, big = false }) 
 }
 
 export default function CollectionsShowcase({ collections: legacyCollections, lang = "fr", design }) {
-  const { siteId } = useParams();
+  const siteId = useShopSiteId();
   const { primary, fontHeading } = designAccents(design);
   const [collections, setCollections] = useState(null);
 

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useShopSiteId } from "../../lib/shopSiteId";
 import { useParams, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { fetchPublicSite } from "../StorefrontLayout";
@@ -73,7 +74,7 @@ function _postLanguageChange(siteId, fromLang, toLang) {
 
 
 export function useSiteAndLang() {
-  const { siteId: urlSiteId } = useParams();
+  const urlSiteId = useShopSiteId();
   const [searchParams, setSearchParams] = useSearchParams();
   const [site, setSite] = useState(null);
   const [design, setDesign] = useState(null);

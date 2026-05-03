@@ -11,6 +11,7 @@ import { pickLang, t } from "../lib/i18n";
 import { useSiteAndLang, designAccents, formatPrice, buildHreflangs, BACKEND_URL } from "../components/storefront/storefrontUtils";
 import { getPrimaryImage } from "../lib/productImage";
 import ProductCard from "../components/storefront/ProductCard";
+import { useShopSiteId } from "../lib/shopSiteId";
 
 const SORT_OPTIONS = [
   { value: "featured", label: "Mis en avant" },
@@ -82,7 +83,7 @@ export function StorefrontCollections() {
  * COLLECTION DETAIL — /shop/:siteId/collection/:slug
  * ========================================================= */
 export function StorefrontCollection() {
-  const { siteId, slug } = useParams();
+  const siteId = useShopSiteId(); const { slug } = useParams();
   const { site, design, lang, setLang, availableLangs } = useSiteAndLang();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();

@@ -1,6 +1,10 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/auth";
+import {
+  CustomShopProvider,
+  useCustomDomainBootstrap,
+} from "./lib/shopSiteId";
 import ScrollToTop from "./components/ScrollToTop";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -129,6 +133,85 @@ function HomeRoute() {
 }
 
 function App() {
+  const bootstrap = useCustomDomainBootstrap();
+  if (bootstrap.mode === "loading") {
+    return (
+      <div style={{
+        minHeight: "100vh", display: "flex",
+        alignItems: "center", justifyContent: "center",
+        background: "#fafaf9", fontFamily: "system-ui, -apple-system, sans-serif",
+      }}>
+        <div style={{ color: "#78716c", fontSize: 14 }}>Chargement…</div>
+      </div>
+    );
+  }
+  if (bootstrap.mode === "custom-domain") {
+    return <CustomDomainApp bootstrap={bootstrap} />;
+  }
+  return <PlatformApp />;
+}
+
+function CustomDomainApp({ bootstrap }) {
+  // Render storefront routes at the ROOT of the URL tree (no /shop/:siteId
+  // prefix) since a dedicated hostname already identifies the shop.
+  // `useShopSiteId()` falls back on CustomShopProvider's context.
+  return (
+    <AuthProvider>
+      <CustomShopProvider
+        siteId={bootstrap.siteId}
+        host={bootstrap.host}
+        siteName={bootstrap.siteName}
+      >
+        <BrowserRouter>
+          <ScrollToTop />
+          <Routes>
+            {/* Storefront public (no /shop/:siteId prefix) */}
+            <Route path="/" element={<StorefrontHome />} />
+            <Route path="/search" element={<StorefrontSearch />} />
+            <Route path="/track" element={<StorefrontTrack />} />
+            <Route path="/collections" element={<StorefrontCollections />} />
+            <Route path="/collection/:slug" element={<StorefrontCollection />} />
+            <Route path="/product/:productId" element={<StorefrontProduct />} />
+            <Route path="/products/:productId" element={<StorefrontProduct />} />
+            <Route path="/cart" element={<StorefrontCart />} />
+            <Route path="/checkout" element={<StorefrontCheckout />} />
+            <Route path="/checkout/success" element={<StorefrontConfirmation />} />
+            <Route path="/confirmation" element={<StorefrontConfirmation />} />
+            <Route path="/about" element={<StorefrontAbout />} />
+            <Route path="/faq" element={<StorefrontFAQ />} />
+            <Route path="/contact" element={<StorefrontContact />} />
+            <Route path="/cgv" element={<StorefrontCGV />} />
+            <Route path="/mentions" element={<StorefrontMentions />} />
+            <Route path="/confidentialite" element={<StorefrontConfidentialite />} />
+            <Route path="/cookies" element={<StorefrontCookies />} />
+            <Route path="/livraison" element={<StorefrontLivraison />} />
+            <Route path="/retours" element={<StorefrontRetours />} />
+            <Route path="/mediation" element={<StorefrontMediation />} />
+            <Route path="/blog" element={<StorefrontBlog />} />
+            <Route path="/blog/:slug" element={<StorefrontBlogPost />} />
+            <Route path="/account" element={<StorefrontAccount />} />
+            <Route path="/account/login" element={<StorefrontLogin />} />
+            <Route path="/account/register" element={<StorefrontRegister />} />
+            <Route path="/account/orders/:orderId" element={<StorefrontOrderDetail />} />
+            <Route path="/review/:token" element={<StorefrontReview />} />
+            {/* Legal aliases (preserve platform-style paths) */}
+            <Route path="/legal/cgv" element={<StorefrontCGV />} />
+            <Route path="/legal/mentions" element={<StorefrontMentions />} />
+            <Route path="/legal/confidentialite" element={<StorefrontConfidentialite />} />
+            <Route path="/legal/cookies" element={<StorefrontCookies />} />
+            <Route path="/legal/livraison" element={<StorefrontLivraison />} />
+            <Route path="/legal/retours" element={<StorefrontRetours />} />
+            <Route path="/legal/mediation" element={<StorefrontMediation />} />
+            {/* Fallback → home */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </CustomShopProvider>
+    </AuthProvider>
+  );
+}
+
+function PlatformApp() {
   return (
     <AuthProvider>
       <BrowserRouter>

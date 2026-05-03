@@ -10,6 +10,7 @@ import StorefrontTracking from "./storefront/StorefrontTracking";
 import CookieConsentBanner from "./storefront/CookieConsentBanner";
 import UkWelcomeBanner from "./storefront/UkWelcomeBanner";
 import { sanitizeBrandText } from "../lib/brandText";
+import { useShopSiteId } from "../lib/shopSiteId";
 import {
   ShoppingBag, Phone, ShieldCheck, Truck, MagnifyingGlass, User,
   List, X, FacebookLogo, InstagramLogo, YoutubeLogo, LinkedinLogo,
@@ -28,7 +29,7 @@ const navItems = (shopRoot, lang) => [
 ];
 
 export default function StorefrontLayout({ children, lang, setLang, availableLangs, site, design }) {
-  const { siteId } = useParams();
+  const siteId = useShopSiteId();
   const navigate = useNavigate();
   const [cartCount, setCartCount] = useState(0);
   const [customer, setCustomer] = useState(() => (siteId ? getCustomer(siteId) : null));
