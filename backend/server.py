@@ -109,6 +109,7 @@ from routes import well_known as well_known_routes  # Google Site Verification (
 from routes import google_master as google_master_routes  # Master OAuth + auto-provisioning
 from routes import public_legal as public_legal_routes  # Fallback HTML SSR /legal/* (altiaro.com prod)
 from routes import admin_reset as admin_reset_routes  # Reset site → étape 5 + launch instructions
+from routes import seo_content as seo_content_routes  # Sprint 2 & 3 — buyer guides, glossary, compare, top lists, team
 
 logging.basicConfig(
     level=logging.INFO,
@@ -205,6 +206,7 @@ api.include_router(automation_routes.router)  # Refonte UX — toggles automatis
 api.include_router(well_known_routes.router)  # Google Site Verification (altiaro.com)
 api.include_router(google_master_routes.router)  # Master OAuth + auto-provisioning
 api.include_router(admin_reset_routes.router)  # Admin reset + launch instructions
+api.include_router(seo_content_routes.router)  # Sprint 2 & 3 — SEO content endpoints (admin + public)
 
 # IMPORTANT — Routes /legal/* HTML server-side : montées DIRECTEMENT sur `app`
 # (pas sur le router /api). Sur le preview Kubernetes l'ingress route /legal/*
@@ -682,7 +684,7 @@ async def startup():
         # (1) Blog auto 3x/semaine — Mon/Wed/Fri 06:00 UTC
         scheduler.add_job(
             lambda: _wrap_cron(run_blog_auto_batch, "blog_auto_weekly_batch"),
-            CronTrigger(day_of_week="mon,wed,fri", hour=6, minute=0),
+            CronTrigger(day_of_week="mon,tue,thu,fri", hour=6, minute=0),
             id="blog_auto_weekly_batch", replace_existing=True, misfire_grace_time=7200,
         )
         # (2) Emerging keywords — Mon 07:00 UTC

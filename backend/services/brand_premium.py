@@ -70,9 +70,9 @@ async def generate_about_and_team(site_id: str) -> Dict[str, Any]:
 
     try:
         data = await safe_claude_json(
-            system, user, model="claude-sonnet-4-5",
+            system, user, quality_tier="premium",
             session_id=f"about-{site_id[:8]}",
-            timeout=90, request_id=f"about-{site_id[:8]}",
+            timeout=150, request_id=f"about-{site_id[:8]}",
         )
     except Exception as e:
         logger.warning(f"[brand-premium] failed: {str(e)[:200]}")

@@ -191,7 +191,8 @@ export function StorefrontProduct() {
           || `${pickLang(p.name, lang)} · ${site?.name || ""}`
         }
         description={
-          p.narrative?.seo?.description
+          p.aeo_snippet
+          || p.narrative?.seo?.description
           || p.narrative?.subheadline
           || pickLang(p.description, lang)
           || pickLang(p.name, lang)
@@ -400,6 +401,19 @@ export function StorefrontProduct() {
                 <p className="text-[15px] md:text-[17px] mt-5 leading-[1.65]" style={{ color: "#525252" }}>
                   {p.narrative.subheadline}
                 </p>
+              )}
+
+              {/* Sprint 1 — AEO snippet 40-60 mots (réponse directe pour Google SGE / LLMs) */}
+              {p.aeo_snippet && (
+                <aside
+                  className="mt-5 p-4 rounded-lg border-l-4"
+                  style={{ background: "#FAFAF7", borderColor: "#0A0A0A" }}
+                  data-testid="aeo-snippet"
+                >
+                  <p className="text-[14px] leading-[1.65] italic" style={{ color: "#0A0A0A" }}>
+                    {p.aeo_snippet}
+                  </p>
+                </aside>
               )}
 
               <div className="flex items-center gap-4 mt-6 text-[13px]" style={{ color: "#525252" }}>

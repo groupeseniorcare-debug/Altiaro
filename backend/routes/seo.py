@@ -187,6 +187,45 @@ async def sitemap(site_id: str):
     except Exception:
         pass
 
+    # Sprint 2/3 — SEO content (buyer guides, comparisons, top lists, glossary, team)
+    try:
+        kind_to_path = {
+            "buyer_guide": "/buyer-guides",
+            "comparison": "/compare",
+            "top_list": "/top",
+        }
+        seo_pages = await db.landing_pages.find(
+            {"site_id": site_id, "published": True,
+             "kind": {"$in": list(kind_to_path.keys())}},
+            {"_id": 0, "slug": 1, "kind": 1, "updated_at": 1},
+        ).to_list(2000)
+        if seo_pages:
+            urls.append(urlset("/buyer-guides", "0.75"))
+            urls.append(urlset("/glossary", "0.65"))
+            urls.append(urlset("/top", "0.7"))
+        for sp in seo_pages:
+            prefix = kind_to_path.get(sp.get("kind"))
+            if prefix and sp.get("slug"):
+                urls.append(urlset(f"{prefix}/{sp['slug']}", "0.8", "monthly"))
+        glossary = await db.glossary_terms.find(
+            {"site_id": site_id, "published": True},
+            {"_id": 0, "slug": 1},
+        ).to_list(2000)
+        for t in glossary:
+            if t.get("slug"):
+                urls.append(urlset(f"/glossary/{t['slug']}", "0.55", "monthly"))
+        # Team / authors (Sprint 3)
+        s_team = await db.sites.find_one(
+            {"id": site_id}, {"_id": 0, "authors": 1},
+        )
+        if s_team and (s_team.get("authors") or []):
+            urls.append(urlset("/team", "0.6"))
+            for a in s_team["authors"]:
+                if a.get("slug"):
+                    urls.append(urlset(f"/team/{a['slug']}", "0.5", "yearly"))
+    except Exception:
+        pass
+
     xml = ('<?xml version="1.0" encoding="UTF-8"?>\n'
            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
            'xmlns:xhtml="http://www.w3.org/1999/xhtml" '

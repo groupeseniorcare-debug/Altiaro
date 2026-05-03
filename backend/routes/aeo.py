@@ -371,3 +371,133 @@ async def aeo_readiness(site_id: str, user=Depends(get_current_user)):
         "blog_posts": blog_count,
         "checklist": checklist,
     }
+
+
+
+# =====================================================================
+# AEO SNIPPETS (Sprint 1) — 40-60 mots, optimisés pour réponses directes
+# Google SGE / ChatGPT / Claude / Perplexity / Gemini
+# =====================================================================
+class BulkSnippetInput(BaseModel):
+    force: bool = False
+    max_products: int = 50
+
+
+async def _generate_aeo_snippet(product: dict, site: dict) -> Optional[str]:
+    """Génère un snippet 40-60 mots répondant directement à 'Pourquoi choisir X ?'."""
+    name = _pick_text(product.get("name") or "")
+    narrative = product.get("narrative") or {}
+    subhead = _pick_text(narrative.get("subheadline") or "")
+    usps = narrative.get("usps") or narrative.get("benefits") or []
+    usps_txt = ", ".join(_pick_text(u) for u in usps[:5] if u)
+    category = _pick_text(product.get("category") or site.get("niche") or "")
+    brand = _pick_text((site.get("design") or {}).get("brand", {}).get("name") or site.get("name") or "")
+
+    system = (
+        "Tu es un rédacteur SEO/AEO expert. Tu écris des réponses courtes, "
+        "directes et factuelles, optimisées pour Google SGE et les moteurs IA. "
+        "Réponds UNIQUEMENT en JSON strict."
+    )
+    user = (
+        f"Produit : {name}\n"
+        f"Marque : {brand}\n"
+        f"Catégorie : {category}\n"
+        f"Accroche : {subhead}\n"
+        f"USPs : {usps_txt}\n\n"
+        "Rédige un snippet AEO de 40-60 mots MAXIMUM répondant directement "
+        "à la question : « Pourquoi choisir ce produit ? ».\n"
+        "Ton premium, factuel, USPs concrètes, aucun superlatif creux.\n"
+        "Format JSON : {\"snippet\": \"...\"}"
+    )
+    data, err = await _call_claude_json(system, user, timeout=40)
+    if err or not isinstance(data, dict):
+        return None
+    s = (data.get("snippet") or "").strip()
+    # Trim to roughly 60 words if Claude over-shoots.
+    words = s.split()
+    if len(words) > 65:
+        s = " ".join(words[:60])
+    return s or None
+
+
+async def _run_bulk_snippets_job(site_id: str, job_id: str, force: bool, max_products: int):
+    await db.aeo_jobs.update_one({"id": job_id}, {"$set": {"status": "running"}})
+    try:
+        query = {"site_id": site_id, "status": "active"}
+        if not force:
+            query["aeo_snippet"] = {"$exists": False}
+        products = await db.products.find(query, {"_id": 0}).limit(max_products).to_list(max_products)
+        site = await db.sites.find_one({"id": site_id}, {"_id": 0}) or {}
+        sem = asyncio.Semaphore(4)
+        done = 0
+        budget_hit = False
+
+        async def _one(p):
+            nonlocal done, budget_hit
+            if budget_hit:
+                return
+            async with sem:
+                try:
+                    snippet = await _generate_aeo_snippet(p, site)
+                except Exception as e:
+                    msg = str(e)
+                    if "402" in msg or "budget" in msg.lower():
+                        budget_hit = True
+                    return
+                if snippet:
+                    await db.products.update_one(
+                        {"id": p["id"]},
+                        {"$set": {
+                            "aeo_snippet": snippet,
+                            "aeo_snippet_at": datetime.now(timezone.utc).isoformat(),
+                        }},
+                    )
+                    done += 1
+                    await db.aeo_jobs.update_one({"id": job_id}, {"$inc": {"progress": 1}})
+
+        await asyncio.gather(*[_one(p) for p in products])
+        await db.aeo_jobs.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "completed",
+                "done": done,
+                "total": len(products),
+                "budget_hit": budget_hit,
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }},
+        )
+    except Exception as e:
+        logger.exception("[aeo-snippets] bulk job crashed")
+        await db.aeo_jobs.update_one(
+            {"id": job_id},
+            {"$set": {"status": "failed", "error": str(e)[:300]}},
+        )
+
+
+@router.post("/sites/{site_id}/products/aeo-snippet-bulk")
+async def aeo_snippet_bulk(site_id: str, body: BulkSnippetInput,
+                           user=Depends(get_current_user)):
+    """Sprint 1 — Génère le snippet 40-60 mots pour tous les produits du site."""
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "id": 1, "operator_id": 1})
+    if not site:
+        raise HTTPException(404, "Site introuvable")
+    if user.get("role") != "admin" and site.get("operator_id") != user.get("id"):
+        raise HTTPException(403, "Accès interdit")
+
+    job_id = str(uuid.uuid4())
+    await db.aeo_jobs.insert_one({
+        "id": job_id, "site_id": site_id, "type": "aeo_snippet",
+        "status": "queued", "progress": 0,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    asyncio.create_task(_run_bulk_snippets_job(site_id, job_id, body.force, body.max_products))
+    return {"ok": True, "job_id": job_id}
+
+
+@router.get("/sites/{site_id}/products/aeo-snippet-bulk/{job_id}")
+async def aeo_snippet_bulk_status(site_id: str, job_id: str,
+                                  user=Depends(get_current_user)):
+    doc = await db.aeo_jobs.find_one({"id": job_id, "site_id": site_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Job introuvable")
+    return doc

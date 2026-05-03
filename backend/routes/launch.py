@@ -1609,7 +1609,7 @@ async def _run_launch_inner(job_id: str, site_id: str, user_id: str, wizard: dic
             await _mark_degraded(job_id, "review_photos", str(e)[:200])
 
         # 9) Mark Étape 5 validated + unlock Étape 6 ---------------------
-        await _advance(job_id, "finalize", "Finalisation & déblocage SEO", 98)
+        await _advance(job_id, "finalize", "Finalisation & déblocage SEO", 96)
         try:
             await db.sites.update_one(
                 {"id": site_id},
@@ -1671,6 +1671,78 @@ async def _run_launch_inner(job_id: str, site_id: str, user_id: str, wizard: dic
                 logger.info(f"[launch] enqueued 3 pillar blog jobs for site {site_id[:8]}")
         except Exception:
             logger.exception("[launch] pillar blog enqueue failed (non-blocking)")
+
+        # 9.6) Sprint 1+2+3+4 — SEO Content Industrialization (non-blocking)
+        #   Sprint 1 — AEO snippets 40-60 mots pour chaque produit
+        #   Sprint 2 — Buyer guides (5) + Glossary (40) + Comparisons (10) + Top lists (5)
+        #   Sprint 3 — About rich + 3 auteurs fictifs E-E-A-T
+        #   Sprint 4 — Alt text IA pour toutes les images produit
+        # Chaque bloc est try/except silencieux → n'interrompt pas le launch en
+        # cas d'échec (budget LLM, réponse malformée, timeout, etc.).
+        try:
+            await _advance(job_id, "seo-content-sprints", "Contenu SEO/AEO (Sprints 1-4)…", 97)
+
+            if not budget_exhausted:
+                # Sprint 3 — About + team (rapide, ~1 prompt + 3 portraits)
+                try:
+                    from services import brand_premium as _bp
+                    r3 = await _bp.generate_about_and_team(site_id)
+                    logger.info(f"[launch-seo] brand_premium: {r3}")
+                except Exception as e:
+                    msg = str(e)
+                    if "402" in msg or "budget" in msg.lower():
+                        budget_exhausted = True
+                    await _mark_degraded(job_id, "brand_premium", str(e)[:200])
+
+            if not budget_exhausted:
+                # Sprint 1 — AEO snippets 40-60 mots par produit
+                try:
+                    from routes.aeo import _run_bulk_snippets_job as _run_snip
+                    snippet_job_id = str(uuid.uuid4())
+                    await db.aeo_jobs.insert_one({
+                        "id": snippet_job_id, "site_id": site_id, "type": "aeo_snippet",
+                        "status": "queued", "progress": 0,
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "triggered_by": "launch",
+                    })
+                    await _run_snip(site_id, snippet_job_id, force=False, max_products=50)
+                except Exception as e:
+                    msg = str(e)
+                    if "402" in msg or "budget" in msg.lower():
+                        budget_exhausted = True
+                    await _mark_degraded(job_id, "aeo_snippets", str(e)[:200])
+
+            if not budget_exhausted:
+                # Sprint 4 — Alt text IA pour toutes les images produit
+                try:
+                    from services import image_alt_text as _alt
+                    r4 = await _alt.generate_alt_texts_for_site(site_id)
+                    logger.info(f"[launch-seo] alt_texts: {r4}")
+                except Exception as e:
+                    msg = str(e)
+                    if "402" in msg or "budget" in msg.lower():
+                        budget_exhausted = True
+                    await _mark_degraded(job_id, "alt_texts", str(e)[:200])
+
+            if not budget_exhausted:
+                # Sprint 2 — Buyer guides + Glossary + Comparisons + Top lists
+                # C'est le plus coûteux (~60 pages × ~40 cts = ~2.5$ / site).
+                try:
+                    from services import seo_content_generators as _scg
+                    r2 = await _scg.generate_all_seo_content(site_id)
+                    logger.info(f"[launch-seo] seo_content: buyer_guides={r2.get('buyer_guides', {}).get('generated')} "
+                                f"glossary={r2.get('glossary', {}).get('generated')} "
+                                f"comparisons={r2.get('comparisons', {}).get('generated')} "
+                                f"top_lists={r2.get('top_lists', {}).get('generated')}")
+                except Exception as e:
+                    msg = str(e)
+                    if "402" in msg or "budget" in msg.lower():
+                        budget_exhausted = True
+                    await _mark_degraded(job_id, "seo_content_generators", str(e)[:200])
+        except Exception:
+            logger.exception("[launch] seo-content-sprints block crashed (non-blocking)")
+
+        await _advance(job_id, "finalize-seo", "Contenu SEO/AEO prêt", 99)
 
         # Si des étapes sont en mode dégradé → status final
         # `completed_with_degraded` (le frontend pourra afficher un récap +

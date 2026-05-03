@@ -31,7 +31,7 @@ from services.slugify import slugify
 
 logger = logging.getLogger("altiaro.seo_content")
 
-_SEM = asyncio.Semaphore(3)
+_SEM = asyncio.Semaphore(2)
 
 
 def _now() -> str:
@@ -109,7 +109,7 @@ async def generate_buyer_guide(
         "et une FAQ finale de 8-10 questions."
     )
     user = (
-        f"Rédige un Buyer Guide SEO de 2000 mots sur : « {title} ».\n\n"
+        f"Rédige un Buyer Guide SEO de 1000-1300 mots sur : « {title} ».\n\n"
         f"Angle éditorial : {topic['angle']}.\n"
         f"Marque : {site.get('name')}\n"
         f"Niche : {niche}\n"
@@ -131,14 +131,14 @@ async def generate_buyer_guide(
         '  "internal_links": [{"anchor":"...","target_slug":"..."}],\n'
         '  "seo_keywords": ["kw1","kw2",...]\n'
         "}\n\n"
-        "IMPORTANT : 5-7 sections, 8-10 FAQs, 5+ internal_links vers produits. "
-        "Total body : 1800-2200 mots."
+        "IMPORTANT : 4-6 sections, 6-8 FAQs, 4+ internal_links vers produits. "
+        "Total body : 1000-1300 mots (pas plus)."
     )
     try:
         data = await safe_claude_json(
-            system, user, model="claude-sonnet-4-5",
+            system, user, quality_tier="premium",
             session_id=f"buyer-guide-{slug}",
-            timeout=120, request_id=f"buyer-guide-{slug}",
+            timeout=180, request_id=f"buyer-guide-{slug}",
         )
     except Exception as e:
         logger.warning(f"[buyer-guide] {slug} failed: {str(e)[:200]}")
@@ -223,9 +223,9 @@ async def generate_glossary(site_id: str, target_count: int = 40) -> Dict[str, A
     )
     try:
         data = await safe_claude_json(
-            system, user, model="claude-sonnet-4-5",
+            system, user, quality_tier="premium",
             session_id=f"glossary-{site_id[:8]}",
-            timeout=120, request_id=f"glossary-{site_id[:8]}",
+            timeout=180, request_id=f"glossary-{site_id[:8]}",
         )
     except Exception as e:
         logger.warning(f"[glossary] failed: {str(e)[:200]}")
@@ -300,9 +300,9 @@ async def generate_comparison(site: Dict[str, Any], a: Dict, b: Dict) -> Dict[st
     )
     try:
         data = await safe_claude_json(
-            system, user, model="claude-sonnet-4-5",
+            system, user, quality_tier="premium",
             session_id=f"cmp-{slug[:40]}",
-            timeout=90, request_id=f"cmp-{slug[:40]}",
+            timeout=150, request_id=f"cmp-{slug[:40]}",
         )
     except Exception as e:
         return {"ok": False, "slug": slug, "error": str(e)[:200]}
@@ -390,9 +390,9 @@ async def generate_top_list(
     )
     try:
         data = await safe_claude_json(
-            system, user, model="claude-sonnet-4-5",
+            system, user, quality_tier="premium",
             session_id=f"top-{slug[:30]}",
-            timeout=90, request_id=f"top-{slug[:30]}",
+            timeout=150, request_id=f"top-{slug[:30]}",
         )
     except Exception as e:
         return {"ok": False, "slug": slug, "error": str(e)[:200]}

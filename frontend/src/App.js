@@ -78,6 +78,18 @@ import {
 } from "./pages/StorefrontBlog";
 import StorefrontReview from "./pages/StorefrontReview";
 import {
+  StorefrontBuyerGuides,
+  StorefrontBuyerGuide,
+  StorefrontGlossary,
+  StorefrontGlossaryTerm,
+  StorefrontComparisons,
+  StorefrontCompare,
+  StorefrontTopLists,
+  StorefrontTopList,
+  StorefrontTeam,
+  StorefrontTeamMember,
+} from "./pages/StorefrontSEOContent";
+import {
   StorefrontAbout,
   StorefrontFAQ,
   StorefrontContact,
@@ -193,6 +205,17 @@ function CustomDomainApp({ bootstrap }) {
             <Route path="/mediation" element={<StorefrontMediation />} />
             <Route path="/blog" element={<StorefrontBlog />} />
             <Route path="/blog/:slug" element={<StorefrontBlogPost />} />
+            {/* Sprint 2/3 — SEO content (buyer guides, glossary, comparisons, top lists, team) */}
+            <Route path="/buyer-guides" element={<StorefrontBuyerGuides />} />
+            <Route path="/buyer-guides/:slug" element={<StorefrontBuyerGuide />} />
+            <Route path="/glossary" element={<StorefrontGlossary />} />
+            <Route path="/glossary/:slug" element={<StorefrontGlossaryTerm />} />
+            <Route path="/compare" element={<StorefrontComparisons />} />
+            <Route path="/compare/:slug" element={<StorefrontCompare />} />
+            <Route path="/top" element={<StorefrontTopLists />} />
+            <Route path="/top/:slug" element={<StorefrontTopList />} />
+            <Route path="/team" element={<StorefrontTeam />} />
+            <Route path="/team/:slug" element={<StorefrontTeamMember />} />
             <Route path="/account" element={<StorefrontAccount />} />
             <Route path="/account/login" element={<StorefrontLogin />} />
             <Route path="/account/register" element={<StorefrontRegister />} />
