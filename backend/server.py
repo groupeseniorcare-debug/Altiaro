@@ -111,6 +111,7 @@ from routes import public_legal as public_legal_routes  # Fallback HTML SSR /leg
 from routes import admin_reset as admin_reset_routes  # Reset site → étape 5 + launch instructions
 from routes import seo_content as seo_content_routes  # Sprint 2 & 3 — buyer guides, glossary, compare, top lists, team
 from routes import merchant_onboarding as merchant_onboarding_routes  # GMC auto-onboard one-click
+from routes import admin_approve_ads as admin_approve_ads_routes  # Admin guard avant push Ads
 
 logging.basicConfig(
     level=logging.INFO,
@@ -209,6 +210,7 @@ api.include_router(google_master_routes.router)  # Master OAuth + auto-provision
 api.include_router(admin_reset_routes.router)  # Admin reset + launch instructions
 api.include_router(seo_content_routes.router)  # Sprint 2 & 3 — SEO content endpoints (admin + public)
 api.include_router(merchant_onboarding_routes.router)  # GMC auto-onboard (admin + operator)
+api.include_router(admin_approve_ads_routes.router)  # Admin guard avant push Google Ads
 
 # IMPORTANT — Routes /legal/* HTML server-side : montées DIRECTEMENT sur `app`
 # (pas sur le router /api). Sur le preview Kubernetes l'ingress route /legal/*

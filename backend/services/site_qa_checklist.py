@@ -7,6 +7,9 @@ from deps import db
 CHECKS_DEF = [
     "branding_complete", "products_min", "all_products_have_images",
     "translations_min", "json_ld_valid", "sitemap_published",
+    # ⚠️ HARD-FAIL si absent — étape 6 peut être skippée mais à l'étape 10
+    # le go-live exige un vrai domaine vérifié.
+    "domain_configured",
     "domain_dns_ok", "ssl_ok", "mollie_active", "legal_pages",
     "blog_min_3", "landing_pages_min", "gsc_connected",
     # NEW — Sprint Onboarding One-Click
@@ -58,6 +61,8 @@ async def compute(site_id: str) -> dict:
     site_pinterest_opted = bool((site.get("pinterest") or {}).get("auto_pin"))
 
     custom_domain = site.get("custom_domain") or ""
+    domain_verified = bool(site.get("custom_domain_verified"))
+    domain_skipped = bool(site.get("domain_skipped"))
 
     raw = {
         "branding_complete": (
@@ -74,6 +79,18 @@ async def compute(site_id: str) -> dict:
             f"{len(available)} langues : {available}"),
         "json_ld_valid": ("ok", "Injecté côté backend (Phase B1)"),
         "sitemap_published": ("ok", "/api/public/sitemap actif"),
+        # HARD-FAIL : avant go-live, le site DOIT avoir un domaine custom
+        # vérifié. Si l'étape 6 a été skippée, on fail explicitement ici
+        # pour que le concepteur retourne acheter un domaine.
+        "domain_configured": (
+            "ok" if (custom_domain and domain_verified)
+            else "fail",
+            (f"Domaine {custom_domain} vérifié ✓"
+             if (custom_domain and domain_verified)
+             else ("Domaine OBLIGATOIRE avant publication — étape 6 skippée à reprendre"
+                   if domain_skipped
+                   else "Aucun domaine custom — retour étape 6 requis")),
+        ),
         "domain_dns_ok": (
             "ok" if (domain_doc and domain_doc.get("status") == "dns_configured")
             else ("ok" if custom_domain else "warn"),

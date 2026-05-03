@@ -101,6 +101,8 @@ export default function SiteQA() {
   const score = data?.score || 0;
   const ready = !!data?.ready;
   const ringColor = score >= 85 ? "#10b981" : score >= 70 ? "#f59e0b" : "#f43f5e";
+  const domainCheck = checks.find((c) => c.id === "domain_configured");
+  const domainBlocked = domainCheck && domainCheck.status === "fail";
 
   return (
     <div className="min-h-screen bg-[#FAF7F2]">
@@ -136,6 +138,30 @@ export default function SiteQA() {
             </button>
           </div>
         </div>
+
+        {domainBlocked && (
+          <div
+            className="mb-6 rounded-xl border-2 border-rose-300 bg-rose-50 p-5 flex items-start gap-4"
+            data-testid="qa-domain-blocker"
+          >
+            <div className="text-3xl">🚨</div>
+            <div className="flex-1">
+              <div className="font-semibold text-rose-900 text-base">
+                Domaine obligatoire avant la mise en ligne
+              </div>
+              <p className="text-sm text-rose-800 mt-1">
+                {domainCheck.detail}
+              </p>
+              <Link
+                to={`/sites/${siteId}/domains`}
+                data-testid="qa-go-buy-domain"
+                className="inline-flex items-center gap-2 mt-3 h-10 px-4 rounded-lg bg-rose-600 text-white text-sm font-medium hover:bg-rose-700"
+              >
+                Aller acheter un domaine →
+              </Link>
+            </div>
+          </div>
+        )}
 
         {toast && (
           <div

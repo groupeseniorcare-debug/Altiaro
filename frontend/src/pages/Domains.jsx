@@ -147,6 +147,32 @@ export default function Domains() {
     refreshMine();
   };
 
+  const [skipBusy, setSkipBusy] = useState(false);
+  const [showSkipModal, setShowSkipModal] = useState(false);
+
+  const skipDomain = async () => {
+    setSkipBusy(true);
+    const { data } = await apiCall(() => api.post(`/sites/${siteId}/domain/skip`));
+    setSkipBusy(false);
+    if (data?.ok) {
+      // Refresh site to reflect domain_skipped flag
+      const { data: s } = await apiCall(() => api.get(`/sites/${siteId}`));
+      if (s) setSite(s);
+      setShowSkipModal(false);
+      window.alert("✅ Étape Domaine reportée. Tu peux continuer le flow ; un domaine reste obligatoire avant publication.");
+    }
+  };
+
+  const unskipDomain = async () => {
+    setSkipBusy(true);
+    const { data } = await apiCall(() => api.post(`/sites/${siteId}/domain/unskip`));
+    setSkipBusy(false);
+    if (data?.ok) {
+      const { data: s } = await apiCall(() => api.get(`/sites/${siteId}`));
+      if (s) setSite(s);
+    }
+  };
+
   return (
     <Layout>
       <div className="p-8 md:p-12 max-w-[1100px]">
@@ -175,6 +201,79 @@ export default function Domains() {
             </p>
           </div>
         </div>
+
+        {/* Skip / Unskip CTA — étape optionnelle pour le flow demo */}
+        {!site?.custom_domain && (
+          <div className="mb-6 rounded-xl border-2 border-dashed border-neutral-300 bg-neutral-50 p-5">
+            {site?.domain_skipped ? (
+              <div className="flex items-start gap-3">
+                <div className="text-2xl">⏸️</div>
+                <div className="flex-1">
+                  <div className="font-medium text-neutral-900">Étape reportée</div>
+                  <p className="text-sm text-neutral-600 mt-1">
+                    Tu as choisi de continuer sans domaine. Tu pourras revenir
+                    ici à tout moment, mais un domaine vérifié <strong>reste obligatoire</strong> avant la mise en ligne (étape 10).
+                  </p>
+                  <button
+                    onClick={unskipDomain}
+                    disabled={skipBusy}
+                    data-testid="domain-unskip"
+                    className="mt-3 h-9 px-4 rounded-lg bg-neutral-900 text-white text-sm font-medium hover:bg-neutral-800 disabled:opacity-50"
+                  >
+                    Reprendre cette étape
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="font-medium text-neutral-900">Pas envie d'acheter un domaine maintenant ?</div>
+                  <p className="text-sm text-neutral-600 mt-1">
+                    Tu peux passer cette étape pour tester le flow. Tu devras
+                    revenir l'ajouter avant la publication finale.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowSkipModal(true)}
+                  data-testid="domain-skip"
+                  className="h-9 px-4 rounded-lg border border-neutral-300 bg-white text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+                >
+                  Passer cette étape
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {showSkipModal && (
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" data-testid="domain-skip-modal">
+            <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+              <div className="text-2xl mb-3">⏭️ Reporter cette étape ?</div>
+              <p className="text-sm text-neutral-600 mb-4">
+                Tu pourras continuer les étapes 7-10 sans domaine. <strong>Avant
+                la mise en ligne (étape 10) tu devras impérativement revenir
+                acheter et vérifier ton domaine</strong> — sinon l'étape "Publier"
+                restera bloquée.
+              </p>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setShowSkipModal(false)}
+                  className="h-9 px-4 rounded-lg border border-neutral-300 text-sm hover:bg-neutral-100"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={skipDomain}
+                  disabled={skipBusy}
+                  data-testid="domain-skip-confirm"
+                  className="h-9 px-4 rounded-lg bg-neutral-900 text-white text-sm font-medium hover:bg-neutral-800 disabled:opacity-50"
+                >
+                  {skipBusy ? "Patientez…" : "Oui, reporter"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Return banner after Mollie redirect */}
         {returnStatus && (

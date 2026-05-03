@@ -5,6 +5,7 @@ import { api, apiCall } from "../lib/api";
 import CommandPalette from "./CommandPalette";
 import CommandMenu from "./CommandMenu";
 import CopilotFab from "./CopilotFab";  // Unused — Copilot désactivé
+import DomainSkipBanner from "./DomainSkipBanner";
 import { List, X } from "@phosphor-icons/react";
 import { AltiaroLogo } from "./AltiaroLogo";
 import {
@@ -199,7 +200,10 @@ export default function Layout({ children }) {
         </div>
       </aside>
 
-      <main className="flex-1 md:ml-[240px] min-h-screen pt-14 md:pt-0 bg-neutral-50">{children}</main>
+      <main className="flex-1 md:ml-[240px] min-h-screen pt-14 md:pt-0 bg-neutral-50">
+        <DomainSkipBanner />
+        {children}
+      </main>
       {user?.role === "admin" && <CommandPalette />}
       {user?.role && user.role !== "admin" && <CommandMenu />}
       {/* user.role might be 'operator', 'concepteur', 'user', etc. — anything non-admin shows the navigation palette. */}

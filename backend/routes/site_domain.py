@@ -191,6 +191,52 @@ async def clear_domain(site_id: str, user: dict = Depends(get_current_user)):
 
 
 # ---------------------------------------------------------------------------
+# SKIP / UNSKIP — Permet au concepteur d'avancer sur les étapes 7-10 sans
+# avoir configuré son domaine. Le check QA étape 10 enforcera quand même
+# que `custom_domain` soit set + verified avant la mise en ligne.
+# ---------------------------------------------------------------------------
+
+@router.post("/sites/{site_id}/domain/skip")
+async def skip_domain(site_id: str, user: dict = Depends(get_current_user)):
+    """Marque l'étape Domaine comme skippée (le concepteur veut tester
+    le flow et ajoutera son domaine plus tard). Débloque les étapes 7-10
+    via journey_gating._check_domain qui lit `site.domain_skipped`.
+
+    Idempotent. À l'étape 10 QA, un check séparé `domain_configured` re-
+    forcera l'obligation d'avoir un vrai domaine avant le go-live.
+    """
+    await _check_site_access(site_id, user)
+    from datetime import datetime, timezone
+    await db.sites.update_one(
+        {"id": site_id},
+        {"$set": {
+            "domain_skipped": True,
+            "domain_skipped_at": datetime.now(timezone.utc).isoformat(),
+            "domain_skipped_by": user.get("id"),
+        }},
+    )
+    logger.info(f"[domain-skip] site={site_id[:8]} skipped by {user.get('email')}")
+    return {"ok": True, "domain_skipped": True}
+
+
+@router.post("/sites/{site_id}/domain/unskip")
+async def unskip_domain(site_id: str, user: dict = Depends(get_current_user)):
+    """Annule le skip (le concepteur revient configurer son domaine)."""
+    await _check_site_access(site_id, user)
+    await db.sites.update_one(
+        {"id": site_id},
+        {"$unset": {
+            "domain_skipped": "",
+            "domain_skipped_at": "",
+            "domain_skipped_by": "",
+        }},
+    )
+    return {"ok": True, "domain_skipped": False}
+
+
+
+
+# ---------------------------------------------------------------------------
 # Approximated provisioning core
 # ---------------------------------------------------------------------------
 async def _provision_approximated(site_id: str, domain: str) -> dict:
