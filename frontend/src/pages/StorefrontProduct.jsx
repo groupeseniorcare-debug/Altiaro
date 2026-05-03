@@ -450,10 +450,10 @@ export function StorefrontProduct() {
                         <Check size={14} weight="bold" className="mt-1 shrink-0" style={{ color: "#9F6E50" }} />
                         <div className="min-w-0">
                           <div className="text-[13.5px] font-medium leading-tight" style={{ color: "#0A0A0A" }}>
-                            {u.title}
+                            {pickLang(u.title, lang)}
                           </div>
                           <div className="text-[12px] mt-0.5 leading-snug" style={{ color: "#737373" }}>
-                            {u.description}
+                            {pickLang(u.description, lang)}
                           </div>
                         </div>
                       </li>
@@ -598,6 +598,7 @@ export function StorefrontProduct() {
             product={p}
             colorSlug={selectedColorSlug}
             design={design}
+            lang={lang}
           />
 
           {/* §5 — Caractéristiques produit */}

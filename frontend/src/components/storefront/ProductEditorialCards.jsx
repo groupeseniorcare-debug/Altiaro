@@ -14,6 +14,7 @@
  * Si `editorial_cards` manquant ou corrompu → composant masqué.
  */
 import React from "react";
+import { pickLang } from "../../lib/i18n";
 
 function _itemUrl(item) {
   if (!item) return null;
@@ -56,7 +57,7 @@ function pickImageByStyle(product, colorSlug, style) {
   return (product.images && product.images[0]) || null;
 }
 
-export default function ProductEditorialCards({ product, colorSlug, design }) {
+export default function ProductEditorialCards({ product, colorSlug, design, lang = "fr" }) {
   const ed = product?.editorial_cards;
   if (!ed || !ed.hero || !Array.isArray(ed.cards) || ed.cards.length < 2) return null;
 
@@ -123,7 +124,7 @@ export default function ProductEditorialCards({ product, colorSlug, design }) {
                     borderRadius: "2px",
                   }}
                   role="img"
-                  aria-label={c.title}
+                  aria-label={pickLang(c.title, lang)}
                 />
               )}
               <div className="px-1">
@@ -135,13 +136,13 @@ export default function ProductEditorialCards({ product, colorSlug, design }) {
                   className="text-[20px] md:text-[22px] leading-[1.2] font-light mb-3"
                   style={{ fontFamily: fontHeading, color: "#0A0A0A" }}
                 >
-                  {c.title}
+                  {pickLang(c.title, lang)}
                 </h3>
                 <p
                   className="text-[13.5px] leading-[1.65]"
                   style={{ color: "#525252" }}
                 >
-                  {c.description}
+                  {pickLang(c.description, lang)}
                 </p>
               </div>
             </article>

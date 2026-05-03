@@ -17,6 +17,7 @@ import { motion } from "framer-motion";
 import * as LucideIcons from "lucide-react";
 import { Sparkles } from "lucide-react";
 import { designAccents } from "./storefrontUtils";
+import { pickLang } from "../../lib/i18n";
 
 /**
  * Resolve a Lucide icon component by its PascalCase name.
@@ -66,7 +67,8 @@ export default function ProductUsps({ usps, design, lang = "fr" }) {
         {/* 4 vertical cards — ivory background, Lucide icon top */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
           {list.map((usp, i) => {
-            const Icon = resolveLucideIcon(usp.icon);
+            const iconName = typeof usp.icon === "string" ? usp.icon : pickLang(usp.icon, lang);
+            const Icon = resolveLucideIcon(iconName);
             return (
               <motion.div
                 key={i}
@@ -99,12 +101,12 @@ export default function ProductUsps({ usps, design, lang = "fr" }) {
                     fontWeight: 500,
                   }}
                 >
-                  {usp.title}
+                  {pickLang(usp.title, lang)}
                 </h3>
 
                 {/* Description — sans-serif, calm */}
                 <p className="text-[13.5px] leading-[1.65]" style={{ color: "#525252" }}>
-                  {usp.description}
+                  {pickLang(usp.description, lang)}
                 </p>
               </motion.div>
             );

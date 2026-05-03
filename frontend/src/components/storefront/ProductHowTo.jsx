@@ -17,6 +17,7 @@
  */
 import React from "react";
 import * as LucideIcons from "lucide-react";
+import { pickLang } from "../../lib/i18n";
 
 const ROMAN = ["I", "II", "III", "IV", "V"];
 
@@ -87,21 +88,24 @@ export default function ProductHowTo({ steps, sectionTitle, design, lang = "fr" 
               >
                 {ROMAN[i] || (i + 1)}
               </div>
-              <StepIcon name={s.icon} color={accent} />
+              <StepIcon
+                name={typeof s.icon === "string" ? s.icon : pickLang(s.icon, lang)}
+                color={accent}
+              />
             </div>
 
             <h3
               className="text-[20px] md:text-[22px] leading-[1.15] font-light mb-3"
               style={{ fontFamily: fontHeading, color: "#0A0A0A" }}
             >
-              {s.title}
+              {pickLang(s.title, lang)}
             </h3>
 
             <p
               className="text-[13.5px] leading-[1.65]"
               style={{ color: "#525252" }}
             >
-              {s.description}
+              {pickLang(s.description, lang)}
             </p>
           </article>
         ))}
