@@ -64,7 +64,15 @@ async def sitemap(site_id: str):
     if not site:
         raise HTTPException(404, "Site introuvable")
     origin = _origin()
-    base = f"{origin}/shop/{site_id}"
+    # Use the verified custom domain as sitemap base so URLs match the
+    # canonical <link> tags served by the SPA (SEO consistency).
+    custom = site.get("custom_domain") if site.get("custom_domain_verified") else None
+    if custom:
+        base = f"https://{custom}"
+        shop_root = ""  # No /shop/{id} prefix on custom domains
+    else:
+        base = f"{origin}"
+        shop_root = f"/shop/{site_id}"
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # Chantier 5 — langues dérivées de seo_countries (pas selected_countries)
@@ -72,7 +80,8 @@ async def sitemap(site_id: str):
 
     products = await db.products.find(
         {"site_id": site_id, "status": "active"},
-        {"_id": 0, "id": 1, "name": 1, "images": 1, "generated_images": 1, "updated_at": 1},
+        {"_id": 0, "id": 1, "slug": 1, "name": 1, "images": 1,
+         "generated_images": 1, "updated_at": 1},
     ).to_list(5000)
 
     design = site.get("design") or {}
@@ -81,32 +90,41 @@ async def sitemap(site_id: str):
         collections = [{"slug": "mobilite"}, {"slug": "sommeil"}, {"slug": "quotidien"}]
     blog_posts = design.get("blog_posts") or []
 
+    def _full(path: str) -> str:
+        return f"{base}{shop_root}{path}"
+
     def urlset(path: str, prio: str = "0.8", changefreq: str = "weekly") -> str:
+        full = _full(path)
         alts = "".join(
-            f'<xhtml:link rel="alternate" hreflang="{lg}" href="{base}{path}?lang={lg}"/>'
+            f'<xhtml:link rel="alternate" hreflang="{lg}" href="{full}?lang={lg}"/>'
             for lg in langs
         )
-        # x-default → langue principale (1ère de la liste)
-        alts += f'<xhtml:link rel="alternate" hreflang="x-default" href="{base}{path}?lang={langs[0]}"/>'
-        return (f"<url><loc>{base}{path}</loc><lastmod>{now}</lastmod>"
+        alts += f'<xhtml:link rel="alternate" hreflang="x-default" href="{full}?lang={langs[0]}"/>'
+        return (f"<url><loc>{full}</loc><lastmod>{now}</lastmod>"
                 f"<changefreq>{changefreq}</changefreq><priority>{prio}</priority>{alts}</url>")
 
     def product_urlset(p: dict) -> str:
         """Product URL enriched with <image:image> for Google Image Search + AEO."""
-        path = f"/product/{p['id']}"
+        # Canonical = /products/{slug} on custom domain, /shop/{id}/product/{slug}
+        # on the platform. Slug is always preferred over UUID for SEO.
+        slug = p.get("slug") or p.get("id")
+        if custom:
+            path = f"/products/{slug}"
+        else:
+            path = f"/product/{slug}"
+        full = _full(path)
         alts = "".join(
-            f'<xhtml:link rel="alternate" hreflang="{lg}" href="{base}{path}?lang={lg}"/>'
+            f'<xhtml:link rel="alternate" hreflang="{lg}" href="{full}?lang={lg}"/>'
             for lg in langs
         )
-        alts += f'<xhtml:link rel="alternate" hreflang="x-default" href="{base}{path}?lang={langs[0]}"/>'
+        alts += f'<xhtml:link rel="alternate" hreflang="x-default" href="{full}?lang={langs[0]}"/>'
         pname_raw = p.get("name")
         pname = pname_raw if isinstance(pname_raw, str) else (
             (pname_raw or {}).get("fr") or next(iter((pname_raw or {}).values()), "")
         )
-        # Prefer AI-generated images first (closeup, studio, lifestyle)
         ai_urls = [g.get("url") for g in (p.get("generated_images") or []) if isinstance(g, dict) and g.get("url")]
         supplier_urls = [u for u in (p.get("images") or []) if isinstance(u, str)]
-        images = (ai_urls + supplier_urls)[:8]  # Google image sitemap cap is 1000, keep it clean
+        images = (ai_urls + supplier_urls)[:8]
         image_tags = "".join(
             f"<image:image><image:loc>{_xml_escape(img if img.startswith('http') else origin + img)}</image:loc>"
             f"<image:title>{_xml_escape(pname)}</image:title></image:image>"
@@ -115,7 +133,7 @@ async def sitemap(site_id: str):
         lastmod = p.get("updated_at")
         lastmod = (str(lastmod)[:10] if lastmod else now)
         return (
-            f"<url><loc>{base}{path}</loc><lastmod>{lastmod}</lastmod>"
+            f"<url><loc>{full}</loc><lastmod>{lastmod}</lastmod>"
             f"<changefreq>weekly</changefreq><priority>0.85</priority>{alts}{image_tags}</url>"
         )
 

@@ -222,21 +222,41 @@ async def public_collection_detail(site_id: str, slug: str):
     return {**{k: v for k, v in found.items() if k != "_id"}, "products_count": count, "source": "legacy"}
 
 
-@router.get("/sites/{site_id}/products/{product_id}")
-async def public_product_detail(site_id: str, product_id: str):
+@router.get("/sites/{site_id}/products/{product_id_or_slug}")
+async def public_product_detail(site_id: str, product_id_or_slug: str):
+    """Resolve a product by id OR by slug (SEO-friendly URLs).
+
+    Also returns the canonical slug so the frontend can 301-redirect UUID URLs.
+    """
+    # Try UUID first (fast-path, uses an index)
     p = await db.products.find_one(
-        {"id": product_id, "site_id": site_id, "status": "active"},
-        {"_id": 0}
+        {"id": product_id_or_slug, "site_id": site_id, "status": "active"},
+        {"_id": 0},
     )
+    if not p:
+        # Fallback: lookup by slug
+        p = await db.products.find_one(
+            {"slug": product_id_or_slug, "site_id": site_id, "status": "active"},
+            {"_id": 0},
+        )
     if not p:
         raise HTTPException(status_code=404, detail="Produit introuvable")
     return p
 
 
-@router.get("/sites/{site_id}/products/{product_id}/upsells")
-async def public_product_upsells(site_id: str, product_id: str, limit: int = 4):
+@router.get("/sites/{site_id}/products/{product_id_or_slug}/upsells")
+async def public_product_upsells(site_id: str, product_id_or_slug: str, limit: int = 4):
     """Return upsells linked to this main product.
+
+    Accepts either the product id or the slug (SEO-friendly URLs).
     Fallback: if no specific upsell is linked, return any active upsell of the site."""
+    # Resolve to canonical id
+    p = await db.products.find_one(
+        {"$or": [{"id": product_id_or_slug}, {"slug": product_id_or_slug}],
+         "site_id": site_id, "status": "active"},
+        {"_id": 0, "id": 1},
+    )
+    product_id = (p or {}).get("id") or product_id_or_slug
     # Linked first
     linked = await db.products.find(
         {"site_id": site_id, "status": "active", "role": "upsell",

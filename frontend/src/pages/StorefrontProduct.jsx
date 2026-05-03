@@ -50,6 +50,13 @@ import ProductHowTo from "../components/storefront/ProductHowTo";
 import ProductEditorialCards from "../components/storefront/ProductEditorialCards";
 import WideLifestyleBanner from "../components/storefront/WideLifestyleBanner";
 import { useShopSiteId } from "../lib/shopSiteId";
+import {
+  isUuid,
+  productCanonicalUrl,
+  productPath,
+  collectionPath,
+  shopPath,
+} from "../lib/shopUrls";
 
 export function StorefrontProduct() {
   const siteId = useShopSiteId(); const { productId } = useParams();
@@ -69,6 +76,19 @@ export function StorefrontProduct() {
       .get(`${BACKEND_URL}/api/public/sites/${siteId}/products/${productId}`)
       .then(({ data }) => {
         setP(data);
+        // --- SEO: 301-style redirect UUID → slug (window.history.replaceState) ---
+        // The backend resolves both UUID and slug → canonical slug returned as
+        // `data.slug`. If the URL still carries the UUID, rewrite it to the
+        // slug form (same path shape). This avoids UUID-based URLs being
+        // indexed by Google while preserving navigation state.
+        try {
+          if (data?.slug && productId && productId !== data.slug && isUuid(productId)) {
+            const target = productPath(siteId, data);
+            if (target && target !== "#" && target !== window.location.pathname) {
+              window.history.replaceState({}, "", target);
+            }
+          }
+        } catch (_) { /* noop */ }
         // Initialise selectedVariant si le produit a des variantes (>1 cas non dégénéré)
         const vs = Array.isArray(data?.variants) ? data.variants : [];
         if (vs.length > 1) {
@@ -151,6 +171,17 @@ export function StorefrontProduct() {
     );
   }
 
+  // Canonical URL (slug-based, always absolute)
+  const canonicalUrl = productCanonicalUrl(site, p, lang);
+  const canonicalPath = (() => {
+    try {
+      const u = new URL(canonicalUrl);
+      return u.pathname || `/products/${p.slug || p.id}`;
+    } catch (_) {
+      return `/products/${p.slug || p.id}`;
+    }
+  })();
+
   return (
     <ProductColorProvider product={p}>
     <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
@@ -165,11 +196,7 @@ export function StorefrontProduct() {
           || pickLang(p.description, lang)
           || pickLang(p.name, lang)
         }
-        canonical={
-          typeof window !== "undefined"
-            ? `${window.location.origin}/shop/${siteId}/product/${p.id}`
-            : undefined
-        }
+        canonical={canonicalUrl || undefined}
         image={getPrimaryImage(p)}
         type="product"
         siteName={site?.name}
@@ -177,7 +204,7 @@ export function StorefrontProduct() {
           p.narrative?.seo?.keywords?.join(", ")
           || [pickLang(p.name, lang), p.category, ...(p.tags || [])].filter(Boolean).join(", ")
         }
-        langs={buildHreflangs(site, `/product/${p.id}`)}
+        langs={buildHreflangs(site, canonicalPath)}
         schema={[
           {
             "@context": "https://schema.org",
@@ -214,10 +241,7 @@ export function StorefrontProduct() {
                   ? "https://schema.org/InStock"
                   : "https://schema.org/OutOfStock",
               itemCondition: "https://schema.org/NewCondition",
-              url:
-                typeof window !== "undefined"
-                  ? `${window.location.origin}/shop/${siteId}/product/${p.id}`
-                  : undefined,
+              url: canonicalUrl || undefined,
               shippingDetails: {
                 "@type": "OfferShippingDetails",
                 shippingRate: { "@type": "MonetaryAmount", value: 0, currency: p.currency || "EUR" },
@@ -242,10 +266,10 @@ export function StorefrontProduct() {
             "@context": "https://schema.org",
             "@type": "BreadcrumbList",
             itemListElement: [
-              { "@type": "ListItem", position: 1, name: "Accueil", item: `${window.location.origin}/shop/${siteId}` },
-              { "@type": "ListItem", position: 2, name: "Collections", item: `${window.location.origin}/shop/${siteId}/collections` },
-              p.category ? { "@type": "ListItem", position: 3, name: p.category, item: `${window.location.origin}/shop/${siteId}/collection/${p.category}` } : null,
-              { "@type": "ListItem", position: p.category ? 4 : 3, name: pickLang(p.name, lang), item: `${window.location.origin}/shop/${siteId}/product/${p.id}` },
+              { "@type": "ListItem", position: 1, name: "Accueil", item: `${window.location.origin}${shopPath(siteId)}` },
+              { "@type": "ListItem", position: 2, name: "Collections", item: `${window.location.origin}${shopPath(siteId).replace(/\/$/, "")}/collections` },
+              p.category ? { "@type": "ListItem", position: 3, name: p.category, item: `${window.location.origin}${collectionPath(siteId, p.category)}` } : null,
+              { "@type": "ListItem", position: p.category ? 4 : 3, name: pickLang(p.name, lang), item: canonicalUrl },
             ].filter(Boolean),
           },
           (() => {
@@ -310,13 +334,13 @@ export function StorefrontProduct() {
             style={{ color: "#737373" }}
             data-testid="product-breadcrumb"
           >
-            <Link to={`/shop/${siteId}`} className="hover:opacity-60 transition">Accueil</Link>
+            <Link to={shopPath(siteId)} className="hover:opacity-60 transition">Accueil</Link>
             <span className="mx-2 opacity-50">/</span>
-            <Link to={`/shop/${siteId}/collections`} className="hover:opacity-60 transition">Collections</Link>
+            <Link to={`${shopPath(siteId).replace(/\/$/, "")}/collections`} className="hover:opacity-60 transition">Collections</Link>
             {p.category && (
               <>
                 <span className="mx-2 opacity-50">/</span>
-                <Link to={`/shop/${siteId}/collection/${p.category}`} className="hover:opacity-60 transition capitalize">
+                <Link to={collectionPath(siteId, p.category)} className="hover:opacity-60 transition capitalize">
                   {p.category}
                 </Link>
               </>

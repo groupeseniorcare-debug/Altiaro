@@ -38,6 +38,7 @@ import {
   CheckCircle,
 } from "@phosphor-icons/react";
 import { pickLang, t } from "../../lib/i18n";
+import { productPath, shopPath } from "../../lib/shopUrls";
 import { designAccents, formatPrice } from "./storefrontUtils";
 import { addToCart } from "../../lib/cart";
 import { getPrimaryImage } from "../../lib/productImage";
@@ -95,7 +96,7 @@ export default function ProductCard({
   const p = product;
 
   const name = pickLang(p.name, lang) || p.name || "—";
-  const url = href || (hasReal ? `/shop/${siteId}/product/${p.id}` : `/shop/${siteId}`);
+  const url = href || (hasReal ? productPath(siteId, p) : shopPath(siteId));
   const imageSrc = getPrimaryImage(p);
   const isFeatured = !!p.featured;
   const hasPromo = !!p.compare_at_price && p.compare_at_price > p.price;

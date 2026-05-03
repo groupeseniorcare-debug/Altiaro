@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowRight, CheckCircle, Star } from "@phosphor-icons/react";
 import { pickLang, t } from "../../lib/i18n";
 import { formatPrice } from "./storefrontUtils";
+import { productPath, shopPath } from "../../lib/shopUrls";
 import { useShopSiteId } from "../../lib/shopSiteId";
 
 /**
@@ -134,7 +135,7 @@ export default function FeaturedProduct({ products, design, lang = "fr" }) {
             {/* CTA */}
             <div className="flex flex-col sm:flex-row gap-3">
               <Link
-                to={displayed._isDemo ? `/shop/${siteId}` : `/shop/${siteId}/product/${displayed.id}`}
+                to={displayed._isDemo ? shopPath(siteId) : productPath(siteId, displayed)}
                 data-testid="featured-cta"
                 className="inline-flex items-center justify-center gap-2 h-14 px-8 rounded-full text-white font-medium text-[15px] transition hover:opacity-90 active:scale-[0.98]"
                 style={{ background: primary }}
