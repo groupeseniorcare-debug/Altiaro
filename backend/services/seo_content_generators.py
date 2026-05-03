@@ -136,7 +136,7 @@ async def generate_buyer_guide(
     )
     try:
         data = await safe_claude_json(
-            system, user, quality_tier="premium",
+            system, user, quality_tier="standard",
             session_id=f"buyer-guide-{slug}",
             timeout=180, request_id=f"buyer-guide-{slug}",
         )
@@ -223,7 +223,7 @@ async def generate_glossary(site_id: str, target_count: int = 40) -> Dict[str, A
     )
     try:
         data = await safe_claude_json(
-            system, user, quality_tier="premium",
+            system, user, quality_tier="standard",
             session_id=f"glossary-{site_id[:8]}",
             timeout=180, request_id=f"glossary-{site_id[:8]}",
         )
@@ -300,7 +300,7 @@ async def generate_comparison(site: Dict[str, Any], a: Dict, b: Dict) -> Dict[st
     )
     try:
         data = await safe_claude_json(
-            system, user, quality_tier="premium",
+            system, user, quality_tier="standard",
             session_id=f"cmp-{slug[:40]}",
             timeout=150, request_id=f"cmp-{slug[:40]}",
         )
@@ -390,7 +390,7 @@ async def generate_top_list(
     )
     try:
         data = await safe_claude_json(
-            system, user, quality_tier="premium",
+            system, user, quality_tier="standard",
             session_id=f"top-{slug[:30]}",
             timeout=150, request_id=f"top-{slug[:30]}",
         )

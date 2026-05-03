@@ -70,7 +70,7 @@ async def generate_about_and_team(site_id: str) -> Dict[str, Any]:
 
     try:
         data = await safe_claude_json(
-            system, user, quality_tier="premium",
+            system, user, quality_tier="standard",
             session_id=f"about-{site_id[:8]}",
             timeout=150, request_id=f"about-{site_id[:8]}",
         )
