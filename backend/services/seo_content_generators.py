@@ -276,7 +276,21 @@ def _pick_comparison_pairs(products: List[Dict[str, Any]], limit: int = 10) -> L
 async def generate_comparison(site: Dict[str, Any], a: Dict, b: Dict) -> Dict[str, Any]:
     slug_a = a.get("slug") or a.get("id")
     slug_b = b.get("slug") or b.get("id")
-    slug = slugify(f"{slug_a}-vs-{slug_b}")[:80]
+    raw = slugify(f"{slug_a}-vs-{slug_b}")
+    # Truncate to 100 chars; if collision (already exists in DB), append short hash.
+    slug = raw[:100]
+    if len(raw) > 100:
+        import hashlib
+        slug = f"{raw[:90]}-{hashlib.md5(raw.encode()).hexdigest()[:8]}"
+    # Defensive : even at <=100 chars, two different pairs can collide on
+    # the truncated form. If slug already exists for this site, force a hash.
+    existing = await db.landing_pages.find_one(
+        {"site_id": site["id"], "kind": "comparison", "slug": slug},
+        {"_id": 0, "id": 1},
+    )
+    if existing:
+        import hashlib
+        slug = f"{raw[:90]}-{hashlib.md5(raw.encode()).hexdigest()[:8]}"
     a_name = _ensure_str(a.get("name"))
     b_name = _ensure_str(b.get("name"))
 

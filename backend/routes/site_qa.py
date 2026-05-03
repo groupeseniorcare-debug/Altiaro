@@ -1,6 +1,7 @@
 """Phase C — Endpoints QA + Go Live."""
 from __future__ import annotations
 import logging
+import asyncio
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from deps import db, get_current_user
@@ -11,7 +12,7 @@ logger = logging.getLogger("altiaro.site_qa")
 
 
 async def _check(site_id: str, user: dict):
-    s = await db.sites.find_one({"id": site_id}, {"_id": 0, "operator_id": 1, "id": 1, "name": 1, "status": 1})
+    s = await db.sites.find_one({"id": site_id}, {"_id": 0, "operator_id": 1, "id": 1, "name": 1, "status": 1, "merchant": 1})
     if not s:
         raise HTTPException(404, "Site introuvable")
     if user.get("role") != "admin" and s.get("operator_id") != user.get("id"):
@@ -19,10 +20,35 @@ async def _check(site_id: str, user: dict):
     return s
 
 
+async def _maybe_auto_onboard_gmc(site: dict) -> None:
+    """Auto-trigger GMC onboarding if not already done. Idempotent.
+
+    Lazy + non-blocking : if it fails (no MCA, no creds), QA still proceeds
+    with `merchant_connected=warn` instead of erroring out.
+    """
+    merchant = site.get("merchant") or {}
+    if merchant.get("business_info_pushed"):
+        return
+    try:
+        from services.gmc_onboarding import auto_onboard
+        # Fire & forget — the QA UI will reflect the result on next refresh.
+        asyncio.create_task(auto_onboard(site["id"], force=False))
+        logger.info(f"[qa] GMC auto-onboard triggered for site {site['id'][:8]}")
+    except Exception:
+        logger.exception("[qa] gmc auto-onboard scheduling failed (non-blocking)")
+
+
 @router.get("/sites/{site_id}/qa/checklist")
 async def qa_checklist(site_id: str, user: dict = Depends(get_current_user)):
-    await _check(site_id, user)
-    return await compute(site_id)
+    site = await _check(site_id, user)
+    # Auto-trigger GMC onboarding the first time the operator opens Step 10.
+    await _maybe_auto_onboard_gmc(site)
+    cl = await compute(site_id)
+    # Surface the manual GMC steps so the UI can render them inline.
+    merchant = site.get("merchant") or {}
+    cl["gmc_manual_steps"] = merchant.get("manual_steps_required") or []
+    cl["gmc_sub_account_id"] = merchant.get("sub_account_id") or None
+    return cl
 
 
 @router.post("/sites/{site_id}/go-live")
