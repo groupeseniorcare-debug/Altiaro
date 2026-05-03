@@ -398,11 +398,12 @@ async def get_purchase_status(domain: str, user: dict = Depends(get_current_user
 # ============== DNS CONFIG ============== #
 @router.post("/domains/{domain}/configure-dns")
 async def configure_dns(domain: str, user: dict = Depends(get_current_user)):
-    """Configure la zone DNS pour pointer le domaine vers notre plateforme.
+    """Configure la zone DNS via Approximated pour un domaine acheté.
 
-    Ajoute :
-    - A record @ → PLATFORM_SITE_IP
-    - CNAME www → @
+    Remplace l'ancien comportement (A @ → PLATFORM_IP + CNAME www → @).
+    Nouveau flow : appelle `_provision_approximated(site_id, domain)` qui
+    crée le vhost Approximated + pousse les A records OVH vers les cluster
+    IPs Approximated + refresh + poller SSL.
 
     Requiert que le domaine soit dans l'état "purchased" (la zone OVH met
     en général 5-15 min à être créée après achat).
@@ -414,43 +415,34 @@ async def configure_dns(domain: str, user: dict = Depends(get_current_user)):
     if user.get("role") != "admin":
         if record.get("site_id"):
             await _check_site_access(record["site_id"], user)
-    if not PLATFORM_IP:
-        raise HTTPException(503, "PLATFORM_SITE_IP non configurée côté serveur.")
-
-    client = _client()
-    import asyncio as _aio
+    site_id = record.get("site_id")
+    if not site_id:
+        raise HTTPException(400, "Domaine non rattaché à un site.")
     try:
-        # A record @ → PLATFORM_IP
-        await _aio.to_thread(
-            client.post, f"/domain/zone/{domain}/record",
-            fieldType="A", subDomain="", target=PLATFORM_IP, ttl=300,
+        from routes.site_domain import _provision_approximated
+        # Make sure the site knows about the custom domain
+        await db.sites.update_one(
+            {"id": site_id},
+            {"$set": {"custom_domain": domain}},
         )
-        # CNAME www → @
-        try:
-            await _aio.to_thread(
-                client.post, f"/domain/zone/{domain}/record",
-                fieldType="CNAME", subDomain="www", target=f"{domain}.", ttl=300,
-            )
-        except Exception as e:
-            logger.warning(f"CNAME www failed (might already exist): {e}")
-        # Refresh
-        await _aio.to_thread(client.post, f"/domain/zone/{domain}/refresh")
+        report = await _provision_approximated(site_id, domain)
         await db.domains.update_one(
             {"domain": domain},
             {"$set": {"status": "dns_configured",
-                      "dns_configured_at": datetime.now(timezone.utc).isoformat()}},
+                      "dns_configured_at": datetime.now(timezone.utc).isoformat(),
+                      "dns_provisioning_report": report}},
         )
         await db.sites.update_one(
             {"domain": domain},
             {"$set": {"domain_status": "active",
                       "updated_at": datetime.now(timezone.utc).isoformat()}},
         )
-        return {"ok": True, "domain": domain, "platform_ip": PLATFORM_IP}
+        return {"ok": True, "domain": domain, "provisioning": report}
     except ovh.exceptions.ResourceNotFoundError:
         raise HTTPException(409, "La zone DNS n'est pas encore créée. Réessaye dans 10 min.")
-    except ovh.exceptions.APIError as e:
+    except Exception as e:
         logger.exception("DNS config failed")
-        raise HTTPException(502, f"OVH API : {str(e)[:300]}")
+        raise HTTPException(502, f"Provisioning : {str(e)[:300]}")
 
 
 # ============== LIST / MANAGE ============== #

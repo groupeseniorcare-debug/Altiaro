@@ -928,12 +928,21 @@ async def startup():
 
 
 async def try_auto_configure_dns() -> dict:
-    """Scanne les domaines en statut 'purchased' et tente la config DNS automatiquement.
+    """Scanne les domaines en statut 'purchased' et déclenche le provisioning
+    Approximated + OVH DNS automatiquement.
 
-    Appelé par APScheduler toutes les 5 min. Idempotent : si la zone OVH n'est pas
-    encore créée (~10 min post-achat), l'erreur ResourceNotFoundError est ignorée
-    et on retentera au cycle suivant. Après 30 min d'échec, bascule en
+    Appelé par APScheduler toutes les 5 min. Idempotent : si la zone OVH n'est
+    pas encore créée (~10 min post-achat), l'erreur ResourceNotFoundError est
+    ignorée et on retentera au cycle suivant. Après 30 min d'échec, bascule en
     `dns_auto_failed` (intervention manuelle requise).
+
+    2026-05-01 : bascule vers Approximated. Pour chaque domaine acheté, on
+    appelle `site_domain._provision_approximated(site_id, domain)` qui :
+      1. crée le vhost Approximated (idempotent)
+      2. pousse les A records OVH vers les cluster IPs Approximated
+      3. refresh la zone OVH
+      4. lance un poller 60s × 15 min qui flip `custom_domain_verified=true`
+         dès que apx_hit && is_resolving && has_ssl
     """
     from datetime import datetime, timedelta, timezone
     from deps import db
@@ -946,59 +955,30 @@ async def try_auto_configure_dns() -> dict:
     ).to_list(50)
     configured, retrying, failed = [], [], []
 
+    if not pending:
+        return {"configured": [], "retrying": [], "failed": []}
+
+    from routes.site_domain import _provision_approximated
+    from services import approximated_provisioning as apx
+    from services import ovh_dns
+
+    if not apx.is_configured():
+        logger.warning("[dns-auto] Approximated not configured — skipping cycle")
+        return {"configured": [], "retrying": [], "failed": [],
+                "skipped": "APPROXIMATED_API_KEY missing"}
+
+    import ovh  # for exception class
+
     for d in pending:
         domain = d.get("domain")
-        if not domain:
+        site_id = d.get("site_id")
+        if not domain or not site_id:
             continue
         try:
-            import asyncio as _aio
-            from routes.ovh_domains import _client, PLATFORM_IP
-            import ovh
-            if not PLATFORM_IP:
-                break
-            client = _client()
+            # Make sure the OVH zone actually exists — otherwise skip until next cycle.
             try:
-                await _aio.to_thread(
-                    client.post, f"/domain/zone/{domain}/record",
-                    fieldType="A", subDomain="", target=PLATFORM_IP, ttl=300,
-                )
-                try:
-                    await _aio.to_thread(
-                        client.post, f"/domain/zone/{domain}/record",
-                        fieldType="CNAME", subDomain="www", target=f"{domain}.", ttl=300,
-                    )
-                except Exception:
-                    pass
-                await _aio.to_thread(client.post, f"/domain/zone/{domain}/refresh")
-                await db.domains.update_one(
-                    {"domain": domain},
-                    {"$set": {"status": "dns_configured",
-                              "dns_configured_at": now.isoformat(),
-                              "dns_auto": True}},
-                )
-                await db.sites.update_one(
-                    {"domain": domain},
-                    {"$set": {"domain_status": "active", "updated_at": now.isoformat()}},
-                )
-                configured.append(domain)
-                try:
-                    from routes.emails import _build_domain_email_html, send_email_via_resend, RESEND_OWNER_EMAIL
-                    site = await db.sites.find_one({"id": d.get("site_id")}, {"_id": 0})
-                    user = await db.users.find_one({"id": d.get("purchased_by")}, {"_id": 0})
-                    recipient = (user or {}).get("email") or RESEND_OWNER_EMAIL
-                    if recipient and site:
-                        body = f"""<div style="background:#D1FAE5;border:1px solid #A7F3D0;border-radius:8px;padding:14px 16px;margin:16px 0;"><div style="font-size:13px;color:#065F46;line-height:1.5;">🌍 <strong>Ton site est en ligne sur {domain} !</strong><br>La propagation DNS peut prendre 5 à 30 min supplémentaires avant d'être visible partout. Tu peux tester dès maintenant.</div></div>"""
-                        html = await _build_domain_email_html(
-                            domain=domain, site=site,
-                            title=f"🌍 {domain} est vivant !",
-                            intro=f"Bonne nouvelle : la zone DNS vient d'être configurée automatiquement pour <strong>{site.get('name','')}</strong>.",
-                            body_html=body, cta_label="Voir mon site",
-                            cta_url=f"https://{domain}",
-                            preheader="Ton domaine est actif",
-                        )
-                        await send_email_via_resend(to=recipient, subject=f"🌍 {domain} est en ligne", html=html, site=site, tags=["domain_live"])
-                except Exception:
-                    logger.exception("domain_live email failed")
+                if ovh_dns.is_configured():
+                    await ovh_dns.list_records(domain)  # 404 if zone not yet created
             except ovh.exceptions.ResourceNotFoundError:
                 if (d.get("ovh_purchased_at") or "") < cutoff:
                     await db.domains.update_one(
@@ -1009,6 +989,63 @@ async def try_auto_configure_dns() -> dict:
                     failed.append(domain)
                 else:
                     retrying.append(domain)
+                continue
+
+            # Main path : Approximated vhost + OVH DNS push + poller.
+            await db.sites.update_one(
+                {"id": site_id},
+                {"$set": {"custom_domain": domain}},
+            )
+            report = await _provision_approximated(site_id, domain)
+            await db.domains.update_one(
+                {"domain": domain},
+                {"$set": {"status": "dns_configured",
+                          "dns_configured_at": now.isoformat(),
+                          "dns_auto": True,
+                          "dns_provisioning_report": report}},
+            )
+            await db.sites.update_one(
+                {"domain": domain},
+                {"$set": {"domain_status": "active",
+                          "updated_at": now.isoformat()}},
+            )
+            configured.append(domain)
+
+            # Notify the concepteur by email (best-effort)
+            try:
+                from routes.emails import (
+                    _build_domain_email_html,
+                    send_email_via_resend,
+                    RESEND_OWNER_EMAIL,
+                )
+                site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+                user = await db.users.find_one({"id": d.get("purchased_by")}, {"_id": 0})
+                recipient = (user or {}).get("email") or RESEND_OWNER_EMAIL
+                if recipient and site:
+                    body = (
+                        f"""<div style="background:#D1FAE5;border:1px solid #A7F3D0;"""
+                        f"""border-radius:8px;padding:14px 16px;margin:16px 0;">"""
+                        f"""<div style="font-size:13px;color:#065F46;line-height:1.5;">"""
+                        f"""🌍 <strong>Ton site est en ligne sur {domain} !</strong><br>"""
+                        f"""Le certificat SSL est émis automatiquement (1-2 min)."""
+                        f"""</div></div>"""
+                    )
+                    html = await _build_domain_email_html(
+                        domain=domain, site=site,
+                        title=f"🌍 {domain} est vivant !",
+                        intro=(f"Bonne nouvelle : DNS + SSL configurés automatiquement "
+                               f"pour <strong>{site.get('name','')}</strong>."),
+                        body_html=body, cta_label="Voir mon site",
+                        cta_url=f"https://{domain}",
+                        preheader="Ton domaine est actif",
+                    )
+                    await send_email_via_resend(
+                        to=recipient,
+                        subject=f"🌍 {domain} est en ligne",
+                        html=html, site=site, tags=["domain_live"],
+                    )
+            except Exception:
+                logger.exception("domain_live email failed")
         except Exception as e:
             logger.exception(f"auto-config DNS failed for {domain}")
             failed.append(f"{domain}:{str(e)[:60]}")
