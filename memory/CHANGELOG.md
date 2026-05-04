@@ -1,6 +1,11 @@
 # Altiora — CHANGELOG
 
 
+## 2026-05-04 · Phase 3.1.1b — Hotfix `SiteForecast.jsx`
+
+- Bug 4 résolu : `ReferenceError: isValidated is not defined` (+ `validateStep` + `validating`). Les 2 states, le `useEffect` étendu (`GET /sites/{id}` pour lire `journey_validated`) et le handler `validateStep` (`POST /sites/{id}/journey/validate-step`) avaient été perdus lors du wrap `StepLayout` Phase 3.1. Restaurés à l'identique du commit `d725e2a` + ajout `window.dispatchEvent("cf_steps_changed")` après validation pour cohérence avec `useCockpitJourney`. Lint OK.
+
+
 ## 2026-05-04 · Phase 3.1.1 — Hotfixes post-test e1_tester
 
 > **5 bugs remontés par e1_tester, 4 fixés + 1 à re-vérifier. ZÉRO backend. ZÉRO LLM.**

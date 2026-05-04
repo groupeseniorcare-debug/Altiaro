@@ -39,10 +39,16 @@ export default function SiteForecast() {
   const [dailyBudget, setDailyBudget] = useState(30);
   const [activeScenario, setActiveScenario] = useState("realistic");
   const [showFormulas, setShowFormulas] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [isValidated, setIsValidated] = useState(false);
 
   useEffect(() => {
-    apiCall(() => api.get(`/sites/${siteId}/financial-forecast`)).then((fc) => {
+    Promise.all([
+      apiCall(() => api.get(`/sites/${siteId}/financial-forecast`)),
+      apiCall(() => api.get(`/sites/${siteId}`)),
+    ]).then(([fc, s]) => {
       if (fc.data && fc.data.generated_at) setForecast(fc.data);
+      setIsValidated((s.data?.journey_validated || []).includes("forecast"));
     });
   }, [siteId]);
 
@@ -64,6 +70,18 @@ export default function SiteForecast() {
   const verdict = forecast ? VERDICT_META[forecast.verdict] : null;
   const scen = forecast?.scenarios?.[activeScenario];
   const gate = forecast?.launch_gate;
+
+  const validateStep = async () => {
+    if (!gate || gate.status === "blocked") return;
+    setValidating(true);
+    const { error } = await apiCall(() =>
+      api.post(`/sites/${siteId}/journey/validate-step`, { step: "forecast", validated: true })
+    );
+    setValidating(false);
+    if (error) { window.alert(error); return; }
+    setIsValidated(true);
+    try { window.dispatchEvent(new CustomEvent("cf_steps_changed")); } catch (_) {}
+  };
 
   if (checking) {
     return (
