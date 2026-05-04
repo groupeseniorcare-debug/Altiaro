@@ -1,6 +1,36 @@
 # Altiora — CHANGELOG
 
 
+## 2026-05-04 · Phase 3.0 — Fondations UX Cockpit (StepLayout + hook réactif + pilote pricing)
+
+> **Phase préparatoire refonte UX « Luxury Minimal ». 4 fichiers frontend modifiés, ZÉRO backend touché, ZÉRO LLM.**
+
+### Livrables
+
+- `frontend/src/components/cockpit/StepLayout.jsx` (**NEW**, 317 lignes) — coquille unifiée : top bar compacte (breadcrumb + progress dots animés) + header étape (N/10, titre Fraunces serif, subtitle, ~temps, badge statut ✅⏳❌, encart « À quoi ça sert ? » rétractable framer-motion) + slot body + footer avec [← Précédent] · Magic button · [Continuer → Étape suivante]. Bouton « Continuer » actif uniquement si l'étape courante est `completed=true`. Palette `#F5F2EB` (ivoire), micro-animations sobres.
+- `frontend/src/hooks/useCockpitJourney.js` (**NEW**, 130 lignes) — hook réactif qui poll `GET /api/sites/{id}/journey` toutes les 8 s ; pause automatique quand l'onglet est `hidden` (`document.visibilityState`) ; refresh instantané au retour de focus et sur l'event custom `cf_steps_changed`. API : `{ loading, error, steps, currentStepKey, currentStepIndex, totalSteps, progressPct, completedCount, allCompleted, getStep(key), refetch() }`. Résout **LE** pain-point critique user : quand une étape bascule `complete:true` côté backend (cron, IA async, OAuth redirect), l'UI se met à jour ≤ 8 s sans F5, le bouton « Continuer » devient actif automatiquement.
+- `frontend/src/pages/SitePricing.jsx` (**REFACTO**, 228 lignes) — page pilote wrappée dans `<StepLayout>`, logique métier inchangée (`GET/POST /sites/{id}/pricing-analysis`). Magic button dynamique (« Lancer l'analyse IA » / « Relancer l'analyse » selon état), émet `cf_steps_changed` après run pour refresh instantané du journey. Encart résultat enrichi (Fraunces sur les prix, palette ivoire cohérente).
+- `frontend/src/hooks/useMasterGoogleStatus.js` (**FIX Bug A**, 108 lignes) — ajout d'un guard `user.role === 'admin'` en amont du `useEffect`. Les concepteurs n'émettent plus **aucun** appel `GET /admin/google/master/status` → fin du spam 403 dans les logs backend (le hook retourne directement `OPERATOR_ASSUME_CONNECTED` sans réseau).
+- `frontend/src/pages/SiteSEO.jsx` (**FIX Bug B**, 1 ligne) — URL corrigée `/seo/audit` → `/seo-audit` (conforme au router backend).
+
+### Critères acceptation — 8/8 ✅
+
+1. `StepLayout.jsx` créé avec 8 props (`siteId`, `stepKey`, `title`, `subtitle`, `whatItDoes`, `estimatedTime`, `magicButton`, `secondaryActions`, `children`).
+2. `useCockpitJourney.js` polling 8 s + pause visibilité + event listener.
+3. `SitePricing.jsx` utilise `<StepLayout>` et préserve toute la logique métier.
+4. Bug A 403 master/status : fix guard role → 0 appel concepteur → 0 log 403.
+5. Bug B 404 seo/audit : URL corrigée.
+6. OpenAPI 404 paths / 438 ops (parité Phase 2 intouchée).
+7. Frontend webpack : `Compiled successfully!` ×3 rounds sans warning.
+8. Description visuelle du pilote livrée au user pour validation avant Phase 3.1.
+
+### Ne PAS traiter dans cette phase
+
+- 9 autres pages step (import, upsells, forecast, branding, domain, content, translate, seo, qa) → Phase 3.1.
+- Découpage des 3 monolithes (Products 1446L, Branding 1067L, Forecast 637L) → Phase 3.2.
+- Thème Tailwind « Luxury Minimal » formalisé (custom `theme.extend`) → Phase 3.2.
+
+
 ## 2026-05-04 · Phase 1.3 — Fix callback AliExpress (relay canonique)
 
 > **1 ligne `.env` modifiée. Aucun code touché. Aucun appel LLM/Google/AE.**
