@@ -122,6 +122,7 @@ function useSiteDesign() {
   const siteId = useShopSiteId();
   const [site, setSite] = useState(null);
   const [design, setDesign] = useState(null);
+  const [collectionPosts, setCollectionPosts] = useState(null);   // Phase 3.3 — collection db.blog_posts
   const storageKey = `cf_lang_${siteId}`;
   const [lang, setLangState] = useState(() => localStorage.getItem(storageKey) || "fr");
   const setLang = (l) => { localStorage.setItem(storageKey, l); setLangState(l); };
@@ -131,14 +132,38 @@ function useSiteDesign() {
       .then(({ data }) => setDesign(data?.published ? data.design : null))
       .catch(() => setDesign(null));
   }, [siteId]);
+  // Phase 3.3 — charge les articles de la collection blog_posts (source of truth)
+  useEffect(() => {
+    if (!siteId || !lang) return;
+    axios.get(`${BACKEND_URL}/api/public/sites/${siteId}/blog-posts?lang=${lang}&limit=60`)
+      .then(({ data }) => setCollectionPosts(Array.isArray(data) ? data : []))
+      .catch(() => setCollectionPosts([]));
+  }, [siteId, lang]);
   // Bloc 2 — fix bug `availableLangs is not defined` qui plantait /blog
   const availableLangs = (site?.selected_languages && site.selected_languages.length)
     ? site.selected_languages
     : ["fr"];
-  return { siteId, site, design: design || {}, lang, setLang, availableLangs };
+  return { siteId, site, design: design || {}, lang, setLang, availableLangs, collectionPosts };
 }
 
-function getPosts(design) {
+function getPosts(design, collectionPosts) {
+  // Phase 3.3 — priorité à la collection db.blog_posts (Magic Content 3.3)
+  if (Array.isArray(collectionPosts) && collectionPosts.length > 0) {
+    return collectionPosts.map((p) => ({
+      slug: p.slug,
+      title: (p.title && (p.title[p.lang] || p.title.fr || Object.values(p.title)[0])) || "",
+      excerpt: (p.excerpt && (p.excerpt[p.lang] || p.excerpt.fr || Object.values(p.excerpt)[0])) || "",
+      category: p.category || "Journal",
+      date: p.published_at || p.created_at,
+      read_minutes: p.read_minutes || 6,
+      hero_image_url: p.hero_image_url,
+      inline_image_url: p.inline_image_url,
+      role: p.role,
+      tags: p.tags || [],
+      body_md: "",  // chargé à la demande dans BlogPost
+      _source: "collection",
+    }));
+  }
   const custom = design?.blog_posts;
   return (Array.isArray(custom) && custom.length > 0) ? custom : FALLBACK_POSTS;
 }
@@ -164,8 +189,8 @@ function mdLite(md) {
  * BLOG INDEX — /shop/:siteId/blog
  * ========================================================= */
 export function StorefrontBlog() {
-  const { siteId, site, design, lang, setLang, availableLangs } = useSiteDesign();
-  const posts = getPosts(design);
+  const { siteId, site, design, lang, setLang, availableLangs, collectionPosts } = useSiteDesign();
+  const posts = getPosts(design, collectionPosts);
   const { primary, fontHeading } = designAccents(design);
   const canonical = typeof window !== "undefined" ? `${window.location.origin}/shop/${siteId}/blog` : undefined;
 
@@ -252,8 +277,8 @@ export function StorefrontBlog() {
  * ========================================================= */
 export function StorefrontBlogPost() {
   const siteId = useShopSiteId(); const { slug } = useParams();
-  const { site, design, lang, setLang, availableLangs } = useSiteDesign();
-  const posts = getPosts(design);
+  const { site, design, lang, setLang, availableLangs, collectionPosts } = useSiteDesign();
+  const posts = getPosts(design, collectionPosts);
   const post = posts.find((p) => p.slug === slug);
   const { primary, fontHeading } = designAccents(design);
 
@@ -269,10 +294,14 @@ export function StorefrontBlogPost() {
   }
 
   const title = pickLang(post.title, lang) || post.title;
-  const body = pickLang(post.body, lang) || post.body || "";
+  // Phase 3.3 — la collection stocke body_html (pré-rendu côté pipeline) sous
+  // forme de dict {lang: html}. Fallback sur body_md rendu via mdLite.
+  const bodyHtmlCollection = (post.body_html && (post.body_html[lang] || post.body_html.fr)) || "";
+  const bodyMdCollection = (post.body_md && (post.body_md[lang] || post.body_md.fr)) || "";
+  const body = bodyMdCollection || pickLang(post.body, lang) || post.body || "";
   const category = pickLang(post.category, lang) || post.category;
   const canonical = typeof window !== "undefined" ? `${window.location.origin}/shop/${siteId}/blog/${slug}` : undefined;
-  const html = mdLite(body);
+  const html = bodyHtmlCollection || mdLite(body);
 
   const wordCount = body.split(/\s+/).filter(Boolean).length;
   const articleSchema = {

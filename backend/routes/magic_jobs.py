@@ -254,22 +254,28 @@ async def _run_dry(job: Dict[str, Any]) -> None:
 
 
 async def _run_content(job: Dict[str, Any]) -> None:
-    """Real content pipeline — **NOT YET IMPLEMENTED** in this phase.
+    """Real content pipeline — Phase 3.3 Bloc 2.
 
-    Phase 3.2 livre l'UX + l'ossature SSE. Le pipeline réel 14 × 6 langues
-    (84 posts) avec AEO snippets, FAQ JSON-LD, maillage contextuel et
-    hreflang sera implémenté dans Phase 3.3. Pour éviter toute consommation
-    LLM accidentelle, ce runner redirige vers le simulateur dry-run et
-    retourne une erreur explicite en mode réel.
+    Orchestre 14 articles FR (1 pilier Sonnet + 8 satellites + 5 long-tail
+    Haiku) puis 70 traductions Haiku vers EN/DE/NL/IT/ES, puis 14 hero + 14
+    inline images Nano Banana, maillage interne, hreflang, JSON-LD et
+    publication. Délégué à `services.magic_content_pipeline.run_magic_content`.
     """
-    if not job["dry_run"]:
-        _finish_error(
-            job,
-            "magic/content réel non encore implémenté (Phase 3.3). "
-            "Utilise ?dry_run=true pour simuler l'UX en attendant.",
-        )
+    if job["dry_run"]:
+        await _run_dry(job)
         return
-    await _run_dry(job)
+    from services.magic_content_pipeline import run_magic_content
+
+    def _emit(step_key: str, **kw):
+        """Adapt pipeline callbacks → job step updates."""
+        _update_step(job, step_key, **kw)
+
+    try:
+        summary = await run_magic_content(job["site_id"], emit=_emit)
+        _finish_success(job, summary)
+    except Exception as e:
+        logger.exception("[magic_jobs] magic/content real runner failed")
+        _finish_error(job, f"Content pipeline error: {e}")
 
 
 async def _run_seo(job: Dict[str, Any]) -> None:

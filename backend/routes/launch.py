@@ -748,6 +748,27 @@ async def _run_launch_inner(job_id: str, site_id: str, user_id: str, wizard: dic
                         await regenerate_and_persist_favicons(site_id)
                     except Exception as fe:
                         logger.warning(f"[launch] favicon generation failed: {fe}")
+                    # Phase 3.3 Fix 1.2 — Auto-generate the typographic wordmark
+                    # (Pillow pure, no LLM, ~50 ms, transparent PNG) so the
+                    # storefront header displays a proper brand wordmark
+                    # instead of the abstract Nano Banana pictogram.
+                    try:
+                        from services.wordmark_generator import persist_wordmark_for_site
+                        fresh = await db.sites.find_one(
+                            {"id": site_id},
+                            {"_id": 0, "design.brand.name": 1, "design.brand.primary_color": 1,
+                             "design.brand.accent_color": 1, "name": 1},
+                        )
+                        fresh_brand = ((fresh or {}).get("design") or {}).get("brand") or {}
+                        wm_name = (fresh_brand.get("name") or (fresh or {}).get("name")
+                                   or _logo_name or "Maison")
+                        wm_palette = {
+                            "primary_color": fresh_brand.get("primary_color"),
+                            "accent_color": fresh_brand.get("accent_color"),
+                        }
+                        await persist_wordmark_for_site(site_id, wm_name, wm_palette)
+                    except Exception as we:
+                        logger.warning(f"[launch] wordmark generation failed: {we}")
             except asyncio.TimeoutError:
                 logger.warning("[launch] logo timed out")
             except Exception as e:

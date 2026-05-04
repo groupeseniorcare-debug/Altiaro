@@ -77,6 +77,8 @@ import {
   StorefrontBlogPost,
 } from "./pages/StorefrontBlog";
 import StorefrontReview from "./pages/StorefrontReview";
+import StorefrontAllProducts from "./pages/StorefrontAllProducts";
+import StorefrontAccessoriesPage from "./pages/StorefrontAccessoriesPage";
 import {
   StorefrontBuyerGuides,
   StorefrontBuyerGuide,
@@ -205,6 +207,9 @@ function CustomDomainApp({ bootstrap }) {
             <Route path="/mediation" element={<StorefrontMediation />} />
             <Route path="/blog" element={<StorefrontBlog />} />
             <Route path="/blog/:slug" element={<StorefrontBlogPost />} />
+            {/* Phase 3.3 Fix 1.3 + 1.4 — pages catalogue & accessoires dédiées */}
+            <Route path="/products" element={<StorefrontAllProducts />} />
+            <Route path="/accessories" element={<StorefrontAccessoriesPage />} />
             {/* Sprint 2/3 — SEO content (buyer guides, glossary, comparisons, top lists, team) */}
             <Route path="/buyer-guides" element={<StorefrontBuyerGuides />} />
             <Route path="/buyer-guides/:slug" element={<StorefrontBuyerGuide />} />
@@ -549,6 +554,9 @@ function PlatformApp() {
           <Route path="/shop/:siteId/retours" element={<StorefrontRetours />} />
           <Route path="/shop/:siteId/blog" element={<StorefrontBlog />} />
           <Route path="/shop/:siteId/blog/:slug" element={<StorefrontBlogPost />} />
+          {/* Phase 3.3 Fix 1.3 + 1.4 — pages catalogue & accessoires dédiées */}
+          <Route path="/shop/:siteId/products" element={<StorefrontAllProducts />} />
+          <Route path="/shop/:siteId/accessories" element={<StorefrontAccessoriesPage />} />
           {/* Phase 3.2 chantier E — SEO Sprint 2/3 pages (buyer-guides,
               glossary, comparisons, top lists, team) — identiques à celles
               déjà montées dans CustomDomainApp, ajoutées ici pour que le

@@ -21,7 +21,8 @@ const BACKEND_URL = "";
 
 /* ------- Nav items (pages naturelles du template) ------- */
 const navItems = (shopRoot, lang) => [
-  { label: t(lang, "nav_shop"),        href: `${shopRoot}` },
+  { label: t(lang, "nav_shop"),        href: `${shopRoot}/products` },
+  { label: "Accessoires",              href: `${shopRoot}/accessories` },
   { label: t(lang, "nav_collections"), href: `${shopRoot}/collections` },
   { label: t(lang, "nav_journal"),     href: `${shopRoot}/blog` },
   { label: t(lang, "nav_about"),       href: `${shopRoot}/about` },

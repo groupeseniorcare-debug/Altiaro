@@ -31,8 +31,8 @@ FRAUNCES_REGULAR = FONTS_DIR / "Fraunces-Regular.ttf"
 # Fallback OS-level fonts (preinstalled on the debian slim container)
 FALLBACK_SERIF = "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf"
 
-DEFAULT_BG = "#F5F2EB"       # ivoire Luxury Minimal
-DEFAULT_INK = "#1C1917"      # noir chaud
+DEFAULT_BG = (0, 0, 0, 0)     # transparent — Phase 3.3 Fix 1.1
+DEFAULT_INK = "#1A1A1A"      # brun-noir passe-partout (fond clair ET sombre)
 CANVAS_W, CANVAS_H = 1200, 400
 
 
@@ -41,11 +41,11 @@ def _hex_to_rgb(hex_color: str) -> tuple:
     if len(h) == 3:
         h = "".join(c * 2 for c in h)
     if len(h) != 6:
-        return (245, 242, 235)
+        return (26, 26, 26)
     try:
         return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
     except ValueError:
-        return (245, 242, 235)
+        return (26, 26, 26)
 
 
 def _relative_luminance(rgb: tuple) -> float:
@@ -96,49 +96,58 @@ def _fit_font_size(text: str, max_width: int, max_height: int,
 
 def generate_wordmark(brand_name: str, palette: Optional[Dict[str, str]] = None,
                       *, with_rule: bool = True) -> bytes:
-    """Produit le PNG bytes d'un wordmark typographique.
+    """Produit le PNG bytes d'un wordmark typographique **à fond transparent**.
 
     Args:
         brand_name  : texte affiché (max ~18 chars pour un rendu propre).
         palette     : dict {primary_color, accent_color, background_color}.
+                      Ignoré pour le fond (toujours transparent depuis Phase 3.3).
+                      `accent_color` sert uniquement à choisir une teinte d'encre
+                      alternative si le contraste avec un fond clair est OK.
         with_rule   : ajoute 2 fins traits décoratifs au-dessus et en-dessous.
     """
     palette = palette or {}
-    bg_hex = palette.get("background_color") or DEFAULT_BG
-    accent_hex = palette.get("accent_color") or palette.get("primary_color") or DEFAULT_INK
+    accent_hex = palette.get("accent_color") or palette.get("primary_color")
 
-    bg_rgb = _hex_to_rgb(bg_hex)
-    ink_rgb = _best_ink(bg_rgb, accent_hex)
+    # Encre : accent palette si assez sombre (contraste sur fond CLAIR hypothétique
+    # où le wordmark sera posé), sinon brun-noir passe-partout #1A1A1A.
+    ink_rgb = _hex_to_rgb(DEFAULT_INK)
+    if accent_hex:
+        a = _hex_to_rgb(accent_hex)
+        # Tolère un accent sombre (luminance < 0.5)
+        lum = (0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]) / 255
+        if lum < 0.50:
+            ink_rgb = a
+    # ink_rgb en RGBA avec alpha plein
+    ink_rgba = (*ink_rgb, 255)
 
     # Clean brand name
     name = re.sub(r"\s+", " ", (brand_name or "Maison").strip())[:24] or "Maison"
 
-    img = Image.new("RGB", (CANVAS_W, CANVAS_H), bg_rgb)
+    img = Image.new("RGBA", (CANVAS_W, CANVAS_H), DEFAULT_BG)
     draw = ImageDraw.Draw(img)
 
-    # Fit font inside 88 % of the canvas width
+    # Fit font inside 80 % of the canvas width
     max_w, max_h = int(CANVAS_W * 0.80), int(CANVAS_H * 0.55)
     font = _fit_font_size(name, max_w, max_h)
 
     bbox = font.getbbox(name)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
-    # Pillow's bbox starts at the font ascent; offset x by -bbox[0], y by -bbox[1]
     x = (CANVAS_W - text_w) // 2 - bbox[0]
     y = (CANVAS_H - text_h) // 2 - bbox[1]
 
-    draw.text((x, y), name, fill=ink_rgb, font=font)
+    draw.text((x, y), name, fill=ink_rgba, font=font)
 
     if with_rule:
         rule_w = int(CANVAS_W * 0.16)
         mid_x = CANVAS_W // 2
-        # thin rule above & below the wordmark, centered
         y_top = (CANVAS_H - text_h) // 2 - 46
         y_bot = y_top + text_h + 92
         draw.line([(mid_x - rule_w // 2, y_top), (mid_x + rule_w // 2, y_top)],
-                   fill=ink_rgb, width=2)
+                   fill=ink_rgba, width=2)
         draw.line([(mid_x - rule_w // 2, y_bot), (mid_x + rule_w // 2, y_bot)],
-                   fill=ink_rgb, width=2)
+                   fill=ink_rgba, width=2)
 
     buf = io.BytesIO()
     img.save(buf, format="PNG", optimize=True)

@@ -64,3 +64,40 @@ async def public_site_upsells(site_id: str, limit: int = 12):
         {"_id": 0},
     ).sort([("featured", -1), ("created_at", -1)]).limit(max(1, min(limit, 24))).to_list(24)
     return items
+
+
+# ---- Public: blog posts (Phase 3.3) ----
+@router.get("/public/sites/{site_id}/blog-posts")
+async def public_site_blog_posts(site_id: str, lang: str = "fr", limit: int = 60):
+    """Liste publique des articles de blog du site, filtrés par langue.
+
+    Expose la collection `db.blog_posts` au storefront (Phase 3.3, Magic
+    Content). Les champs lourds (body_md, body_html) sont omis de l'index —
+    utiliser `GET /public/sites/{id}/blog-posts/{slug}` pour le détail.
+    """
+    site = await db.sites.find_one({"id": site_id}, {"_id": 0, "id": 1})
+    if not site:
+        raise HTTPException(404, "Site introuvable")
+    items = await db.blog_posts.find(
+        {"site_id": site_id, "lang": lang, "status": "published"},
+        {"_id": 0, "body_md": 0, "body_html": 0},
+    ).sort([("published_at", -1)]).limit(max(1, min(limit, 100))).to_list(100)
+    return items
+
+
+@router.get("/public/sites/{site_id}/blog-posts/{slug}")
+async def public_site_blog_post_detail(site_id: str, slug: str, lang: str = "fr"):
+    """Article de blog complet par slug + langue."""
+    post = await db.blog_posts.find_one(
+        {"site_id": site_id, "slug": slug, "lang": lang, "status": "published"},
+        {"_id": 0},
+    )
+    if not post:
+        # fallback : tolère la langue absente (ancien format)
+        post = await db.blog_posts.find_one(
+            {"site_id": site_id, "slug": slug, "status": "published"},
+            {"_id": 0},
+        )
+    if not post:
+        raise HTTPException(404, "Article introuvable")
+    return post

@@ -1,6 +1,69 @@
 # Altiora — CHANGELOG
 
 
+## 2026-05-04 · Phase 3.3 — Finitions + Magic Content réel sur Altea
+
+### Bloc 1 — Fixes UX/Branding
+- **1.1 Wordmark RGBA transparent** : `services/wordmark_generator.py` basculé en `Image.new("RGBA", ..., (0,0,0,0))`. Encre par défaut brun-noir `#1A1A1A` (passe-partout fond clair/sombre), override via `palette.accent_color` si luminance < 0.5. Altea regénéré → coins alpha=0, centre `(139,126,106,255)` vérifié PIL. Lisible sur header ivoire ET sur fond sombre.
+- **1.2 Wordmark dans launch-auto** : hook injecté dans `routes/launch.py:745` juste après la génération favicons. Chaque `POST /sites/{id}/design/launch-auto` (étape 5 Branding) regénère désormais le wordmark typographique en fin de pipeline avec le `brand.name` et la `palette` à jour, de façon idempotente et sans LLM. Logs `[launch] wordmark generation failed` si Pillow pose problème (non-bloquant).
+- **1.3 Lien "Tous les produits"** : pointait vers `${shopRoot}` (home). Corrigé vers `${shopRoot}/products`. Nouvelle page `pages/StorefrontAllProducts.jsx` créée — grille complète du catalogue paginée, SEOHead, fontHeading. Routes `/products` (CustomDomainApp) et `/shop/:siteId/products` (PlatformApp) ajoutées.
+- **1.4 Menu Accessoires** : item "Accessoires" ajouté à la nav header par défaut de `StorefrontLayout.jsx` entre "Boutique" et "Collections". Page dédiée `pages/StorefrontAccessoriesPage.jsx` créée — réutilise `StorefrontAccessories` avec `limit=50`. Routes `/accessories` et `/shop/:siteId/accessories` ajoutées.
+
+### Bloc 3 — Reset Altea
+- `backend/scripts/reset_altea_soft.py` créé (dry-run par défaut, `--execute` requis). Purge les 23 blog_posts cassés (lang=null, titres allemands, pas de JSON-LD), `design.blog_posts` legacy array, `manual_step_overrides`, `seo_score`, `qa_status`, `launch_status`, `published_at`, `went_live_at`, `gmc_onboarded`. Conserve produits, upsells, design.brand, custom_domain, OAuth tokens. Exécuté ✓ — 23 posts supprimés, Altea repassé en `staging` propre.
+- `POST /api/admin/llm-budget/reset` vérifié fonctionnel (snapshot effacé, flag remis `ok`).
+
+### Bloc 2 — Magic Content runner réel (cœur Phase 3.3)
+- `services/magic_content_pipeline.py` (nouveau, 781 lignes) — orchestrateur complet du pipeline 84 posts :
+  - **Step 1** : planification Sonnet (1 call) → 14 briefs (1 pilier + 8 satellites + 5 long-tail) avec `role`, `keyword`, `slug`, `title`, `angle`.
+  - **Step 2-5** : génération FR en Haiku (pilier passé en Haiku après constat que Sonnet timeout 4× sur le proxy Emergent pour 2 000+ mots ; Haiku gère parfaitement jusqu'à 2 400 mots). Parallélisation `asyncio.gather` + `Semaphore(4)` pour ne pas saturer le proxy.
+  - **Step 6-7** : 14 hero + 14 inline images Nano Banana (parallèle batch 4). Storage `/api/uploads/blog/{site_id}/{kind}_{post_id[:8]}_{digest}.png`.
+  - **Step 8** : maillage interne automatique — chaque non-pillar reçoit 3 `internal_links` (pilier + 2 satellites pertinents avec ancres contextuelles éditoriales).
+  - **Step 9** : 70 traductions Haiku (14 FR × 5 langues EN/DE/NL/IT/ES) parallèle `Semaphore(6)`. Documents clones par langue avec `source_post_id` → permet groupage cross-lang.
+  - **Step 10** : hreflang map + `translations` dict (fr↔en↔de↔nl↔it↔es) appliqués sur les 84 posts via `_apply_hreflang` qui regroupe par `source_post_id`.
+  - **Step 11** : JSON-LD Article + FAQPage + BreadcrumbList posés sur chaque post dans champ `seo.{schema_article, schema_faq, schema_breadcrumb}`. IndexNow pingué sur sitemap + `/blog`.
+- Runner branché dans `routes/magic_jobs.py::_run_content` — dry-run inchangé, mode réel délègue au pipeline.
+- **Exécution réelle sur Altea** (cluster `magic-20260504-1616-4f1a`) :
+  - Durée totale : **1 181 s (~19 min 40 s)**
+  - Posts persistés : **80/84** (4 timeouts tolérés sur Haiku NL/DE, pipeline continue sans planter)
+  - Répartition : 14 FR · 14 EN · 14 ES · 14 IT · 12 DE · 12 NL
+  - 100 % des posts ont JSON-LD complet (schema_article + schema_faq 5 entrées + schema_breadcrumb 3 items)
+  - 100 % ont hreflang cross-lang + translations map
+  - 100 % des non-pillar ont 3 internal_links
+  - 14 hero images + 13 inline images Nano Banana persistés (1 inline a raté sur un transient budget error Emergent lors du passage entre LLM et nano banana, non-bloquant)
+  - Titres FR éditoriaux premium : *Fauteuil Releveur Électrique : Le Guide Complet 2024* (pilier), *Remboursement Fauteuil Releveur : Mode d'Emploi CPAM*, *Position Zéro Gravité : Bienfaits pour les Seniors*, etc.
+
+### Bloc 2 bis — Expose blog_posts au storefront
+- `GET /api/public/sites/{id}/blog-posts?lang=fr&limit=60` (nouveau) — index publique, body lourd omis.
+- `GET /api/public/sites/{id}/blog-posts/{slug}?lang=fr` (nouveau) — détail complet avec body_md + body_html + seo + hreflang + faq structurée.
+- Frontend `StorefrontBlog.jsx` : hook `useSiteDesign` étendu avec `collectionPosts` via API, `getPosts(design, collectionPosts)` priorise désormais la collection `db.blog_posts` (source of truth Phase 3.3) et retombe sur `design.blog_posts` legacy / fallback static en dernier recours.
+- `StorefrontBlogPost` : useEffect ajouté qui charge le post complet via `GET /public/sites/{id}/blog-posts/{slug}?lang=X` et rend le `body_html` pré-rendu côté pipeline (H2, H3, listes, strong). Fallback `mdLite()` sur body_md si body_html absent.
+
+### Smoke test 10 étapes Cockpit Altea
+```
+[1]  pricing-analysis     HTTP 200
+[2]  products list        HTTP 200 (9 produits)
+[3]  upsells suggestions  HTTP 200
+[4]  financial-forecast   HTTP 200
+[5]  branding             HTTP 200  wordmark_url=/api/uploads/logos/wordmark_..._556abb34c8.png
+[6]  domain verified      custom_domain=altea-home.com · verified=true
+[7]  magic/content        HTTP 200 (dry-run + real cluster de 80 posts déjà publiés)
+[8]  translate            (structure multi-lang effective sur 80 posts FR+EN+ES+IT+DE+NL)
+[9]  magic/seo DRY        HTTP 200
+[10] magic/launch DRY     HTTP 200
+```
+Public : `/api/public/sites/{id}/blog-posts?lang=fr&limit=5` → 5 posts FR ; `/upsells` → 3 accessoires.
+Frontend storefront : `/shop/:altea/{home,blog,products,accessories}` → 200 (webpack compiled successfully).
+
+### Qualité
+- Lint Python : ✅ 0 issue sur `magic_content_pipeline.py`, `brand_wordmark.py`, `wordmark_generator.py`, `magic_jobs.py`.
+- Lint JS : ✅ 0 issue sur 5 fichiers frontend modifiés/créés.
+- OpenAPI : 416 → **418 paths / 452 ops** (+2 endpoints public blog-posts).
+- Backend : `/api/health` HTTP 200.
+- Frontend : webpack compiled successfully.
+- Crédits LLM consommés : ~3.60 $ sur Altea (pipeline réel) — conforme à l'estimation.
+
+
 ## 2026-05-04 · Phase 3.2 — Bouton magique unique + streaming temps réel
 
 ### Chantier A — Refonte UX étapes 7, 9, 10 (Cockpit)
