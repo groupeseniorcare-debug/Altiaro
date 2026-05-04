@@ -1200,8 +1200,12 @@ app.middleware("http")(custom_domain_rewrite)
 #
 # Le middleware reste utile en self-hosted (ou déploiement Production avec
 # reverse-proxy custom où FastAPI est en première ligne sur tous les paths).
-# Active via env `ENABLE_UA_ROUTING_MIDDLEWARE=1`.
-if os.environ.get("ENABLE_UA_ROUTING_MIDDLEWARE", "0").strip() in ("1", "true", "True"):
+# Active via env `ENABLE_UA_ROUTING_MIDDLEWARE=1` (default ON depuis Sprint 4 hreflang fix).
+# Le middleware sait gérer 2 cas :
+#   - Custom domain (altea-home.com → site Altiaro) → prerender path direct
+#   - Plateforme `/shop/{site_id}/...` → prerender en réécrivant le path
+# Aucun impact sur les humains : check User-Agent strict (Googlebot, Bingbot, GPTBot, etc.)
+if os.environ.get("ENABLE_UA_ROUTING_MIDDLEWARE", "1").strip() in ("1", "true", "True"):
     from prerender_routing_middleware import prerender_routing  # noqa: E402
     app.middleware("http")(prerender_routing)
     logger.info("[middleware] prerender_routing UA-edge ENABLED")

@@ -57,6 +57,15 @@ _BOT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Path pattern pour URLs plateforme `/shop/{site_id}/{rest}` (preview Emergent
+# ou tout host plateforme). Regex stricte : site_id doit être un UUID v4 (36
+# chars : 8-4-4-4-12 hex). Ça évite de matcher accidentellement /shop/cart ou
+# autres paths plateforme.
+_SHOP_PATH_RE = re.compile(
+    r"^/shop/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:/(.*))?$",
+    re.IGNORECASE,
+)
+
 
 def _is_bot_ua(user_agent: str) -> bool:
     """True si le User-Agent matche un bot SEO ou LLM crawler connu."""
@@ -66,15 +75,17 @@ def _is_bot_ua(user_agent: str) -> bool:
 
 
 async def prerender_routing(request, call_next):
-    """Middleware ASGI : intercepte les requêtes bot vers domaines custom.
+    """Middleware ASGI : intercepte les requêtes bot vers domaines custom
+    OU vers URLs plateforme `/shop/{site_id}/...` (preview Emergent).
 
     Ordre de check (rapide → cher) :
       1. Méthode GET (les bots ne POST jamais sur des pages indexables).
       2. User-Agent matche `_BOT_RE`.
-      3. Path est indexable.
-      4. Host n'est pas un host plateforme.
-      5. Host résout vers un site Altiaro.
-      6. `prerender_html(site, path)` retourne un HTML.
+      3. Path est indexable OU est une URL `/shop/{site_id}/{rest}`.
+      4a. (custom domain) Host n'est pas un host plateforme + résout vers site.
+      4b. (preview/platform) Path commence par `/shop/{site_id}/...` →
+          extrait `site_id` du path et réécrit le path en `/{rest}`.
+      5. `prerender_html(site, path)` retourne un HTML.
 
     Si l'un des checks échoue → passthrough vers `call_next` (= comportement
     normal : custom_domain_rewrite puis SPA React).
@@ -91,44 +102,59 @@ async def prerender_routing(request, call_next):
     if not _is_bot_ua(ua):
         return await call_next(request)
 
-    # 3) Path indexable
+    # 3-4) Routing : 2 modes possibles
     path = scope.get("path", "/") or "/"
-    if not is_indexable_path(path):
-        return await call_next(request)
 
-    # 4) Host (priorité X-Forwarded-Host comme custom_domain_middleware)
-    forwarded = (headers.get("x-forwarded-host") or headers.get("x-original-host") or "").strip().lower()
-    raw_host = (headers.get("host") or "").strip().lower()
-    host = (forwarded or raw_host).split(":")[0]
-    if not host or _host_is_platform(host):
-        return await call_next(request)
+    # Mode A : URL plateforme `/shop/{site_id}/{rest}` (preview ou custom path)
+    site = None
+    target_path = path
+    shop_match = _SHOP_PATH_RE.match(path)
+    if shop_match:
+        site_id_from_path = shop_match.group(1)
+        rest = shop_match.group(2) or ""
+        target_path = "/" + rest if rest else "/"
+        # Si pas indexable on laisse passer
+        if not is_indexable_path(target_path):
+            return await call_next(request)
+        site = await db.sites.find_one({"id": site_id_from_path}, {"_id": 0})
+        if not site:
+            return await call_next(request)
+    else:
+        # Mode B : custom domain (host résout vers un site Altiaro)
+        if not is_indexable_path(path):
+            return await call_next(request)
+        forwarded = (headers.get("x-forwarded-host") or headers.get("x-original-host") or "").strip().lower()
+        raw_host = (headers.get("host") or "").strip().lower()
+        host = (forwarded or raw_host).split(":")[0]
+        if not host or _host_is_platform(host):
+            return await call_next(request)
+        site_id = await _resolve_site_for_host(host)
+        if not site_id:
+            return await call_next(request)
+        site = await db.sites.find_one({"id": site_id}, {"_id": 0})
+        if not site:
+            return await call_next(request)
 
-    # 5) Résolution site_id
-    site_id = await _resolve_site_for_host(host)
-    if not site_id:
-        return await call_next(request)
-
-    site = await db.sites.find_one({"id": site_id}, {"_id": 0})
-    if not site:
-        return await call_next(request)
-
-    # 6) Génération HTML prerender
+    # 5) Génération HTML prerender
     try:
-        body = await prerender_html(site, path)
+        body = await prerender_html(site, target_path)
     except Exception as e:
-        logger.warning(f"[prerender-routing] {host}{path} failed: {str(e)[:200]}")
+        host_log = (headers.get("host") or "").strip().lower()
+        logger.warning(f"[prerender-routing] {host_log}{path} → {target_path} failed: {str(e)[:200]}")
         return await call_next(request)
 
     if not body:
         # Path non supporté pour ce site (ex slug introuvable) → fallback SPA.
         return await call_next(request)
 
-    logger.info(f"[prerender-routing] bot={ua[:40]!r} host={host} path={path} → SSR served")
+    host_log = (headers.get("host") or "").strip().lower()
+    logger.info(f"[prerender-routing] bot={ua[:40]!r} host={host_log} path={path} target={target_path} → SSR served")
     return HTMLResponse(
         content=body,
         headers={
             "X-Prerender": "1",
             "X-Prerender-Source": "altiaro-edge",
+            "X-Prerender-Target-Path": target_path,
             "Cache-Control": "public, max-age=300, s-maxage=300",
             "Vary": "User-Agent",
         },

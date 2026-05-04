@@ -143,7 +143,7 @@ def _base_style() -> str:
 def _render_head(
     *, lang: str, title: str, description: str, canonical: str,
     og_type: str = "website", og_image: str = "",
-    jsonld: Optional[dict] = None,
+    jsonld: Optional[Any] = None,
     hreflangs: Optional[Dict[str, str]] = None,
     x_default: Optional[str] = None,
 ) -> str:
@@ -180,11 +180,18 @@ def _render_head(
     if og_image:
         parts.append(f"<meta property='og:image' content='{_h(og_image)}'/>")
     if jsonld:
-        parts.append(
-            f"<script type='application/ld+json'>"
-            f"{html.escape(json.dumps(jsonld, ensure_ascii=False), quote=False)}"
-            f"</script>"
-        )
+        # Sprint 4 fix — accepte une liste de schémas (Article + FAQ + Breadcrumb)
+        # ou un seul dict (legacy). Sérialise un <script type="application/ld+json">
+        # par schéma pour la compat Googlebot.
+        items = jsonld if isinstance(jsonld, list) else [jsonld]
+        for j in items:
+            if not j:
+                continue
+            parts.append(
+                f"<script type='application/ld+json'>"
+                f"{html.escape(json.dumps(j, ensure_ascii=False), quote=False)}"
+                f"</script>"
+            )
     parts.append(f"<style>{_base_style()}</style>")
     parts.append("</head>")
     return "".join(parts)
@@ -674,7 +681,7 @@ async def _render_blog(site: dict, slug: str) -> Optional[str]:
     )
     if not bp:
         return None
-    lang = bp.get("language") or _site_lang(site)
+    lang = bp.get("lang") or bp.get("language") or _site_lang(site)
     domain = site.get("custom_domain") or ""
     canonical = f"https://{domain}/blog/{slug}" if domain else ""
     brand = _site_brand_name(site)
@@ -684,37 +691,115 @@ async def _render_blog(site: dict, slug: str) -> Optional[str]:
     h1_str = _pick_lang(bp.get("title"), lang) or title_str
     description = _pick_lang(bp.get("meta_description"), lang) or _pick_lang(bp.get("excerpt"), lang) or ""
     excerpt = _pick_lang(bp.get("excerpt"), lang) or ""
-    body_md = _pick_lang(bp.get("body"), lang) or ""
-    body_html = _md_to_html(body_md)
+    # Sprint 4 fix — Magic Content stocke `body_md` (et `body_html` pré-rendu) ;
+    # les anciens articles (avant Phase 3) utilisaient `body`. Fallback ordonné.
+    body_html_pre = _pick_lang(bp.get("body_html"), lang)
+    if body_html_pre:
+        body_html = body_html_pre
+    else:
+        body_md = (_pick_lang(bp.get("body_md"), lang)
+                    or _pick_lang(bp.get("body"), lang) or "")
+        body_html = _md_to_html(body_md)
+
+    # FAQ as <details> blocks for crawlers + JSON-LD
+    faq_raw = bp.get("faq") or []
+    faq_html = ""
+    faq_pairs = []
+    for f in faq_raw:
+        if not isinstance(f, dict):
+            continue
+        q = _pick_lang(f.get("q"), lang) or ""
+        a = _pick_lang(f.get("a"), lang) or ""
+        if q and a:
+            faq_pairs.append((q, a))
+            faq_html += (f"<details><summary>{_h(q)}</summary>"
+                          f"<p>{_h(a)}</p></details>")
+    if faq_html:
+        faq_html = f"<section><h2>FAQ</h2>{faq_html}</section>"
+
+    # Internal links footer (Sprint 1.3 maillage Jaccard)
+    internal_links = bp.get("internal_links") or []
+    internal_html = ""
+    if internal_links:
+        items = "".join(
+            f"<li><a href='/blog/{_h(li.get('slug',''))}'>{_h(li.get('anchor',''))}</a></li>"
+            for li in internal_links if li.get("slug")
+        )
+        if items:
+            internal_html = f"<section><h2>À lire aussi</h2><ul>{items}</ul></section>"
+
     tags = bp.get("tags") or []
     tags_html = ""
     if tags:
         tags_html = "<p><em>Mots-clés : " + ", ".join(_h(t) for t in tags) + "</em></p>"
-    jsonld = {
+
+    # JSON-LD : prefer pre-built schemas (Sprint 1.4 magic_content writes them)
+    seo_meta = bp.get("seo") or {}
+    schema_article = seo_meta.get("schema_article") or {
         "@context": "https://schema.org",
         "@type": "BlogPosting",
         "headline": h1_str or title_str,
         "description": description,
-        "datePublished": bp.get("created_at"),
+        "datePublished": bp.get("published_at") or bp.get("created_at"),
         "dateModified": bp.get("updated_at"),
         "inLanguage": lang,
         "author": {"@type": "Organization", "name": brand},
         "publisher": {"@type": "Organization", "name": brand},
     }
+    schema_faq = seo_meta.get("schema_faq")
+    if not schema_faq and faq_pairs:
+        schema_faq = {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": [
+                {"@type": "Question", "name": q,
+                 "acceptedAnswer": {"@type": "Answer", "text": a}}
+                for q, a in faq_pairs
+            ],
+        }
+    schema_breadcrumb = seo_meta.get("schema_breadcrumb")
+    if not schema_breadcrumb and domain:
+        schema_breadcrumb = {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": "Accueil",
+                 "item": f"https://{domain}/"},
+                {"@type": "ListItem", "position": 2, "name": "Blog",
+                 "item": f"https://{domain}/blog"},
+                {"@type": "ListItem", "position": 3,
+                 "name": h1_str, "item": canonical or f"/blog/{slug}"},
+            ],
+        }
+
+    jsonlds = [j for j in (schema_article, schema_faq, schema_breadcrumb) if j]
+
     head = _render_head(
         lang=lang, title=title_str, description=description,
-        canonical=canonical, og_type="article", jsonld=jsonld,
+        canonical=canonical, og_type="article", jsonld=jsonlds,
         hreflangs=(bp.get("hreflang") if isinstance(bp.get("hreflang"), dict) else None),
     )
+
+    # Hero image if present
+    hero_url = bp.get("hero_image_url") or ""
+    hero_html = ""
+    if hero_url:
+        if hero_url.startswith("/"):
+            hero_url = (f"https://{domain}{hero_url}" if domain else hero_url)
+        hero_html = f"<img src='{_h(hero_url)}' alt='{_h(h1_str)}' loading='lazy'/>"
+
     return (
         head
         + f"<body><header><a href='/'>{_h(brand)}</a></header><main>"
         + f"<h1>{_h(h1_str)}</h1>"
         + (f"<p><strong>{_h(excerpt)}</strong></p>" if excerpt else "")
+        + hero_html
         + body_html
+        + faq_html
+        + internal_html
         + tags_html
-        + f"<footer><time datetime='{_h(bp.get('created_at',''))}'>"
-        + f"{_h(str(bp.get('created_at',''))[:10])}</time></footer>"
+        + f"<footer><time datetime='{_h(bp.get('published_at') or bp.get('created_at',''))}'>"
+        + f"{_h(str(bp.get('published_at') or bp.get('created_at',''))[:10])}</time></footer>"
         + "</main></body></html>"
     )
 
