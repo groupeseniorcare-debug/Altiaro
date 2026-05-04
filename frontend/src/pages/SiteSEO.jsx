@@ -36,7 +36,7 @@ export default function SiteSEO() {
   const loadAll = useCallback(async (fromRefresh = false) => {
     if (fromRefresh) setRefreshing(true); else setLoading(true);
     const [a, st, gs, mc, sd] = await Promise.all([
-      apiCall(() => api.get(`/sites/${siteId}/seo/audit`)),
+      apiCall(() => api.get(`/sites/${siteId}/seo-audit`)),
       apiCall(() => api.get(`/sites/${siteId}/automation/status`)),
       apiCall(() => api.get(`/sites/${siteId}/gsc/status`)),
       apiCall(() => api.get("/merchant/status")),
