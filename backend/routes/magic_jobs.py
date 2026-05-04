@@ -382,14 +382,39 @@ async def _evaluate_healthcheck(site: dict) -> Dict[str, Dict[str, Any]]:
     }
 
     try:
-        upsells_n = await db.upsells.count_documents({"site_id": site_id})
+        # Sprint 4 fix : align HC sur la sémantique du Cockpit (journey_gating).
+        # Le cockpit considère un upsell = product avec type/role/is_upsell upsell|accessory|addon.
+        # Le HC magique doit faire le MÊME check (sinon on peut compléter le cockpit
+        # mais bloquer le launch — incohérent).
+        upsells_n = await db.products.count_documents({
+            "site_id": site_id,
+            "$or": [
+                {"type": {"$in": ["upsell", "accessory", "addon"]}},
+                {"role": {"$in": ["upsell", "accessory"]}},
+                {"is_upsell": True},
+            ],
+        })
     except Exception:
         upsells_n = 0
     if upsells_n == 0:
-        # fallback : upsells inlined in products
+        # fallback : collection legacy `db.upsells` (anciens sites)
+        try:
+            upsells_n = await db.upsells.count_documents({"site_id": site_id})
+        except Exception:
+            upsells_n = 0
+    if upsells_n == 0:
+        # fallback : array inline products.upsells:[…]
         try:
             upsells_n = await db.products.count_documents(
                 {"site_id": site_id, "upsells": {"$exists": True, "$ne": []}})
+        except Exception:
+            upsells_n = 0
+    if upsells_n == 0:
+        # fallback ultime : suggestions adoptées (Sprint 4 — pour les sites
+        # qui ont laissé l'AI tagger sans encore matérialiser les products).
+        try:
+            upsells_n = await db.upsell_suggestions.count_documents(
+                {"site_id": site_id, "status": {"$in": ["adopted", "accepted", "approved", "linked"]}})
         except Exception:
             upsells_n = 0
     out["hc_upsells_min"] = {
