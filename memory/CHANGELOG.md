@@ -2420,3 +2420,48 @@ Tous les `data-testid` FOUND : `delivery-estimate`, `payment-options`, `payment-
 **Validation curl** : tous endpoints 200, lint OK (ruff + eslint).
 
 **Note Resend** : la clé actuelle est *restricted-send* — le 401 sur `/api-keys` est un comportement Resend normal pour ce type de clé, pas une révocation. Le health check le marque `ok` avec `key_restricted: true`. L'envoi SMTP via `resend.emails.send` reste fonctionnel (69 entries dans `db.email_log` avec status=`sent`).
+
+## 2026-05-04 — Hotfix e1_tester follow-up (commit pending)
+
+**Root cause identifiée** (e1_tester audit 7/8 PASS, 1 fail legal) :
+- Le contenu niche-adapté (CPAM/LPP/CE/classe I/DEEE/prescription) était bien persisté
+  dans `site.legal.{slug}.body_md` avec `niche_adapted=true` après le run de
+  `legal_niche_adapter`.
+- MAIS le endpoint `GET /api/public/sites/{id}/legal/{slug}` appelait
+  `altiaro_legal.get_site_legal_page(site, slug)` qui appelait **systématiquement**
+  `render_site_cgv(site)`, `render_site_confidentialite(site)`, etc. — ces
+  fonctions reconstruisent le markdown via f-strings depuis les templates
+  plateforme **sans jamais regarder** `site.legal.{slug}.body_md`.
+- Le contenu niche-adapté était donc silencieusement ignoré à la lecture publique.
+
+**Fix** : `altiaro_legal.get_site_legal_page()` refactoré avec 3 priorités :
+  1. `site.legal.{db_key}.body_md` si `niche_adapted=true` → **source=niche_adapted**
+  2. `site.design.legal_pages.{key}.body_md` si présent → **source=design_legal_pages**
+  3. Fallback render_site_*() depuis templates plateforme → **source=platform_template**
+
+Le registry alias → (db_key, renderer) gère correctement `mentions-legales`,
+`mentions`, `mentions_legales`, `privacy`, `returns`, `shipping`. Les fields
+`title` et `updated` sont conservés via la base fonction (cohérence JSON shape),
+seul `body_md` est overridé par le contenu niche-adapté.
+
+**Validation curl Altea** (6867223e) — 5 sections × 8 termes attendus :
+```
+/legal/confidentialite : len=5525 source=niche_adapted · CPAM LPP CE classe I prescription DEEE garantie ✓
+/legal/cgv             : len=6495 source=niche_adapted · CPAM LPP CE classe I prescription DEEE garantie ✓
+/legal/mentions        : len=5487 source=niche_adapted · CPAM LPP CE classe I prescription DEEE garantie ✓
+/legal/livraison       : len=4522 source=niche_adapted · CPAM LPP CE classe I prescription DEEE garantie ✓
+/legal/retours         : len=6861 source=niche_adapted · CPAM LPP CE classe I prescription DEEE garantie ✓
+```
+
+**Validation fallback** — Projet Matelas (non niche-adapted) :
+```
+/legal/confidentialite : len=3157 source=platform_template (fallback attendu)
+```
+
+**Point 6 bonus** (divergence badges vs legal) : la détection niche → family
+fonctionnait parfaitement côté `legal_niche_adapter` (Altea `fauteuil releveur
+éléctrique` → `silver_economy_medical`). Le vrai bug était uniquement côté
+lecture publique. Les badges réassurance passaient la niche en raw au prompt
+LLM (pas de détection family), d'où leur succès.
+
+**Score Altea estimé** : 8,5-9/10 (vs 8/10 après batch 10).

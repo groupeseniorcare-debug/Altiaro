@@ -630,21 +630,70 @@ Pour toute question logistique : **{c['email_contact']}** · {c['telephone']}
 
 
 def get_site_legal_page(site: Dict[str, Any], slug: str) -> Optional[Dict[str, str]]:
-    """Return a generated legal page for a Concepteur store, or None if unknown."""
+    """Return a generated legal page for a Concepteur store, or None if unknown.
+
+    PRIORITY (Fix 2026-05-04 Sprint 4 Batch 10 Fix 2 follow-up) :
+      1. site.legal.{db_key}.body_md  si niche_adapted=true
+         → contenu adapté par `services/legal_niche_adapter.py` lors du launch
+      2. site.design.legal_pages.{slug}.body_md si déjà injecté par design
+      3. Fallback : render_site_*() depuis les templates altiaro_legal plateforme
+    """
     registry = {
-        "mentions-legales": render_site_mentions_legales,
-        "mentions":         render_site_mentions_legales,
-        "cgv":              render_site_cgv,
-        "confidentialite":  render_site_confidentialite,
-        "privacy":          render_site_confidentialite,
-        "cookies":          render_site_cookies,
-        "retours":          render_site_retours,
-        "returns":          render_site_retours,
-        "livraison":        render_site_livraison,
-        "shipping":         render_site_livraison,
+        "mentions-legales": ("mentions", render_site_mentions_legales),
+        "mentions":         ("mentions", render_site_mentions_legales),
+        "mentions_legales": ("mentions", render_site_mentions_legales),
+        "cgv":              ("cgv",      render_site_cgv),
+        "confidentialite":  ("confidentialite", render_site_confidentialite),
+        "privacy":          ("confidentialite", render_site_confidentialite),
+        "cookies":          ("cookies",  render_site_cookies),
+        "retours":          ("retours",  render_site_retours),
+        "returns":          ("retours",  render_site_retours),
+        "livraison":        ("livraison", render_site_livraison),
+        "shipping":         ("livraison", render_site_livraison),
     }
-    fn = registry.get(slug)
-    return fn(site) if fn else None
+    entry = registry.get(slug)
+    if not entry:
+        return None
+    db_key, fn = entry
+
+    # Priority 1 : niche-adapted body in site.legal.{db_key}
+    site_legal = (site.get("legal") or {}).get(db_key) or {}
+    if isinstance(site_legal, dict) and site_legal.get("niche_adapted"):
+        body_md = site_legal.get("body_md") or site_legal.get("body")
+        if body_md and isinstance(body_md, str) and len(body_md) > 200:
+            # Reuse the title/updated computed by the standard renderer for
+            # coherence with the rest of the API shape, but override body_md.
+            base = fn(site) or {}
+            return {
+                **base,
+                "body_md": body_md,
+                "niche_adapted": True,
+                "niche": site_legal.get("niche") or site.get("niche"),
+                "source": "niche_adapted",
+            }
+
+    # Priority 2 : design.legal_pages.{slug_aliases}.body_md
+    design_legal = (site.get("design") or {}).get("legal_pages") or {}
+    design_key_candidates = [db_key]
+    if db_key == "mentions":
+        design_key_candidates += ["mentions_legales"]
+    for dk in design_key_candidates:
+        dl = design_legal.get(dk) or {}
+        if isinstance(dl, dict):
+            body_md = dl.get("body_md") or dl.get("body")
+            if body_md and isinstance(body_md, str) and len(body_md) > 200:
+                base = fn(site) or {}
+                return {
+                    **base,
+                    "body_md": body_md,
+                    "source": "design_legal_pages",
+                }
+
+    # Priority 3 : fallback platform template
+    result = fn(site) or {}
+    if result:
+        result["source"] = "platform_template"
+    return result
 
 
 # ═════════════════════════════════════════════════════════════════════════════
