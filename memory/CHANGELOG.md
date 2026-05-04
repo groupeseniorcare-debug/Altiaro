@@ -2465,3 +2465,55 @@ lecture publique. Les badges réassurance passaient la niche en raw au prompt
 LLM (pas de détection family), d'où leur succès.
 
 **Score Altea estimé** : 8,5-9/10 (vs 8/10 après batch 10).
+
+## 2026-05-04 — Sprint 4 Partie A+B + Bing verification (commits 30972db→a784577)
+
+### TÂCHE 1 — Bing Webmaster Tools verification
+- `frontend/public/BingSiteAuth.xml` (statique CRA + Approximated prod)
+- `backend/routes/bing_verification.py` → `GET /BingSiteAuth.xml` (sans /api)
+- Belt-and-suspenders : si le build React est stale, FastAPI sert toujours
+  le fichier avec `Content-Type: application/xml`.
+- Validation : backend:8001 200 + frontend:3000 200 + preview HTTPS 200.
+- Code vérification : `A5B253755223EA9AF2CC5650871274E9` (pour altiaro.com)
+
+### TÂCHE 2 — Translate produits étape 8
+- Utilisation du endpoint existant `POST /api/sites/{id}/translate` (routes/translate.py)
+  qui traduit site+products+blog_posts en une seule task asynchrone.
+- Altea : task `a2a2d80fb64c` lancée avec `target_langs=[de,nl,it,es]`.
+- État final produits Altea (9 produits) :
+  - FR+EN+DE : tagline, narrative.{headline,subheadline,sections}, usps, how_to_steps ✓
+  - NL/IT/ES : task interrompue par timeouts LLM proxy (logs `altiaro.llm_resilience`
+    "TimeoutError attempt 1-4/4 FAIL" sur articles pillars > 10k chars)
+  - La task continue en background mais semble bloquée sur traduction des
+    83 blog_posts (37 × 5 langs × ~30 batches). Solutions futures possibles :
+    chunking du body par sections, ou overwrite=false ciblé uniquement produits.
+
+### TÂCHE 3 — Endpoint /magic/content/repair
+- POST /api/sites/{id}/magic/content/repair?lang={code}
+- Détecte les FR posts sans équivalent `(site_id, source_post_id, lang=X)` dans
+  db.blog_posts et les re-traduit avec :
+  - Retry exponentiel : 2s → 4s → échec
+  - Escalade qualité Haiku → Sonnet à l'essai 3 (max_tokens 8192 vs 4096)
+  - Concurrence 3 parallel
+  - Idempotent via `source_post_id` check
+- **Résultats Altea** : blog=fr:14 de:12→14 ✓ nl:12→13 (1 pillar résiste par
+  timeout LLM infra). 2 articles DE repaired avec Sonnet.
+- **Résultats Jardin Premium** : blog=fr:13 de:11→13 ✓ nl:10→11 (2 pillars
+  résistent). 3 articles DE repaired (2 via Haiku, 1 via Sonnet).
+- **Timeouts résiduels sur 3 pillars longs** : `fauteuil-releveur-electrique-guide-complet-2024`,
+  `outils-jardinage-professionnels-guide-2025`, `arrosoir-cuivre-jardinier-collectionneur`.
+  Ces articles > 10k chars subissent des TimeoutError au niveau du proxy
+  Emergent LLM (pas au niveau modèle). Solution future : chunking body par
+  sections ou traduction 2-pass (structure puis body).
+
+### Coût LLM cumulé cette session (estimé)
+- Bing verification : 0 €
+- Translate produits Altea (task a2a2d80fb64c) : ~0,10 € (DE partiel)
+- Repair blog posts : ~0,12 € (5 articles repaired × Haiku/Sonnet)
+- **Total batch : ~0,25 €**
+
+### Points à adresser dans un futur sprint
+- Chunking translation pour articles > 10k chars (pillars) pour éviter
+  les TimeoutError proxy LLM.
+- Exposer un endpoint `POST /translate/cancel?task_id=X` pour tuer proprement
+  les tasks bloquées en mémoire.
