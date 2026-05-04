@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Package } from "@phosphor-icons/react";
+import { useParams } from "react-router-dom";
 import { api, apiCall } from "../lib/api";
 import ProductImportPanel from "../components/ProductImportPanel";
 import AeDealsPanel from "../components/AeDealsPanel";
-import NextStepCTA from "../components/NextStepCTA";
+import StepLayout from "../components/cockpit/StepLayout";
 import { useStepGuard } from "../lib/useStepGuard";
 
 /**
- * Sourcing page — étape 2 (import catalogue).
- * Chantier 2 refonte : bascule sur <ProductImportPanel variant="main" />.
+ * Sourcing — étape 2 (import catalogue).
+ * Phase 3.1 (2026-05-04) — wrap StepLayout.
  */
 export default function Sourcing() {
   const { id: siteId } = useParams();
@@ -26,7 +25,7 @@ export default function Sourcing() {
 
   if (checking) {
     return (
-      <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F5F2EB] flex items-center justify-center">
         <div className="text-sm text-neutral-500">Vérification des prérequis…</div>
       </div>
     );
@@ -38,47 +37,31 @@ export default function Sourcing() {
   const nicheHint = site?.niche_name || site?.niche?.name || site?.name || "";
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2]">
-      <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-8">
-        <Link
-          to={`/sites/${siteId}`}
-          className="inline-flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900 mb-6"
-          data-testid="back-to-site"
-        >
-          <ArrowLeft size={14} /> Retour au cockpit
-        </Link>
-
-        <div className="mb-7">
-          <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-1 flex items-center gap-2">
-            <Package size={12} weight="bold" /> Étape 2 · Import catalogue
-          </div>
-          <h1 className="text-2xl md:text-3xl font-semibold text-neutral-900" style={{ fontFamily: "'Fraunces', serif" }}>
-            Constituer le catalogue du site
-          </h1>
-          {site && (
-            <p className="text-sm text-neutral-600 mt-2">
-              {nicheHint ? <>Niche&nbsp;: <strong>{nicheHint}</strong> · </> : null}
-              Pays cibles&nbsp;: <strong>{targetCountries.join(" · ") || "aucun défini"}</strong>
-            </p>
-          )}
+    <StepLayout
+      siteId={siteId}
+      stepKey="import"
+      title="Import du catalogue"
+      subtitle="Constitue ton catalogue à partir d'AliExpress ou manuellement."
+      estimatedTime="~5 min"
+      whatItDoes="Recherche les meilleurs produits de ta niche sur AliExpress (filtres volume, marge, shipping EU), sélectionne 5 à 15 hero products, importe-les en un clic. L'IA reformule automatiquement les titres, descriptions, SEO et génère des images premium à la marque. Les deals AliExpress pertinents sont surfacés en bas de page."
+    >
+      {site && (
+        <div className="text-[13px] text-neutral-600 mb-5">
+          {nicheHint ? <>Niche&nbsp;: <strong className="text-neutral-900">{nicheHint}</strong> · </> : null}
+          Pays cibles&nbsp;: <strong className="text-neutral-900">{targetCountries.join(" · ") || "aucun défini"}</strong>
         </div>
+      )}
 
-        <ProductImportPanel
-          siteId={siteId}
-          variant="main"
-          nicheHint={nicheHint}
-          targetCountries={targetCountries}
-        />
+      <ProductImportPanel
+        siteId={siteId}
+        variant="main"
+        nicheHint={nicheHint}
+        targetCountries={targetCountries}
+      />
 
-        {/* Chantier 6 — AeDealsPanel déplacé ici depuis le cockpit.
-            Les deals AliExpress pertinents pour la niche sont plus utiles
-            pendant la phase d'import que sur la page cockpit générique. */}
-        <div className="mt-10" data-testid="sourcing-ae-deals-section">
-          <AeDealsPanel siteId={siteId} />
-        </div>
-
-        <NextStepCTA siteId={siteId} currentKey="import" />
+      <div className="mt-10" data-testid="sourcing-ae-deals-section">
+        <AeDealsPanel siteId={siteId} />
       </div>
-    </div>
+    </StepLayout>
   );
 }

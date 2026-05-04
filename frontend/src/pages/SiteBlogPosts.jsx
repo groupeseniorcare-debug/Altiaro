@@ -5,8 +5,9 @@ import {
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 import { useStepGuard } from "../lib/useStepGuard";
-import { StepValidateCTA } from "../components/StepPageHeader";
-import { buildOnValidate } from "../lib/journeySteps";
+
+
+import StepLayout from "../components/cockpit/StepLayout";
 
 const LANG_FLAGS = {
   fr: "🇫🇷", en: "🇬🇧", de: "🇩🇪", es: "🇪🇸", it: "🇮🇹", nl: "🇳🇱",
@@ -117,8 +118,14 @@ export default function SiteBlogPosts() {
   });
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2]">
-      <div className="max-w-[1100px] mx-auto px-6 md:px-10 py-10">
+    <StepLayout
+      siteId={siteId}
+      stepKey="content"
+      title="Contenu éditorial"
+      subtitle="Pillars + satellites générés par IA pour ton autorité SEO."
+      estimatedTime="~4 min"
+      whatItDoes="Claude génère un pillar article (~2000 mots) qui positionne ton expertise sur la niche, puis 3 articles satellites (~800 mots chacun) qui maillent vers le pillar. JSON-LD Article + FAQ + Breadcrumb injecté automatiquement. Publication immédiate sur le storefront."
+    >
         <Link to={`/sites/${siteId}`} className="inline-flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900 mb-6" data-testid="blog-back">
           <ArrowLeft size={14} /> Retour au cockpit
         </Link>
@@ -319,28 +326,7 @@ export default function SiteBlogPosts() {
           )}
         </div>
 
-        {/* Validation finale étape 7 — Contenu SEO (UN SEUL CTA, pas de doublon) */}
-        <StepValidateCTA
-          currentStepKey="content"
-          nextStepNumber={8}
-          nextStepLabel="Traduction multilingue"
-          nextStepHref={`/sites/${siteId}/translate?step=8`}
-          canValidate={
-            (status?.content?.blog_published ?? 0) >= 3 &&
-            !!auto?.content_enabled
-          }
-          missingConditions={[
-            ...((status?.content?.blog_published ?? 0) >= 3
-              ? []
-              : [`Au moins 3 articles publiés (actuel : ${status?.content?.blog_published ?? 0})`]),
-            ...(auto?.content_enabled
-              ? []
-              : ["Activer la publication automatique"]),
-          ]}
-          onValidate={buildOnValidate(siteId, "content", loadAll)}
-        />
-      </div>
-    </div>
+    </StepLayout>
   );
 }
 

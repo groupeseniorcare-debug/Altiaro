@@ -5,10 +5,10 @@ import { api, apiCall } from "../lib/api";
 import StepLayout from "../components/cockpit/StepLayout";
 
 /**
- * SitePricing (Phase 3.0 \u2014 pilote UX refonte)
+ * SitePricing (Phase 3.0 — pilote UX refonte)
  *
- * Wrapp\u00e9e dans <StepLayout /> pour donner la nouvelle charte \u00ab Luxury Minimal \u00bb.
- * Logique m\u00e9tier inchang\u00e9e : lecture + d\u00e9clenchement de l'analyse pricing IA.
+ * Wrappée dans <StepLayout /> pour donner la nouvelle charte « Luxury Minimal ».
+ * Logique métier inchangée : lecture + déclenchement de l'analyse pricing IA.
  */
 export default function SitePricing() {
   const { id: siteId } = useParams();
@@ -32,7 +32,7 @@ export default function SitePricing() {
       return;
     }
     setPricing(data);
-    // Signale au reste de l'app qu'une \u00e9tape a boug\u00e9 (bascule du journey).
+    // Signale au reste de l'app qu'une étape a bougé (bascule du journey).
     window.dispatchEvent(new CustomEvent("cf_steps_changed"));
   };
 
@@ -45,10 +45,10 @@ export default function SitePricing() {
       title="Pricing & positionnement concurrentiel"
       subtitle="L'IA scanne les prix concurrents et te propose un placement optimal pour ta niche."
       estimatedTime="~2 min"
-      whatItDoes="Claude identifie 3 \u00e0 5 concurrents directs (Google Shopping + AliExpress), analyse leurs prix actuels, et te sugg\u00e8re une fourchette de pricing premium align\u00e9e sur ton positionnement marque. Tu obtiens aussi un co\u00fbt d'acquisition cible pour tes campagnes Google Ads."
+      whatItDoes="Claude identifie 3 à 5 concurrents directs (Google Shopping + AliExpress), analyse leurs prix actuels, et te suggère une fourchette de pricing premium alignée sur ton positionnement marque. Tu obtiens aussi un coût d'acquisition cible pour tes campagnes Google Ads."
       magicButton={{
         label: loading
-          ? "Analyse en cours (30\u201360 s)\u2026"
+          ? "Analyse en cours (30–60 s)…"
           : hasAnalysis
           ? "Relancer l'analyse"
           : "Lancer l'analyse IA",
@@ -83,11 +83,11 @@ function EmptyState() {
         className="text-3xl mb-3 text-neutral-400"
         style={{ fontFamily: "'Fraunces', serif" }}
       >
-        \u2014
+        —
       </div>
       <div className="font-medium text-neutral-900 mb-1">Aucune analyse encore</div>
       <div className="text-sm text-neutral-500 max-w-md mx-auto">
-        Clique sur <em>\u00ab Lancer l'analyse IA \u00bb</em> en bas \u00e0 droite. Claude identifie les
+        Clique sur <em>« Lancer l'analyse IA »</em> en bas à droite. Claude identifie les
         concurrents de ta niche et revient avec trois fourchettes de prix.
       </div>
     </div>
@@ -101,9 +101,9 @@ function LoadingState() {
       data-testid="pricing-loading"
     >
       <div className="inline-block w-8 h-8 rounded-full border-2 border-neutral-300 border-t-neutral-900 animate-spin mb-4" />
-      <div className="font-medium text-neutral-900 mb-1">Analyse en cours\u2026</div>
+      <div className="font-medium text-neutral-900 mb-1">Analyse en cours…</div>
       <div className="text-sm text-neutral-500">
-        Claude consulte les concurrents et \u00e9crit tes fourchettes de prix. 30 \u00e0 60 secondes.
+        Claude consulte les concurrents et écrit tes fourchettes de prix. 30 à 60 secondes.
       </div>
     </div>
   );
@@ -115,7 +115,7 @@ function PricingResult({ pricing }) {
       {/* Verdict / market overview */}
       <div className="bg-white border border-neutral-200 rounded-2xl p-6">
         <div className="text-[10px] uppercase tracking-[0.22em] text-neutral-500 mb-3 font-medium">
-          Vue d'ensemble du march\u00e9
+          Vue d'ensemble du marché
         </div>
         <p className="text-[15px] text-neutral-800 leading-relaxed">
           {pricing.market_overview}
@@ -126,7 +126,7 @@ function PricingResult({ pricing }) {
       {pricing.competitors?.length > 0 && (
         <div className="bg-white border border-neutral-200 rounded-2xl p-6">
           <div className="text-[10px] uppercase tracking-[0.22em] text-neutral-500 mb-4 font-medium">
-            Concurrents identifi\u00e9s
+            Concurrents identifiés
           </div>
           <div className="grid md:grid-cols-2 gap-3">
             {pricing.competitors.map((c, i) => (
@@ -145,11 +145,11 @@ function PricingResult({ pricing }) {
         </div>
       )}
 
-      {/* Fourchettes recommand\u00e9es */}
+      {/* Fourchettes recommandées */}
       {pricing.recommended_ranges?.length > 0 && (
         <div className="bg-white border border-neutral-200 rounded-2xl p-6">
           <div className="text-[10px] uppercase tracking-[0.22em] text-neutral-500 mb-4 font-medium">
-            Fourchettes recommand\u00e9es
+            Fourchettes recommandées
           </div>
           <div className="space-y-4">
             {pricing.recommended_ranges.map((r, i) => (
@@ -161,7 +161,7 @@ function PricingResult({ pricing }) {
                   {r.product_type}
                 </div>
                 <div className="grid grid-cols-3 gap-3 mb-4">
-                  <Tier label="Entr\u00e9e" price={r.entry_eur} color="neutral" />
+                  <Tier label="Entrée" price={r.entry_eur} color="neutral" />
                   <Tier label="Sweet spot" price={r.sweet_spot_eur} color="emerald" />
                   <Tier label="Premium" price={r.premium_eur} color="amber" />
                 </div>
@@ -177,7 +177,7 @@ function PricingResult({ pricing }) {
         {pricing.margin_advice && (
           <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-5">
             <div className="text-[10px] uppercase tracking-[0.22em] text-emerald-700 font-medium mb-1.5">
-              Marge recommand\u00e9e
+              Marge recommandée
             </div>
             <div className="text-sm text-emerald-900 leading-relaxed">{pricing.margin_advice}</div>
           </div>
@@ -190,7 +190,7 @@ function PricingResult({ pricing }) {
             <ul className="space-y-1.5 text-sm text-sky-900">
               {pricing.strategic_notes.map((n, i) => (
                 <li key={i} className="flex gap-2 leading-relaxed">
-                  <span className="text-sky-400">\u2022</span>
+                  <span className="text-sky-400">•</span>
                   {n}
                 </li>
               ))}
@@ -200,7 +200,7 @@ function PricingResult({ pricing }) {
       </div>
 
       <div className="text-[11px] text-neutral-400 text-right pt-2 tabular-nums">
-        G\u00e9n\u00e9r\u00e9 le {new Date(pricing.generated_at).toLocaleString("fr-FR")}
+        Généré le {formatDateTime(pricing.generated_at)}
       </div>
     </div>
   );
@@ -221,7 +221,7 @@ function Tier({ label, price, color }) {
         className="text-2xl font-normal tabular-nums"
         style={{ fontFamily: "'Fraunces', serif" }}
       >
-        {price}\u202f\u20ac
+        {price} €
       </div>
     </div>
   );

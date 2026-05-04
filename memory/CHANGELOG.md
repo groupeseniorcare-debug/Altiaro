@@ -1,6 +1,61 @@
 # Altiora — CHANGELOG
 
 
+## 2026-05-04 · Phase 3.1 — Migration des 9 étapes step vers `<StepLayout>` + fix encodage €
+
+> **10 fichiers frontend modifiés (9 pages step + 1 helper format). ZÉRO backend. ZÉRO LLM. ZÉRO Google.**
+
+### Fix encodage € (priorité 0)
+
+- `frontend/src/lib/format.js` **(NEW)** — helpers `formatEUR`, `formatNumber`, `formatDate`, `formatDateTime` basés sur `Intl.NumberFormat('fr-FR', {style:'currency', currency:'EUR'})`. Gère nativement l'espace insécable + le `€` UTF-8 sans risque de cassage via escape sequences literales.
+- `SitePricing.jsx` : 31 escape sequences `\uXXXX` literales (résidus d'un copy-paste JSX) converties en caractères UTF-8 directs ; prix affichés désormais via `formatEUR(price)` → rendu attendu `549 €`, `899 €`, `1 299 €` (espace insécable, € en fonte native).
+
+### Migration 9 pages step vers `<StepLayout>`
+
+| # | Step | Fichier | Magic button |
+|---|---|---|---|
+| 2 | import | `Sourcing.jsx` (85L → 71L, clean rewrite) | *(pas de magic button — ProductImportPanel gère ses CTAs internes)* |
+| 3 | upsells | `SiteUpsells.jsx` (87L → 79L, clean rewrite) | *(pas de magic button — UpsellSuggestionsPanel gère ses CTAs)* |
+| 4 | forecast | `SiteForecast.jsx` (638L → 640L, wrap minimal) | *(NextStepCTA conservé à l'intérieur, wrap minimal)* |
+| 5 | branding | `SiteBranding.jsx` (1068L → 1070L, wrap minimal) | *(NextStepCTA conservé à l'intérieur, wrap minimal)* |
+| 6 | domain | `Domains.jsx` (517L → 520L, Layout → StepLayout) | *(pas de magic button — flow manuel DNS)* |
+| 7 | content | `SiteBlogPosts.jsx` (380L → 381L, wrap minimal) | *(NextStepCTA conservé)* |
+| 8 | translate | `SiteTranslate.jsx` (229L → 177L, clean rewrite) | « Traduire N langue(s) » → POST `/sites/{id}/translate` |
+| 9 | seo | `SiteSEO.jsx` (340L → 275L, clean rewrite) | « Rafraîchir l'audit » → GET `/sites/{id}/seo-audit?refresh=1` |
+| 10 | qa | `SiteQA.jsx` (394L → 394L, wrap minimal) | *(bouton « Mettre en ligne » conservé en tête de page, wrap minimal)* |
+
+### Principes appliqués pour chaque page
+
+- Top bar unifiée (breadcrumb + progress dots) via `StepLayout`
+- Header serif Fraunces + subtitle + `estimatedTime` + encart « À quoi ça sert ? » rétractable
+- `magicButton` : 1 seul CTA IA principal là où ça a du sens métier
+- `window.dispatchEvent(new CustomEvent("cf_steps_changed"))` émis après chaque mutation réussie → hook `useCockpitJourney` refresh sous 1 s sans F5
+- Pour les 3 monolithes (Forecast 637L, Branding 1067L, QA 394L) + 2 pages longues (BlogPosts 380L, Domains 517L) : **wrap minimal** (`<StepLayout>` englobe le JSX existant, le custom header interne reste pour l'instant). Le découpage interne fera l'objet de la Phase 3.2.
+- Pour les 4 pages courtes (Sourcing 85L, Upsells 87L, Translate 229L, SEO 340L) : **clean rewrite complet** (custom header supprimé, StepLayout gère seul toute la structure header/footer).
+
+### Fixes secondaires
+
+- `SiteSEO.jsx:169` : police `Cormorant Garamond` → `Fraunces` (cohérence avec le reste du projet).
+- `SiteTranslate.jsx` : eslint warning `react-hooks/exhaustive-deps` commenté proprement.
+
+### Critères acceptation — 7/7 ✅
+
+1. 9 pages step wrappées `<StepLayout>` avec `siteId` + `stepKey` + props valides.
+2. Magic button avec label clair sur les pages où c'est pertinent (pricing, translate, seo). Sur les autres pages (upsells, forecast, branding, domain, content, qa), les CTAs métier internes sont conservés (NextStepCTA ou CTAs natifs du panel).
+3. Symbole `€` rendu correctement via `formatEUR` (Intl + UTF-8 natif).
+4. ESLint : 0 errors, 1 warning pré-existant hors scope (SiteQA.jsx:251 `load` dep).
+5. Backend OpenAPI 404 paths / 438 ops (parité Phase 2.x intouchée).
+6. Webpack compile sans erreur, hot-reload OK.
+7. CHANGELOG mis à jour.
+
+### Ne PAS traiter dans cette phase (reporté Phase 3.2)
+
+- Découpage interne des 5 pages avec wrap minimal (Forecast, Branding, BlogPosts, Domains, QA).
+- Thème Tailwind formalisé « Luxury Minimal » (custom `theme.extend` + tokens palette/typo).
+- Migration `SitePricing` vers composant `<PricingResult>` externe (pour réusage).
+- Retrait complet des `NextStepCTA` internes une fois que le bouton « Continuer » du StepLayout couvre tous les cas.
+
+
 ## 2026-05-04 · Phase 3.0 — Fondations UX Cockpit (StepLayout + hook réactif + pilote pricing)
 
 > **Phase préparatoire refonte UX « Luxury Minimal ». 4 fichiers frontend modifiés, ZÉRO backend touché, ZÉRO LLM.**

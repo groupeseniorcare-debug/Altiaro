@@ -5,6 +5,7 @@ import {
 } from "@phosphor-icons/react";
 import { api, apiCall } from "../lib/api";
 import { useStepGuard } from "../lib/useStepGuard";
+import StepLayout from "../components/cockpit/StepLayout";
 
 const STATUS_META = {
   ok:   { label: "OK",      color: "text-emerald-700", bg: "bg-emerald-50",  border: "border-emerald-200", icon: CheckCircle },
@@ -105,12 +106,14 @@ export default function SiteQA() {
   const domainBlocked = domainCheck && domainCheck.status === "fail";
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2]">
-      <div className="max-w-[1200px] mx-auto px-6 md:px-10 py-10">
-        <Link to={`/sites/${siteId}`} className="inline-flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900 mb-6" data-testid="qa-back">
-          <ArrowLeft size={14} /> Retour au cockpit
-        </Link>
-
+    <StepLayout
+      siteId={siteId}
+      stepKey="qa"
+      title="Validation finale & mise en ligne"
+      subtitle="16 contrôles automatiques avant le passage en production."
+      estimatedTime="~3 min"
+      whatItDoes="Vérifie la conformité de ton site (images, textes, pricing, domaine, hébergement, pixels analytics, JSON-LD, AEO, mentions légales, politiques retour/livraison, sitemap, hreflang). Score ≥ 70 requis. Le bouton « Mettre en ligne » active le passage staging → live et pousse IndexNow + sitemap vers Google."
+    >
         <div className="mb-8 flex items-center justify-between gap-4 flex-wrap">
           <div>
             <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 mb-2 flex items-center gap-2">
@@ -229,8 +232,7 @@ export default function SiteQA() {
 
         {/* Statut Google + bouton provisioning */}
         <GoogleProvisioningPanel siteId={siteId} ready={ready} />
-      </div>
-    </div>
+    </StepLayout>
   );
 }
 

@@ -17,6 +17,7 @@ import {
 } from "../components/BrandingContent";
 import HomepageSectionsEditor from "../components/HomepageSectionsEditor";
 import AiTweakPanel from "../components/cockpit/AiTweakPanel";
+import StepLayout from "../components/cockpit/StepLayout";
 
 /**
  * Étape 5 — Identité & design.
@@ -363,8 +364,15 @@ export default function SiteBranding() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA]">
-      <div className="max-w-[1600px] mx-auto px-6 md:px-10 py-8">
+    <StepLayout
+      siteId={siteId}
+      stepKey="branding"
+      title="Identité de marque"
+      subtitle="Génère ou ajuste logo, palette, hero, testimonials et FAQ en quelques clics."
+      estimatedTime="~5 min"
+      whatItDoes="Le BrandWizard génère en quelques secondes un nom, un logo SVG premium, une palette cohérente, un hero section avec visuel IA, 3 testimonials crédibles et une FAQ de 8 questions. Chaque élément est éditable via AiTweakPanel. Publie le design quand tu es satisfait — le storefront reflète instantanément les changements."
+    >
+      <div className="max-w-[1600px] mx-auto">
         <Link
           to={`/sites/${siteId}`}
           className="inline-flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900 mb-6"
@@ -621,7 +629,7 @@ export default function SiteBranding() {
 
         <NextStepCTA siteId={siteId} currentKey="branding" />
       </div>
-    </div>
+    </StepLayout>
   );
 }
 

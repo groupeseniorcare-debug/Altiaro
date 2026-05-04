@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, apiCall } from "../lib/api";
 import Layout from "../components/Layout";
+import StepLayout from "../components/cockpit/StepLayout";
 import {
   ArrowLeft,
   Globe,
@@ -174,7 +175,14 @@ export default function Domains() {
   };
 
   return (
-    <Layout>
+    <StepLayout
+      siteId={siteId}
+      stepKey="domain"
+      title="Nom de domaine"
+      subtitle="Trouve et connecte ton domaine custom en quelques clics."
+      estimatedTime="~3 min"
+      whatItDoes="Altiaro suggère des noms de domaine disponibles alignés sur ta marque, puis gère l'achat (via OVH) et la configuration DNS automatique. Tu peux aussi connecter un domaine existant (Approximated reverse-proxy + SSL auto). Vérification TXT record pour l'ownership."
+    >
       <div className="p-8 md:p-12 max-w-[1100px]">
         <button
           onClick={() => navigate(`/sites/${siteId}`)}
@@ -512,6 +520,6 @@ export default function Domains() {
           </div>
         </div>
       </div>
-    </Layout>
+    </StepLayout>
   );
 }

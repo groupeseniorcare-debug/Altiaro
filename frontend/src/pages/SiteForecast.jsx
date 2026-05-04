@@ -8,6 +8,7 @@ import {
 import { api, apiCall } from "../lib/api";
 import NextStepCTA from "../components/NextStepCTA";
 import { useStepGuard } from "../lib/useStepGuard";
+import StepLayout from "../components/cockpit/StepLayout";
 
 const SCENARIO_META = {
   pessimistic: { color: "text-rose-700", bg: "bg-rose-50", border: "border-rose-200", accent: "#BE123C" },
@@ -74,8 +75,15 @@ export default function SiteForecast() {
   if (!allowed) return null;
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2]">
-      <div className="max-w-[1600px] mx-auto px-6 md:px-10 py-8">
+    <StepLayout
+      siteId={siteId}
+      stepKey="forecast"
+      title="Prévisionnel 30 jours"
+      subtitle="Projection de chiffre, marge et CAC selon 3 scénarios budget Google Ads."
+      estimatedTime="~1 min"
+      whatItDoes="Calcul déterministe (sans LLM) basé sur pricing analysis, concurrence Google Ads, volumes de recherche et taux de conversion e-commerce médian. Produit 3 scénarios (prudent · sweet-spot · agressif), un launch_gate (feu vert/orange/rouge) et des alertes si le CAC cible est trop élevé."
+    >
+      <div className="max-w-[1600px] mx-auto">
         <Link to={`/sites/${siteId}`} className="inline-flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900 mb-6">
           <ArrowLeft size={14} /> Retour au cockpit
         </Link>
@@ -494,7 +502,7 @@ export default function SiteForecast() {
 
         <NextStepCTA siteId={siteId} currentKey="forecast" />
       </div>
-    </div>
+    </StepLayout>
   );
 }
 
