@@ -84,31 +84,53 @@ async def legal_adapt_niche(site_id: str, user: dict = Depends(get_current_user)
     if not site:
         raise HTTPException(404, "Site not found")
     niche = site.get("niche") or "e-commerce premium"
-    # Build base texts from existing site.legal (or fall back to platform legal templates)
+    # Build base texts. Priority order:
+    #   1. site.legal.{key}.body_md (already adapted previously)
+    #   2. site.design.legal_pages.{key}.body_md (injected during launch-auto)
+    #   3. altiaro_legal platform defaults
     legal_src = site.get("legal") or {}
+    design_legal = (site.get("design") or {}).get("legal_pages") or {}
     base = {}
+    # Aliases : design.legal_pages uses 'mentions_legales' while site.legal uses 'mentions'
+    aliases = {"mentions": ["mentions", "mentions_legales"]}
     for key in ("cgv", "mentions", "confidentialite", "livraison", "retours"):
-        v = legal_src.get(key) or {}
-        if isinstance(v, dict):
-            base[key] = v.get("body_md") or ""
-        elif isinstance(v, str):
-            base[key] = v
-    # If no site-level legal text exists yet, pull from altiaro_legal platform defaults
-    if not any(base.values()):
+        candidates = aliases.get(key, [key])
+        body = ""
+        for cand in candidates:
+            v1 = legal_src.get(cand) or {}
+            v2 = design_legal.get(cand) or {}
+            if isinstance(v1, dict) and (v1.get("body_md") or v1.get("body")):
+                body = v1.get("body_md") or v1.get("body") or ""
+                break
+            if isinstance(v2, dict) and (v2.get("body_md") or v2.get("body")):
+                body = v2.get("body_md") or v2.get("body") or ""
+                break
+            if isinstance(v1, str) and v1:
+                body = v1; break
+            if isinstance(v2, str) and v2:
+                body = v2; break
+        if body:
+            base[key] = body
+    if not base:
         try:
             from altiaro_legal import PLATFORM_LEGAL_TEMPLATES  # type: ignore
-            for k in base:
+            for k in ("cgv", "mentions", "confidentialite", "livraison", "retours"):
                 base[k] = (PLATFORM_LEGAL_TEMPLATES.get(k) or "") if PLATFORM_LEGAL_TEMPLATES else ""
         except Exception:
             pass
+    base = {k: v for k, v in base.items() if v}
+    if not base:
+        return {"ok": False, "reason": "no_base_legal_text",
+                "hint": "Run launch-auto first to inject default legal templates."}
     from services.legal_niche_adapter import adapt_legal_for_niche
     adapted = await adapt_legal_for_niche(site_id, niche, base)
-    # Persist in site.legal.{key}.body_md
     update = {}
     for k, text in adapted.items():
         update[f"legal.{k}.body_md"] = text
         update[f"legal.{k}.updated_at"] = __import__("datetime").datetime.utcnow().isoformat() + "Z"
         update[f"legal.{k}.niche_adapted"] = True
+        update[f"legal.{k}.niche"] = niche
     if update:
         await db.sites.update_one({"id": site_id}, {"$set": update})
-    return {"ok": True, "sections_adapted": list(adapted.keys()), "niche": niche}
+    return {"ok": True, "sections_adapted": list(adapted.keys()), "niche": niche,
+            "base_sections": list(base.keys())}

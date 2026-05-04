@@ -17,7 +17,7 @@ Le pipeline quotidien (cron 09h00 UTC) :
 L'API Featured étant en évolution permanente, ce module est codé défensivement
 autour d'endpoints REST raisonnablement standards. Si la signature change,
 la seule fonction à ajuster est `_request()`.
-”””
+"""
 from __future__ import annotations
 
 import asyncio
@@ -88,7 +88,7 @@ def _q_text(q: Dict[str, Any]) -> str:
 
 def filter_relevant(queries: List[Dict[str, Any]], niche: str) -> List[Dict[str, Any]]:
     """Heuristique simple : retient les queries dont le texte contient un
-    mot de la niche. Pas de NLP fancy - si trop strict, l'utilisateur
+    mot de la niche. Pas de NLP fancy : si trop strict, l_utilisateur
     elargira `keywords` dans `marketing.featured.keywords`."""
     if not niche:
         return queries
