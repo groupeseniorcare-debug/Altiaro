@@ -105,16 +105,25 @@ def _norm_cid(cid: str) -> str:
 # ====================== OAUTH FLOW ====================== #
 @router.get("/google-ads/oauth/start")
 async def oauth_start(user: dict = Depends(get_current_user)):
-    """Retourne l'URL Google pour démarrer la connexion OAuth."""
+    """Retourne l'URL Google pour démarrer la connexion OAuth.
+
+    Fix 2026-05-04 : le `state` n'utilise plus `admin_user_id` (qui causait
+    des écrasements si l'admin cliquait 2× avant de finaliser le flow). On
+    génère maintenant un UUID aléatoire par call, stocké avec admin_user_id
+    et code_verifier pour le callback.
+    """
+    import uuid as _uuid
     _require_admin(user)
     _require_config()
-    flow = _build_flow(state=user.get("id"))
+    random_state = _uuid.uuid4().hex
+    flow = _build_flow(state=random_state)
     auth_url, state = flow.authorization_url(
         access_type="offline",
         prompt="consent",
         include_granted_scopes="true",
     )
-    # Persist code_verifier (PKCE) pour pouvoir le réutiliser dans le callback
+    # Persist state → admin_user_id + code_verifier (PKCE)
+    # upsert sur `state` (unique par flow) pour éviter toute collision
     await db.google_ads_oauth_state.update_one(
         {"state": state},
         {"$set": {
@@ -151,19 +160,27 @@ async def oauth_callback(request: Request, code: Optional[str] = None, state: Op
         )
     _require_config()
     try:
-        # Retrieve code_verifier (PKCE) stored at oauth/start
+        # Retrieve code_verifier + admin_user_id (PKCE) stored at oauth/start
+        # Fix 2026-05-04 : state est un UUID aléatoire (plus admin_user_id).
+        # On récupère donc admin_user_id depuis le state_doc.
         state_doc = await db.google_ads_oauth_state.find_one(
             {"state": state}, {"_id": 0}
         )
+        if not state_doc or not state_doc.get("admin_user_id"):
+            return RedirectResponse(
+                f"{frontend_base}/admin/integrations?google_ads=error&reason=state_expired_or_invalid",
+                status_code=302,
+            )
+        admin_user_id = state_doc["admin_user_id"]
         flow = _build_flow(state=state)
-        if state_doc and state_doc.get("code_verifier"):
+        if state_doc.get("code_verifier"):
             flow.code_verifier = state_doc["code_verifier"]
         flow.fetch_token(code=code)
         creds_obj = flow.credentials
         await db.google_ads_credentials.update_one(
-            {"admin_user_id": state},
+            {"admin_user_id": admin_user_id},
             {"$set": {
-                "admin_user_id": state,
+                "admin_user_id": admin_user_id,
                 "refresh_token": creds_obj.refresh_token,
                 "access_token": creds_obj.token,
                 "token_expiry": creds_obj.expiry.isoformat() if creds_obj.expiry else None,

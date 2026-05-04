@@ -244,6 +244,9 @@ function CustomDomainApp({ bootstrap }) {
             <Route path="/shop/:siteId/collections" element={<StorefrontCollections />} />
             <Route path="/shop/:siteId/collection/:slug" element={<StorefrontCollection />} />
             <Route path="/shop/:siteId/product/:productId" element={<StorefrontProduct />} />
+            {/* Fix 2026-05-04 (Sprint 4 Fix 3) — route alias pluriel, harmonisée
+                avec productPath(). Évite le 404 qui redirigeait vers home. */}
+            <Route path="/shop/:siteId/products/:productId" element={<StorefrontProduct />} />
             <Route path="/shop/:siteId/cart" element={<StorefrontCart />} />
             <Route path="/shop/:siteId/checkout" element={<StorefrontCheckout />} />
             <Route path="/shop/:siteId/checkout/success" element={<StorefrontConfirmation />} />
@@ -498,6 +501,12 @@ function PlatformApp() {
               </ProtectedRoute>
             }
           />
+          {/* Alias rétrocompat : les anciens emails/redirects pointent encore
+              vers /admin/google-master. On redirige proprement côté client. */}
+          <Route
+            path="/admin/google-master"
+            element={<Navigate to="/admin/google/master-auth" replace />}
+          />
           <Route
             path="/admin/integrations"
             element={
@@ -543,6 +552,8 @@ function PlatformApp() {
           <Route path="/shop/:siteId/collections" element={<StorefrontCollections />} />
           <Route path="/shop/:siteId/collection/:slug" element={<StorefrontCollection />} />
           <Route path="/shop/:siteId/product/:productId" element={<StorefrontProduct />} />
+          {/* Fix 2026-05-04 (Sprint 4 Fix 3) — alias pluriel harmonisé. */}
+          <Route path="/shop/:siteId/products/:productId" element={<StorefrontProduct />} />
           <Route path="/shop/:siteId/cart" element={<StorefrontCart />} />
           <Route path="/shop/:siteId/checkout" element={<StorefrontCheckout />} />
           <Route path="/shop/:siteId/confirmation" element={<StorefrontConfirmation />} />

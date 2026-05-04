@@ -113,6 +113,7 @@ def _normalize_suggestion(raw: dict) -> Optional[dict]:
 # ─── Routes ──────────────────────────────────────────────────────────────
 
 @router.post("/sites/{site_id}/upsells/suggest")
+@router.post("/sites/{site_id}/upsells/ai-suggest")  # alias cohérent avec /collections/ai-suggest
 async def suggest_upsells(site_id: str, user=Depends(get_current_user)):
     """Analyse le catalogue actif du site et génère 8-10 suggestions d'upsells."""
     await _check_site_access(site_id, user)

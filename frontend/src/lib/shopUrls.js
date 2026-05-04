@@ -36,15 +36,19 @@ function hostFor(site) {
 }
 
 /**
- * Build a RELATIVE URL for a product — respects the current runtime
- * (custom domain → slug only; platform → `/shop/:siteId/product/:slug`).
+ * Build a RELATIVE URL for a product — respects the current runtime.
+ *
+ * Fix 2026-05-04 (Sprint 4 Fix 3) : canonique harmonisée sur `/products/{slug}`
+ * (pluriel) partout. Les routes singulier `/product/{slug}` et les URL avec
+ * UUID sont acceptées en lecture (rétrocompat) mais on génère toujours le
+ * pluriel avec slug en sortie.
  */
 export function productPath(siteId, product) {
   const slug = product?.slug || product?.id;
   if (!slug) return "#";
   const host = typeof window !== "undefined" ? window.location.hostname : "";
   if (isCustomDomainHost(host)) return `/products/${slug}`;
-  return `/shop/${siteId}/product/${slug}`;
+  return `/shop/${siteId}/products/${slug}`;
 }
 
 /** Same for a collection page. */
@@ -71,9 +75,9 @@ export function productCanonicalUrl(site, product, lang /* eslint-disable-line n
   if (!slug) return "";
   const host = hostFor(site);
   if (host) return `https://${host}/products/${slug}`;
-  // Fallback — platform preview
+  // Fallback — platform preview (harmonisé sur pluriel Fix 2026-05-04)
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  return `${origin}/shop/${site?.id}/product/${slug}`;
+  return `${origin}/shop/${site?.id}/products/${slug}`;
 }
 
 export function shopCanonicalUrl(site) {

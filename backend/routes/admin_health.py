@@ -683,12 +683,18 @@ async def _ping_resend() -> dict:
         is_restricted = resp.status_code == 401 and "restricted" in resp.text.lower()
         auth_ok = resp.status_code == 200 or is_restricted
         if not auth_ok:
+            # Fix 2026-05-04 : distinction explicite entre clé absente/révoquée
+            # et erreur serveur Resend, pour que le rapport soit actionnable.
+            reason = "key_invalid_or_revoked" if resp.status_code in (401, 403) else f"http_{resp.status_code}"
             return _result(
                 "resend", "Resend (emails transactionnels)",
                 status="error",
-                message=f"Clé rejetée · HTTP {resp.status_code}",
+                message=f"Clé Resend rejetée · HTTP {resp.status_code} ({reason}) — renouveler sur resend.com",
                 configured_env=True,
+                details={"http_status": resp.status_code, "reason": reason,
+                         "response_snippet": resp.text[:200]},
                 actions=["retest", "configure"],
+                docs_url="https://resend.com/api-keys",
                 duration_ms=dur,
             )
         # Si from = onboarding@resend.dev → sandbox
@@ -708,10 +714,15 @@ async def _ping_resend() -> dict:
         return _result(
             "resend", "Resend (emails transactionnels)",
             status="ok",
-            message=f"Connecté · expéditeur {from_addr or '(non défini)'}",
+            message=(
+                f"Connecté · clé restricted-send · expéditeur {from_addr or '(non défini)'}"
+                if is_restricted else
+                f"Connecté · expéditeur {from_addr or '(non défini)'}"
+            ),
             connected=True,
             configured_env=True,
-            details={"from": from_addr, "key_restricted": is_restricted},
+            details={"from": from_addr, "key_restricted": is_restricted,
+                     "http_status": resp.status_code},
             actions=["test"],
             duration_ms=dur,
         )

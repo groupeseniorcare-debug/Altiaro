@@ -191,7 +191,12 @@ async def _check_mollie() -> Dict[str, Any]:
 
 
 async def _check_resend() -> Dict[str, Any]:
-    return {"ok": bool(os.environ.get("RESEND_API_KEY"))}
+    # Ce helper est un fallback minimal (utilisé par cron/debug interne).
+    # Le vrai ping HTTP live est dans routes/admin_health.py::_ping_resend
+    # (qui discrimine 401 "restricted" vs révocation). Ne pas dupliquer la
+    # logique ici — on renvoie juste "configuré" ou non.
+    return {"ok": bool(os.environ.get("RESEND_API_KEY")),
+            "note": "live check via GET /api/admin/integrations/health"}
 
 
 async def _check_google_master() -> Dict[str, Any]:

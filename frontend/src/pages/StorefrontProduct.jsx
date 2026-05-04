@@ -567,37 +567,89 @@ export function StorefrontProduct() {
                 <DeliveryPaymentInfo price={p.price} currency={p.currency} design={design} lang={lang} />
               </div>
 
-              <div className="mt-8 grid grid-cols-2 gap-2.5" data-testid="product-trust-badges">
-                {[
-                  { Icon: Truck,                  label: t(lang, "trust_free_shipping"), sub: "48–72 h" },
-                  { Icon: ShieldCheck,            label: t(lang, "trust_warranty_2y"),   sub: "Pièces & MO" },
-                  { Icon: ArrowsCounterClockwise, label: t(lang, "trust_returns_14d"),   sub: { fr: "Gratuit", en: "Free", de: "Kostenlos", nl: "Gratis", it: "Gratis", es: "Gratis" }[lang] || "Gratuit" },
-                  { Icon: Headphones,             label: "Conseil dédié",                sub: "Lun–Sam 9h–19h" },
-                ].map((b, i) => (
-                  <div
-                    key={i}
-                    className="p-4 flex items-start gap-3 transition-all hover:translate-y-[-1px]"
-                    style={{
-                      background: "#F5F2EB",
-                      border: "1px solid #E7E5E4",
-                      borderRadius: "2px",
-                    }}
-                  >
-                    <b.Icon size={18} weight="thin" className="mt-[2px] shrink-0" style={{ color: "#0A0A0A" }} />
-                    <div className="min-w-0">
+              {/* Sprint 4 Fix 6 — bandeaux réassurance niche-aware générés par l'IA
+                  dans launch-auto (design.reassurance_badges). Fallback = 4 badges
+                  statiques génériques si le site n'a pas encore été re-launch.
+                  N.B. : on accepte 3 à 6 badges générés (grid s'adapte). */}
+              {Array.isArray(design?.reassurance_badges) && design.reassurance_badges.length >= 3 ? (
+                <div
+                  className="mt-8 grid grid-cols-2 gap-2.5"
+                  data-testid="product-reassurance-badges"
+                  data-badges-source="ai-niche"
+                >
+                  {design.reassurance_badges.slice(0, 6).map((b, i) => {
+                    // Resolve Phosphor icon name → component (fallback ShieldCheck)
+                    const iconMap = {
+                      ShieldCheck, Truck, ArrowsClockwise: ArrowsCounterClockwise,
+                      Phone: Headphones, Heart: Star, Medal: ShieldCheck, Clock: Headphones,
+                      Lightning: CheckCircle, HandHeart: Star, ThumbsUp: CheckCircle,
+                      CheckCircle, Certificate: ShieldCheck,
+                    };
+                    const Icon = iconMap[b.icon] || ShieldCheck;
+                    const title = pickLang(b.title, lang) || pickLang(b.title, "fr") || "";
+                    const subtitle = pickLang(b.subtitle, lang) || pickLang(b.subtitle, "fr") || "";
+                    if (!title) return null;
+                    return (
                       <div
-                        className="text-[14px] leading-tight font-light"
-                        style={{ fontFamily: fontHeading, color: "#0A0A0A" }}
+                        key={i}
+                        className="p-4 flex items-start gap-3 transition-all hover:translate-y-[-1px]"
+                        style={{
+                          background: "#F5F2EB",
+                          border: "1px solid #E7E5E4",
+                          borderRadius: "2px",
+                        }}
                       >
-                        {b.label}
+                        <Icon size={18} weight="thin" className="mt-[2px] shrink-0" style={{ color: "#0A0A0A" }} />
+                        <div className="min-w-0">
+                          <div
+                            className="text-[14px] leading-tight font-light"
+                            style={{ fontFamily: fontHeading, color: "#0A0A0A" }}
+                          >
+                            {title}
+                          </div>
+                          {subtitle && (
+                            <div className="text-[10.5px] mt-1 uppercase tracking-[0.18em]" style={{ color: "#9C8C7C" }}>
+                              {subtitle}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-[10.5px] mt-1 uppercase tracking-[0.18em]" style={{ color: "#9C8C7C" }}>
-                        {b.sub}
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-8 grid grid-cols-2 gap-2.5" data-testid="product-trust-badges" data-badges-source="static-fallback">
+                  {[
+                    { Icon: Truck,                  label: t(lang, "trust_free_shipping"), sub: "48–72 h" },
+                    { Icon: ShieldCheck,            label: t(lang, "trust_warranty_2y"),   sub: "Pièces & MO" },
+                    { Icon: ArrowsCounterClockwise, label: t(lang, "trust_returns_14d"),   sub: { fr: "Gratuit", en: "Free", de: "Kostenlos", nl: "Gratis", it: "Gratis", es: "Gratis" }[lang] || "Gratuit" },
+                    { Icon: Headphones,             label: "Conseil dédié",                sub: "Lun–Sam 9h–19h" },
+                  ].map((b, i) => (
+                    <div
+                      key={i}
+                      className="p-4 flex items-start gap-3 transition-all hover:translate-y-[-1px]"
+                      style={{
+                        background: "#F5F2EB",
+                        border: "1px solid #E7E5E4",
+                        borderRadius: "2px",
+                      }}
+                    >
+                      <b.Icon size={18} weight="thin" className="mt-[2px] shrink-0" style={{ color: "#0A0A0A" }} />
+                      <div className="min-w-0">
+                        <div
+                          className="text-[14px] leading-tight font-light"
+                          style={{ fontFamily: fontHeading, color: "#0A0A0A" }}
+                        >
+                          {b.label}
+                        </div>
+                        <div className="text-[10.5px] mt-1 uppercase tracking-[0.18em]" style={{ color: "#9C8C7C" }}>
+                          {b.sub}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
               {!p.narrative && pickLang(p.description, lang) && (
                 <p

@@ -36,8 +36,14 @@ export function buildHreflangs(site, path) {
  * + primaryLang. Résout la langue au mount avec la priorité :
  *   1. ?lang=xx dans l'URL (si supportée)
  *   2. localStorage "cf_lang_<siteId>" (si supportée)
- *   3. navigator.language.slice(0,2) (si supportée)
- *   4. primary_lang du site (fallback)
+ *   3. primary_lang du site (si supportée) ← Fix 2026-05-04
+ *      RATIONALE : un site premium orienté marchés FR doit s'afficher en FR
+ *      à la première visite, même si le navigateur est en anglais. Le
+ *      visiteur peut toujours basculer via le LanguageSwitcher (choix alors
+ *      persisté en localStorage). navigator.language devient un fallback
+ *      qui ne s'applique que si primary_lang n'est pas dans available_langs.
+ *   4. navigator.language.slice(0,2) (si supportée)
+ *   5. availableLangs[0] (fallback final)
  *
  * setLang() persiste en localStorage + sync query string + émet un event
  * `language_change` vers le tracker analytics (Chantier 7).
@@ -46,11 +52,12 @@ function _detectInitialLang(urlLang, storageLang, availableLangs, primaryLang) {
   const supports = (lg) => !!lg && availableLangs.includes(lg);
   if (supports(urlLang)) return urlLang;
   if (supports(storageLang)) return storageLang;
+  if (supports(primaryLang)) return primaryLang;
   if (typeof navigator !== "undefined") {
     const nav = (navigator.language || "fr").slice(0, 2).toLowerCase();
     if (supports(nav)) return nav;
   }
-  return supports(primaryLang) ? primaryLang : (availableLangs[0] || "fr");
+  return availableLangs[0] || "fr";
 }
 
 function _postLanguageChange(siteId, fromLang, toLang) {

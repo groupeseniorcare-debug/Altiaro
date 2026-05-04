@@ -1010,6 +1010,88 @@ async def _run_launch_inner(job_id: str, site_id: str, user_id: str, wizard: dic
         except Exception as e:
             logger.warning(f"[launch] legal niche adaptation skipped: {str(e)[:160]}")
 
+        # Sprint 4 Fix 6 — Bandeaux réassurance fiche produit, niche-aware.
+        # Idempotent : skip si design.reassurance_badges déjà rempli.
+        # Best-effort : fallback statique 4 badges génériques si l'IA échoue.
+        try:
+            current_badges = (design2.get("reassurance_badges") or [])
+            if not current_badges and not budget_exhausted:
+                niche_for_badges = site2.get("niche") or "e-commerce premium"
+                primary_lang = site2.get("primary_lang") or "fr"
+                from services.llm_resilience import safe_claude_json
+                badges_system = (
+                    "Tu es expert UX copywriter e-commerce premium. Tu rédiges "
+                    "des bandeaux de réassurance courts (max 4 mots chacun) "
+                    f"pour une fiche produit dans la niche « {niche_for_badges} ». "
+                    "Les bandeaux doivent être CONCRETS et spécifiques à la "
+                    "niche (pas génériques). Réponds UNIQUEMENT en JSON valide."
+                )
+                badges_user = (
+                    f"Produis 5 bandeaux réassurance pour la niche « {niche_for_badges} »."
+                    f" Langue principale : {primary_lang}.\n"
+                    "Schéma JSON strict :\n"
+                    "{\n"
+                    "  \"badges\": [\n"
+                    "    {\"icon\": \"ShieldCheck|Truck|Phone|ArrowsClockwise|Heart|Medal|Clock|Lightning|HandHeart|ThumbsUp|CheckCircle|Certificate\", "
+                    "\"title\": {\"fr\":\"...\",\"en\":\"...\",\"de\":\"...\",\"nl\":\"...\"}, "
+                    "\"subtitle\": {\"fr\":\"...\",\"en\":\"...\",\"de\":\"...\",\"nl\":\"...\"}}\n"
+                    "  ]\n"
+                    "}\n"
+                    "Exemples attendus pour fauteuil releveur médical : "
+                    "« Remboursement LPP possible · Sur prescription médicale », "
+                    "« Livraison + installation · Par technicien agréé », "
+                    "« Garantie 3 ans · Pièces incluses », "
+                    "« SAV 7j/7 · Support téléphonique », "
+                    "« Dispositif médical CE · Classe I certifié ».\n"
+                    "Tu DOIS adapter aux spécificités de la niche."
+                )
+                badges_json = await safe_claude_json(
+                    system=badges_system, user=badges_user,
+                    quality_tier="speed",
+                    request_id=f"reassurance-{site_id[:8]}",
+                    timeout=60,
+                )
+                badges_list = (badges_json or {}).get("badges") or []
+                # Validation + sanitize
+                clean_badges = []
+                VALID_ICONS = {
+                    "ShieldCheck", "Truck", "Phone", "ArrowsClockwise", "Heart",
+                    "Medal", "Clock", "Lightning", "HandHeart", "ThumbsUp",
+                    "CheckCircle", "Certificate",
+                }
+                for b in badges_list[:6]:
+                    if not isinstance(b, dict):
+                        continue
+                    icon = b.get("icon") or "ShieldCheck"
+                    if icon not in VALID_ICONS:
+                        icon = "ShieldCheck"
+                    title = b.get("title") or {}
+                    subtitle = b.get("subtitle") or {}
+                    if not isinstance(title, dict):
+                        title = {"fr": str(title)}
+                    if not isinstance(subtitle, dict):
+                        subtitle = {"fr": str(subtitle)}
+                    if title.get(primary_lang):
+                        clean_badges.append({
+                            "icon": icon,
+                            "title": title,
+                            "subtitle": subtitle,
+                        })
+                if len(clean_badges) >= 3:
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    await db.sites.update_one(
+                        {"id": site_id},
+                        {"$set": {
+                            "design.reassurance_badges": clean_badges,
+                            "design.reassurance_badges_niche": niche_for_badges,
+                            "design.reassurance_badges_generated_at": now_iso,
+                        }},
+                    )
+                    logger.info(f"[launch] reassurance_badges generated ({len(clean_badges)}) "
+                                f"for niche '{niche_for_badges}'")
+        except Exception as e:
+            logger.warning(f"[launch] reassurance_badges generation skipped: {str(e)[:160]}")
+
         # 8) Products — narrative + images (biggest step) ------------------
         # Phase 4 — bucket : on tagge "content" pour copywriting et "images"
         # pour les générations Nano Banana (basculé inline ci-dessous).

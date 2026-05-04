@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
 import axios from "axios";
-import { Helmet } from "react-helmet-async";
 import { ChevronDown } from "lucide-react";
 import StorefrontLayout from "../components/StorefrontLayout";
+import SEOHead from "../components/SEOHead";
 import { pickLang, t } from "../lib/i18n";
+import { useShopSiteId } from "../lib/shopSiteId";
+import { useSiteAndLang } from "../components/storefront/storefrontUtils";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -14,34 +15,35 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
  * Lit en priorité `design.faq.items` (renseigné par launch-auto / `_inject_faq`)
  * sinon `design.faq` (legacy array). Affiche chaque item dans un `<details>`
  * accessible et SEO-friendly + JSON-LD FAQPage.
+ *
+ * Compatible custom domain (useShopSiteId hydrate siteId depuis le host).
  */
 export default function StorefrontFAQ() {
-  const { siteId } = useParams();
-  const [site, setSite] = useState(null);
-  const [lang, setLang] = useState("fr");
+  const siteId = useShopSiteId();
+  const { site: siteFromContext, design: designFromContext, lang, setLang, availableLangs } = useSiteAndLang();
+  const [site, setSite] = useState(siteFromContext || null);
   const [openIdx, setOpenIdx] = useState(null);
 
+  // useSiteAndLang hydrate le contexte — on le synchronise localement pour
+  // pouvoir aussi tomber back sur un GET public direct si besoin.
   useEffect(() => {
+    if (siteFromContext) { setSite(siteFromContext); return; }
     if (!siteId) return;
     axios
       .get(`${BACKEND_URL}/api/public/sites/${siteId}`)
-      .then((r) => {
-        setSite(r.data || null);
-        const loc = (r.data?.primary_locale || "fr-FR").toLowerCase().split("-")[0];
-        setLang(loc);
-      })
+      .then((r) => setSite(r.data || null))
       .catch(() => setSite(null));
-  }, [siteId]);
+  }, [siteId, siteFromContext]);
 
   if (!site) {
     return (
       <div style={{ padding: "4rem 1rem", textAlign: "center" }}>
-        <p>{t(lang, "loading") || "Chargement…"}</p>
+        <p>{t(lang || "fr", "loading") || "Chargement…"}</p>
       </div>
     );
   }
 
-  const design = site.design || {};
+  const design = designFromContext || site.design || {};
   const faqRaw = design.faq;
   let items = [];
   if (Array.isArray(faqRaw?.items)) items = faqRaw.items;
@@ -78,21 +80,16 @@ export default function StorefrontFAQ() {
       design={design}
       lang={lang}
       setLang={setLang}
-      availableLangs={site.available_languages || ["fr", "en", "de", "nl", "it", "es"]}
+      availableLangs={availableLangs || site.available_languages || ["fr", "en", "de", "nl", "it", "es"]}
     >
-      <Helmet>
-        <title>{pageTitle}</title>
-        <meta name="description" content={description} />
-        <link
-          rel="canonical"
-          href={`${typeof window !== "undefined" ? window.location.origin : ""}/shop/${siteId}/faq`}
-        />
-        {jsonLd.mainEntity.length > 0 && (
-          <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
-        )}
-      </Helmet>
+      <SEOHead
+        title={pageTitle}
+        description={description}
+        canonical={typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}` : undefined}
+        schema={jsonLd.mainEntity.length > 0 ? jsonLd : undefined}
+      />
 
-      <main className="max-w-3xl mx-auto px-4 py-12 lg:py-20">
+      <main className="max-w-3xl mx-auto px-4 py-12 lg:py-20" data-testid="storefront-faq-page">
         <header className="mb-10 lg:mb-14 text-center">
           <h1 className="text-4xl lg:text-5xl font-serif font-semibold text-stone-900 leading-tight mb-4">
             {t(lang, "faq_title") || "Questions fréquentes"}
@@ -104,7 +101,7 @@ export default function StorefrontFAQ() {
         </header>
 
         {items.length === 0 ? (
-          <p className="text-stone-500 text-center py-16">
+          <p className="text-stone-500 text-center py-16" data-testid="faq-empty">
             {t(lang, "faq_empty") ||
               "Aucune question pour le moment. Contactez-nous, nous vous répondons sous 24h."}
           </p>
@@ -114,6 +111,7 @@ export default function StorefrontFAQ() {
               const q = pickLang(it.q || it.question, lang) || "";
               const a = pickLang(it.a || it.answer, lang) || "";
               const isOpen = openIdx === idx;
+              if (!q || !a) return null;
               return (
                 <details
                   key={idx}
