@@ -188,7 +188,7 @@ Voir `/app/memory/test_credentials.md`.
 | **R1** | Budget LLM Emergent à 100,04 % ($118.04/$118.00) — toute génération bloquée | 🔴 Bloquant — recharger Emergent |
 | **R2** | Refresh token Google Master expiré (`invalid_grant`) — bloque GSC/GMC/Ads | 🔴 Bloquant — reconnecter + passer GCP en Production |
 | **R3** | Pinterest token 401 — scopes write absents OU PAT révoqué | 🟠 Bloquant publisher |
-| **R4** | ~~Pas de routing UA-based Edge-level~~ — **résolu Phase 1** : `backend/prerender_routing_middleware.py` intercepte 23 bots/LLM crawlers et sert le HTML prerender avant que le SPA React ne charge | ✅ Résolu |
+| **R4** | **Routing UA-based Edge-level — partiellement résolu Phase 1.1** : code middleware FastAPI livré (`prerender_routing_middleware.py`) ET fonctionnel en local + self-hosted. ⚠️ Inopérant en preview Emergent (l'ingress route `/*` → CRA dev server :3000, jamais vers FastAPI :8001 sauf `/api/*`). Le middleware est désactivé par défaut via feature flag `ENABLE_UA_ROUTING_MIDDLEWARE=0`. Le mécanisme canonique de SSR pour bots reste `robots.smart.txt` qui pointe vers `/api/seo/prerender/...` (couvre Googlebot, Bingbot, GPTBot, ClaudeBot, PerplexityBot, CCBot — la quasi-totalité des bots respectueux). | 🟡 Partiellement résolu (feature flag self-hosted) |
 | **R5** | Coût LLM par site ~$5-8 (vs $25-30 annoncé initialement) — 15 sites/mois maxi avec budget actuel | 🟡 À mesurer empiriquement |
 | **R6** | `FEATURED_API_KEY` absente — worker idle | 🟡 Pipeline press inactif |
 | **R7** | ~~Comparisons / top-lists / blog non prerenderés côté SSR~~ — **résolu Phase 1** : 5 nouveaux types ajoutés (comparison, top_list, longtail, blog, collection). Sitemap-prerender passe de 62 → 97 URLs sur Altea. | ✅ Résolu |

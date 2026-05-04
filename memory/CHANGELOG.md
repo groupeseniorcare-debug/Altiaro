@@ -1,6 +1,97 @@
 # Altiora — CHANGELOG
 
 
+## 2026-05-04 · Phase 1.1 — Correctifs (Approximated forward + UA-routing flag + headers)
+
+> **Scope strict, aucune génération LLM, aucun appel Google API.**
+
+### 🔴 Incident résolu — `altea-home.com` était inaccessible publiquement
+
+**Constat** : `https://altea-home.com/*` retournait `200 OK` + `Content-Length: 0` pour tous les paths, y compris `/api/health`. Diagnostic via `services.approximated_provisioning.list_vhosts` :
+- Le vhost `altea-home.com` n'existait PAS côté Approximated.
+- Seul un vhost `www.altea-home.com` existait, avec `target_address: https://altea-home.com` (boucle vers néant).
+- Conséquence : l'edge Caddy d'Approximated répondait au DNS mais ne savait pas où forward → réponse vide.
+
+**Réparation** :
+1. DELETE `www.altea-home.com` (boucle).
+2. POST `altea-home.com` avec la combinaison vérifiée empiriquement :
+   - `target_address: commerce-builder-21.preview.emergentagent.com` (**sans** préfixe `https://` — avec, Cloudflare en aval renvoie « 400 The plain HTTP request was sent to HTTPS port »)
+   - `target_ports: "443"` (string littérale, pas l'alias `"https"` qui force un comportement différent)
+   - `keep_host: false` (sinon Cloudflare bloque sur Host ≠ TLS SNI)
+   - `redirect_www: true` (Approximated provisionne automatiquement le `www.` en 301)
+3. SSL Let's Encrypt re-provisionné automatiquement (~25 sec).
+
+**Vérification post-fix (live)** :
+- `curl https://altea-home.com/api/health` → `{"status":"ok"}` (200, 42 bytes) ✅
+- `curl https://altea-home.com/` → SPA React (200, 7794 bytes, `<div id="root">` + 6 bundles JS) ✅
+- `curl https://altea-home.com/api/seo/prerender/{altea}?path=/about` → 200, 5054 bytes, h1 = « Altea — L'art de vivre debout, assis » + meta description ✅
+- `curl https://altea-home.com/api/public/sites/{altea}/sitemap-prerender.xml` → 200, 135 URLs (16 comparisons + 21 blog + 2 collections + glossary + buyer-guides + top-lists + products + home + about) ✅
+- `apx_hit=True is_resolving=True has_ssl=True ready=True status=ACTIVE_SSL` ✅
+
+### `backend/services/approximated_provisioning.py::create_vhost` — convention figée
+Le helper a été corrigé pour matcher la combinaison gagnante :
+- Strip automatique du préfixe `http://` / `https://` du `target_address` si présent (compatible avec `APPROXIMATED_TARGET_HOST` mal renseigné).
+- Normalisation des alias `https`/`http` → `"443"`/`"80"` (string littérale).
+- `keep_host=False` par défaut explicite (était `None` → comportement Approximated par défaut variable).
+- Docstring enrichie avec le détail empirique (1 paragraphe documentant l'incident et les 3 erreurs à éviter).
+
+### Headers `X-Prerender` normalisés (convention universelle)
+Avant Phase 1.1, deux émetteurs avec valeurs incohérentes :
+- `routes/prerender.py` → `X-Prerender: altiaro` ❌
+- `prerender_routing_middleware.py` → `X-Prerender: 1` + `X-Prerender-By: altiaro-edge` ❌ (clé `By` non standard)
+
+Après Phase 1.1, harmonisation universelle :
+- **`X-Prerender: 1`** (clé active, convention Prerender.io)
+- **`X-Prerender-Source: altiaro-edge`** (signature)
+
+Les deux émetteurs utilisent désormais exactement ces deux headers. `grep -rn "X-Prerender" backend/` retourne 5 lignes, toutes alignées.
+
+### Feature flag `ENABLE_UA_ROUTING_MIDDLEWARE`
+Le middleware UA-routing créé en Phase 1 est codé correctement et fonctionne en local FastAPI direct. Mais dans l'archi preview Emergent (ingress qui route `/api/*` → :8001 et `/*` → :3000), il ne reçoit jamais les requêtes vers les paths SPA — donc ineffective pour les bots qui tapent `https://altea-home.com/products/...`.
+
+**Décision** :
+- Le mount du middleware est **conditionnel** sur `os.environ.get("ENABLE_UA_ROUTING_MIDDLEWARE", "0") == "1"`.
+- Par défaut en preview : `0` → middleware désactivé. Log INFO au boot : « [middleware] prerender_routing UA-edge DISABLED ... ineffective in preview Emergent infra anyway ».
+- En self-hosted ou Production avec reverse-proxy custom où FastAPI est en première ligne sur `/*` : passer à `1`.
+- `.env.example` documenté avec un commentaire explicite (10 lignes).
+
+### Mécanisme principal de SSR pour bots = `robots.smart.txt`
+Confirmation honnête du modèle de fonctionnement actuel :
+1. Bot tape `https://altea-home.com/robots.txt` (ou `robots.smart.txt`).
+2. Reçoit une directive ciblée par UA pointant vers `Sitemap: https://altea-home.com/api/public/sites/{site_id}/sitemap-prerender.xml`.
+3. Lit le sitemap (135 URLs) qui pointe chaque page sur `https://altea-home.com/api/seo/prerender/{site_id}?path=/...`.
+4. Tape ces URLs `/api/*` qui atterrissent sur FastAPI → renderers Phase 1 → HTML hydraté avec headers `X-Prerender: 1` + `X-Prerender-Source: altiaro-edge`.
+
+**Couverture** : Googlebot, Bingbot, GPTBot, ChatGPT-User, ClaudeBot, Claude-Web, PerplexityBot, CCBot, Google-Extended, Applebot, FacebookExternalHit, Twitterbot, LinkedInBot, etc. — la quasi-totalité des bots qui respectent `robots.txt`.
+
+**Cas marginal non couvert** : bots scrapeurs sauvages qui ignorent `robots.txt` et tapent directement `/products/xxx` sur le SPA. Non critique pour SEO/AEO mainstream (les indexeurs majeurs respectent tous robots.txt).
+
+### Documentation
+- `memory/PRD.md` : R4 reclassifié 🟡 « Partiellement résolu (feature flag self-hosted) » au lieu de ✅ Résolu. Section « Notes architecture » Phase 1 conservée mais enrichie.
+- `memory/CHANGELOG.md` : présente entrée.
+- `.env.example` : section UA-routing middleware ajoutée (10 lignes commentées).
+
+### Tests d'acceptation 6/6 PASS
+| # | Test | Résultat |
+|---|---|---|
+| 1 | `Googlebot https://altea-home.com/api/health` | 200, 42 octets, body `{"status":"ok"}` ✅ |
+| 2 | `Googlebot https://altea-home.com/api/seo/prerender/{altea}?path=/about` | 200, 5054 octets, `X-Prerender:1` + `X-Prerender-Source:altiaro-edge`, h1 + meta desc ✅ |
+| 3 | `Googlebot https://altea-home.com/api/public/sites/{altea}/robots.smart.txt` | 200, 2828 octets ✅ |
+| 4 | `Googlebot https://altea-home.com/api/public/sites/{altea}/sitemap-prerender.xml` | 200, 135 URLs ✅ |
+| 5 | `Chrome https://altea-home.com/` | 200, 7794 octets SPA, **pas** de X-Prerender ✅ |
+| 6 | `Googlebot https://altea-home.com/api/seo/prerender/{altea}?path=/comparisons/{slug}` | 200, 34484 octets, `X-Prerender:1` ✅ |
+
+### Confirmations finales
+- **Aucune génération LLM déclenchée.** Pipeline prerender = lecture MongoDB + transformation HTML pure.
+- **Aucun appel Google API déclenché.**
+- **Backend redémarré 2 fois** (incorporation feature flag + nettoyage create_vhost). 24 jobs APScheduler actifs, OpenAPI à 404 endpoints.
+
+### Incohérences signalées hors scope
+- L'API Approximated retourne un 422 « already been created » + 404 sur `get_vhost_status` immédiatement après suppression — la propagation interne de leur API prend ~6-8 secondes. Le retry implicit dans `delete_vhost` + sleep avant re-create n'est pas systématique côté `services/approximated_provisioning.py` ; le bug originel d'Altea (`www.altea-home.com` boucle) avait été causé par ce timing à un re-provisioning antérieur. Recommandation : ajouter un retry-with-backoff dans `create_vhost` quand on reçoit un 422 fantôme. Hors scope, à traiter en Phase 2 si pertinent.
+
+---
+
+
 ## 2026-05-04 · Phase 1 — SSR Coverage + UA Routing Edge
 
 > **Scope strict, aucune génération LLM, aucun appel Google API.**

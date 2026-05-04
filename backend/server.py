@@ -1143,14 +1143,32 @@ cors_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
 from custom_domain_middleware import custom_domain_rewrite  # noqa: E402
 app.middleware("http")(custom_domain_rewrite)
 
-# UA-routing edge-level (Phase 1 — 2026-05-04) :
+# UA-routing edge-level (Phase 1 — 2026-05-04, mis derrière feature flag en 1.1) :
 # intercepte les bots SEO/LLM sur paths indexables et sert le HTML prerender
 # AVANT que custom_domain_rewrite ne préfixe /shop/{site_id}/. Pas d'impact
-# pour les utilisateurs humains. Doit être appliqué APRÈS custom_domain
-# côté ordre de déclaration pour s'exécuter EN PREMIER (Starlette empile
-# les middlewares LIFO : last-added = first-executed).
-from prerender_routing_middleware import prerender_routing  # noqa: E402
-app.middleware("http")(prerender_routing)
+# pour les utilisateurs humains.
+#
+# ⚠️ Limitation infra preview Emergent : l'ingress Kubernetes route
+# `/api/*` → :8001 (FastAPI) et `/*` → :3000 (CRA dev server). Les requêtes
+# bots vers `/`, `/about`, `/products/...` n'atterrissent JAMAIS sur FastAPI
+# en preview, donc le middleware est inopérant pour les paths SPA. Le pipe
+# canonique de SSR reste `robots.smart.txt` qui pointe les bots vers
+# `/api/seo/prerender/...` (couvre Googlebot, Bingbot, GPTBot, ClaudeBot,
+# PerplexityBot, CCBot — la quasi-totalité des bots respectueux).
+#
+# Le middleware reste utile en self-hosted (ou déploiement Production avec
+# reverse-proxy custom où FastAPI est en première ligne sur tous les paths).
+# Active via env `ENABLE_UA_ROUTING_MIDDLEWARE=1`.
+if os.environ.get("ENABLE_UA_ROUTING_MIDDLEWARE", "0").strip() in ("1", "true", "True"):
+    from prerender_routing_middleware import prerender_routing  # noqa: E402
+    app.middleware("http")(prerender_routing)
+    logger.info("[middleware] prerender_routing UA-edge ENABLED")
+else:
+    logger.info(
+        "[middleware] prerender_routing UA-edge DISABLED "
+        "(set ENABLE_UA_ROUTING_MIDDLEWARE=1 to activate ; "
+        "ineffective in preview Emergent infra anyway)"
+    )
 
 # Wildcard mode with credentials: use allow_origin_regex to echo request origin
 # (Starlette refuses to send ACAO:<origin> when allow_origins=["*"] and credentials=True,

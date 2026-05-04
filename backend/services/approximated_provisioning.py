@@ -115,17 +115,47 @@ async def create_vhost(
 
     Idempotent: if a vhost already exists with the same incoming address, we
     fetch and return its current state (status 200) instead of erroring.
+
+    Convention vérifiée empiriquement le 2026-05-04 (post-incident
+    altea-home.com — voir CHANGELOG Phase 1.1) :
+      - `target_address` : hostname seul, **sans** préfixe `https://` (avec
+        le préfixe + ports=443, l'edge Cloudflare en aval renvoie « 400 The
+        plain HTTP request was sent to HTTPS port » → forward cassé).
+      - `target_ports` : la string littérale `"443"` (avec `"https"`,
+        Approximated renvoie 301 sur l'origin sans body utile).
+      - `keep_host=False` : Approximated réécrit le Host avec le target_address
+        avant le forward (Cloudflare en aval accepte). Le Host original
+        `altea-home.com` reste lu côté Altiaro via `Apx-Incoming-Host` ou
+        `X-Forwarded-Host` (`custom_domain_middleware.py` les reconnaît
+        en priorité).
+      - `redirect_www=True` : Approximated provisionne aussi un vhost `www.`
+        avec un 301 vers l'apex (cohérent avec le DNS OVH `www` push auto).
     """
     target = target or TARGET_HOST
     target_ports = target_ports or TARGET_PORT
+
+    # IMPORTANT : ne pas préfixer https:// (cf. docstring). Si appelant en
+    # passe un, on le strip pour ne pas casser le forward TLS.
+    if target.startswith(("http://", "https://")):
+        target = target.split("://", 1)[1]
+    target = target.rstrip("/")
+
+    # IMPORTANT : pas d'alias `https`/`http` ; Approximated attend la string
+    # littérale du port. On normalise les alias les plus courants.
+    if str(target_ports) == "https":
+        target_ports = "443"
+    elif str(target_ports) == "http":
+        target_ports = "80"
+
     payload = {
         "incoming_address": domain,
         "target_address": target,
-        "target_ports": target_ports,
+        "target_ports": str(target_ports),
         "redirect_www": redirect_www,
     }
-    if keep_host is not None:
-        payload["keep_host"] = bool(keep_host)
+    # Default explicite keep_host=False (Cloudflare-friendly) si non spécifié.
+    payload["keep_host"] = bool(keep_host) if keep_host is not None else False
+
     code, body = await _request("POST", "/vhosts", json=payload)
     if code in (200, 201):
         data = (body or {}).get("data") if isinstance(body, dict) else None

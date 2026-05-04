@@ -848,5 +848,9 @@ async def prerender(
             "/comparisons/{slug} (alias /compare/), /top-lists/{slug} (alias /top/), "
             "/longtail/{slug}, /blog/{slug}, /collections/{slug})",
         )
-    headers = {"Cache-Control": "public, max-age=300", "X-Prerender": "altiaro"}
+    headers = {
+        "Cache-Control": "public, max-age=300",
+        "X-Prerender": "1",
+        "X-Prerender-Source": "altiaro-edge",
+    }
     return HTMLResponse(content=body, headers=headers)

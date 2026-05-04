@@ -128,7 +128,7 @@ async def prerender_routing(request, call_next):
         content=body,
         headers={
             "X-Prerender": "1",
-            "X-Prerender-By": "altiaro-edge",
+            "X-Prerender-Source": "altiaro-edge",
             "Cache-Control": "public, max-age=300, s-maxage=300",
             "Vary": "User-Agent",
         },
