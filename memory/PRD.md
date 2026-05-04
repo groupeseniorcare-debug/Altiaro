@@ -195,6 +195,7 @@ Voir `/app/memory/test_credentials.md`.
 | **R8** | Step `pages` orphelin | ✅ Résolu Phase 0 |
 | **R9** | About/Team incohérent sur Altea (`team_members=0`, `about_rich` absent) | 🟡 Script dry-run prêt pour Phase 2 |
 | **R10** | Champ `alt_texts` produit non visible | ✅ Résolu Phase 0 (stocké dans `generated_images[].alt_text`) |
+| **R11** | **Cloudflare frontstage Emergent injecte `X-Robots-Tag: noindex, nofollow`** sur 100 % des réponses HTTP des domaines preview ET de leurs custom domains forwardés (ex `altea-home.com` via Approximated). Source : règle infra Cloudflare au niveau du compte Emergent preview, **pas** notre code (`grep backend/ "noindex\|robots-tag"` = 0). HTML prerender lui-même reste 100 % propre (aucun `<meta name="robots">` injecté). **Impact SEO : aucune indexation Googlebot/Bingbot/etc. tant que ce header est présent → bloqueur PHASE 2 GO-LIVE.** Non résolvable côté code Altiaro. Résolutions possibles : (A recommandée) déploiement Production Emergent — les domaines Production ne portent pas la règle ; (B) response-header rule côté Approximated.app pour strip/override `X-Robots-Tag` (à vérifier dans leur dashboard) ; (C) Page/Transform Rule Cloudflare via accès admin Emergent ; (D) self-hosted (long terme). Action attendue : utilisateur passe le projet en Production Emergent. | 🔴 Bloquant Phase 2 — action infra utilisateur |
 
 ## Notes architecture (Phase 1 — 2026-05-04)
 

@@ -89,6 +89,43 @@ Confirmation honnête du modèle de fonctionnement actuel :
 ### Incohérences signalées hors scope
 - L'API Approximated retourne un 422 « already been created » + 404 sur `get_vhost_status` immédiatement après suppression — la propagation interne de leur API prend ~6-8 secondes. Le retry implicit dans `delete_vhost` + sleep avant re-create n'est pas systématique côté `services/approximated_provisioning.py` ; le bug originel d'Altea (`www.altea-home.com` boucle) avait été causé par ce timing à un re-provisioning antérieur. Recommandation : ajouter un retry-with-backoff dans `create_vhost` quand on reçoit un 422 fantôme. Hors scope, à traiter en Phase 2 si pertinent.
 
+### Diagnostic post-livraison — X-Robots-Tag Cloudflare (NOT_OUR_CODE)
+
+Investigation déclenchée par `e1_tester` qui a constaté `x-robots-tag: noindex, nofollow` sur `/api/seo/prerender/{altea}?path=/about`.
+
+**Conclusion** :
+- Header injecté par **Cloudflare frontstage Emergent preview**, PAS par notre code.
+- Preuves : `grep -rni "noindex\|robots-tag\|robots_tag" backend/` = **0 occurrence**. Test `localhost:8001` (FastAPI direct, sans proxy) → header **absent**. Test `*.preview.emergentagent.com` → header présent, `server: cloudflare`, `cf-ray: 9f66c4015ceea068-ORD`. Test `altea-home.com` → header présent, `server: cloudflare`, `cf-ray: 9f66c4035833d6bc-IAD` (Approximated propage tel quel).
+- Présent sur **100 % des paths** (`/`, `/about`, `/products/*`, `/comparisons/*`) et de toutes les méthodes/UA.
+- HTML prerender lui-même reste **100 % propre** (aucun `<meta name="robots">`, aucun `noindex` dans le body).
+- Aucun lien avec `site.status` (le tag est posé en amont de FastAPI, indépendamment de la DB).
+- Pages internes `/cart`, `/checkout`, `/account/`, `/api/` correctement protégées via `Disallow` dans `robots.smart.txt` (cohérent).
+- Comportement standard Emergent preview, attendu pour empêcher l'indexation des sandboxes dev sous `*.preview.emergentagent.com`.
+
+**Bloqueur Phase 2** : Altea ne pourra pas être indexé tant qu'on reste sur preview. Le header HTTP `X-Robots-Tag` prime sur le contenu HTML aux yeux de Googlebot/Bingbot.
+
+**Actions** :
+- Fix infra côté utilisateur requis (passage **Production Emergent** recommandé, voir R11 dans PRD pour les 4 options).
+- Risque ajouté en `R11` dans `memory/PRD.md`.
+- Note ajoutée en tête de `.env.example` pour clarifier la différence Preview vs Production.
+- **Aucune modification de code Altiaro effectuée** (et aucune n'est faisable côté code applicatif).
+
+---
+
+## 🏁 Phase 1 COMPLÈTE — récapitulatif
+
+| Sous-phase | Statut | Détail |
+|---|---|---|
+| Phase 1.0 (couverture SSR) | ✅ Validée 6/6 tests | 5 nouveaux renderers prerender, sitemap 97→135 URLs, séquelles Phase 0 résolues |
+| Phase 1.1 (correctifs) | ✅ Validée 6/6 tests | `altea-home.com` restauré (Approximated reprovisionné), headers `X-Prerender` normalisés, feature flag `ENABLE_UA_ROUTING_MIDDLEWARE` |
+| Diagnostic X-Robots-Tag | ✅ Documenté | NOT_OUR_CODE — Cloudflare frontstage preview ; bloqueur Phase 2 documenté en R11 |
+
+**Prérequis utilisateur avant Phase 2 (go-live)** :
+1. 🔴 Passer le projet Emergent en mode **Production** (lève le `X-Robots-Tag: noindex` Cloudflare).
+2. 🔴 Reconnecter Google Master OAuth + passer l'app GCP en mode **Production** (lève le `invalid_grant` qui bloque GSC/GMC/Ads, voir `memory/GOOGLE_OAUTH_PRODUCTION_SETUP.md`).
+3. 🟠 Recharger le crédit Emergent LLM (budget à 100,04 % — bloque toute génération nouvelle, dont la régénération About/Team via `backend/scripts/regenerate_about_team.py`).
+4. 🟠 Pinterest PAT avec scopes `boards:write`+`pins:write` + `FEATURED_API_KEY` (bloquent les workers marketing off-page).
+
 ---
 
 
