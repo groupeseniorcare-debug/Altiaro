@@ -398,12 +398,25 @@ async def verify_domain(site_id: str, user: dict = Depends(get_current_user)):
                 }
             },
         )
+        # Auto-provision Google Search Console (idempotent, best-effort).
+        # Ajoute la Domain property + soumet le sitemap. Ne bloque jamais
+        # la réponse de /verify si le master OAuth est en panne.
+        try:
+            from services.gsc_provisioning import provision_for_site as _gsc_provision
+            gsc_report = await _gsc_provision(site_id)
+            logger.info(f"[verify_domain] GSC auto-provision site={site_id} ok={gsc_report.get('ok')} reason={gsc_report.get('reason','')}")
+        except Exception as _gsc_err:
+            logger.warning(f"[verify_domain] GSC auto-provision failed (non-blocking) site={site_id}: {str(_gsc_err)[:200]}")
+            gsc_report = {"ok": False, "reason": "exception", "error": str(_gsc_err)[:200]}
+    else:
+        gsc_report = None
 
     return {
         "domain": domain,
         "verified": verified,
         "status": status,
         "provisioning": report,
+        "gsc": gsc_report,
         "checked_at": _now_iso(),
     }
 

@@ -54,9 +54,31 @@ Pour l'instant, **single-tenant + skip verification = OK**.
 1. Aller sur `https://altiaro.com/admin/google-master` -> Reconnect
 2. Authoriser tous les scopes
 3. Persister
-4. Test : `python3 -c "import asyncio; from services.google_oauth_health import google_master_health_tick; print(asyncio.run(google_master_health_tick()))"`
-5. Attendre **>7j** et re-tester. Si `{ok: True}` apres 8j -> probleme resolu.
-6. Le cron `google_oauth_health` (toutes les 6h) creera une `admin_notifications` si jamais le token re-expire.
+4. Test rapide :
+   ```bash
+   cd /app/backend && python3 -c "import asyncio; from services.google_oauth_health import google_master_health_tick; print(asyncio.run(google_master_health_tick()))"
+   ```
+   Attendu : `{"ok": True, ...}`.
+5. Test GSC auto-provision (Altea) :
+   ```bash
+   cd /app/backend && python3 -c "
+   import asyncio, os
+   from dotenv import load_dotenv; load_dotenv('/app/backend/.env')
+   from services.gsc_provisioning import provision_for_site
+   print(asyncio.run(provision_for_site('6867223e-7ea5-45a7-815a-300cd89b7656')))"
+   ```
+   Attendu apres reconnect : `{"ok": True, "property": {...}, "sitemap": {"ok": True, ...}}`.
+6. Attendre **>7j** et re-tester `google_master_health_tick`. Si `{ok: True}` apres 8j -> probleme resolu definitivement (mode Production).
+7. Le cron `google_oauth_health` (toutes les 6h) cree une `admin_notifications` si le token re-expire (filet de securite).
+
+## Auto-cablage cote Altiaro (deja en place)
+
+- A chaque `POST /api/sites/{id}/domain/verify` qui passe `verified=True`, le service `provision_for_site(site_id)` est appele en best-effort.
+- Idempotent (Google retourne `409 already exists` -> traite comme succes).
+- Sitemap soumis automatiquement : `https://{domain}/sitemap.xml`.
+- Persiste `gsc_property_created=true` + `gsc_sitemap_submitted_at` sur le site.
+- En cas de `invalid_grant`, l'erreur est loguee mais ne bloque pas la reponse de `verify` (le hook GMC/Approximated reste OK).
+- Endpoints admin manuels : `POST /api/admin/sites/{id}/gsc/provision` (relance) + `GET /api/admin/sites/{id}/gsc/status`.
 
 ## Notes
 

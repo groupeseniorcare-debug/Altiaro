@@ -116,6 +116,8 @@ from routes import gmc_onboarding_status as gmc_onboarding_status_routes  # GMC 
 from routes import marketing_offpage as marketing_offpage_routes  # Pinterest / Annuaires / HARO
 from routes import prerender as prerender_routes  # Dynamic Rendering pour bots
 from routes import robots_smart as robots_smart_routes  # robots.txt + sitemap-prerender
+from routes import admin_integrations_health as admin_integrations_health_routes  # token-swap Pinterest/Featured
+from routes import gsc_provisioning_admin as gsc_provisioning_admin_routes  # GSC auto-provision admin
 
 logging.basicConfig(
     level=logging.INFO,
@@ -219,6 +221,8 @@ api.include_router(gmc_onboarding_status_routes.router)  # GMC onboarding status
 api.include_router(marketing_offpage_routes.router)  # Marketing off-page (Pinterest/Annuaires/HARO)
 api.include_router(prerender_routes.router)  # Dynamic Rendering — /api/seo/prerender/{site_id}
 api.include_router(robots_smart_routes.router)  # robots.smart.txt + sitemap-prerender.xml
+api.include_router(admin_integrations_health_routes.router)  # Token-swap Pinterest/Featured
+api.include_router(gsc_provisioning_admin_routes.router)  # GSC provision + status admin
 
 # IMPORTANT — Routes /legal/* HTML server-side : montées DIRECTEMENT sur `app`
 # (pas sur le router /api). Sur le preview Kubernetes l'ingress route /legal/*

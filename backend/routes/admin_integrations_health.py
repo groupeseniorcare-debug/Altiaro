@@ -1,8 +1,11 @@
-"""Admin token-swap endpoints + health-checks d'integrations.
+"""Admin token-swap endpoints pour intégrations off-OAuth.
 
 POST /api/admin/integrations/pinterest/update-token
 POST /api/admin/integrations/featured/update-key
-GET  /api/admin/integrations/health
+
+NOTE: GET /admin/integrations/health est servi par routes/admin_health.py
+(plus complet, 10 intégrations). On ne le redéclare PAS ici pour éviter le
+conflit FastAPI.
 """
 from __future__ import annotations
 
@@ -126,7 +129,7 @@ async def featured_update_key(body: FeaturedKeyIn,
     return {"valid": True, "persisted": True}
 
 
-# ---- Health overview ----------------------------------------------------
+# ---- Helpers (réservés pour usage interne / cron) -----------------------
 async def _check_pinterest() -> Dict[str, Any]:
     tok = os.environ.get("PINTEREST_APP_SECRET")
     if not tok:
@@ -211,19 +214,6 @@ INTEGRATIONS = [
 ]
 
 
-@router.get("/admin/integrations/health")
-async def integrations_health(user: dict = Depends(get_current_user)):
-    _require_admin(user)
-    out: List[Dict[str, Any]] = []
-    for slug, label, fn, url in INTEGRATIONS:
-        try:
-            res = await fn()
-        except Exception as e:
-            res = {"ok": False, "error": str(e)[:120]}
-        out.append({
-            "slug": slug, "label": label,
-            "ok": bool(res.get("ok")),
-            "detail": res,
-            "reconnect_url": url,
-        })
-    return {"items": out, "checked_at": datetime.now(timezone.utc).isoformat()}
+# Note: GET /admin/integrations/health est exposé par routes/admin_health.py
+# (registry _PING_REGISTRY plus riche). Les helpers ci-dessus restent
+# disponibles pour usage interne / cron / debug uniquement.
