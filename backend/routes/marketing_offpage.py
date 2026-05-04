@@ -57,26 +57,43 @@ class PinterestActivate(BaseModel):
     enabled: bool = True
 
 
+@router.post("/sites/{site_id}/marketing/pinterest/enable")
+async def pinterest_enable(site_id: str, user: dict = Depends(get_current_user)):
+    """Toggle ON : crée le board s'il n'existe pas + publie premier batch 20 pins."""
+    await _check(site_id, user)
+    if not (os.environ.get("PINTEREST_APP_ID") and os.environ.get("PINTEREST_APP_SECRET")):
+        raise HTTPException(424, detail={"error": "missing_pinterest_credentials"})
+    return await pinterest_publisher.publish_first_batch(site_id, max_pins=20)
+
+
+@router.post("/sites/{site_id}/marketing/pinterest/disable")
+async def pinterest_disable(site_id: str, delete_board: bool = False,
+                            user: dict = Depends(get_current_user)):
+    await _check(site_id, user)
+    return await pinterest_publisher.disable_for_site(site_id, delete_board=delete_board)
+
+
 @router.get("/sites/{site_id}/marketing/pinterest/status")
 async def pinterest_status(site_id: str, user: dict = Depends(get_current_user)):
     site = await _check(site_id, user)
     pl = await db.platform_settings.find_one({"key": "pinterest"}) or {}
     site_pin = (site.get("marketing") or {}).get("pinterest") or {}
     creds_set = bool(os.environ.get("PINTEREST_APP_ID") and os.environ.get("PINTEREST_APP_SECRET"))
+    api_ok = await pinterest_publisher.is_configured() if creds_set else False
+    pins_count = await db.pinterest_pins.count_documents({"site_id": site_id}) if site_pin else 0
     return {
         "site_id": site_id,
         "app_credentials_configured": creds_set,
+        "api_reachable": api_ok,
         "platform_oauth_connected": bool(pl.get("connected")),
-        "site_auto_publish": bool(site_pin.get("auto_pin")),
+        "site_auto_publish": bool(site_pin.get("enabled") or site_pin.get("auto_pin")),
         "board_id": site_pin.get("board_id"),
+        "board_url": site_pin.get("board_url"),
+        "board_name": site_pin.get("board_name"),
         "pins_published": site_pin.get("pins_published", 0),
+        "pins_count_db": pins_count,
         "last_pin_at": site_pin.get("last_pin_at"),
-        "note": (
-            "OAuth Pinterest non implementé (stub). Active le toggle pour "
-            "persister la préférence ; les pins seront publiés dès que les "
-            "vars PINTEREST_APP_ID/APP_SECRET seront set ET que l'OAuth sera "
-            "complété dans un futur sprint."
-        ) if not creds_set else None,
+        "last_error": site_pin.get("last_error"),
     }
 
 

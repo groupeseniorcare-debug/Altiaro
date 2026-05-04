@@ -106,6 +106,76 @@ async def refresh_zone(domain: str) -> None:
     await asyncio.to_thread(client.post, f"/domain/zone/{domain}/refresh")
 
 
+async def upsert_txt_record(
+    zone: str,
+    subdomain: str,
+    target: str,
+    ttl: int = 300,
+) -> Dict[str, Any]:
+    """Upsert a TXT record (e.g. google-site-verification=<token>).
+
+    - Looks up existing TXT records on the zone for the given subdomain.
+    - If a TXT with the same target exists → no-op (already present).
+    - If a TXT exists with a different target → DELETE then CREATE.
+    - If no TXT exists → CREATE.
+    - Refreshes the zone after the change.
+    """
+    if not is_configured():
+        return {"ok": False, "reason": "ovh_not_configured"}
+    sub = (subdomain or "").strip()
+    client = _client()
+    records = await list_records(zone)
+    existing = [
+        r for r in records
+        if r.get("fieldType") == "TXT" and (r.get("subDomain") or "") == sub
+    ]
+    # Already present with same target → idempotent no-op
+    for r in existing:
+        rt = (r.get("target") or "").strip().strip('"')
+        if rt == target.strip().strip('"'):
+            return {"ok": True, "action": "noop", "id": int(r["id"]),
+                    "zone": zone, "sub": sub}
+
+    # Wipe stale TXT(s) on this subdomain (keeps the zone clean)
+    deleted_ids: List[int] = []
+    for r in existing:
+        try:
+            await asyncio.to_thread(
+                client.delete, f"/domain/zone/{zone}/record/{r['id']}",
+            )
+            deleted_ids.append(int(r["id"]))
+        except Exception as e:
+            logger.warning(f"OVH delete TXT {r.get('id')} on {zone} failed: {e}")
+
+    try:
+        created = await asyncio.to_thread(
+            client.post,
+            f"/domain/zone/{zone}/record",
+            fieldType="TXT",
+            subDomain=sub,
+            target=target,
+            ttl=ttl,
+        )
+    except Exception as e:
+        return {"ok": False, "reason": "ovh_create_failed",
+                "error": str(e)[:300], "deleted_stale_ids": deleted_ids}
+
+    try:
+        await refresh_zone(zone)
+    except Exception as e:
+        logger.warning(f"OVH refresh_zone {zone} failed: {e}")
+
+    return {
+        "ok": True,
+        "action": "created",
+        "id": int(created.get("id", 0)) if created else 0,
+        "zone": zone,
+        "sub": sub,
+        "deleted_stale_ids": deleted_ids,
+    }
+
+
+
 async def replace_with_a_records(
     domain: str,
     target_ips: List[str],

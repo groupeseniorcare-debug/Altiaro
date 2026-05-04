@@ -115,6 +115,7 @@ from routes import admin_approve_ads as admin_approve_ads_routes  # Admin guard 
 from routes import gmc_onboarding_status as gmc_onboarding_status_routes  # GMC status + verify-domain
 from routes import marketing_offpage as marketing_offpage_routes  # Pinterest / Annuaires / HARO
 from routes import prerender as prerender_routes  # Dynamic Rendering pour bots
+from routes import robots_smart as robots_smart_routes  # robots.txt + sitemap-prerender
 
 logging.basicConfig(
     level=logging.INFO,
@@ -217,6 +218,7 @@ api.include_router(admin_approve_ads_routes.router)  # Admin guard avant push Go
 api.include_router(gmc_onboarding_status_routes.router)  # GMC onboarding status + verify-domain
 api.include_router(marketing_offpage_routes.router)  # Marketing off-page (Pinterest/Annuaires/HARO)
 api.include_router(prerender_routes.router)  # Dynamic Rendering — /api/seo/prerender/{site_id}
+api.include_router(robots_smart_routes.router)  # robots.smart.txt + sitemap-prerender.xml
 
 # IMPORTANT — Routes /legal/* HTML server-side : montées DIRECTEMENT sur `app`
 # (pas sur le router /api). Sur le preview Kubernetes l'ingress route /legal/*
@@ -870,6 +872,36 @@ async def startup():
             _scheduled_oauth_health,
             CronTrigger(hour="*/6", minute=15),
             id="google_oauth_health", replace_existing=True, misfire_grace_time=1800,
+        )
+
+        # Featured.com press outreach — 09h UTC quotidien
+        async def _scheduled_featured_tick():
+            try:
+                from services.featured_press_outreach import daily_tick
+                res = await daily_tick()
+                logger.info(f"[scheduler] featured_daily : {res}")
+            except Exception:
+                logger.exception("[scheduler] featured_daily failed")
+
+        scheduler.add_job(
+            _scheduled_featured_tick,
+            CronTrigger(hour=9, minute=0),
+            id="featured_press_outreach_daily", replace_existing=True, misfire_grace_time=3600,
+        )
+
+        # Pinterest auto-pin tick — 5x par jour (drip-feed)
+        async def _scheduled_pinterest_tick():
+            try:
+                from services.pinterest_publisher import auto_pin_tick
+                res = await auto_pin_tick()
+                logger.info(f"[scheduler] pinterest_tick : {res}")
+            except Exception:
+                logger.exception("[scheduler] pinterest_tick failed")
+
+        scheduler.add_job(
+            _scheduled_pinterest_tick,
+            CronTrigger(hour="8,11,14,17,20", minute=30),
+            id="pinterest_auto_pin", replace_existing=True, misfire_grace_time=1800,
         )
 
         # Every Monday at 08:00 UTC (09h CET) — Coach SEO weekly digest email
