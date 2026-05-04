@@ -1,6 +1,87 @@
 # Altiora — CHANGELOG
 
 
+## 2026-05-04 · Phase 1.2 — Fix admin health AliExpress (false-positive sur tokens expirés)
+
+> **Scope strict : 1 fichier backend modifié, aucun changement frontend, aucune génération LLM, aucun appel Google/AliExpress live.**
+
+### 🔴 Bug résolu — `_ping_aliexpress` retournait `connected=true` malgré refresh_token expiré
+
+**Constat** : la page `/admin/integrations` affichait AliExpress comme « connecté · compte fr912906817plhae » alors que :
+- `platform_settings.aliexpress.connected = false`
+- `disconnected_at = 2026-05-03T18:37:01Z` (auto-déco sur erreur refresh)
+- `refresh_expires_at = 2026-05-01T06:38:52Z` (expiré depuis 77 h au moment du diagnostic)
+- `last_error = "refresh_no_access_token"`
+
+Conséquence : tout call concepteur sur l'étape Cockpit Sourcing (POST `/aliexpress/products/search`) tombait sur 401 `AE_RECONNECT_REQUIRED`, créant un mismatch perçu comme un bug applicatif.
+
+### Cause racine
+
+`backend/routes/admin_health.py::_ping_aliexpress` ligne 159 :
+```python
+connected = bool(doc.get("refresh_token") or doc.get("access_token"))
+```
+
+→ Logique laxiste : tant que les chaînes traînent en DB (jamais purgées sauf disconnect manuel), l'endpoint retourne `connected=True`, **sans** vérifier :
+1. le flag explicite `connected`
+2. la fraîcheur de `refresh_expires_at`
+3. la présence de `disconnected_at`
+4. la présence de `last_error`
+
+L'autre endpoint `aliexpress_status_admin` (`routes/aliexpress.py:280`) avait déjà la bonne logique stricte (`connected AND access_token`) — divergence non détectée historiquement parce que l'UI Intégrations utilise `_ping_aliexpress` (via `/api/admin/integrations/health`), pas `aliexpress_status_admin`.
+
+### Fix appliqué
+
+Refonte de `_ping_aliexpress` avec 4 cas explicites :
+1. **Pas configuré** (`APP_KEY/SECRET` manquants) → `not_configured`.
+2. **Pas connecté** (jamais d'OAuth) → `warning` + bouton Connecter.
+3. **Auto-déconnecté ou refresh expiré** → `warning` + message explicite `"Reconnexion requise · refresh_token expiré le YYYY-MM-DD"` + bouton Connecter.
+4. **OK** → `ok` (avec note transparente si access_token expiré mais refresh valide : « refresh auto au prochain appel »).
+
+`details` enrichi (sans secrets) avec : `user_nick`, `connected_at`, `expires_at`, `refresh_expires_at`, `last_refreshed_at`, `disconnected_at`, `last_error`, `reconnect_url=/api/admin/aliexpress/authorize-url`.
+
+### Validation post-fix
+
+`GET /api/admin/integrations/health?force=true` après fix sur le doc actuel :
+```json
+{
+  "key": "aliexpress",
+  "status": "warning",            // était "ok"
+  "connected": false,             // était true
+  "message": "Reconnexion requise · refresh_token expiré le 2026-05-01",
+  "actions": ["connect"],         // était ["test","disconnect"]
+  "details": {
+    "user_nick": "fr912906817plhae",
+    "connected_at": "2026-04-29T06:38:52+00:00",
+    "expires_at": "2026-04-30T12:37:01+00:00",
+    "refresh_expires_at": "2026-05-01T06:38:52+00:00",
+    "disconnected_at": "2026-05-03T18:37:01+00:00",
+    "last_error": "refresh_no_access_token",
+    "reconnect_url": "/api/admin/aliexpress/authorize-url"
+  }
+}
+```
+
+UI `AdminIntegrations.jsx` : aucune modification nécessaire. La branche `status === "warning" && !connected && requires_oauth` (ligne 405) affiche déjà naturellement le bouton « Connecter » qui POST `/admin/integrations/aliexpress/connect` → renvoie l'authorize_url AE → redirect plein écran (préserve cookie httpOnly admin).
+
+Sanity check sur les 9 autres providers du même endpoint : verdicts inchangés (Emergent LLM ✅, Google Ads ✅ ok, GMC ✅ ok, GSC ⚠️ pas de site connecté, Mollie ✅ live mode 7 méthodes, OVH ✅ 2 domaines, IndexNow ✅, CJ/Resend ❌ timeout pré-existant indépendant).
+
+### Anomalies connexes signalées (hors scope, à traiter ultérieurement)
+
+1. **Pattern laxiste identique dans `_ping_google_ads:392`** : `connected = bool(doc.get("refresh_token"))` sans check d'expiration ni `disconnected_at`. Risque latent du même type si Google Ads OAuth expire sans rotation.
+2. **Pattern laxiste dans `_ping_google_merchant:534`** : `if not refresh_token` sans check d'expiration. Même risque.
+3. **`operator_id` Mongo `_id` hex au lieu d'UUID** sur `sites/0129ea89-...` (Projet Matelas) : `db.users.find_one({id: operator_id})` retourne `None` parce que `operator_id` contient le hex de `_id` Mongo (`69eb2dd0cd865aff6afdf997`) et non l'UUID canonique (`9e9f6961-e6ed-4cd5-9f22-0202c5148c53`). À auditer sur tous les sites pour identifier le vecteur de pollution.
+
+### Fichiers modifiés
+- `backend/routes/admin_health.py` (`_ping_aliexpress`, refonte 159-179 → ~110 lignes incluant docstring)
+
+### Tests
+- ✅ `ruff` — All checks passed
+- ✅ Backend redémarre, OpenAPI 404 paths / 438 ops (parité avec Phase 1.1)
+- ✅ `curl /api/admin/integrations/health` AVANT vs APRÈS — diff conforme aux attentes
+- ✅ Aucune régression sur les autres `_ping_*`
+
+
 ## 2026-05-04 · Phase 1.1 — Correctifs (Approximated forward + UA-routing flag + headers)
 
 > **Scope strict, aucune génération LLM, aucun appel Google API.**

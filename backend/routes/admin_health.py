@@ -142,6 +142,20 @@ async def _ping_emergent_llm() -> dict:
 
 
 async def _ping_aliexpress() -> dict:
+    """Honest health check for AliExpress platform OAuth.
+
+    Phase 1.2 fix (2026-05-04) — l'ancienne logique `bool(refresh_token OR
+    access_token)` retournait `connected=True` tant qu'une chaîne traînait en
+    DB, même après expiration ou auto-déconnexion. Le cockpit Sourcing tombait
+    alors sur un 401 `AE_RECONNECT_REQUIRED` au premier appel API, créant un
+    mismatch perçu comme un bug. La logique aligne désormais :
+      - le flag explicite `connected` (posé par l'OAuth callback)
+      - l'absence de `disconnected_at` (posé par l'auto-déco sur refresh fail)
+      - la fraîcheur de `refresh_expires_at` (cas refresh_token expiré)
+      - la fraîcheur de `expires_at` n'est PAS bloquante en soi (le refresh
+        renouvelle l'access_token), mais elle est exposée pour debug.
+    """
+    from datetime import datetime, timezone
     t0 = time.perf_counter()
     app_key = os.environ.get("ALIEXPRESS_APP_KEY", "").strip()
     app_secret = os.environ.get("ALIEXPRESS_APP_SECRET", "").strip()
@@ -156,9 +170,35 @@ async def _ping_aliexpress() -> dict:
             duration_ms=int((time.perf_counter() - t0) * 1000),
         )
     doc = await db.platform_settings.find_one({"key": "aliexpress"}) or {}
-    connected = bool(doc.get("refresh_token") or doc.get("access_token"))
+
+    flag_connected = bool(doc.get("connected"))
+    has_refresh = bool(doc.get("refresh_token"))
+    disconnected_at = doc.get("disconnected_at")
+    last_error = doc.get("last_error")
+    refresh_exp = doc.get("refresh_expires_at") or ""
+    access_exp = doc.get("expires_at") or ""
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    refresh_valid = (refresh_exp == "" or refresh_exp > now_iso)
+    access_valid = (access_exp == "" or access_exp > now_iso)
+
+    connected = bool(flag_connected and has_refresh and refresh_valid and not disconnected_at)
     dur = int((time.perf_counter() - t0) * 1000)
-    if not connected:
+
+    # Détails communs (debug-friendly, pas de secrets).
+    base_details = {
+        "user_nick": doc.get("user_nick"),
+        "connected_at": doc.get("connected_at"),
+        "expires_at": access_exp or None,
+        "refresh_expires_at": refresh_exp or None,
+        "last_refreshed_at": doc.get("last_refreshed_at"),
+        "disconnected_at": disconnected_at,
+        "last_error": last_error,
+        "reconnect_url": "/api/admin/aliexpress/authorize-url",
+    }
+
+    # Cas 1 : jamais connecté (fresh setup) → warning + bouton Connecter.
+    if not has_refresh and not flag_connected and not disconnected_at:
         return _result(
             "aliexpress", "AliExpress Dropshipping",
             status="warning",
@@ -166,21 +206,62 @@ async def _ping_aliexpress() -> dict:
             connected=False,
             requires_oauth=True,
             configured_env=True,
+            details={k: v for k, v in base_details.items() if v},
             actions=["connect"],
             duration_ms=dur,
         )
+
+    # Cas 2 : auto-déconnecté (last refresh failed) ou refresh_token expiré.
+    if disconnected_at or not refresh_valid:
+        if not refresh_valid and refresh_exp:
+            short_date = refresh_exp.split("T")[0]
+            msg = f"Reconnexion requise · refresh_token expiré le {short_date}"
+        elif disconnected_at:
+            short_date = str(disconnected_at).split("T")[0]
+            err_short = (str(last_error) or "refresh failed")[:60]
+            msg = f"Déconnecté le {short_date} ({err_short}) · cliquez sur Connecter"
+        else:
+            msg = "Reconnexion requise · cliquez sur Connecter"
+        return _result(
+            "aliexpress", "AliExpress Dropshipping",
+            status="warning",
+            message=msg,
+            connected=False,
+            requires_oauth=True,
+            configured_env=True,
+            details={k: v for k, v in base_details.items() if v},
+            actions=["connect"],
+            duration_ms=dur,
+        )
+
+    # Cas 3 : flag_connected=False mais pas de disconnect (état partiel rare).
+    if not connected:
+        return _result(
+            "aliexpress", "AliExpress Dropshipping",
+            status="warning",
+            message="État OAuth incohérent · cliquez sur Connecter pour réinitialiser",
+            connected=False,
+            requires_oauth=True,
+            configured_env=True,
+            details={k: v for k, v in base_details.items() if v},
+            actions=["connect"],
+            duration_ms=dur,
+        )
+
+    # Cas 4 : tout est vert.
+    msg = f"Connecté · compte {doc.get('user_nick', 'AE')}"
+    if not access_valid:
+        # Access token expiré mais refresh valide : pas bloquant (refresh auto au
+        # prochain appel API) — on signale juste pour transparence.
+        msg += " (access_token expiré · refresh auto au prochain appel)"
     return _result(
         "aliexpress", "AliExpress Dropshipping",
         status="ok",
-        message=f"Connecté · compte {doc.get('user_nick', 'AE')}",
+        message=msg,
         connected=True,
         requires_oauth=True,
         configured_env=True,
-        details={
-            "user_nick": doc.get("user_nick"),
-            "expires_at": doc.get("expires_at"),
-            "connected_at": doc.get("connected_at"),
-        },
+        details={k: v for k, v in base_details.items() if v},
         actions=["test", "disconnect"],
         duration_ms=dur,
     )
