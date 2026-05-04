@@ -2396,3 +2396,27 @@ Tous les `data-testid` FOUND : `delivery-estimate`, `payment-options`, `payment-
 ## 2026-04-20 · Sprint 3 : Admin Ops Center + refactor
 - 5 endpoints admin orders, page /orders, transitions status, rate-limit IP.
 - Refactor server.py monolithic → modulaire (14 routers).
+
+## 2026-05-04 — Sprint 4 Batch 10 fixes (commit 30972db)
+
+**Code fixes** (10/10) :
+1. Hero FR priorisé (storefrontUtils `_detectInitialLang` : primary_lang > navigator.language)
+2. `NICHE_LEGAL_REQUIREMENTS` dict (5 familles : silver_medical, tools_garden, mattress, fashion, cosmetics) avec injection dans prompt Claude `legal_niche_adapter`
+3. URLs produits harmonisées `/products/{slug}` (pluriel) + routes alias `/shop/:siteId/products/:productId`
+4. `StorefrontFAQ.jsx` refactoré (SEOHead au lieu de react-helmet-async + useShopSiteId)
+5. Router `relink` enregistré dans `server.py` (POST /api/sites/{id}/magic/content/relink live)
+6. `design.reassurance_badges` niche-aware (génération launch-auto + affichage `StorefrontProduct.jsx`)
+7. `/admin/google-master` → Navigate redirect vers `/admin/google/master-auth`
+8. Google Ads PKCE state = uuid4() (plus d'écrasement admin_user_id)
+9. Health Resend : message discriminé (`key_invalid_or_revoked`/`http_XXX`)
+10. Alias endpoint `/api/sites/{id}/upsells/ai-suggest`
+
+**Altea regenerations** :
+- 5 sections légales injectent CPAM/LPP/CE classe I/DEEE (verify : `mongosh .legal.{cgv,mentions,confidentialite,livraison,retours}.body_md`)
+- 5 reassurance_badges générés (Certificate/Truck/Medal/Clock/Phone)
+- 14 posts FR dont 13 non-pillar ont `internal_links` Jaccard (3 chacun)
+- hero.title.fr : « Relevez-vous sans effort, détendez-vous profondément »
+
+**Validation curl** : tous endpoints 200, lint OK (ruff + eslint).
+
+**Note Resend** : la clé actuelle est *restricted-send* — le 401 sur `/api-keys` est un comportement Resend normal pour ce type de clé, pas une révocation. Le health check le marque `ok` avec `key_restricted: true`. L'envoi SMTP via `resend.emails.send` reste fonctionnel (69 entries dans `db.email_log` avec status=`sent`).
