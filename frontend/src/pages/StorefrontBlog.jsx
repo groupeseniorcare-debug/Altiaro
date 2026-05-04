@@ -347,6 +347,14 @@ export function StorefrontBlogPost() {
       { "@type": "ListItem", position: 3, name: title, item: canonical },
     ],
   };
+  // Phase 3.3 fix hreflang — priorité au `hreflang` dict stocké en DB (6
+  // slugs différents par langue, URLs absolues pré-calculées par le pipeline).
+  // Fallback `buildHreflangs` si pas de hreflang DB (ancien format).
+  const hreflangEntries = (post.hreflang && typeof post.hreflang === "object")
+    ? Object.entries(post.hreflang)
+        .filter(([code, href]) => code && href)
+        .map(([code, href]) => ({ code: code === "fr" ? "fr-FR" : code, href }))
+    : buildHreflangs(site, `/blog/${slug}`);
 
   return (
     <StorefrontLayout lang={lang} setLang={setLang} availableLangs={availableLangs} site={site} design={design}>
@@ -357,7 +365,7 @@ export function StorefrontBlogPost() {
         image={post.image}
         type="article"
         siteName={site?.name}
-        langs={buildHreflangs(site, `/blog/${slug}`)}
+        langs={hreflangEntries}
         schema={[articleSchema, breadcrumb]}
       />
 

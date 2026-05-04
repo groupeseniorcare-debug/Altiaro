@@ -144,8 +144,15 @@ def _render_head(
     *, lang: str, title: str, description: str, canonical: str,
     og_type: str = "website", og_image: str = "",
     jsonld: Optional[dict] = None,
+    hreflangs: Optional[Dict[str, str]] = None,
+    x_default: Optional[str] = None,
 ) -> str:
-    """Génère le bloc <head> standard."""
+    """Génère le bloc <head> standard.
+
+    Phase 3.3 : `hreflangs` = dict {lang: absolute_url} — ajoute autant de
+    <link rel="alternate" hreflang> que d'entrées + un `x-default` (FR si
+    `x_default` non précisé).
+    """
     desc_safe = _h(description[:200])
     parts = [
         f"<!doctype html><html lang='{_h(lang)}'><head>",
@@ -159,6 +166,17 @@ def _render_head(
         f"<meta property='og:type' content='{_h(og_type)}'/>",
         f"<meta property='og:url' content='{_h(canonical)}'/>",
     ]
+    # Phase 3.3 — hreflang multilingue
+    if hreflangs and isinstance(hreflangs, dict):
+        for code, href in hreflangs.items():
+            if not code or not href:
+                continue
+            hl = "fr-FR" if code == "fr" else code
+            parts.append(f"<link rel='alternate' hreflang='{_h(hl)}' href='{_h(href)}'/>")
+        # x-default → explicit override, else fr if present, else first entry
+        default_href = x_default or hreflangs.get("fr") or next(iter(hreflangs.values()), "")
+        if default_href:
+            parts.append(f"<link rel='alternate' hreflang='x-default' href='{_h(default_href)}'/>")
     if og_image:
         parts.append(f"<meta property='og:image' content='{_h(og_image)}'/>")
     if jsonld:
@@ -686,6 +704,7 @@ async def _render_blog(site: dict, slug: str) -> Optional[str]:
     head = _render_head(
         lang=lang, title=title_str, description=description,
         canonical=canonical, og_type="article", jsonld=jsonld,
+        hreflangs=(bp.get("hreflang") if isinstance(bp.get("hreflang"), dict) else None),
     )
     return (
         head
