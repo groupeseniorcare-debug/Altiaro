@@ -1,6 +1,16 @@
 # Altiora — CHANGELOG
 
 
+## 2026-05-04 · Phase 1.3 — Fix callback AliExpress (relay canonique)
+
+> **1 ligne `.env` modifiée. Aucun code touché. Aucun appel LLM/Google/AE.**
+
+- `/app/backend/.env` : commenté `ALIEXPRESS_CALLBACK_URL=https://24f2727d-...preview...` (override pointant vers un ancien pod ID, qui aurait fait rejeter l'OAuth par AE en `redirect_uri mismatch`).
+- Le code retombe sur le default codé en dur `https://altiaro.com/api/aliexpress/oauth/callback` (URL master canonique whitelistée chez AE).
+- Le mécanisme relay HMAC-signed state était déjà en place dans `routes/aliexpress.py:110-180` — il encode l'origin du caller dans le `state`, le callback master altiaro.com fait un 302 vers `{origin}/api/aliexpress/oauth/relay` qui finalise sur le bon pod et écrit dans la bonne DB. Robuste face aux rotations de pod preview.
+- Vérifié : authorize_url régénéré contient bien `redirect_uri=https%3A%2F%2Faltiaro.com%2F...`. Statut admin AliExpress reste `connected:false / refresh_token expiré le 2026-05-01` (Phase 1.2 inchangée). OpenAPI 404 paths / 438 ops.
+
+
 ## 2026-05-04 · Phase 1.2 — Fix admin health AliExpress (false-positive sur tokens expirés)
 
 > **Scope strict : 1 fichier backend modifié, aucun changement frontend, aucune génération LLM, aucun appel Google/AliExpress live.**
