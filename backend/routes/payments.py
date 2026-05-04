@@ -47,8 +47,10 @@ async def _get_mollie_client(site_id: str):
     Refresh automatique du token si expiré (utilise `refresh_token` stocké).
     Retourne `(client, mode, source)` où source ∈ {"oauth", "platform"}.
 
-    # TODO: split payments routing 5% commission Altiaro
-    # (décision user 2026-04-27 : pas pour l'instant, on commence sans split)
+    Note 2026-04-27 : split commission marketplace ABANDONNÉ. Altiaro est
+    le commerçant légal (KBIS centralisé) ; pas de routing de commission
+    sur Mollie Connect. Les payouts concepteurs sont gérés en interne via
+    le ledger (50 % marge brute HT, 1er/15) et virés via SEPA.
     """
     from mollie.api.client import Client
     site = await db.sites.find_one(

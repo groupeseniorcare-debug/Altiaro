@@ -682,7 +682,7 @@ Priorise ceux avec une vraie utilité (pas juste un gadget), cohérents avec le 
 # =====================================================================
 VALID_STEP_KEYS = {
     "pricing", "import", "upsells", "forecast",
-    "branding", "pages", "content", "seo", "qa",
+    "branding", "domain", "content", "translate", "seo", "qa",
 }
 
 

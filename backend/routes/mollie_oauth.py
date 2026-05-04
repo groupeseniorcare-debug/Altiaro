@@ -5,7 +5,10 @@ Les paiements sur la storefront vont alors directement sur le compte Mollie
 du concepteur (au lieu du compte plateforme Altiaro), avec son nom commercial
 sur la page de paiement hébergée.
 
-Sans split commission pour l'instant (décision user 2026-04-27 — TODO).
+Note 2026-04-27 : split commission marketplace ABANDONNÉ. Altiaro est
+commerçant légal (KBIS centralisé) ; pas de commission marketplace sur
+Mollie Connect. Les payouts concepteurs sont gérés en interne via le
+ledger (50 % marge brute HT, 1er/15) et virés via SEPA.
 
 Endpoints exposés :
     GET  /api/sites/{site_id}/mollie/oauth/start

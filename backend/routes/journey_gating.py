@@ -68,7 +68,6 @@ STEP_SUBTITLES = {
     "qa":        "Vérification finale avant mise en ligne publique",
 }
 
-
 # ────────── Helpers de check par étape ────────── #
 
 async def _check_pricing(site_id: str, site: dict) -> dict:
@@ -305,6 +304,9 @@ async def _check_domain(site_id: str, site: dict) -> dict:
 
 
 def _page_has_content(page: dict) -> bool:
+    """Helper conservé pour usage interne (analyse de pages CMS).
+    Note 2026-05-04 : l'étape Cockpit `pages` a été retirée de STEP_ORDER ;
+    cette fonction reste utile pour validation.py et autres consommateurs."""
     if not page:
         return False
     body = page.get("body")
@@ -339,33 +341,6 @@ async def _check_translate(site_id: str, site: dict) -> dict:
             "primary": primary,
             "extras_count": len(extra),
         },
-    }
-
-
-async def _check_pages(site_id: str, site: dict) -> dict:
-    """Pages légales (mentions, cgv, confidentialite, cookies) + 3 éditoriales
-    (about, faq, contact) toutes non-vides."""
-    pages = (site.get("design") or {}).get("pages") or {}
-    required_legal = ["mentions_legales", "cgv", "confidentialite", "cookies"]
-    required_editorial = ["about", "faq", "contact"]
-    filled_legal = [k for k in required_legal if _page_has_content(pages.get(k))]
-    filled_editorial = [k for k in required_editorial if _page_has_content(pages.get(k))]
-    missing = [
-        k for k in (required_legal + required_editorial)
-        if k not in (filled_legal + filled_editorial)
-    ]
-    completed = len(missing) == 0
-    reason = (
-        "Toutes les pages essentielles remplies"
-        if completed
-        else f"Pages manquantes : {', '.join(missing)}"
-    )
-    return {
-        "key": "pages",
-        "label": STEP_LABELS["pages"],
-        "completed": completed,
-        "reason": reason,
-        "counters": {"filled": filled_legal + filled_editorial, "missing": missing},
     }
 
 
@@ -526,10 +501,9 @@ _CHECKERS = {
     "upsells":   _check_upsells,
     "forecast":  _check_forecast,
     "branding":  _check_branding,
-    "domain":    _check_domain,        # Lot D — étape 6 (optional)
-    "translate": _check_translate,     # Mission Finalisation — étape 7 (remplace `pages`)
-    "pages":     _check_pages,         # déprécié mais conservé pour back-compat (route /sites/:id/pages)
-    "content":   _check_content,
+    "domain":    _check_domain,        # Lot D — étape 6 (optional, skippable)
+    "translate": _check_translate,     # Mission Finalisation — étape 8
+    "content":   _check_content,       # étape 7
     "seo":       _check_seo,
     "qa":        _check_qa,
 }

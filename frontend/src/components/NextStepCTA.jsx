@@ -23,27 +23,29 @@ import { api, apiCall } from "../lib/api";
  */
 
 const STEP_LINKS = (siteId) => ({
-  pricing:  `/sites/${siteId}/pricing`,
-  import:   `/sites/${siteId}/sourcing`,
-  upsells:  `/sites/${siteId}/upsells`,
-  forecast: `/sites/${siteId}/forecast`,
-  branding: `/sites/${siteId}/branding?step=5`,
-  pages:    `/sites/${siteId}/pages?step=6`,
-  content:  `/sites/${siteId}/blog-posts?step=7`,
-  seo:      `/sites/${siteId}/seo`,
-  qa:       `/sites/${siteId}#site-qa-panel`,
+  pricing:   `/sites/${siteId}/pricing`,
+  import:    `/sites/${siteId}/sourcing`,
+  upsells:   `/sites/${siteId}/upsells`,
+  forecast:  `/sites/${siteId}/forecast`,
+  branding:  `/sites/${siteId}/branding?step=5`,
+  domain:    `/sites/${siteId}/domains?step=6`,
+  content:   `/sites/${siteId}/blog-posts?step=7`,
+  translate: `/sites/${siteId}/translate?step=8`,
+  seo:       `/sites/${siteId}/seo`,
+  qa:        `/sites/${siteId}#site-qa-panel`,
 });
 
 const STEP_LABEL = {
-  pricing:  "Pricing",
-  import:   "Import des produits",
-  upsells:  "Upsells & accessoires",
-  forecast: "Prévisionnel financier",
-  branding: "Identité de marque",
-  pages:    "Pages légales & infos",
-  content:  "Contenu blog SEO",
-  seo:      "Score SEO",
-  qa:       "Validation finale (QA)",
+  pricing:   "Pricing",
+  import:    "Import des produits",
+  upsells:   "Upsells & accessoires",
+  forecast:  "Prévisionnel financier",
+  branding:  "Identité de marque",
+  domain:    "Nom de domaine",
+  content:   "Contenu blog SEO",
+  translate: "Traduction multilingue",
+  seo:       "Score SEO",
+  qa:        "Validation finale (QA)",
 };
 
 export default function NextStepCTA({ siteId, currentKey }) {
@@ -74,7 +76,7 @@ export default function NextStepCTA({ siteId, currentKey }) {
   if (loading || !status) return null;
 
   const steps = status.steps || [];
-  const order = ["pricing", "import", "upsells", "forecast", "branding", "pages", "content", "seo", "qa"];
+  const order = ["pricing", "import", "upsells", "forecast", "branding", "domain", "content", "translate", "seo", "qa"];
   const current = steps.find((s) => s.key === currentKey);
   const idx = order.indexOf(currentKey);
   const nextKey = idx >= 0 && idx < order.length - 1 ? order[idx + 1] : null;

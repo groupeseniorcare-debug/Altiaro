@@ -1,6 +1,70 @@
 # Altiora — CHANGELOG
 
 
+## 2026-05-04 · Phase 0 — Cleanup & remise à plat
+
+> **Scope strict, aucune génération LLM, aucun appel Google API.**
+
+### Code mort supprimé
+- `backend/routes/journey_gating.py` :
+  - Fonction `_check_pages` (l. 344-368) supprimée — elle n'était jamais appelée par `compute_step_statuses` puisque `STEP_ORDER` ne contient pas `"pages"` (depuis 2026-04-29).
+  - Entrée `"pages": _check_pages` retirée de `_CHECKERS`.
+  - Helper `_page_has_content` conservé (utilisé par d'autres consommateurs) ; docstring enrichi pour signaler le retrait de l'étape Cockpit.
+- `backend/routes/validation.py:253` : retrait de `"pages"` du set `required_steps` du check `journey-complete`.
+- `backend/routes/cockpit_tools.py:683-686` : retrait de `"pages"` de `VALID_STEP_KEYS` ; ajout des entrées manquantes `"domain"` et `"translate"`.
+
+### Frontend aligné sur STEP_ORDER backend
+- `frontend/src/components/CockpitJourney.jsx::STEP_LINKS` : retrait de la ligne `pages` ; query strings alignés (`content?step=7`, `translate?step=8`).
+- `frontend/src/components/NextStepCTA.jsx` : `STEP_LINKS`, `STEP_LABEL` et tableau `order` mis à jour pour refléter les 10 étapes canoniques avec `domain` et `translate`.
+- La route React `/sites/:id/pages` (composant `SitePages.jsx`) reste montée dans `App.js` pour back-compat — elle est accessible via lien direct mais ne figure plus comme étape Cockpit. Le `<NextStepCTA currentKey="pages">` dans cette page renvoie `null` (régression UX mineure attendue).
+
+### Commentaires trompeurs
+- `backend/routes/marketing_offpage.py:54` : `# PINTEREST (stub activable…)` → note factuelle pointant vers `services/pinterest_publisher.py` et le token-swap admin.
+- `backend/routes/marketing_offpage.py:131` : `# HARO / Press Outreach (stub activable…)` → note factuelle pointant vers `services/featured_press_outreach.py`.
+
+### TODOs abandonnés purgés
+- `backend/routes/payments.py:50` : `# TODO: split payments routing 5% commission Altiaro` → décision documentée (Altiaro = commerçant légal centralisé, pas de marketplace, payouts gérés via ledger interne SEPA).
+- `backend/routes/mollie_oauth.py:8` : ligne docstring équivalente reformulée.
+
+### Resend pour invitations review
+- `backend/routes/reviews_hook.py:99` : commentaire trompeur `stub — integrate Resend playbook here` corrigé. `_send_review_email` était déjà câblé via `resend.Emails.send` (l. 113-157).
+- Ajout de l'écriture dans `db.email_log` sur succès et échec, selon le pattern de `backend/routes/emails.py:159-182` (champs `to, from, subject, tags=["review_invitation"], site_id, invitation_id, email_id, status, created_at`).
+
+### Pinterest token — fallback propre
+- `backend/services/pinterest_publisher.py::_token()` : nouvelle cascade `PINTEREST_ACCESS_TOKEN` (clé canonique 2026-05-04+) → `PINTEREST_APP_SECRET` (legacy, rétrocompat avec le token-swap admin actuel). Trim systématique. Module docstring mis à jour.
+- Aucune régression : le token-swap admin écrit dans `os.environ` live, la rotation à chaud reste fonctionnelle.
+
+### `.env.example` exhaustif
+Ajouts (clés référencées dans le code mais qui n'étaient pas documentées) :
+- **Identité légale Altiaro** : `ALTIARO_SIREN`, `ALTIARO_SIRET`, `ALTIARO_CODE_NAF`, `ALTIARO_LEGAL_FORM`.
+- **Tuning images** : `IMAGE_QA_MAX_RETRIES`, `IMAGE_QA_FAIL_SOFT`, `MAX_TOTAL_QA_RETRIES_PER_LAUNCH`, `MAX_VARIANT_PIPELINE_USD_PER_PRODUCT`, `GEMINI_VISION_MODEL`.
+- **Factory landings & analytics** : `LANDINGS_PER_DAY_PER_SITE`, `IP_HASH_SALT`, `GA4_MASTER_ACCOUNT_ID`.
+- **Pinterest** : section reformulée (plus de mention `STUB`), `PINTEREST_ACCESS_TOKEN` posée comme clé canonique, `PINTEREST_APP_SECRET` documentée comme fallback rétrocompat.
+- **Featured.com** : section dédiée avec `FEATURED_API_KEY` et `FEATURED_API_BASE=https://api.featured.com/v1`.
+
+### Investigation Altea (lecture seule)
+- **alt_texts** : ✅ TROUVÉS sous `products.generated_images[].alt_text` (clé `alt_text`, pas `alt`). Exemple Altea : `"Fauteuil releveur électrique Altea 2 moteurs avec massage intégré"`. Le `alt_texts_generated_at` au niveau produit horodate la passe globale. ⚠️ Gap mineur : `generated_images_by_variant.{color}[].alt_text=None` — les variantes color (white/brown/black) n'ont PAS reçu d'alt généré.
+- **About** : ✅ Présent en DOUBLE — `design.about` (legacy, multilangue 6) + `design.cms_pages.about` (premium 2026-04+, body_md 1592 chars FR + 3 highlights). ❌ `design.about_rich` ABSENT (clé jamais peuplée). ⚠️ **Bug SSR signalé** : `backend/routes/prerender.py:174-175` lit `site.about_rich` qui n'existe pas → SSR `/about` ne renverra pas le contenu pour Altea (et probablement aucun site).
+- **Team** : ❌ `design.team_members` count=0 — trou réel de génération.
+- **Décision** : pas de regénération immédiate (budget LLM Emergent à 100,04 %). Squelette `backend/scripts/regenerate_about_team.py` créé en mode dry-run pour Phase 2. Coût estimé ~$0.35/site quand le budget sera rétabli.
+
+### Documentation
+- `memory/PRD.md` : 404 endpoints (vs 338 obsolètes), 52 collections inventoriées avec cardinalité réelle, section Sprint 1-4 confirmée sur Altea, tableau Risques R1-R10, notes architecture Phase 0.
+- `memory/HANDOFF.md` : entrée Phase 0 ajoutée en tête.
+- `memory/CHANGELOG.md` : présente entrée.
+
+### Critères d'acceptation Phase 0 — résultats
+1. `grep -rn "_check_pages" backend/ frontend/src/` → 0 ligne ✅
+2. `grep -rn "stub activable\|TODO: split payments\|stub — integrate Resend" backend/` → 0 ligne ✅
+3. `cat .env.example | grep -E "FEATURED_API_KEY|PINTEREST_ACCESS_TOKEN"` → 2 lignes ✅
+4. `/api/docs` accessible, OpenAPI valide, **404 endpoints** ✅
+5. Cockpit Altea (`compute_step_statuses`) → 10 étapes dans l'ordre canonique, aucune `pages` ✅
+6. PRD/HANDOFF/CHANGELOG datés 2026-05-04 ✅
+7. `backend/scripts/regenerate_about_team.py` existe, dry-run only, refuse `--execute` ✅
+8. Backend redémarré sans erreur, 24 crons OK, supervisor logs clean ✅
+
+---
+
 ## 2026-05-01 · Custom Domains via Approximated.app (live `altea-home.com`)
 
 ### Custom Domains — pivot final vers Approximated

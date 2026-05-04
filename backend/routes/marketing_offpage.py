@@ -51,7 +51,11 @@ async def directories_status(site_id: str, user: dict = Depends(get_current_user
 
 
 # ────────────────────────────────────────────────────────────────
-# PINTEREST (stub activable — OAuth complet en sprint dédié)
+# PINTEREST — endpoints toggle ON/OFF + auto-pin batch.
+# Implémentation : services/pinterest_publisher.py (API v5, PAT Bearer).
+# Token lu via _get_pinterest_token() : PINTEREST_ACCESS_TOKEN > PINTEREST_APP_SECRET
+# (legacy) > db.platform_settings.pinterest.access_token (token-swap admin).
+# Endpoint admin pour rotation : POST /api/admin/integrations/pinterest/update-token.
 # ────────────────────────────────────────────────────────────────
 class PinterestActivate(BaseModel):
     enabled: bool = True
@@ -128,7 +132,11 @@ async def pinterest_auto_publish(site_id: str, body: PinterestActivate,
 
 
 # ────────────────────────────────────────────────────────────────
-# HARO / Press Outreach (stub activable — source RSS à brancher en sprint dédié)
+# Press Outreach (Featured.com — successeur HARO).
+# Implémentation : services/featured_press_outreach.py (worker APScheduler tick).
+# Endpoint admin pour clé API : POST /api/admin/integrations/featured/update-key.
+# Note : le toggle ci-dessous persiste juste la préférence concepteur ;
+# le worker tourne globalement sur tous les sites où marketing.haro.enabled=true.
 # ────────────────────────────────────────────────────────────────
 class HARoActivate(BaseModel):
     enabled: bool = True

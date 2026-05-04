@@ -1,11 +1,13 @@
 """Pinterest publication service — real implementation.
 
-Le PAT (`PINTEREST_APP_SECRET` préfixé `pina_`) sert directement comme
-Bearer token sur l'API v5. Pas de flow OAuth utilisateur à gérer.
+Le PAT (préfixé `pina_`) sert directement comme Bearer token sur l'API v5.
+Pas de flow OAuth utilisateur à gérer.
 
-Variables env :
-    PINTEREST_APP_ID      : id app Pinterest (info, pas utilisé pour signer)
-    PINTEREST_APP_SECRET  : Personal Access Token Pinterest (Bearer)
+Variables env (priorité décroissante, voir _token()) :
+    PINTEREST_ACCESS_TOKEN : clé canonique (2026-05-04+) pour le PAT.
+    PINTEREST_APP_SECRET   : legacy — rétrocompat ; le token-swap admin
+                             persiste actuellement sous ce nom.
+    PINTEREST_APP_ID       : id app Pinterest (info, pas utilisé pour signer).
 
 Endpoints utilisés :
     GET  /v5/user_account
@@ -42,7 +44,20 @@ _TIMEOUT = httpx.Timeout(20.0, connect=10.0)
 
 
 def _token() -> Optional[str]:
-    return os.environ.get("PINTEREST_APP_SECRET") or None
+    """Lit le PAT Pinterest avec fallback en cascade :
+      1. PINTEREST_ACCESS_TOKEN (clé canonique 2026-05-04+)
+      2. PINTEREST_APP_SECRET (legacy — rétrocompatibilité avec le
+         token-swap admin actuel qui persiste sous cette clé)
+
+    Le token-swap admin (POST /api/admin/integrations/pinterest/update-token)
+    écrit dans backend/.env ET dans os.environ live, donc os.environ couvre
+    aussi les rotations à chaud sans relecture DB.
+    """
+    tok = (
+        os.environ.get("PINTEREST_ACCESS_TOKEN")
+        or os.environ.get("PINTEREST_APP_SECRET")
+    )
+    return tok.strip() if tok else None
 
 
 def _headers() -> Dict[str, str]:

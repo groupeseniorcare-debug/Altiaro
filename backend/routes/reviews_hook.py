@@ -96,7 +96,7 @@ async def check_due_invitations() -> dict:
             skipped += 1
             logger.info(f"[reviews] would email {inv.get('customer_email')} (no RESEND_API_KEY)")
             continue
-        # Real email dispatch (stub — integrate Resend playbook here)
+        # Real email dispatch via Resend (déjà câblé — voir _send_review_email).
         try:
             await _send_review_email(inv)
             await db.review_invitations.update_one(
@@ -152,9 +152,35 @@ async def _send_review_email(invitation: dict):
         "subject": f"Votre avis sur votre commande {brand}",
         "html": html,
     }
-    result = await asyncio.to_thread(resend.Emails.send, params)
-    logger.info(f"[reviews] email sent to {invitation['customer_email']} · id={result.get('id') if isinstance(result, dict) else result}")
-    return result
+    try:
+        result = await asyncio.to_thread(resend.Emails.send, params)
+        email_id = result.get("id") if isinstance(result, dict) else None
+        await db.email_log.insert_one({
+            "to": invitation["customer_email"],
+            "from": params["from"],
+            "subject": params["subject"],
+            "tags": ["review_invitation"],
+            "site_id": invitation.get("site_id"),
+            "invitation_id": invitation.get("id"),
+            "email_id": email_id,
+            "status": "sent",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        logger.info(f"[reviews] email sent to {invitation['customer_email']} · id={email_id}")
+        return result
+    except Exception as e:
+        await db.email_log.insert_one({
+            "to": invitation["customer_email"],
+            "from": params["from"],
+            "subject": params["subject"],
+            "tags": ["review_invitation"],
+            "site_id": invitation.get("site_id"),
+            "invitation_id": invitation.get("id"),
+            "status": "failed",
+            "error": str(e)[:500],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        raise
 
 
 # =====================================================================

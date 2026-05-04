@@ -1,10 +1,31 @@
 # Altiaro — Mémo technique de reprise (HANDOFF)
 
-> **Dernière mise à jour : 2026-04-28 (mission Finalisation A2/B/C/D'/E' livrée one-shot)**
+> **Dernière mise à jour : 2026-05-04 (Phase 0 Cleanup)**
 >
 > Ce document est la source de vérité pour un nouvel intervenant (client, tech lead, agent IA)
 > qui se demande **ce qui marche, ce qui reste à faire, comment onboarder un concepteur**.
 > Il référence le code actuel ; il remplace les mémos antérieurs.
+
+---
+
+## Phase 0 — Cleanup & remise à plat (2026-05-04)
+
+> **Scope strict, aucune génération LLM, aucun appel Google.**
+
+État après Phase 0 :
+- ✅ STEP_ORDER backend canonique = `[pricing, import, upsells, forecast, branding, domain, content, translate, seo, qa]` (10 étapes, aucune `pages`).
+- ✅ Code mort supprimé : fonction `_check_pages` + son entrée `_CHECKERS["pages"]` dans `journey_gating.py`. `validation.py::required_steps` et `cockpit_tools.py::VALID_STEP_KEYS` alignés.
+- ✅ Frontend aligné : `CockpitJourney.jsx` et `NextStepCTA.jsx` reflètent l'ordre backend (content → step=7, translate → step=8). La route `/sites/:id/pages` (page legacy SitePages) reste accessible mais ne figure plus comme étape Cockpit ; le `<NextStepCTA currentKey="pages">` dans cette page renvoie `null` (régression UX mineure attendue).
+- ✅ Commentaires trompeurs `# stub activable` dans `marketing_offpage.py` (l. 54 et 131) remplacés par des notes factuelles pointant vers `services/pinterest_publisher.py` et `services/featured_press_outreach.py`.
+- ✅ TODO `split payments routing 5%` purgés de `payments.py:50` et docstring de `mollie_oauth.py`. Décision documentée : Altiaro = commerçant légal centralisé, pas de marketplace.
+- ✅ `reviews_hook.py` : commentaire `stub — integrate Resend playbook here` (l. 99) corrigé. `_send_review_email` était déjà câblé via `resend.Emails.send` ; ajout de l'écriture `email_log` (succès + échec) selon le pattern `routes/emails.py`.
+- ✅ `pinterest_publisher.py::_token()` : fallback en cascade `PINTEREST_ACCESS_TOKEN` (canonique) → `PINTEREST_APP_SECRET` (legacy). Aucune régression. Le token-swap admin écrit dans `os.environ` live, donc la rotation à chaud reste fonctionnelle sans relecture DB.
+- ✅ `.env.example` exhaustif : ajout des sections **Featured.com** (`FEATURED_API_KEY`, `FEATURED_API_BASE`), **Identité légale Altiaro** (`ALTIARO_SIREN/SIRET/CODE_NAF/LEGAL_FORM`), **Tuning images & landings** (`IMAGE_QA_*`, `MAX_VARIANT_PIPELINE_USD_PER_PRODUCT`, `LANDINGS_PER_DAY_PER_SITE`, `IP_HASH_SALT`, `GA4_MASTER_ACCOUNT_ID`, `GEMINI_VISION_MODEL`). Section Pinterest reformulée (plus de `STUB`).
+- ✅ Investigation Altea documentée dans `PRD.md` : alt_texts trouvés dans `products.generated_images[].alt_text` (gap mineur sur les variantes color) ; About content présent en double (`design.about` legacy + `design.cms_pages.about` premium) mais `design.about_rich` absent → bug SSR signalé (`prerender.py:174-175` lit une clé qui n'existe pas). `team_members` réellement à 0.
+- ✅ Squelette `backend/scripts/regenerate_about_team.py` (dry-run) créé. Activation prévue Phase 2 quand le budget LLM sera rétabli (~$0.35 par site régénéré).
+- ✅ Backend redémarré : 404 endpoints, 24 crons APScheduler OK, OpenAPI valide, smoke test Cockpit Altea retourne 10 étapes dans l'ordre canonique.
+
+**Aucune génération LLM, aucun appel Google API n'a été déclenché pendant cette phase.**
 
 ---
 

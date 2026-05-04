@@ -250,7 +250,8 @@ async def _run_qa_snapshot(site_id: str) -> dict:
         ))
 
     # ---- Journey progression (all steps validated)
-    required_steps = {"pricing", "import", "upsells", "forecast", "branding", "pages", "content", "seo"}
+    # 2026-05-04 : retrait de "pages" (n'est plus une étape Cockpit ; STEP_ORDER aligné).
+    required_steps = {"pricing", "import", "upsells", "forecast", "branding", "content", "seo"}
     missing = required_steps - journey_validated
     add("journey-complete", "Toutes les étapes du cockpit validées",
         not missing, False,

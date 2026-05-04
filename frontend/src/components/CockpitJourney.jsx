@@ -32,7 +32,9 @@ const STEP_META = {
   qa:        { Icon: ShieldCheck,    subtitle: "Checklist 16 points + bouton Mettre en ligne" },
 };
 
-// Mission Finalisation — `translate` ajouté en étape 7, route /sites/:id/translate
+// Aligné sur STEP_ORDER backend (2026-05-04) :
+// pricing(1) → import(2) → upsells(3) → forecast(4) → branding(5) →
+// domain(6) → content(7) → translate(8) → seo(9) → qa(10)
 const STEP_LINKS = (siteId) => ({
   pricing:   `/sites/${siteId}/pricing`,
   import:    `/sites/${siteId}/sourcing`,
@@ -40,9 +42,8 @@ const STEP_LINKS = (siteId) => ({
   forecast:  `/sites/${siteId}/forecast`,
   branding:  `/sites/${siteId}/branding?step=5`,
   domain:    `/sites/${siteId}/domains?step=6`,
-  translate: `/sites/${siteId}/translate?step=7`,
-  pages:     `/sites/${siteId}/pages`,        // back-compat
-  content:   `/sites/${siteId}/blog-posts?step=8`,
+  content:   `/sites/${siteId}/blog-posts?step=7`,
+  translate: `/sites/${siteId}/translate?step=8`,
   seo:       `/sites/${siteId}/seo`,
   qa:        `/sites/${siteId}/qa`,
 });
