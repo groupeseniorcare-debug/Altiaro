@@ -2517,3 +2517,54 @@ LLM (pas de détection family), d'où leur succès.
   les TimeoutError proxy LLM.
 - Exposer un endpoint `POST /translate/cancel?task_id=X` pour tuer proprement
   les tasks bloquées en mémoire.
+
+## 2026-05-04 — Fix Warn #1 SEO bot routing altea-home.com (commit pending)
+
+**ROOT CAUSE** :
+L'ingress Emergent dispatch par path : `/api/*` → backend FastAPI (port 8001),
+le reste → frontend CRA (port 3000). Le `prerender_routing_middleware` côté
+backend détecte les bots ET lit `Apx-Incoming-Host`/`X-Forwarded-Host`, mais
+ne peut intercepter que les requêtes qui arrivent au backend. Or les bots qui
+tapent `https://altea-home.com/blog/...` étaient envoyés au CRA frontend
+(qui retournait `index.html` générique Altiaro plateforme — 7875 bytes, 0
+hreflang, 0 JSON-LD).
+
+Header forensic confirmé via setupProxy debug log :
+```
+host: commerce-builder-21.cluster-8.preview.emergentcf.cloud
+apx-incoming-host: altea-home.com           ← source de vérité Approximated
+x-forwarded-host: commerce-builder-21.preview.emergentagent.com  ← écrasé par ingress Emergent
+```
+
+**FIX** :
+Ajouté `frontend/src/setupProxy.js` (hook officiel CRA / craco webpack-dev-server)
+qui :
+ 1. Détecte UA bot SEO/AI (Google/Bing/Yandex/Apple/Facebook/Twitter/LinkedIn/
+    Claude/GPT/Perplexity/CCBot/Amazon, etc. via regex)
+ 2. Skip les paths techniques (/api, /static, /uploads, /assets, .js, .css,
+    .png, /BingSiteAuth.xml, /.well-known, etc.)
+ 3. Proxy la requête vers `http://localhost:8001` SANS pathRewrite (le path
+    original est conservé), avec `X-Forwarded-Host` et `Apx-Incoming-Host`
+    repris depuis Apx-Incoming-Host (priorité 1) → x-forwarded-host (2) →
+    host (3).
+ 4. Le backend reçoit alors la requête bot avec le bon host → son
+    `prerender_routing_middleware` matche custom_domain → sert le HTML
+    enrichi (h1, hreflang ×6, JSON-LD Article+FAQ+Breadcrumb, body article,
+    OG tags Altea, content 2300+ words).
+
+**TEST PROD** (https://altea-home.com/blog/remboursement-...) :
+| UA | Avant | Après |
+|----|-------|-------|
+| Googlebot/2.1 | 200, 7875 bytes, 0 hreflang, 0 JSON-LD, titre Altiaro | **200, 21085 bytes, 6 hreflang, 3 JSON-LD (Article+FAQPage+BreadcrumbList), titre Altea, x-prerender:1, 2310 mots** ✅ |
+| Mozilla/5.0 Chrome | 200, CRA SPA Altea | **200, CRA SPA Altea (inchangé)** ✅ |
+| facebookexternalhit | OG tags Altiaro | **OG tags Altea (article, titre/description/type corrects)** ✅ |
+
+**Warn #2 (hreflang multilingue)** : false positive de mon précédent rapport.
+Le code émettait déjà 6 hreflang (`fr-FR`, `en`, `es`, `it`, `nl`, `x-default`).
+Mes greps `[a-z-]+` excluaient `fr-FR` (uppercase F). Aucun fix code requis.
+
+**Note** : `setupProxy.js` est actif en dev (yarn start) et preview Emergent.
+En prod build CRA static, il faudra un middleware équivalent (Caddy/Nginx)
+ou la même logique côté Approximated/Cloudflare Worker. La config actuelle
+est : Approximated → preview.emergentagent.com → ingress dispatch → CRA
+dev server avec setupProxy.js → backend pour bots, CRA pour humains.
