@@ -118,6 +118,7 @@ from routes import prerender as prerender_routes  # Dynamic Rendering pour bots
 from routes import robots_smart as robots_smart_routes  # robots.txt + sitemap-prerender
 from routes import admin_integrations_health as admin_integrations_health_routes  # token-swap Pinterest/Featured
 from routes import gsc_provisioning_admin as gsc_provisioning_admin_routes  # GSC auto-provision admin
+from routes import magic_jobs as magic_jobs_routes  # Phase 3.2 — bouton magique unique + SSE
 
 logging.basicConfig(
     level=logging.INFO,
@@ -223,6 +224,7 @@ api.include_router(prerender_routes.router)  # Dynamic Rendering — /api/seo/pr
 api.include_router(robots_smart_routes.router)  # robots.smart.txt + sitemap-prerender.xml
 api.include_router(admin_integrations_health_routes.router)  # Token-swap Pinterest/Featured
 api.include_router(gsc_provisioning_admin_routes.router)  # GSC provision + status admin
+api.include_router(magic_jobs_routes.router)  # Phase 3.2 — magic/content · magic/seo · magic/launch
 
 # IMPORTANT — Routes /legal/* HTML server-side : montées DIRECTEMENT sur `app`
 # (pas sur le router /api). Sur le preview Kubernetes l'ingress route /legal/*
