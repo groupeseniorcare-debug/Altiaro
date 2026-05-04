@@ -230,6 +230,10 @@ api.include_router(magic_jobs_routes.router)  # Phase 3.2 — magic/content · m
 api.include_router(admin_llm_budget_reset_routes.router)  # Phase 3.2 — POST /admin/llm-budget/reset
 api.include_router(brand_wordmark_routes.router)  # Phase 3.2 — wordmark + public upsells
 
+# Sprint 3 — endpoints industrialisation (health-check 11pts, Bing, cron manuels, legal IA)
+from routes import admin_sprint3 as admin_sprint3_routes  # noqa: E402
+api.include_router(admin_sprint3_routes.router)
+
 # IMPORTANT — Routes /legal/* HTML server-side : montées DIRECTEMENT sur `app`
 # (pas sur le router /api). Sur le preview Kubernetes l'ingress route /legal/*
 # au frontend port 3000, donc ces routes ne sont jamais appelées côté preview ;
@@ -634,6 +638,38 @@ async def startup():
             _scheduled_cj_tracking_sync,
             CronTrigger(hour="*/2", minute=15),
             id="cj_tracking_sync", replace_existing=True, misfire_grace_time=1800,
+        )
+
+        # Sprint 3.3 — Daily 02:00 UTC — AliExpress products price/stock refresh.
+        # Re-pulls prices + stock from AliExpress API for every active product
+        # with `ae_item_id`. Auto-pauses OOS products, notifies admin on
+        # drifts >= 5 %. Gated by RUN_HEAVY=1 env var.
+        async def _scheduled_aliexpress_products_refresh():
+            try:
+                from services.cron_jobs import refresh_aliexpress_products_job
+                result = await refresh_aliexpress_products_job()
+                logger.info(f"[scheduler] AE products refresh : {result}")
+            except Exception:
+                logger.exception("[scheduler] AE products refresh failed")
+        scheduler.add_job(
+            _scheduled_aliexpress_products_refresh,
+            CronTrigger(hour=2, minute=0),
+            id="ae_products_refresh", replace_existing=True, misfire_grace_time=3600,
+        )
+
+        # Sprint 3.5 — Every 6h — Follow-up directory submissions in pending_review
+        # and transition them to `live` when backlink detected.
+        async def _scheduled_directory_followup():
+            try:
+                from services.directory_fsm import follow_up_pending_reviews
+                result = await follow_up_pending_reviews()
+                logger.info(f"[scheduler] directory followup : {result}")
+            except Exception:
+                logger.exception("[scheduler] directory followup failed")
+        scheduler.add_job(
+            _scheduled_directory_followup,
+            CronTrigger(hour="*/6", minute=10),
+            id="directory_followup", replace_existing=True, misfire_grace_time=3600,
         )
 
         # Every 5 min — auto-resume des launch_jobs failed+resumable=true

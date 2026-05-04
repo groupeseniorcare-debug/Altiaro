@@ -1308,8 +1308,19 @@ async def ai_enrich_homepage(site_id: str, user: dict = Depends(get_current_user
 # =====================================================================
 @router.post("/sites/{site_id}/navigation/ai-optimize")
 async def ai_optimize_nav(site_id: str, user: dict = Depends(get_current_user)):
-    """Uses Claude to build a sales-optimized navigation based on catalog."""
+    """Uses Claude to build a sales-optimized navigation based on catalog.
+
+    Sprint 2.1 — le prompt est désormais ADAPTATIF à la niche du site
+    (plus d'hardcoding 'Silver Economy'). Lit `site.niche` et l'injecte
+    dans le system prompt.
+    """
     await _check_site_access(site_id, user)
+    site_doc = await db.sites.find_one({"id": site_id}, {"_id": 0, "niche": 1,
+                                                          "target_audience": 1,
+                                                          "name": 1}) or {}
+    niche = site_doc.get("niche") or "e-commerce premium"
+    audience = ((site_doc.get("target_audience") or {}).get("description")
+                or "audience francophone premium").strip()
     products = await db.products.find(
         {"site_id": site_id, "status": "active"},
         {"_id": 0, "name": 1, "role": 1, "category": 1, "price": 1},
@@ -1331,10 +1342,17 @@ async def ai_optimize_nav(site_id: str, user: dict = Depends(get_current_user)):
         ],
     }
     system = (
-        "Tu es un expert CRO e-commerce Silver Economy. Tu construis une navigation HEADER "
-        "et FOOTER optimisée pour la conversion : max 5 items header, hiérarchie claire, libellés "
-        "courts et orientés valeur (ex: 'Fauteuils' > 'Nos produits'). Footer : liens utilitaires "
-        "+ legal. Toujours pointer vers /collections/{slug} ou /shop si collection inexistante."
+        f"Tu es un expert CRO e-commerce spécialisé dans la niche « {niche} » "
+        f"(audience cible : {audience}). Tu construis une navigation HEADER "
+        "et FOOTER optimisée pour la conversion de CETTE niche précisément :\n"
+        "- max 5 items header, hiérarchie claire adaptée au parcours d'achat\n"
+        "- libellés courts (1-2 mots) ET orientés valeur pour la niche\n"
+        "- pas de libellés génériques ('Nos produits', 'Shop') sauf dernier recours\n"
+        "- footer : liens utilitaires + legal\n"
+        "- toujours pointer vers /collections/{slug} ou /shop si collection inexistante\n"
+        "- utilise le vocabulaire métier de la niche (ex. 'Tailles', 'Composition' "
+        "  pour mode ; 'Cépages', 'Accords' pour vins ; 'Entretien', 'SAV' pour "
+        "  outils ; 'Ergonomie', 'Aides' pour Silver Economy)."
     )
     prompt = (
         "Catalogue :\n" + json.dumps(catalog_summary, ensure_ascii=False, indent=2) +

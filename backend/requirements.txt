@@ -1,3 +1,7 @@
+ImageHash==4.3.2
+PyWavelets==1.9.0
+scipy==1.17.1
+
 aiohappyeyeballs==2.6.1
 aiohttp==3.13.5
 aiosignal==1.4.0

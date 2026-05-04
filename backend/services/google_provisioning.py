@@ -175,11 +175,35 @@ async def provision_ga4_property(site: dict, creds) -> dict:
             ).execute,
         )
         measurement_id = ((stream.get("webStreamData") or {}).get("measurementId")) or ""
+
+        # Sprint 3.1 — mark the 4 e-commerce events as "conversion events" so
+        # they are imported into Google Ads automatically when the Ads ↔ GA4
+        # link is established. Idempotent (409 already_exists → ignored).
+        conversion_events = ["purchase", "add_to_cart", "begin_checkout", "view_item"]
+        created_conversions: list = []
+        for ev in conversion_events:
+            try:
+                await asyncio.to_thread(
+                    svc.properties().conversionEvents().create(
+                        parent=f"properties/{prop_id}",
+                        body={"eventName": ev, "countingMethod": "ONCE_PER_EVENT"},
+                    ).execute,
+                )
+                created_conversions.append(ev)
+            except Exception as e:
+                # 409 already exists → OK; anything else logged but non-blocking.
+                msg = str(e)[:120]
+                if "already exists" in msg or "409" in msg:
+                    created_conversions.append(ev)
+                else:
+                    logger.warning(f"[ga4] conversion event '{ev}' failed: {msg}")
+
         return {
             "ok": True,
             "ga4_property_id": prop_id,
             "ga4_measurement_id": measurement_id,
             "account_id": account_id,
+            "conversion_events": created_conversions,
         }
     except Exception as e:
         return {"ok": False, "error": str(e)[:400]}

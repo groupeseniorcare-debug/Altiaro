@@ -176,6 +176,44 @@ def _public_origin_for(site: Dict[str, Any]) -> str:
             or "https://altea-home.com").rstrip("/")
 
 
+def _detect_kw_country(site: Dict[str, Any]) -> str:
+    """Return ISO2 country for Keyword Planner call.
+    Prefers site.primary_country, then locale prefix, then 'FR'."""
+    c = (site.get("primary_country") or site.get("country") or "").upper()
+    if c and len(c) == 2:
+        return c
+    loc = (site.get("primary_locale") or site.get("locale") or "fr-FR").upper()
+    if "-" in loc:
+        return loc.split("-")[-1][:2]
+    return "FR"
+
+
+def _tokenize_for_similarity(text: str) -> set:
+    """Small FR-stopworded tokenizer used by the semantic internal-linking
+    algorithm. Returns a set of tokens for Jaccard similarity — good enough
+    for 14-doc clusters without importing sklearn."""
+    if not text:
+        return set()
+    txt = text.lower()
+    # strip accents
+    accents = {"à": "a", "â": "a", "ä": "a", "é": "e", "è": "e", "ê": "e", "ë": "e",
+               "î": "i", "ï": "i", "ô": "o", "ö": "o", "ù": "u", "û": "u", "ü": "u",
+               "ç": "c", "ñ": "n"}
+    for k, v in accents.items():
+        txt = txt.replace(k, v)
+    tokens = re.findall(r"[a-z0-9]{3,}", txt)
+    # minimal FR stopwords (len<=4 kept if numeric)
+    stop = {"les", "des", "une", "dans", "pour", "avec", "cette", "votre", "notre",
+            "sur", "par", "est", "aux", "qui", "que", "son", "mais", "ses", "pas",
+            "comme", "tout", "tous", "toute", "plus", "moins", "bien", "sans",
+            "leur", "leurs", "sont", "etre", "avoir", "cela", "celui", "celle",
+            "the", "and", "for", "with", "this", "that", "are", "was", "ist",
+            "que", "qui", "aussi", "apres", "avant", "entre", "chez", "donc",
+            "vers", "peut", "peuvent", "nous", "vous", "elle", "elles", "ils",
+            "faire", "faut", "doit", "doivent", "alors", "encore", "ainsi"}
+    return {t for t in tokens if t not in stop and len(t) >= 3}
+
+
 # ────────────────────────────────────────────────────────────────────────
 # Step 1 — Plan the 14 topics via Sonnet (1 call)
 # ────────────────────────────────────────────────────────────────────────
@@ -266,7 +304,14 @@ async def _generate_fr_article(site: Dict[str, Any], brief: Dict[str, Any],
         "- Jamais de disclaimers génériques ni 'Je suis une IA'.\n"
         "- AEO snippet : 1 paragraphe de 40-60 mots qui répond DIRECTEMENT à la requête.\n"
         "- FAQ : 3-5 Q/R uniques (ne pas paraphraser le body).\n"
-        "- Hero prompt : description FR d'une scène lifestyle premium pour Nano Banana.\n\n"
+        "- Hero prompt : description FR d'une scène lifestyle premium pour Nano Banana.\n"
+        "- Sprint 1.4 — RÉFÉRENCES EXTERNES : dans le body, cite 2-3 "
+        "  **sources externes crédibles** (sites institutionnels, presse "
+        "  nationale reconnue, études publiées) sous forme markdown "
+        "  `[ancre descriptive](https://url-complete)`. Les URL doivent "
+        "  être plausibles (service-public.fr, ameli.fr, ministères, INSEE, "
+        "  OMS, DREES, Que-Choisir, UFC, 60-millions-consommateurs, etc.). "
+        "  Pas de lien commercial, pas de lien Wikipedia.\n\n"
         "JSON STRICT :\n"
         "{\n"
         '  "slug": "slug-kebab-case-fr",\n'
@@ -277,7 +322,7 @@ async def _generate_fr_article(site: Dict[str, Any], brief: Dict[str, Any],
         '  "category": "Guide d\'achat|Maintien à domicile|Sommeil|Bien-être|Santé",\n'
         '  "tags": ["tag1", "tag2", "tag3"],\n'
         '  "aeo_snippet": "40-60 mots réponse directe",\n'
-        '  "body_md": "article markdown complet avec ## H2 et ### H3",\n'
+        '  "body_md": "article markdown complet avec ## H2 et ### H3 ET 2-3 [ancre](https://url) externes",\n'
         '  "faq": [{"q": "...", "a": "..."}, ...],\n'
         '  "hero_prompt": "description scène premium en français",\n'
         '  "inline_prompt": "description seconde illustration en français",\n'
@@ -355,23 +400,54 @@ async def _translate_article(fr_doc: Dict[str, Any], lang: str,
 # ────────────────────────────────────────────────────────────────────────
 async def _generate_image_for_post(site_id: str, post_id: str, prompt: str,
                                     kind: str) -> Optional[str]:
-    """Generate one Nano Banana image and persist it. Returns the public URL."""
+    """Generate one Nano Banana image and persist it. Returns the public URL.
+
+    Sprint 2.2 — branche `style_seed` par marque (cohérence inter-fiches) et
+    `pHash` dedup (évite que 2 heros se ressemblent au pixel).
+    """
     if not prompt:
         return None
     size_hint = (" Photographic, editorial, natural light, premium minimal style. "
                  "16:9 aspect ratio." if kind == "hero"
                  else " Photographic, lifestyle, soft ambient. 4:3 aspect ratio.")
+    # Sprint 2.2 — suffixe stylistique stable par marque (style_seed)
     try:
-        data = await safe_nano_banana_bytes(
-            prompt=prompt + size_hint,
-            system="You produce premium editorial photography (no text overlays, no people faces clearly visible).",
-            session_id=f"magic-{site_id[:6]}-{post_id[:6]}-{kind}",
-            request_id=f"magic-img-{kind}-{post_id[:8]}",
-            timeout=180,
-        )
-    except Exception as e:
-        logger.warning(f"[magic_content] image {kind} failed for {post_id[:8]}: {e}")
-        return None
+        from services.image_phash_dedup import style_seed_suffix, find_duplicate, register_image
+        style_suffix = await style_seed_suffix(site_id)
+    except Exception:
+        style_suffix = ""
+        find_duplicate = None  # type: ignore
+        register_image = None  # type: ignore
+
+    full_prompt = prompt + size_hint + style_suffix
+    data: Optional[bytes] = None
+    # Retry loop with prompt variation to avoid pHash duplicates
+    for attempt in range(2):
+        try:
+            data = await safe_nano_banana_bytes(
+                prompt=full_prompt if attempt == 0 else full_prompt + f" (variant {attempt+1}, different framing and angle)",
+                system="You produce premium editorial photography (no text overlays, no people faces clearly visible).",
+                session_id=f"magic-{site_id[:6]}-{post_id[:6]}-{kind}-{attempt}",
+                request_id=f"magic-img-{kind}-{post_id[:8]}-{attempt}",
+                timeout=180,
+            )
+        except Exception as e:
+            logger.warning(f"[magic_content] image {kind} failed for {post_id[:8]}: {e}")
+            return None
+        if not data:
+            return None
+        # pHash duplicate check (only for non-first attempts we re-run)
+        if find_duplicate is not None:
+            try:
+                dup = await find_duplicate(site_id, data, threshold=5)
+                if dup and attempt == 0:
+                    logger.info(f"[magic_content] phash dup detected on {kind} "
+                                f"{post_id[:8]} (dist={dup.get('distance')}) → retry variant")
+                    continue
+            except Exception as e:
+                logger.warning(f"[magic_content] phash check failed: {e}")
+        break
+
     if not data:
         return None
     site_dir = UPLOAD_ROOT / site_id
@@ -379,7 +455,14 @@ async def _generate_image_for_post(site_id: str, post_id: str, prompt: str,
     digest = hashlib.sha256(data).hexdigest()[:10]
     filename = f"{kind}_{post_id[:8]}_{digest}.png"
     (site_dir / filename).write_bytes(data)
-    return f"/api/uploads/blog/{site_id}/{filename}"
+    url = f"/api/uploads/blog/{site_id}/{filename}"
+    # Sprint 2.2 — register pHash for future dedup
+    if register_image is not None:
+        try:
+            await register_image(site_id, data, kind=kind, ref_id=post_id, url=url)
+        except Exception as e:
+            logger.warning(f"[magic_content] register pHash failed: {e}")
+    return url
 
 
 # ────────────────────────────────────────────────────────────────────────
@@ -405,11 +488,7 @@ async def run_magic_content(site_id: str, emit: Optional[EmitCallback] = None,
     public_origin = _public_origin_for(site)
     cluster_id = f"magic-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M')}-{uuid.uuid4().hex[:4]}"
 
-    # ── Step 1 : audit keywords (placeholder — on s'appuie sur le plan topics) ──
-    _e("audit_keywords", status="running")
-    _e("audit_keywords", status="done", message="Univers éditorial analysé")
-
-    # ── Step 2 : cluster topics ──────────────────────────────────────────
+    # ── Step 2 : cluster topics (appelé AVANT audit pour alimenter le vrai audit) ──
     _e("cluster_topics", status="running")
     try:
         topics = await _plan_topics(site)
@@ -422,6 +501,39 @@ async def run_magic_content(site_id: str, emit: Optional[EmitCallback] = None,
     pillar = next((t for t in topics if t.get("role") == "pillar"), topics[0])
     satellites = [t for t in topics if t.get("role") == "satellite"][:max_satellites]
     longtail = [t for t in topics if t.get("role") == "longtail"][:max_longtail]
+
+    # ── Step 1 (real) : audit keywords via Google Ads Keyword Planner ────
+    # Sprint 1.2 — on récupère volumes + competition + CPC RÉELS pour les
+    # 14 keywords planifiés par Sonnet. Enrichit `topics` en place (clé
+    # `seo_metrics`) qui sera recopiée dans chaque post.
+    _e("audit_keywords", status="running")
+    kw_country = _detect_kw_country(site)
+    keyword_list = [t.get("keyword") for t in topics if t.get("keyword")][:20]
+    kw_metrics: Dict[str, Dict[str, Any]] = {}
+    try:
+        from routes.google_ads import fetch_keyword_volumes
+        kp_out = await fetch_keyword_volumes({kw_country: keyword_list})
+        if kp_out.get("available"):
+            country_data = (kp_out.get("by_country") or {}).get(kw_country) or {}
+            for row in country_data.get("keywords") or []:
+                kw_metrics[(row.get("keyword") or "").strip().lower()] = row
+            for t in topics:
+                kw = (t.get("keyword") or "").strip().lower()
+                if kw in kw_metrics:
+                    t["seo_metrics"] = kw_metrics[kw]
+            total_vol = country_data.get("total_volume_monthly", 0)
+            _e("audit_keywords", status="done",
+               message=f"Keyword Planner OK · {len(kw_metrics)} kw enrichis · "
+                       f"volume cumulé {total_vol:,}/mois · CPC moyen "
+                       f"{country_data.get('avg_cpc_eur', 0)}€")
+        else:
+            _e("audit_keywords", status="warn",
+               message=f"Keyword Planner indisponible ({kp_out.get('reason','?')}) · "
+                       "fallback plan éditorial sans volumes réels")
+    except Exception as e:
+        logger.warning(f"[magic_content] keyword planner hook failed: {e}")
+        _e("audit_keywords", status="warn",
+           message=f"Keyword Planner erreur : {str(e)[:120]}")
 
     # ── Step 3 : pilier FR ───────────────────────────────────────────────
     _e("generate_pillar_fr", status="running")
@@ -611,6 +723,9 @@ def _build_fr_doc(site: Dict[str, Any], brief: Dict[str, Any],
     faq_raw = art.get("faq") or []
     faq_struct = [{"q": {"fr": f.get("q", "")}, "a": {"fr": f.get("a", "")}}
                   for f in faq_raw if isinstance(f, dict)]
+    # Sprint 1.2 — inject real Keyword Planner metrics if available
+    seo_metrics = brief.get("seo_metrics") or {}
+    external_refs = _extract_external_refs(body_md)
     return {
         "id": post_id,
         "site_id": site["id"],
@@ -637,7 +752,18 @@ def _build_fr_doc(site: Dict[str, Any], brief: Dict[str, Any],
         "internal_links": [],
         "translations": {},
         "hreflang": {},
-        "seo": {},
+        "seo": {
+            # Sprint 1.2 — Keyword Planner real data (empty dict if unavailable)
+            "keyword_volume": seo_metrics.get("volume"),
+            "keyword_competition": seo_metrics.get("competition"),
+            "keyword_competition_index": seo_metrics.get("competition_index"),
+            "keyword_cpc_low_eur": seo_metrics.get("cpc_low_eur"),
+            "keyword_cpc_high_eur": seo_metrics.get("cpc_high_eur"),
+            "keyword_source": "google_ads_keyword_planner" if seo_metrics else "llm_plan",
+            # Sprint 1.4 — external references extracted from body_md
+            "external_refs": external_refs,
+            "external_refs_count": len(external_refs),
+        },
         "author": f"L'équipe {site.get('name', 'Altea')}",
         "status": "published",
         "published_at": now,
@@ -645,6 +771,28 @@ def _build_fr_doc(site: Dict[str, Any], brief: Dict[str, Any],
         "updated_at": now,
         "ai_generated": True,
     }
+
+
+def _extract_external_refs(body_md: str) -> List[Dict[str, str]]:
+    """Scan markdown body for external links [anchor](https://...) not
+    pointing to the current site. Returns a deduplicated list."""
+    if not body_md:
+        return []
+    pattern = r"\[([^\]]+)\]\((https?://[^)]+)\)"
+    seen = set()
+    out: List[Dict[str, str]] = []
+    for m in re.finditer(pattern, body_md):
+        anchor = m.group(1).strip()[:120]
+        url = m.group(2).strip()
+        # Skip internal-looking links (anchors, relative)
+        if url.startswith("#") or "altea-home.com" in url or "altiaro.com" in url:
+            continue
+        key = url.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"anchor": anchor, "url": url})
+    return out[:10]
 
 
 def _build_translated_doc(fr: Dict[str, Any], tr: Dict[str, Any],
@@ -687,7 +835,7 @@ def _build_translated_doc(fr: Dict[str, Any], tr: Dict[str, Any],
         "internal_links": [],
         "translations": {},
         "hreflang": {},
-        "seo": {},
+        "seo": dict(fr.get("seo") or {}),  # Sprint 1.2 — inherit keyword metrics from FR source
         "source_post_id": fr["id"],
         "author": fr.get("author"),
         "status": "published",
@@ -700,24 +848,67 @@ def _build_translated_doc(fr: Dict[str, Any], tr: Dict[str, Any],
 
 async def _apply_internal_linking(fr_docs: List[Dict[str, Any]],
                                     pillar_doc: Dict[str, Any]) -> None:
-    """For each non-pillar FR post, add 3 internal_links : pillar + 2 related
-    non-pillar siblings."""
+    """Sprint 1.3 — Maillage interne PAR SIMILARITÉ SÉMANTIQUE.
+
+    Pour chaque non-pillar FR post :
+      - lien obligatoire vers le pilier (parent cluster)
+      - 2 liens vers les siblings les plus PROCHES sémantiquement (Jaccard
+        sur tokens titre+keyword+body), PAS un round-robin aveugle.
+    """
     non_pillars = [d for d in fr_docs if d["role"] != "pillar"]
-    for i, d in enumerate(non_pillars):
-        siblings = [s for s in non_pillars if s["id"] != d["id"]]
-        picks = siblings[i % max(1, len(siblings)):i % max(1, len(siblings)) + 2]
-        if len(picks) < 2:
-            picks = siblings[:2]
-        links = [{"slug": pillar_doc["slug"],
-                  "anchor": (pillar_doc["title"] or {}).get("fr", pillar_doc["slug"])[:80],
-                  "role": "pillar"}]
+    # Pre-compute tokens per doc (union of title + keyword + body_md snippet)
+    tokens_by_id: Dict[str, set] = {}
+    for d in non_pillars:
+        fr_title = (d.get("title") or {}).get("fr", "")
+        fr_body = (d.get("body_md") or {}).get("fr", "")[:2000]
+        kw = d.get("keyword") or ""
+        tokens_by_id[d["id"]] = _tokenize_for_similarity(f"{fr_title} {kw} {fr_body}")
+
+    for d in non_pillars:
+        my_tokens = tokens_by_id[d["id"]]
+        scored: List[Tuple[float, Dict[str, Any]]] = []
+        for s in non_pillars:
+            if s["id"] == d["id"]:
+                continue
+            s_tokens = tokens_by_id[s["id"]]
+            if not my_tokens or not s_tokens:
+                score = 0.0
+            else:
+                inter = len(my_tokens & s_tokens)
+                union = len(my_tokens | s_tokens)
+                score = inter / union if union else 0.0
+            scored.append((score, s))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        picks = [s for _, s in scored[:2]]
+
+        links = [{
+            "slug": pillar_doc["slug"],
+            "anchor": (pillar_doc["title"] or {}).get("fr", pillar_doc["slug"])[:80],
+            "role": "pillar",
+            "similarity": round(_jaccard(my_tokens, tokens_by_id.get(pillar_doc["id"],
+                _tokenize_for_similarity(
+                    f"{(pillar_doc.get('title') or {}).get('fr','')} "
+                    f"{pillar_doc.get('keyword','')} "
+                    f"{(pillar_doc.get('body_md') or {}).get('fr','')[:2000]}"))), 3),
+        }]
         for s in picks:
-            links.append({"slug": s["slug"],
-                          "anchor": (s["title"] or {}).get("fr", s["slug"])[:80],
-                          "role": s["role"]})
+            links.append({
+                "slug": s["slug"],
+                "anchor": (s["title"] or {}).get("fr", s["slug"])[:80],
+                "role": s["role"],
+                "similarity": round(next((sc for sc, x in scored if x["id"] == s["id"]), 0.0), 3),
+            })
         await db.blog_posts.update_one({"id": d["id"]},
                                         {"$set": {"internal_links": links}})
         d["internal_links"] = links
+
+
+def _jaccard(a: set, b: set) -> float:
+    if not a or not b:
+        return 0.0
+    inter = len(a & b)
+    union = len(a | b)
+    return inter / union if union else 0.0
 
 
 async def _apply_hreflang(cluster_id: str, public_origin: str) -> None:
@@ -767,7 +958,8 @@ async def _attach_json_ld(cluster_id: str, public_origin: str) -> None:
     cluster_posts = await db.blog_posts.find({"cluster_id": cluster_id}).to_list(1000)
     for p in cluster_posts:
         lang = p.get("lang", "fr")
-        seo: Dict[str, Any] = {}
+        # Merge with existing seo (Sprint 1.2 keyword metrics + refs)
+        seo: Dict[str, Any] = dict(p.get("seo") or {})
         seo["schema_article"] = _json_ld_article(p, site, lang, public_origin)
         fq = _json_ld_faq(p.get("faq") or [], lang)
         if fq and fq.get("mainEntity"):

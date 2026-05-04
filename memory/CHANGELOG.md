@@ -1,6 +1,58 @@
 # Altiora — CHANGELOG
 
 
+## 2026-05-04 · Sprints 1+2+3 — Industrialisation data-driven
+
+> Exécution intégrale des 3 sprints + smoke test partiel + procédure GCP Production.
+
+### Sprint 1 — SEO data-driven (réel, plus de placeholders)
+
+- **1.1 Hreflang (vérification)** : code déjà commité dans `44e578c` côté `SEOHead.jsx` (frontend) + `routes/prerender.py` (SSR backend, L147–179, L707). Working tree propre. Rien à recommiter.
+- **1.2 Google Ads Keyword Planner intégration** : `services/magic_content_pipeline.py::run_magic_content` — l'étape 1 (`audit_keywords`) appelle désormais `routes/google_ads.py::fetch_keyword_volumes` avec les 14 keywords planifiés par Sonnet et le pays détecté via nouveau `_detect_kw_country(site)` (priorité `primary_country` > `primary_locale` suffix > `FR`). Volumes mensuels réels + competition + competition_index + cpc_low/high_eur sont injectés dans chaque brief (`brief["seo_metrics"]`) et persistés sur chaque post FR + traduction (`seo.keyword_volume`, `seo.keyword_competition`, `seo.keyword_competition_index`, `seo.keyword_cpc_low_eur`, `seo.keyword_cpc_high_eur`, `seo.keyword_source` = `"google_ads_keyword_planner"` ou `"llm_plan"` en fallback). Dégradation gracieuse : si Google OAuth = `invalid_grant`, `available=False` → warning step "Keyword Planner indisponible · fallback plan éditorial sans volumes réels", pipeline continue sans planter.
+- **1.3 Maillage interne sémantique (Jaccard)** : `_apply_internal_linking` réécrit. Nouveau `_tokenize_for_similarity` (FR-stopworded, accents stripped, tokens len≥3) + `_jaccard`. Pour chaque non-pillar : pillar + 2 siblings avec **score Jaccard maximal** (au lieu d'un round-robin `siblings[i % len:i % len + 2]` aveugle). Le score est stocké dans `internal_links[].similarity` pour audit.
+- **1.4 Références externes crédibles** : prompt FR enrichi pour exiger 2-3 markdown links `[ancre](https://url-complete)` vers sources institutionnelles (service-public.fr, ameli.fr, INSEE, OMS, DREES, Que-Choisir…). Pas de Wikipedia, pas de lien commercial. Nouveau helper `_extract_external_refs(body_md)` qui scan le markdown, déduplique, filtre les liens internes (altea-home.com, altiaro.com), et persiste dans `seo.external_refs` + `seo.external_refs_count` (max 10/article).
+
+### Sprint 2 — Cohérence visuelle & adaptation niche
+
+- **2.1 Navigation IA adaptée à la niche** : `routes/design.py::ai_optimize_nav` — system prompt ne dit plus "expert CRO Silver Economy" hardcoded mais lit `site.niche` + `target_audience.description` et **adapte le vocabulaire métier** ('Tailles/Composition' pour mode, 'Cépages/Accords' pour vins, 'Entretien/SAV' pour outils, 'Ergonomie/Aides' pour Silver Economy). Branchement déjà actif dans `launch-auto` étape 5 via `routes/launch.py:874`.
+- **2.2 Déduplication d'images pHash + style_seed** : nouveau `services/image_phash_dedup.py`. Collection MongoDB `site_images` (`{id, site_id, phash, kind, ref_id, url, created_at}`). Fonctions `compute_phash`, `hamming_distance`, `find_duplicate(threshold=5)`, `register_image`, `get_or_create_style_seed` (entier stable random.randint(100k, 9.9M) écrit dans `design.brand.style_seed`), `style_seed_suffix` (3 cameras × 3 lights × 3 moods déterministes via modulos). Branchement dans `magic_content_pipeline.py::_generate_image_for_post` : retry-loop avec variation prompt si pHash distance ≤ 5 sur la 1ère tentative, register systématique du pHash après écriture disque. Suffixe `style_seed` ajouté à tous les prompts Nano Banana → cohérence inter-fiches automatique. Dépendances ajoutées : `ImageHash==4.3.2`, `PyWavelets==1.9.0`, `scipy==1.17.1`.
+- **2.3 Templates légaux IA-adaptés à la niche** : nouveau `services/legal_niche_adapter.py`. Fonction `adapt_legal_for_niche(site_id, niche, base_texts)` qui réécrit chacune des 5 sections (`cgv`, `mentions`, `confidentialite`, `livraison`, `retours`) via Claude Haiku. Le prompt préserve les références légales obligatoires (LCEN, RGPD, Code de la conso, droit de rétractation 14j) + les placeholders + l'identité légale (Groupeseniorcare SAS, KBIS, SIRET) — il n'injecte QUE les spécificités niche (poids/volume livraison, garanties sectorielles, SAV, données sensibles…). Endpoint `POST /api/sites/{id}/legal/adapt-niche` exposé.
+- **2.4 Emails Resend i18n 6 langues** : nouveau `services/email_i18n.py`. Table `STRINGS` couvrant `order_confirmation.{subject,title,intro,summary_title,total,shipping_to,track,help}` + `shipping_update.{subject,title,tracking_label,carrier,track}` + `footer.{thanks,unsubscribe}` × `fr|en|de|nl|it|es`. Helpers `t(key, lang=, **kw)` avec interpolation `{placeholder}`, `normalize_lang()` (gère 'FR', 'fr-FR', 'fr_FR'…), `detect_order_lang(order, site)` qui pioche `order.customer.lang > customer.locale > order.locale > site.primary_locale > 'fr'`. **Service prêt-à-brancher** dans `routes/emails.py` (la refacto des 3 endpoints HTML est laissée en dette — voir Risques résiduels).
+
+### Sprint 3 — Analytics, polish, machine d'état industriels
+
+- **3.1 GA4 provisioning + 4 conversions** : `services/google_provisioning.py::provision_ga4_property` enrichi. Après création de la GA4 property + WebStream, création **idempotente** des 4 conversion events (`purchase`, `add_to_cart`, `begin_checkout`, `view_item`) via `properties().conversionEvents().create()`. 409 already_exists traité comme succès. Retour enrichi avec `conversion_events: [...]`. Ces events sont automatiquement importés dans Google Ads dès que le link Ads↔GA4 est posé.
+- **3.2 Bing Webmaster Tools API** : nouveau `services/bing_webmaster.py`. Fonctions `add_site`, `submit_sitemap`, `submit_urls(batch ≤500)`, et `provision_bing_for_site(site)` (AddSite + SubmitSitemap idempotent). Endpoint `POST /api/sites/{id}/launch/bing-provision` exposé. Nécessite `BING_WEBMASTER_API_KEY` dans `.env` (à obtenir sur https://www.bing.com/webmasters/home/mysites → Settings → API Access). Status visible via `GET /api/admin/integrations/bing-status`.
+- **3.3 Cron AliExpress refresh** : nouveau `services/cron_jobs.py::refresh_aliexpress_products_job`. Tous les jours à 02:00 UTC : refresh prix/stock des produits avec `ae_item_id` non syncés depuis 18h+. Drifts ≥ 5% → admin_notification. OOS auto-pause. Gated par `RUN_HEAVY=1`. Job APScheduler `ae_products_refresh` ajouté dans `server.py`. Endpoint manuel `POST /api/admin/cron/aliexpress-refresh` pour QA.
+- **3.4 Health-check 11 points HTTP réel** : nouveau `services/launch_health_check.py::run_health_check(site_id)`. **11 vérifications concrètes** (homepage_reachable, robots_txt_present, sitemap_xml_valid, ssl_certificate, no_noindex_header (Googlebot UA), products_published ≥3, blog_posts_published ≥10, legal_pages présentes, ga4_tracking, gsc_provisioned, gmc_provisioned). Score 0-11, status pass (≥9) / warn (≥6) / fail. Persisté sur `sites.{id}.health_check`. Endpoint `POST /api/sites/{id}/launch/health-check`. **Test sur Altea : 9/11 PASS** (les 2 fails attendus = `no_noindex_header` Cloudflare preview + `legal_pages` jamais structuré sur Altea).
+- **3.5 Annuaires machine d'état** : nouveau `services/directory_fsm.py`. Machine d'état `queued → submitting → pending_review → live | failed`. Fonction `transition(submission_id, new_state, note=, detail=)` qui write event log dans nouvelle collection `directory_submission_events`. Cron `follow_up_pending_reviews` toutes les 6h : pour chaque submission `pending_review`, fetch HTTP du listing_url, recherche `site_domain` dans le HTML, si trouvé → transition `live`. Job APScheduler `directory_followup` ajouté. Endpoint manuel `POST /api/admin/cron/directory-followup`.
+
+### Documentation
+
+- **Procédure GCP Production** : `memory/GCP_PRODUCTION_PUBLISH_STEPS.md` créé (env. 320 lignes). 6 étapes pas-à-pas avec URLs exactes Cloud Console, captures décrites textuellement, FAQ pièges fréquents, checklist final 9 cases. Couvre : OAuth consent screen `EDIT APP`, scopes restricted/sensitive, `PUBLISH APP` + Verification needed (Option A skip / Option B submit), credentials, APIs à enable (analyticsadmin + content + googleads + webmasters + siteverification + analyticsdata), reconnect Master, tests post-publication (`google_master_health_tick`, `provision_for_site`, `fetch_keyword_volumes`), contrôle long-terme >7j.
+
+### Endpoints ajoutés
+
+- `POST /api/sites/{id}/launch/health-check` (health-check 11 pts)
+- `POST /api/sites/{id}/launch/bing-provision` (Bing AddSite + SubmitSitemap)
+- `POST /api/sites/{id}/legal/adapt-niche` (Sprint 2.3)
+- `POST /api/admin/cron/aliexpress-refresh` (manual trigger)
+- `POST /api/admin/cron/directory-followup` (manual trigger)
+- `GET /api/admin/integrations/bing-status` (config check)
+
+→ **Total endpoints : 418 → 424.**
+
+### Smoke test
+
+- Création de site `Jardin Premium` (niche "outils de jardinage premium", FR/fr-FR) — site_id `f2f8c37e-f37c-4561-ab0f-c29a8064cf2a` ✅
+- Health-check sur site neuf : 0/11 (skipped pour `no_custom_domain` × 5, fail pour `products=0`, `blog=0`, `legal vide`, `ga4 vide`, `gsc vide`, `gmc vide`) — **comportement attendu**, valide le scoring.
+- Health-check sur Altea : **9/11 PASS** (homepage 200, robots OK, sitemap OK, SSL OK, products=9, blog=80, GA4 set, GSC OK, GMC OK; les 2 fails = noindex Cloudflare preview + legal vide → connus, hors scope sprint).
+- Sprint 1 helpers testés unitairement (Jaccard 0.222 entre 2 articles fauteuils releveurs, 0.0 vs monte-escalier ; extraction 2/3 refs externes correctes ; détection pays DE/ES/FR OK).
+- Sprint 2.2 testé : pHash compute + hamming_distance OK ; style_seed Altea = 9 972 839 (stable, idempotent) ; style_suffix = "Style directive (seed 9972839): 24mm wide, f/5.6; soft morning window light; warm and intimate…"
+- Sprint 1.2 Keyword Planner : `available=False, reason=no_admin_connected` (Google OAuth en `invalid_grant` confirmé — c'est exactement le bloqueur P0 que `GCP_PRODUCTION_PUBLISH_STEPS.md` résout).
+
+
+
 ## 2026-05-04 · Phase 3.3 — Finitions + Magic Content réel sur Altea
 
 ### Bloc 1 — Fixes UX/Branding
