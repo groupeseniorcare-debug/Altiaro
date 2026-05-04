@@ -973,6 +973,42 @@ async def _run_launch_inner(job_id: str, site_id: str, user_id: str, wizard: dic
             {"$set": {"design.legal_pages": design2["legal_pages"],
                       "design.updated_at": datetime.now(timezone.utc).isoformat()}},
         )
+        # Sprint 2.3 — adapt legal templates to the niche via Claude Haiku.
+        # Idempotent : skip if already done. Best-effort : si l'IA échoue, on
+        # garde les templates standards déjà injectés ci-dessus.
+        try:
+            existing_legal = (site2.get("legal") or {})
+            niche_already_done = any(
+                isinstance(v, dict) and v.get("niche_adapted") for v in existing_legal.values()
+            )
+            if not niche_already_done and not budget_exhausted:
+                from services.legal_niche_adapter import adapt_legal_for_niche
+                niche = site2.get("niche") or "e-commerce premium"
+                # base_texts : on prend le markdown injecté à l'étape précédente
+                legal_pages = design2.get("legal_pages") or {}
+                base = {}
+                for k in ("cgv", "mentions", "confidentialite", "livraison", "retours"):
+                    v = legal_pages.get(k) or {}
+                    if isinstance(v, dict):
+                        base[k] = v.get("body_md") or v.get("body") or ""
+                    elif isinstance(v, str):
+                        base[k] = v
+                base = {k: v for k, v in base.items() if v}
+                if base:
+                    adapted = await adapt_legal_for_niche(site_id, niche, base)
+                    update_payload = {}
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    for k, text in adapted.items():
+                        update_payload[f"legal.{k}.body_md"] = text
+                        update_payload[f"legal.{k}.niche_adapted"] = True
+                        update_payload[f"legal.{k}.niche"] = niche
+                        update_payload[f"legal.{k}.updated_at"] = now_iso
+                    if update_payload:
+                        await db.sites.update_one({"id": site_id}, {"$set": update_payload})
+                        logger.info(f"[launch] legal pages adapted to niche '{niche}' "
+                                    f"({len(adapted)} sections)")
+        except Exception as e:
+            logger.warning(f"[launch] legal niche adaptation skipped: {str(e)[:160]}")
 
         # 8) Products — narrative + images (biggest step) ------------------
         # Phase 4 — bucket : on tagge "content" pour copywriting et "images"

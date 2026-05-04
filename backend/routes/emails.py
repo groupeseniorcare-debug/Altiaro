@@ -25,6 +25,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
 
 from deps import db, get_current_user
+from services.email_i18n import t as i18n_t, detect_order_lang, normalize_lang
 
 logger = logging.getLogger("conceptfactory.emails")
 router = APIRouter()
@@ -75,7 +76,11 @@ async def get_site_from_email(site: dict) -> str:
 
 # ============== TEMPLATE SHELL (inline CSS, table-based) ============== #
 def _email_shell(brand_name: str, logo_url: str, primary: str,
-                 site_url: str, inner_html: str, preheader: str = "") -> str:
+                 site_url: str, inner_html: str, preheader: str = "",
+                 lang: str = "fr") -> str:
+    lang = normalize_lang(lang)
+    contact_html = i18n_t("shell.contact_us_html", lang=lang,
+                          contact_url=f"{site_url}/contact", primary=primary)
     logo_block = (
         f'<img src="{logo_url}" alt="{brand_name}" '
         f'style="max-width:180px;height:auto;display:block;">'
@@ -84,7 +89,7 @@ def _email_shell(brand_name: str, logo_url: str, primary: str,
         f'{brand_name}</div>'
     )
     return f"""<!DOCTYPE html>
-<html lang="fr">
+<html lang="{lang}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -109,7 +114,7 @@ def _email_shell(brand_name: str, logo_url: str, primary: str,
         <tr>
           <td style="padding:24px 32px;background:#FAF7F2;border-top:1px solid #E7E5E4;text-align:center;">
             <p style="margin:0 0 8px 0;font-size:13px;color:#57534E;">
-              Une question ? <a href="{site_url}/contact" style="color:{primary};text-decoration:none;">Contactez-nous</a>
+              {contact_html}
             </p>
             <p style="margin:0;font-size:11px;color:#A8A29E;">
               © {datetime.now(timezone.utc).year} {brand_name} · <a href="{site_url}" style="color:#A8A29E;text-decoration:none;">{site_url.replace('https://', '').replace('http://', '')}</a>
@@ -190,6 +195,7 @@ def _eur(v: float) -> str:
 
 def _order_rows_html(order: dict, lang: str = "fr") -> str:
     items = order.get("items") or []
+    quantity_label = i18n_t("order_confirmation.quantity", lang=lang)
     rows = []
     for it in items:
         name = it.get("name") or ""
@@ -202,7 +208,7 @@ def _order_rows_html(order: dict, lang: str = "fr") -> str:
         <tr>
           <td style="padding:12px 0;border-bottom:1px solid #F5F2EB;">
             <strong style="color:#1C1917;font-size:14px;">{name}</strong><br>
-            <span style="color:#78716C;font-size:12px;">Quantité : {qty}</span>
+            <span style="color:#78716C;font-size:12px;">{quantity_label} : {qty}</span>
           </td>
           <td style="padding:12px 0;border-bottom:1px solid #F5F2EB;text-align:right;font-family:monospace;font-size:14px;">{_eur(line_total)}</td>
         </tr>""")
@@ -211,11 +217,13 @@ def _order_rows_html(order: dict, lang: str = "fr") -> str:
 
 async def build_order_confirmation_html(order: dict, site: dict) -> str:
     brand = site.get("name") or "Boutique"
+    lang = detect_order_lang(order, site)
     design = site.get("design") or {}
     logo = (design.get("brand") or {}).get("logo_url") or ""
     primary = (design.get("brand") or {}).get("primary_color") or "#B84B31"
     site_url = await get_site_public_url(site)
-    customer_name = (order.get("customer") or {}).get("name") or "Bonjour"
+    customer_name = ((order.get("customer") or {}).get("name")
+                     or i18n_t("shell.greeting_fallback", lang=lang))
     order_number = order.get("order_number") or order.get("id", "")[:8].upper()
     subtotal = float(order.get("subtotal") or 0)
     shipping = float(order.get("shipping_total") or 0)
@@ -223,67 +231,88 @@ async def build_order_confirmation_html(order: dict, site: dict) -> str:
     total = float(order.get("total") or 0)
     order_url = f"{site_url}/account/orders/{order.get('id')}"
 
+    title = i18n_t("order_confirmation.title_with_name", lang=lang, customer_name=customer_name)
+    confirmed_text = i18n_t("order_confirmation.confirmed_text", lang=lang, order_number=order_number)
+    your_order = i18n_t("order_confirmation.your_order", lang=lang)
+    sub_label = i18n_t("order_confirmation.subtotal", lang=lang)
+    ship_label = i18n_t("order_confirmation.shipping", lang=lang)
+    tax_label = i18n_t("order_confirmation.tax", lang=lang)
+    total_label = i18n_t("order_confirmation.total", lang=lang)
+    track_label = i18n_t("order_confirmation.track_my_order", lang=lang)
+    legal_notice = i18n_t("order_confirmation.legal_notice", lang=lang, brand=brand)
+    security_notice = i18n_t("order_confirmation.security_notice", lang=lang)
+    preheader = i18n_t("order_confirmation.preheader", lang=lang, order_number=order_number)
+
     inner = f"""
-<h1 style="font-family:Georgia,serif;font-size:26px;font-weight:600;color:#1C1917;margin:0 0 8px 0;line-height:1.2;">Merci pour votre commande, {customer_name} !</h1>
+<h1 style="font-family:Georgia,serif;font-size:26px;font-weight:600;color:#1C1917;margin:0 0 8px 0;line-height:1.2;">{title}</h1>
 <p style="color:#57534E;font-size:15px;line-height:1.6;margin:0 0 24px 0;">
-  Votre commande <strong style="color:{primary};">#{order_number}</strong> a été confirmée.
-  Nous préparons l'expédition et vous recevrez un email dès qu'elle partira.
+  {confirmed_text}
 </p>
 
 <div style="background:#FAF7F2;border-radius:12px;padding:20px 20px 8px 20px;margin:24px 0;">
-  <h2 style="font-family:Georgia,serif;font-size:16px;margin:0 0 12px 0;color:#1C1917;">Votre commande</h2>
+  <h2 style="font-family:Georgia,serif;font-size:16px;margin:0 0 12px 0;color:#1C1917;">{your_order}</h2>
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    {_order_rows_html(order)}
-    <tr><td style="padding:10px 0 4px 0;color:#78716C;font-size:13px;">Sous-total</td><td style="padding:10px 0 4px 0;text-align:right;font-family:monospace;font-size:13px;">{_eur(subtotal)}</td></tr>
-    <tr><td style="padding:2px 0;color:#78716C;font-size:13px;">Livraison</td><td style="padding:2px 0;text-align:right;font-family:monospace;font-size:13px;">{_eur(shipping)}</td></tr>
-    <tr><td style="padding:2px 0 12px 0;color:#78716C;font-size:13px;">TVA</td><td style="padding:2px 0 12px 0;text-align:right;font-family:monospace;font-size:13px;">{_eur(tax)}</td></tr>
-    <tr><td style="padding:12px 0 0 0;border-top:2px solid #1C1917;font-weight:600;font-size:15px;">Total</td><td style="padding:12px 0 0 0;text-align:right;border-top:2px solid #1C1917;font-family:monospace;font-size:18px;font-weight:600;color:{primary};">{_eur(total)}</td></tr>
+    {_order_rows_html(order, lang=lang)}
+    <tr><td style="padding:10px 0 4px 0;color:#78716C;font-size:13px;">{sub_label}</td><td style="padding:10px 0 4px 0;text-align:right;font-family:monospace;font-size:13px;">{_eur(subtotal)}</td></tr>
+    <tr><td style="padding:2px 0;color:#78716C;font-size:13px;">{ship_label}</td><td style="padding:2px 0;text-align:right;font-family:monospace;font-size:13px;">{_eur(shipping)}</td></tr>
+    <tr><td style="padding:2px 0 12px 0;color:#78716C;font-size:13px;">{tax_label}</td><td style="padding:2px 0 12px 0;text-align:right;font-family:monospace;font-size:13px;">{_eur(tax)}</td></tr>
+    <tr><td style="padding:12px 0 0 0;border-top:2px solid #1C1917;font-weight:600;font-size:15px;">{total_label}</td><td style="padding:12px 0 0 0;text-align:right;border-top:2px solid #1C1917;font-family:monospace;font-size:18px;font-weight:600;color:{primary};">{_eur(total)}</td></tr>
   </table>
 </div>
 
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
   <tr><td align="center">
-    <a href="{order_url}" style="display:inline-block;padding:14px 28px;background:{primary};color:#FFFFFF;text-decoration:none;border-radius:999px;font-weight:500;font-size:14px;">Suivre ma commande →</a>
+    <a href="{order_url}" style="display:inline-block;padding:14px 28px;background:{primary};color:#FFFFFF;text-decoration:none;border-radius:999px;font-weight:500;font-size:14px;">{track_label} →</a>
   </td></tr>
 </table>
 
 <p style="color:#78716C;font-size:12px;line-height:1.6;margin:24px 0 0 0;">
-  Paiement opéré par Altiaro SAS (France) pour le compte de {brand}.<br>
-  Cet email est envoyé à l'adresse indiquée lors du paiement. Si vous ne reconnaissez pas cette commande, contactez-nous immédiatement.
+  {legal_notice}<br>
+  {security_notice}
 </p>
 """
     return _email_shell(brand, logo, primary, site_url, inner,
-                        preheader=f"Votre commande #{order_number} est confirmée")
+                        preheader=preheader, lang=lang)
 
 
 async def build_shipping_update_html(order: dict, site: dict,
                                      tracking_number: str, carrier: str = "") -> str:
     brand = site.get("name") or "Boutique"
+    lang = detect_order_lang(order, site)
     design = site.get("design") or {}
     logo = (design.get("brand") or {}).get("logo_url") or ""
     primary = (design.get("brand") or {}).get("primary_color") or "#B84B31"
     site_url = await get_site_public_url(site)
-    customer_name = (order.get("customer") or {}).get("name") or "Bonjour"
+    customer_name = ((order.get("customer") or {}).get("name")
+                     or i18n_t("shell.greeting_fallback", lang=lang))
     order_number = order.get("order_number") or order.get("id", "")[:8].upper()
-    carrier_label = carrier or "votre transporteur"
+    carrier_label = carrier or i18n_t("shipping_update.default_carrier", lang=lang)
+
+    title = i18n_t("shipping_update.title_with_name", lang=lang, customer_name=customer_name)
+    body_text = i18n_t("shipping_update.body_text", lang=lang,
+                       order_number=order_number, carrier=carrier_label)
+    tracking_label = i18n_t("shipping_update.tracking_label", lang=lang)
+    help_text = i18n_t("shipping_update.help_text", lang=lang)
+    preheader = i18n_t("shipping_update.preheader", lang=lang,
+                       order_number=order_number, tracking=tracking_number)
 
     inner = f"""
-<h1 style="font-family:Georgia,serif;font-size:26px;font-weight:600;color:#1C1917;margin:0 0 8px 0;line-height:1.2;">📦 Votre commande est expédiée, {customer_name} !</h1>
+<h1 style="font-family:Georgia,serif;font-size:26px;font-weight:600;color:#1C1917;margin:0 0 8px 0;line-height:1.2;">{title}</h1>
 <p style="color:#57534E;font-size:15px;line-height:1.6;margin:0 0 24px 0;">
-  Bonne nouvelle : la commande <strong style="color:{primary};">#{order_number}</strong> est partie chez {carrier_label}.
+  {body_text}
 </p>
 
 <div style="background:#FAF7F2;border-radius:12px;padding:24px;margin:24px 0;text-align:center;">
-  <div style="font-size:12px;color:#78716C;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Numéro de suivi</div>
+  <div style="font-size:12px;color:#78716C;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">{tracking_label}</div>
   <div style="font-family:monospace;font-size:20px;font-weight:600;color:#1C1917;letter-spacing:1px;">{tracking_number}</div>
 </div>
 
 <p style="color:#78716C;font-size:13px;line-height:1.6;margin:16px 0;">
-  La livraison peut prendre quelques jours ouvrés. En cas de problème, contactez-nous — nous sommes là pour vous aider.
+  {help_text}
 </p>
 """
     return _email_shell(brand, logo, primary, site_url, inner,
-                        preheader=f"Expédition #{order_number} — suivi {tracking_number}")
+                        preheader=preheader, lang=lang)
 
 
 async def build_admin_new_order_html(order: dict, site: dict) -> str:
@@ -329,13 +358,16 @@ async def build_admin_new_order_html(order: dict, site: dict) -> str:
 async def send_order_confirmation(order: dict, site: dict) -> dict:
     if not (order.get("customer") or {}).get("email"):
         return {"sent": False, "reason": "no_customer_email"}
+    lang = detect_order_lang(order, site)
     html = await build_order_confirmation_html(order, site)
     order_number = order.get("order_number") or order.get("id", "")[:8].upper()
+    subject = i18n_t("order_confirmation.subject", lang=lang,
+                      brand=site.get("name", "")) + f" · #{order_number}"
     return await send_email_via_resend(
         to=order["customer"]["email"],
-        subject=f"Votre commande #{order_number} · {site.get('name','')}",
+        subject=subject,
         html=html, site=site,
-        tags=["order_confirmation", f"site:{site.get('id','')[:8]}"],
+        tags=["order_confirmation", f"site:{site.get('id','')[:8]}", f"lang:{lang}"],
     )
 
 
@@ -343,13 +375,16 @@ async def send_shipping_update(order: dict, site: dict,
                                tracking_number: str, carrier: str = "") -> dict:
     if not (order.get("customer") or {}).get("email"):
         return {"sent": False, "reason": "no_customer_email"}
+    lang = detect_order_lang(order, site)
     html = await build_shipping_update_html(order, site, tracking_number, carrier)
     order_number = order.get("order_number") or order.get("id", "")[:8].upper()
+    subject = "📦 " + i18n_t("shipping_update.subject", lang=lang,
+                              brand=site.get("name", "")) + f" · #{order_number}"
     return await send_email_via_resend(
         to=order["customer"]["email"],
-        subject=f"📦 Votre commande #{order_number} est expédiée",
+        subject=subject,
         html=html, site=site,
-        tags=["shipping_update"],
+        tags=["shipping_update", f"lang:{lang}"],
     )
 
 
