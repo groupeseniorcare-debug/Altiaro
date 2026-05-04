@@ -414,12 +414,12 @@ export default function SiteBranding() {
                   </button>
                 )}
                 <Link
-                  to={`/sites/${siteId}/pages?step=6`}
+                  to={`/sites/${siteId}/domains?step=6`}
                   data-testid="goto-step6"
                   className="h-10 px-4 bg-white border text-[13px] font-medium text-neutral-900 flex items-center gap-2 hover:border-neutral-900 transition"
                   style={{ borderColor: "#E5E5E5", borderRadius: "2px" }}
                 >
-                  Étape suivante · Rédiger les pages <ArrowRight size={12} />
+                  Étape suivante · Configurer le domaine <ArrowRight size={12} />
                 </Link>
               </div>
             </div>
@@ -581,12 +581,12 @@ export default function SiteBranding() {
                 <p className="text-[12.5px] text-neutral-500 mt-1">À propos, FAQ, Contact, CGV, Livraison, Retours — en 1 clic avec l'IA.</p>
               </div>
               <Link
-                to={`/sites/${siteId}/pages?step=6`}
+                to={`/sites/${siteId}/domains?step=6`}
                 data-testid="goto-step6-footer"
                 className="h-11 px-5 bg-neutral-900 hover:bg-black text-white text-[13px] font-semibold flex items-center gap-2"
                 style={{ borderRadius: "2px" }}
               >
-                Étape 6 · Rédiger les pages <ArrowRight size={13} weight="bold" />
+                Étape 6 · Configurer le domaine <ArrowRight size={13} weight="bold" />
               </Link>
             </div>
           </div>

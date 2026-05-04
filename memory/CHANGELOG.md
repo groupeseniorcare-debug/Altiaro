@@ -1,6 +1,73 @@
 # Altiora — CHANGELOG
 
 
+## 2026-05-04 · Phase 1 — SSR Coverage + UA Routing Edge
+
+> **Scope strict, aucune génération LLM, aucun appel Google API.**
+> Phase 0 validée par e1_tester (4/4 PASS) en amont.
+
+### `backend/routes/prerender.py` — réécrit (190 → 580 lignes)
+- 5 nouveaux renderers : `_render_comparison`, `_render_top_list`, `_render_longtail`, `_render_blog`, `_render_collection`. Chacun produit un HTML complet (head + body + JSON-LD adapté, charte sobre serif/760px max).
+- Fix bug SSR `about_rich` (signalé Phase 0) : `_render_home` et `_render_about` lisent désormais en cascade `design.cms_pages.about` (premium 2026-04+) → `design.about` (legacy multilingue) → fallback générique. La home Altea retourne le contenu réel (`<h1>Altea</h1>` + tagline `cms_pages.about.subtitle` + body_md 1592 chars convertis HTML).
+- Helpers communs ajoutés : `_h` (HTML escape), `_pick_lang` (extraction multilingue dict/str), `_md_to_html` (markdown → HTML safe-for-bots), `_render_head` (head + JSON-LD + OG + canonical), `_base_style` (charte sobre).
+- Aliases rétrocompat : `/compare/{slug}` (= `/comparisons/{slug}`) et `/top/{slug}` (= `/top-lists/{slug}`) supportés en lecture pour ne pas casser le storefront actuel qui utilise les paths singuliers.
+- API programmatique exportée : `prerender_html(site, path) -> Optional[str]` et `is_indexable_path(path) -> bool`. Consommée par le middleware UA-routing sans HTTP round-trip.
+- JSON-LD adapté par type : `Organization` (home), `AboutPage` (/about), `Product` (PDP), `Article` + `FAQPage` dual (buyer-guides, comparisons, longtail), `ItemList` + `FAQPage` dual (top-lists), `BlogPosting` (blog), `CollectionPage` + `ItemList` (collections), `DefinedTerm` (glossary).
+- Robustesse multilingue : `_pick_lang` gère les champs blog (`title`, `body`, `meta_title`, `meta_description`, `excerpt`) qui peuvent être `dict {lang: str}` ou `str` selon l'âge du document. Fix d'un `AttributeError: 'dict' object has no attribute 'replace'` détecté et corrigé en cours de Phase 1.
+
+### `backend/prerender_routing_middleware.py` — créé (135 lignes)
+- Middleware ASGI Starlette monté en premier (LIFO). Détecte 23 bots/LLM crawlers via regex compilée case-insensitive : Googlebot, Bingbot, DuckDuckBot, YandexBot, Slurp, Baiduspider, FacebookExternalHit, Twitterbot, LinkedInBot, DiscordBot, Slackbot, TelegramBot, WhatsApp, GPTBot, ChatGPT-User, OAI-SearchBot, ClaudeBot, Claude-Web, anthropic-ai, PerplexityBot, CCBot, Google-Extended, Applebot, YouBot, AmazonBot, Bytespider.
+- Pipeline de check (rapide → cher) : (1) méthode GET, (2) UA matche `_BOT_RE`, (3) path indexable via `is_indexable_path`, (4) host non-plateforme, (5) résolution `_resolve_site_for_host`, (6) `prerender_html` retourne du contenu.
+- Headers de réponse : `X-Prerender: 1`, `X-Prerender-By: altiaro-edge`, `Cache-Control: public, max-age=300, s-maxage=300`, `Vary: User-Agent`.
+- Logging INFO sur chaque interception réussie. WARNING sur exceptions (fallback gracieux passthrough). Zéro impact humain : tests confirment que Chrome n'est pas matché.
+
+### `backend/server.py`
+- Import + montage du middleware `prerender_routing` après `custom_domain_rewrite`. Starlette stack LIFO → `prerender_routing` s'exécute en PREMIER. Commentaire d'orientation ajouté.
+
+### `backend/routes/robots_smart.py::sitemap_prerender`
+- Sitemap dédié au pipeline Dynamic Rendering enrichi : 97 URLs sur Altea (vs 62 avant Phase 1). Ajouts : 18 blog, 2 collections, slot longtail. Convention canonique paths `/comparisons/` et `/top-lists/` (au lieu de `/compare/` et `/top/`). `<lastmod>` issu de `updated_at`/`created_at` injecté pour chaque URL. `<changefreq>` adapté par type (weekly products/blog/home, monthly buyer-guides/comparisons/top-lists/glossary, monthly about). Priorités hiérarchisées 1.0 → 0.5.
+
+### Frontend — séquelles Phase 0 résolues
+
+#### `frontend/src/pages/SitePages.jsx` — déprécié (refactor 266 → 33 lignes)
+Remplacé par un composant Navigate qui redirige vers `/sites/:id/branding` avec un `console.warn` documentant la dépréciation. Le `<Route path="/sites/:id/pages">` reste monté dans `App.js` pour ne pas casser les bookmarks/liens directs externes ; il sert désormais juste de redirect.
+
+#### `frontend/src/pages/SiteBranding.jsx` — fix les 2 liens « étape 6 »
+Lignes 417 et 584 : `to={`/sites/${siteId}/pages?step=6`}` → `to={`/sites/${siteId}/domains?step=6`}`. Labels CTA mis à jour : « Rédiger les pages » → « Configurer le domaine » (Étape 6 = `domain` dans STEP_ORDER actuel).
+
+#### Audit `step=N` complet — 100% aligné STEP_ORDER
+13 occurrences de `?step=N` dans `frontend/src/`. Toutes vérifiées :
+| Fichier | Ligne | URL | Step | Cohérence |
+|---|---|---|---|---|
+| CockpitJourney.jsx | 43-46 | branding=5, domain=6, content=7, translate=8 | ✅ | ✅ |
+| NextStepCTA.jsx | 30-33 | idem | ✅ | ✅ |
+| SiteBlogPosts.jsx | 327 | translate=8 | ✅ | ✅ |
+| SiteBranding.jsx | 417, 584 | **avant** : pages=6 → **après** : domain=6 | ✅ | ✅ Phase 1 |
+| SiteDetail.jsx | 48-52 | idem | ✅ | ✅ |
+
+### Tests d'acceptation (8/8) — résultats
+1. ✅ `curl -A "Googlebot" http://altea-home.com/comparisons/{slug}` → HTTP 200, `X-Prerender:1`, 32344 octets, h1 rempli avec le titre comparatif.
+2. ✅ Idem `/top-lists/{slug}` (8538 octets), `/blog/{slug}` (17867 octets), `/collections/{slug}` (5933 octets).
+3. ✅ `/about` retourne 4135 octets de contenu réel (`<h1>Altea — L'art de vivre debout, assis</h1>` + body cms_pages.about). Plus de HTML vide.
+4. ✅ Chrome humain → pas de header `X-Prerender` → middleware passthrough confirmé. (En local le backend retourne 404 car le SPA est sur le port 3000 ; en prod via Approximated le humain reçoit le SPA via le frontend, comportement intact.)
+5. ✅ Sitemap-prerender : 97 URLs (16 comparisons + 5 top-lists + 5 buyer-guides + 18 blog + 2 collections + 40 glossary + 9 products + home + about). 0 longtail (collection vide pour Altea — attendu).
+6. ✅ `grep "/pages?step" frontend/src/` = 0 occurrence. `grep "about_rich" backend/` retourne 5 lectures gracieuses (`.get("about_rich") or {}`) dans services consommateurs (pinterest_publisher, directory_submitter, brand_premium, featured_press_outreach, seo_content) — non-bloquantes, signalées hors scope.
+7. ✅ Audit `step=N` : 13/13 occurrences alignées sur STEP_ORDER backend (table de correspondance ci-dessus).
+8. ✅ Backend redémarré, 404 endpoints OpenAPI, 24 crons APScheduler OK, supervisor logs clean.
+
+### Confirmations
+- **Aucune génération LLM déclenchée.** Le module `prerender.py` ne fait QUE de la lecture MongoDB + transformation HTML. Aucun appel à `safe_claude_text/json`, `safe_nano_banana_bytes`, `services.llm_resilience`.
+- **Aucun appel Google API déclenché.** Les routes GSC/GMC/Ads et `services/gsc_provisioning.py` n'ont pas été modifiés ni invoqués.
+
+### Incohérences signalées hors scope (non corrigées)
+1. `services/brand_premium.py:130` est le seul écrivain de `site.about_rich` mais ne s'est jamais exécuté avec succès sur Altea (cf. Phase 0 : `team_members=0`, `about_rich` absent). 5 services lecteurs de `about_rich` continuent de fonctionner avec fallback `.get(...) or {}`. À corriger en Phase 2 quand le budget LLM sera rétabli (cf. `backend/scripts/regenerate_about_team.py` dry-run).
+2. La regex `_BOT_RE` matche `Slackbot` qui contient `bot` mais aussi pourrait matcher partiellement d'autres UA exotiques. Acceptable (faux positifs côté SSR = simplement servir du HTML léger à un humain anonyme avec UA atypique).
+3. `frontend/src/pages/SitePages.jsx` redirige désormais ; aucun lien interne ne pointe plus vers `/sites/:id/pages` mais la route reste montée pour back-compat. Si tu veux la décommissionner totalement, il faudra retirer le `<Route>` dans `App.js` et l'import du composant.
+
+
+---
+
+
 ## 2026-05-04 · Phase 0 — Cleanup & remise à plat
 
 > **Scope strict, aucune génération LLM, aucun appel Google API.**

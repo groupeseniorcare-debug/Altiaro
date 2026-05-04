@@ -1,6 +1,6 @@
 # Altiaro — PRD (Product Requirements Document)
 
-> **Dernière mise à jour : 2026-05-04 (Phase 0 Cleanup)**
+> **Dernière mise à jour : 2026-05-04 (Phase 1 — SSR Coverage + UA Routing Edge)**
 >
 > Document **statique** : problem statement, personas, exigences core.
 > L'historique des livrables est dans **CHANGELOG.md**, le backlog dans **ROADMAP.md**,
@@ -188,13 +188,27 @@ Voir `/app/memory/test_credentials.md`.
 | **R1** | Budget LLM Emergent à 100,04 % ($118.04/$118.00) — toute génération bloquée | 🔴 Bloquant — recharger Emergent |
 | **R2** | Refresh token Google Master expiré (`invalid_grant`) — bloque GSC/GMC/Ads | 🔴 Bloquant — reconnecter + passer GCP en Production |
 | **R3** | Pinterest token 401 — scopes write absents OU PAT révoqué | 🟠 Bloquant publisher |
-| **R4** | Pas de routing UA-based Edge-level — `robots.smart.txt` seul | 🟡 Risque SEO/AEO mitigé |
+| **R4** | ~~Pas de routing UA-based Edge-level~~ — **résolu Phase 1** : `backend/prerender_routing_middleware.py` intercepte 23 bots/LLM crawlers et sert le HTML prerender avant que le SPA React ne charge | ✅ Résolu |
 | **R5** | Coût LLM par site ~$5-8 (vs $25-30 annoncé initialement) — 15 sites/mois maxi avec budget actuel | 🟡 À mesurer empiriquement |
 | **R6** | `FEATURED_API_KEY` absente — worker idle | 🟡 Pipeline press inactif |
-| **R7** | Comparisons / top-lists / blog non prerenderés côté SSR | 🟡 Couverture bots partielle |
+| **R7** | ~~Comparisons / top-lists / blog non prerenderés côté SSR~~ — **résolu Phase 1** : 5 nouveaux types ajoutés (comparison, top_list, longtail, blog, collection). Sitemap-prerender passe de 62 → 97 URLs sur Altea. | ✅ Résolu |
 | **R8** | Step `pages` orphelin | ✅ Résolu Phase 0 |
 | **R9** | About/Team incohérent sur Altea (`team_members=0`, `about_rich` absent) | 🟡 Script dry-run prêt pour Phase 2 |
 | **R10** | Champ `alt_texts` produit non visible | ✅ Résolu Phase 0 (stocké dans `generated_images[].alt_text`) |
+
+## Notes architecture (Phase 1 — 2026-05-04)
+
+### SSR / Dynamic Rendering — couverture étendue
+- **10 types de pages prerenderés** (vs 5 avant) : `/`, `/about`, `/products/{slug}`, `/buyer-guides/{slug}`, `/glossary/{slug}`, `/comparisons/{slug}`, `/top-lists/{slug}`, `/longtail/{slug}`, `/blog/{slug}`, `/collections/{slug}`. Aliases rétrocompat : `/compare/{slug}` et `/top/{slug}` (utilisés par le storefront actuel) toujours acceptés en lecture, **non** listés dans le sitemap pour éviter la duplication d'index.
+- **Bug `about_rich` corrigé** : `prerender.py` lit désormais en cascade `cms_pages.about` → `design.about` → fallback générique. La home et `/about` retournent le contenu réel sur Altea (vérifié : `<h1>Altea — L'art de vivre debout, assis</h1>` + body 4135 octets).
+- **API programmatique** `prerender_html(site, path) → Optional[str]` exportée depuis `routes/prerender.py`, consommée par le middleware UA-routing sans round-trip HTTP.
+- **Sitemap-prerender enrichi** : 97 URLs sur Altea (16 comparisons + 5 top-lists + 5 buyer-guides + 18 blog + 2 collections + 40 glossary + 9 products + home + about). `<lastmod>` ajouté (issu de `updated_at`/`created_at`). Priorités hiérarchisées : home 1.0, products 0.9, buyer-guides 0.8, comparisons/top-lists 0.7, glossary/blog 0.6, longtail/collections 0.5.
+
+### Routing UA-based Edge-level
+- **Middleware `backend/prerender_routing_middleware.py`** monté en premier dans Starlette (LIFO). Intercepte les `GET` provenant de 23 User-Agents bots/LLM (Googlebot, Bingbot, GPTBot, ChatGPT-User, ClaudeBot, Claude-Web, anthropic-ai, PerplexityBot, CCBot, Google-Extended, Applebot, OAI-SearchBot, Bytespider, FacebookExternalHit, etc.) sur des paths indexables. Réponse : `HTMLResponse(prerender_html(...), headers={X-Prerender:1, X-Prerender-By:altiaro-edge, Cache-Control:public,max-age=300, Vary:User-Agent})`.
+- **Zéro impact utilisateur humain** : aucun User-Agent navigateur classique ne matche `_BOT_RE`. Vérifié en local : Chrome → pas de header `X-Prerender` → request transmise à `custom_domain_rewrite` puis SPA.
+- **Résolution site** : réutilise `_resolve_site_for_host` et `_host_is_platform` de `custom_domain_middleware.py` (cache TTL inclus) — pas de duplication de logique.
+- **Logging** : chaque interception logguée en INFO (`[prerender-routing] bot='Mozilla/5.0...' host=altea-home.com path=/products/... → SSR served`). Les exceptions de rendu sont logguées WARNING et fallback gracieux vers la chaîne normale.
 
 ## Notes architecture (Phase 0 — 2026-05-04)
 

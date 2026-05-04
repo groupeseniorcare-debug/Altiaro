@@ -1143,6 +1143,15 @@ cors_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
 from custom_domain_middleware import custom_domain_rewrite  # noqa: E402
 app.middleware("http")(custom_domain_rewrite)
 
+# UA-routing edge-level (Phase 1 — 2026-05-04) :
+# intercepte les bots SEO/LLM sur paths indexables et sert le HTML prerender
+# AVANT que custom_domain_rewrite ne préfixe /shop/{site_id}/. Pas d'impact
+# pour les utilisateurs humains. Doit être appliqué APRÈS custom_domain
+# côté ordre de déclaration pour s'exécuter EN PREMIER (Starlette empile
+# les middlewares LIFO : last-added = first-executed).
+from prerender_routing_middleware import prerender_routing  # noqa: E402
+app.middleware("http")(prerender_routing)
+
 # Wildcard mode with credentials: use allow_origin_regex to echo request origin
 # (Starlette refuses to send ACAO:<origin> when allow_origins=["*"] and credentials=True,
 # and browsers reject ACAO:* with credentials. The regex form sidesteps both issues.)
