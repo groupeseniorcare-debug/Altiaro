@@ -200,18 +200,20 @@ export default function SiteBranding() {
   // ── First-run hero : 2 options claires (Auto IA ⭐ vs Wizard manuel) ──
   // Affiché tant qu'aucun design n'existe. Une fois généré, on bascule sur
   // le layout d'édition normal (essentiel/avancé).
+  // Early return : wrappé dans StepLayout pour garder counter + progress dots
+  // + toggle « À quoi ça sert ? » cohérents même si le design n'est pas encore
+  // publié (cas : concepteur qui arrive pour la première fois sur l'étape 5).
   if (!hasDesign) {
     return (
-      <div className="min-h-screen bg-[#FAFAFA]">
-        <div className="max-w-4xl mx-auto px-6 md:px-10 py-12">
-          <Link
-            to={`/sites/${siteId}`}
-            className="inline-flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900 mb-8"
-            data-testid="back-to-cockpit"
-          >
-            <ArrowLeft size={14} /> Retour au cockpit
-          </Link>
-
+      <StepLayout
+        siteId={siteId}
+        stepKey="branding"
+        title="Identité de marque"
+        subtitle="Génère ou ajuste logo, palette, hero, testimonials et FAQ en quelques clics."
+        estimatedTime="~5 min"
+        whatItDoes="Le BrandWizard génère en quelques secondes un nom, un logo SVG premium, une palette cohérente, un hero section avec visuel IA, 3 testimonials crédibles et une FAQ de 8 questions. Chaque élément est éditable via AiTweakPanel. Publie le design quand tu es satisfait — le storefront reflète instantanément les changements."
+      >
+        <div className="max-w-4xl mx-auto">
           <div className="text-center mb-10">
             <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 mb-2 font-medium">
               Étape 5 — Identité & design
@@ -359,7 +361,7 @@ export default function SiteBranding() {
             Tu pourras retoucher tous les détails après la génération.
           </div>
         </div>
-      </div>
+      </StepLayout>
     );
   }
 

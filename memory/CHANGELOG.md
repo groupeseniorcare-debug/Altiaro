@@ -1,6 +1,36 @@
 # Altiora — CHANGELOG
 
 
+## 2026-05-04 · Phase 3.1.1 — Hotfixes post-test e1_tester
+
+> **5 bugs remontés par e1_tester, 4 fixés + 1 à re-vérifier. ZÉRO backend. ZÉRO LLM.**
+
+- **Bug 1 (bloquant) — `ReferenceError: formatDateTime is not defined` sur `/pricing`** : import `formatEUR, formatDateTime` depuis `lib/format` perdu entre deux rewrites du fichier. Re-ajouté en tête de `SitePricing.jsx`. Fix vérifié lint + compile OK.
+- **Bug 2 (critique) — counter `10/10` sur 8 pages** : `StepLayout` utilisait `currentStepIndex` du hook (qui reflète l'avancement global, pas la route) au lieu de `stepIndex` calculé depuis la prop `stepKey`. Fix : `<div data-testid="journey-counter">{stepIndex}/{STEP_ORDER.length}</div>` + progress dots avec `d.current` en priorité sur `d.done`. Chaque page affiche maintenant son vrai numéro (`2/10` sur `/sourcing`, `5/10` sur `/branding`, etc.).
+- **Bug 3 (majeur) — `/branding` early-return sans data-testid** : la branche `if (!hasDesign) return (...)` (wizard de création pour site sans design publié) n'était pas wrappée dans `StepLayout`, privant les testeurs des data-testid `step-header` / `journey-counter` / `journey-progress-dots`. Wrap appliqué, data-testid maintenant présents quel que soit l'état du site.
+- **Bug 5 (mineur) — toggle « À quoi ça sert ? »** : robustification de l'`<AnimatePresence>` (ajout `initial={false}` + `key` stable + `aria-hidden` synchro + `pointerEvents` synchro + `duration: 0.2` pour faciliter les tests). Le handler utilise déjà `setShowWhatItDoes((v) => !v)` qui est correct, donc le bug était probablement un faux négatif lié à la race entre le click du testeur et la fin de l'exit animation (0.25 s). Durée raccourcie à 0.2 s + pointer-events synchronisé.
+
+### À VÉRIFIER — Bug 4 `/forecast` runtime error
+
+- Fichier lint-clean, compile-clean, aucune syntax error détectable statique.
+- Causes possibles non-reproduites sans repro navigateur :
+  1. `useStepGuard` redirige si les steps précédentes ne sont pas marquées validées en DB (mais Altea a validé pricing/import/upsells en Phase 2).
+  2. `VERDICT_META[forecast.verdict]` null si verdict inattendu (defensive fallback présent ligne 64 : `forecast ? VERDICT_META[forecast.verdict] : null`).
+- Action recommandée : re-run e1_tester avec capture console navigateur pour identifier le message exact. Ligne 490 (`<Rocket size={16} weight="fill" /> Valider l'étape 4`) à surveiller si Rocket icon non exporté dans la version phosphor installée.
+
+### Fichiers modifiés
+
+- `frontend/src/pages/SitePricing.jsx` (fix import)
+- `frontend/src/components/cockpit/StepLayout.jsx` (fix counter + progress dots + toggle)
+- `frontend/src/pages/SiteBranding.jsx` (wrap early-return dans StepLayout)
+
+### Non-régressions
+
+- ESLint : 0 issues sur les 3 fichiers touchés.
+- Webpack compile : OK, 1 warning pré-existant hors scope (SiteQA `load` dep).
+- Backend OpenAPI : 404 paths / 438 ops ✅ (aucune route modifiée).
+
+
 ## 2026-05-04 · Phase 3.1 — Migration des 9 étapes step vers `<StepLayout>` + fix encodage €
 
 > **10 fichiers frontend modifiés (9 pages step + 1 helper format). ZÉRO backend. ZÉRO LLM. ZÉRO Google.**

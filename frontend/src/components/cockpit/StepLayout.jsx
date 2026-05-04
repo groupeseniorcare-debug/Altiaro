@@ -148,17 +148,17 @@ export default function StepLayout({
                 key={d.key}
                 title={`Étape ${d.index} · ${STEP_LABELS[d.key] || d.key}`}
                 className={`h-1.5 w-5 rounded-full transition-all ${
-                  d.done
-                    ? "bg-emerald-500"
-                    : d.current
+                  d.current
                     ? "bg-neutral-900 w-8"
+                    : d.done
+                    ? "bg-emerald-500"
                     : "bg-neutral-300"
                 }`}
               />
             ))}
           </div>
           <div className="text-[12px] text-neutral-500 tabular-nums" data-testid="journey-counter">
-            {currentStepIndex}/{totalSteps}
+            {stepIndex}/{STEP_ORDER.length}
           </div>
         </div>
       </div>
@@ -210,18 +210,21 @@ export default function StepLayout({
             )}
           </div>
 
-          <AnimatePresence>
+          <AnimatePresence initial={false}>
             {showWhatItDoes && whatItDoes && (
               <motion.div
+                key="what-it-does-panel"
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.25, ease: "easeOut" }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
                 className="overflow-hidden"
+                style={{ pointerEvents: showWhatItDoes ? "auto" : "none" }}
               >
                 <div
                   className="mt-5 p-5 rounded-2xl bg-white/60 border border-neutral-200 text-sm text-neutral-700 leading-relaxed max-w-3xl"
                   data-testid="what-it-does-body"
+                  aria-hidden={!showWhatItDoes}
                 >
                   {typeof whatItDoes === "string" ? (
                     <p>{whatItDoes}</p>
