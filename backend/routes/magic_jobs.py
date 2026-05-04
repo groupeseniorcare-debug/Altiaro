@@ -56,13 +56,15 @@ def _gc_jobs() -> None:
 STEPS_CONTENT: List[Dict[str, Any]] = [
     {"key": "audit_keywords", "label": "Audit mots-clés & univers éditorial"},
     {"key": "cluster_topics", "label": "Organisation en 14 thèmes (1 pilier · 8 satellites · 5 long-tail)"},
-    {"key": "generate_pillar", "label": "Génération article pilier (≈ 2 000 mots, Sonnet)"},
-    {"key": "generate_satellites", "label": "Génération 8 articles satellites (≈ 1 200 mots, Haiku)", "counter_total": 8},
-    {"key": "generate_longtail", "label": "Génération 5 articles long-tail (≈ 800 mots, Haiku)", "counter_total": 5},
-    {"key": "generate_images", "label": "Génération 14 visuels hero IA (Nano Banana)", "counter_total": 14},
-    {"key": "internal_linking", "label": "Maillage interne automatique (satellite → pilier + 2 satellites)"},
-    {"key": "translate_all", "label": "Traduction des 14 articles dans 5 langues (EN · DE · NL · IT · ES)", "counter_total": 5},
-    {"key": "publish_sitemap", "label": "Publication storefront + mise à jour sitemap + ping IndexNow"},
+    {"key": "generate_pillar_fr", "label": "Génération article pilier FR (≈ 2 000 mots, Sonnet) — AEO snippet + FAQ + JSON-LD"},
+    {"key": "generate_satellites_fr", "label": "Génération 8 satellites FR (≈ 1 200 mots, Haiku, parallélisé)", "counter_total": 8},
+    {"key": "generate_longtail_fr", "label": "Génération 5 long-tail FR (≈ 800 mots, Haiku, parallélisé)", "counter_total": 5},
+    {"key": "generate_hero_images", "label": "Génération 14 visuels hero 1200×630 (Nano Banana, OG-ready)", "counter_total": 14},
+    {"key": "generate_inline_images", "label": "Génération 14 visuels in-body (Nano Banana, parallélisé)", "counter_total": 14},
+    {"key": "internal_linking", "label": "Maillage interne contextuel (chaque satellite → pilier + 2 pertinents)"},
+    {"key": "translate_articles", "label": "Traduction 14 articles × 5 langues = 70 traductions Haiku (parallélisé)", "counter_total": 70},
+    {"key": "write_hreflang", "label": "Pose des hreflang inter-langues (14 clusters de 6 versions)"},
+    {"key": "publish_sitemap", "label": "Publication 84 posts + sitemap + IndexNow batch"},
 ]
 
 STEPS_SEO: List[Dict[str, Any]] = [
@@ -252,88 +254,22 @@ async def _run_dry(job: Dict[str, Any]) -> None:
 
 
 async def _run_content(job: Dict[str, Any]) -> None:
-    """Real content pipeline — best-effort, tolerant to service failures."""
-    site_id = job["site_id"]
-    try:
-        site = await db.sites.find_one({"id": site_id})
-        if not site:
-            _finish_error(job, "Site introuvable")
-            return
-        # Step 1 — audit keywords
-        _update_step(job, "audit_keywords", status="running")
-        try:
-            from routes.seo_factory import discover_keywords, DiscoverInput  # type: ignore
-            # lightweight noop — seo_factory exposes POST endpoint; reuse its service layer if needed
-            _update_step(job, "audit_keywords", status="done",
-                         message="Keyword universe reviewed")
-        except Exception as e:
-            _update_step(job, "audit_keywords", status="warn", message=f"Skippé : {e}")
+    """Real content pipeline — **NOT YET IMPLEMENTED** in this phase.
 
-        # Step 2 — cluster topics (stub real impl)
-        _update_step(job, "cluster_topics", status="running")
-        await asyncio.sleep(0.1)
-        _update_step(job, "cluster_topics", status="done",
-                     message="14 thèmes retenus (1 pilier + 8 satellites + 5 long-tail)")
-
-        # Step 3 — pillar (reuse ai_draft_blog_post)
-        _update_step(job, "generate_pillar", status="running")
-        try:
-            # Real generation would call routes.blog_posts.ai_draft_blog_post
-            # Kept as a hook — intentionally best-effort so one failure doesn't abort.
-            _update_step(job, "generate_pillar", status="done", message="Pilier généré")
-        except Exception as e:
-            _update_step(job, "generate_pillar", status="warn", message=str(e))
-
-        # Steps 4 & 5 — satellites + long-tail (counter-driven)
-        for key, total in (("generate_satellites", 8), ("generate_longtail", 5)):
-            _update_step(job, key, status="running")
-            for i in range(1, total + 1):
-                await asyncio.sleep(0.05)
-                _update_step(job, key, counter_current=i,
-                             message=f"Article {i}/{total}")
-            _update_step(job, key, status="done")
-
-        # Step 6 — images (14)
-        _update_step(job, "generate_images", status="running")
-        for i in range(1, 15):
-            await asyncio.sleep(0.05)
-            _update_step(job, "generate_images", counter_current=i,
-                         message=f"Hero {i}/14")
-        _update_step(job, "generate_images", status="done")
-
-        # Step 7 — internal linking
-        _update_step(job, "internal_linking", status="running")
-        await asyncio.sleep(0.1)
-        _update_step(job, "internal_linking", status="done",
-                     message="Maillage interne appliqué (3 liens par satellite)")
-
-        # Step 8 — translate
-        target_langs = [lang for lang in (site.get("available_langs") or [])
-                        if lang and lang != (site.get("default_locale") or "fr")][:5]
-        _update_step(job, "translate_all", status="running")
-        for i, lang in enumerate(target_langs[:5] or ["en", "de", "nl", "it", "es"], 1):
-            await asyncio.sleep(0.05)
-            _update_step(job, "translate_all", counter_current=i,
-                         message=f"Langue {lang} traduite")
-        _update_step(job, "translate_all", status="done")
-
-        # Step 9 — publish + sitemap
-        _update_step(job, "publish_sitemap", status="running")
-        try:
-            from routes.indexnow import notify_indexnow
-            public_url = site.get("public_url") or site.get("custom_domain")
-            if public_url and not public_url.startswith("http"):
-                public_url = f"https://{public_url}"
-            if public_url:
-                await notify_indexnow([f"{public_url}/sitemap.xml"])
-        except Exception:
-            logger.exception("[magic_jobs] indexnow ping failed (non-blocking)")
-        _update_step(job, "publish_sitemap", status="done", message="Sitemap mis à jour + IndexNow pingué")
-
-        _finish_success(job, {"message": "Contenu SEO généré"})
-    except Exception as e:
-        logger.exception("[magic_jobs] content runner failed")
-        _finish_error(job, f"Content error: {e}")
+    Phase 3.2 livre l'UX + l'ossature SSE. Le pipeline réel 14 × 6 langues
+    (84 posts) avec AEO snippets, FAQ JSON-LD, maillage contextuel et
+    hreflang sera implémenté dans Phase 3.3. Pour éviter toute consommation
+    LLM accidentelle, ce runner redirige vers le simulateur dry-run et
+    retourne une erreur explicite en mode réel.
+    """
+    if not job["dry_run"]:
+        _finish_error(
+            job,
+            "magic/content réel non encore implémenté (Phase 3.3). "
+            "Utilise ?dry_run=true pour simuler l'UX en attendant.",
+        )
+        return
+    await _run_dry(job)
 
 
 async def _run_seo(job: Dict[str, Any]) -> None:

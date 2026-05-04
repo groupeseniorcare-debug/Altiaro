@@ -549,6 +549,28 @@ function PlatformApp() {
           <Route path="/shop/:siteId/retours" element={<StorefrontRetours />} />
           <Route path="/shop/:siteId/blog" element={<StorefrontBlog />} />
           <Route path="/shop/:siteId/blog/:slug" element={<StorefrontBlogPost />} />
+          {/* Phase 3.2 chantier E — SEO Sprint 2/3 pages (buyer-guides,
+              glossary, comparisons, top lists, team) — identiques à celles
+              déjà montées dans CustomDomainApp, ajoutées ici pour que le
+              menu storefront fonctionne aussi en mode preview. */}
+          <Route path="/shop/:siteId/buyer-guides" element={<StorefrontBuyerGuides />} />
+          <Route path="/shop/:siteId/buyer-guides/:slug" element={<StorefrontBuyerGuide />} />
+          <Route path="/shop/:siteId/glossary" element={<StorefrontGlossary />} />
+          <Route path="/shop/:siteId/glossary/:slug" element={<StorefrontGlossaryTerm />} />
+          <Route path="/shop/:siteId/compare" element={<StorefrontComparisons />} />
+          <Route path="/shop/:siteId/compare/:slug" element={<StorefrontCompare />} />
+          <Route path="/shop/:siteId/top" element={<StorefrontTopLists />} />
+          <Route path="/shop/:siteId/top/:slug" element={<StorefrontTopList />} />
+          <Route path="/shop/:siteId/team" element={<StorefrontTeam />} />
+          <Route path="/shop/:siteId/team/:slug" element={<StorefrontTeamMember />} />
+          {/* Legal aliases (même pattern que CustomDomainApp) */}
+          <Route path="/shop/:siteId/legal/cgv" element={<StorefrontCGV />} />
+          <Route path="/shop/:siteId/legal/mentions" element={<StorefrontMentions />} />
+          <Route path="/shop/:siteId/legal/confidentialite" element={<StorefrontConfidentialite />} />
+          <Route path="/shop/:siteId/legal/cookies" element={<StorefrontCookies />} />
+          <Route path="/shop/:siteId/legal/livraison" element={<StorefrontLivraison />} />
+          <Route path="/shop/:siteId/legal/retours" element={<StorefrontRetours />} />
+          <Route path="/shop/:siteId/legal/mediation" element={<StorefrontMediation />} />
           <Route path="/shop/:siteId/review/:token" element={<StorefrontReview />} />
           <Route path="/shop/:siteId/cgv" element={<StorefrontCGV />} />
           <Route path="/shop/:siteId/mentions" element={<StorefrontMentions />} />

@@ -29,6 +29,7 @@ import FeaturedProduct from "../components/storefront/FeaturedProduct";
 import InstagramGrid from "../components/storefront/InstagramGrid";
 import Manifesto from "../components/storefront/Manifesto";
 import BrandProcess from "../components/storefront/BrandProcess";
+import StorefrontAccessories from "../components/storefront/StorefrontAccessories";
 
 /* =========================================================
  * STOREFRONT HOME — Phase 4 : extrait de `pages/Storefront.jsx`
@@ -252,6 +253,9 @@ function renderHomepageSections({ design, site, siteId, products, loading, lang 
           return <CollectionsShowcase collections={design?.collections} lang={lang} design={design} />;
         case "products":
           return <ProductGrid siteId={siteId} products={products} loading={loading} design={design} lang={lang} />;
+        case "accessories":
+          // Phase 3.2 chantier D — section accessoires/upsells sur la home.
+          return <StorefrontAccessories lang={lang} design={design} />;
         case "featured_product":
           return <FeaturedProduct products={products} design={design} lang={lang} />;
         case "lifestyle_editorial":

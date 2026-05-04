@@ -119,6 +119,8 @@ from routes import robots_smart as robots_smart_routes  # robots.txt + sitemap-p
 from routes import admin_integrations_health as admin_integrations_health_routes  # token-swap Pinterest/Featured
 from routes import gsc_provisioning_admin as gsc_provisioning_admin_routes  # GSC auto-provision admin
 from routes import magic_jobs as magic_jobs_routes  # Phase 3.2 — bouton magique unique + SSE
+from routes import admin_llm_budget_reset as admin_llm_budget_reset_routes  # Phase 3.2 — reset snapshot LLM
+from routes import brand_wordmark as brand_wordmark_routes  # Phase 3.2 — wordmark typographique + public upsells
 
 logging.basicConfig(
     level=logging.INFO,
@@ -225,6 +227,8 @@ api.include_router(robots_smart_routes.router)  # robots.smart.txt + sitemap-pre
 api.include_router(admin_integrations_health_routes.router)  # Token-swap Pinterest/Featured
 api.include_router(gsc_provisioning_admin_routes.router)  # GSC provision + status admin
 api.include_router(magic_jobs_routes.router)  # Phase 3.2 — magic/content · magic/seo · magic/launch
+api.include_router(admin_llm_budget_reset_routes.router)  # Phase 3.2 — POST /admin/llm-budget/reset
+api.include_router(brand_wordmark_routes.router)  # Phase 3.2 — wordmark + public upsells
 
 # IMPORTANT — Routes /legal/* HTML server-side : montées DIRECTEMENT sur `app`
 # (pas sur le router /api). Sur le preview Kubernetes l'ingress route /legal/*

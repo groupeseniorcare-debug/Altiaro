@@ -112,7 +112,12 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
   const brandAccent = brand.primary_color || "#0A0A0A";
   const fontHeading = brand.font_heading || "Fraunces";
   const fontBody = brand.font_body || "Inter";
+  const logoWordmarkUrl = brand.logo_wordmark_url ? `${BACKEND_URL}${brand.logo_wordmark_url}` : null;
   const logoUrl = brand.logo_url ? `${BACKEND_URL}${brand.logo_url}` : null;
+  // Phase 3.2 chantier C — priorité au wordmark typographique pour le header
+  // du storefront. Le picto (logo_url) devient un emblème secondaire réservé
+  // au favicon / footer discret.
+  const headerLogoUrl = logoWordmarkUrl || logoUrl;
   // Sanitize brand name / site name so stale DB entries containing markdown or
   // Claude preambles ("# Proposition de nom…") don't leak into <h1>s and copyright.
   // Priority: explicit logo_text > brand.name > site.name > fallback.
@@ -302,12 +307,12 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
             <List size={20} style={{ color: textCol }} />
           </button>
           <Link to={shopRoot} className="flex items-center justify-center gap-2" data-testid="shop-logo-mobile">
-            {logoUrl ? (
+            {headerLogoUrl ? (
               <img
-                src={logoUrl}
+                src={headerLogoUrl}
                 alt={logoText}
-                className="h-9 max-w-[160px] object-contain"
-                style={{ mixBlendMode: "multiply", filter: "contrast(1.25) brightness(1.08)" }}
+                className="h-9 max-w-[200px] object-contain"
+                style={logoWordmarkUrl ? {} : { mixBlendMode: "multiply", filter: "contrast(1.25) brightness(1.08)" }}
                 loading="eager"
               />
             ) : (
@@ -343,12 +348,12 @@ export default function StorefrontLayout({ children, lang, setLang, availableLan
         <div className="hidden lg:grid max-w-7xl mx-auto px-6 py-5 items-center gap-8 grid-cols-[auto_1fr_auto]">
           {/* LEFT — Logo */}
           <Link to={shopRoot} className="group flex items-center gap-3 shrink-0" data-testid="shop-logo">
-            {logoUrl ? (
+            {headerLogoUrl ? (
               <img
-                src={logoUrl}
+                src={headerLogoUrl}
                 alt={logoText}
-                className="h-10 max-w-[220px] object-contain transition-transform group-hover:scale-[1.02]"
-                style={{ mixBlendMode: "multiply", filter: "contrast(1.25) brightness(1.08)" }}
+                className="h-12 max-w-[280px] object-contain transition-transform group-hover:scale-[1.02]"
+                style={logoWordmarkUrl ? {} : { mixBlendMode: "multiply", filter: "contrast(1.25) brightness(1.08)" }}
                 loading="eager"
               />
             ) : (

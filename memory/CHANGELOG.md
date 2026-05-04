@@ -1,6 +1,45 @@
 # Altiora — CHANGELOG
 
 
+## 2026-05-04 · Phase 3.2 — Bouton magique unique + streaming temps réel
+
+### Chantier A — Refonte UX étapes 7, 9, 10 (Cockpit)
+- Backend `routes/magic_jobs.py` (nouveau, 586 lignes) : orchestrateurs `POST /sites/{id}/magic/{content,seo,launch}` + `GET /stream` (SSE) + `GET /status` (snapshot). Registry in-memory `_JOBS`, TTL 1 h, garbage collector. Mode `?dry_run=true` qui simule 100 % du streaming sans écriture DB ni appel LLM (utilisé pour valider UX). 9 endpoints ajoutés (+3×POST, +3×SSE, +3×status).
+- `STEPS_CONTENT` revu selon décision user 2026-05-04 : scope élargi à **14 articles × 6 langues = 84 posts** (1 pilier Sonnet + 8 satellites Haiku + 5 long-tail Haiku en FR source, puis 70 traductions Haiku, + 14 hero + 14 inline visuels Nano Banana, maillage contextuel, hreflang, JSON-LD Article/FAQ/Breadcrumb + AEO snippet par post). Le runner réel renvoie une erreur explicite « non encore implémenté, utilise dry_run=true » — implémentation concrète planifiée Phase 3.3 pour maîtriser la consommation LLM.
+- `STEPS_SEO` : 6 sous-tâches (audit SEO, GSC provisioning, IndexNow batch, 20 annuaires Silver Eco, Featured.com, vérification schémas). Runner réel câblé sur `services/gsc_provisioning`, `routes/indexnow`, `services/directory_submitter`, `services/featured_press_outreach` (best-effort, warn plutôt que fail).
+- `STEPS_LAUNCH` : 11 points de health-check read-only (≥ 9 produits, ≥ 3 upsells, ≥ 14 articles, 6 langues, about, custom domain + SSL, sitemap > 100 URLs, JSON-LD, Mollie, GSC, score SEO ≥ 70) — si un seul KO, affichage bloquant avec redirection vers l'étape Cockpit concernée. Puis enchaînement GMC onboarding + `status=live` + audit `launch_jobs` + email Resend.
+- Frontend : composant `components/cockpit/MagicJobProgress.jsx` (nouveau) — état `idle/running/success/error`, EventSource SSE avec fallback polling `/status`, liste verticale sous-tâches avec compteur et messages live, écran victoire + écran erreur avec failures cliquables.
+- Clean rewrite `SiteBlogPosts.jsx`, `SiteSEO.jsx`, `SiteQA.jsx` (avant : 400-700 lignes chacun, après : 30-75 lignes) — wrapping `<StepLayout>` + `<MagicJobProgress>` uniquement. `SiteQA.jsx` gère aussi l'écran victoire quand `site.status = 'live'`.
+
+### Chantier B — Cap LLM côté Altiaro
+- **Investigation** : aucun cap artificiel côté code Altiaro pour le budget launch global. Le seul cap code-side est `DEFAULT_BUDGET_CAP_USD = 5 $` par site dans `services/product_variant_pipeline.py`, volontaire (limite les images variantes couleur Nano Banana). Le "$1" observé dans le dernier run Altea venait du **vrai solde Emergent LLM Key** à ce moment-là.
+- **Risque résiduel** : le flag `platform_health.llm.status='budget_exhausted'` posé sur une erreur transitoire bloque les appels Claude suivants du launch. Snapshot `platform_health.llm_budget` peut aussi rester figé (ex: `120.01/120.001`, 100 %) après un crash.
+- **Fix** : nouveau endpoint `POST /api/admin/llm-budget/reset` (`routes/admin_llm_budget_reset.py`) — efface `platform_health.llm_budget`, reset `platform_health.llm` à `ok`, et wipe le snapshot in-memory dans `llm_resilience._LAST_BUDGET_SNAPSHOT`. Idempotent, admin only. À appeler après chaque recharge de crédits Emergent.
+
+### Chantier C — Pipeline wordmark typographique
+- `services/wordmark_generator.py` (nouveau) — `generate_wordmark(brand_name, palette)` produit un PNG 1200×400 bytes en **~50 ms, Pillow pur, zéro LLM**. Font Fraunces SemiBold (téléchargée dans `backend/assets/fonts/`), fit dichotomique de la taille pour remplir 80 % de la largeur, contraste automatique palette/accent (WCAG 4.5:1), 2 règles décoratives optionnelles. Fallback OS (Liberation Serif) si la font est corrompue.
+- `persist_wordmark_for_site(site_id, brand_name, palette)` : écrit `uploads/logos/wordmark_{site_id}_{digest}.png` et update `design.brand.logo_wordmark_url`.
+- Endpoint `POST /api/sites/{id}/brand/wordmark/regenerate` (`routes/brand_wordmark.py`, nouveau). Altea wordmark généré immédiatement : `/api/uploads/logos/wordmark_6867223e-..._123fbae1b0.png` (16 KB, 250 couleurs distinctes = anti-aliasing propre).
+- Frontend `StorefrontLayout.jsx` : priorité au `logo_wordmark_url` pour le header storefront (desktop + mobile). Le `logo_url` (picto Nano Banana) devient un emblème secondaire réservé au favicon/footer discret. Le `mix-blend-multiply` est conservé uniquement quand on retombe sur le picto.
+
+### Chantier D — Section accessoires sur le storefront
+- Backend : nouvel endpoint `GET /api/public/sites/{id}/upsells?limit=12` — liste tous les upsells actifs du site, triés `featured` puis `created_at`. No-auth, cache-friendly (dans `routes/brand_wordmark.py`).
+- Frontend : composant `components/storefront/StorefrontAccessories.jsx` (nouveau) — grille 1/2/3/4 colonnes responsive, palette ivoire + fontHeading, filtre optionnel `currentProductId` pour ne pas répéter un produit déjà affiché, masquage silencieux si liste vide.
+- Home : section « Accessoires & compléments » ajoutée à `DEFAULT_HOMEPAGE_ORDER` (via key `accessories`, branchée dans `renderHomepageSections`).
+- Fiche produit : bloc « Compléter votre achat » ajouté juste avant `<CrossSellProducts>`. Annule partiellement la décision UX du 2026-04-28 qui avait retiré `ProductBundle` + `UpsellsRecommendations` — commentaire explicatif posé dans `StorefrontProduct.jsx`.
+- Cart drawer déjà fonctionnel (impulse offer), intact.
+
+### Chantier E — Menu storefront vers le thème de base
+- **Root cause** : `PlatformApp` (mode preview `/shop/:siteId/*`) ne déclarait pas les routes Sprint 2/3 SEO (`/buyer-guides`, `/glossary`, `/compare`, `/top`, `/team`) ni les alias `/legal/*`. `CustomDomainApp` les avait. Résultat : un menu contenant `design.navigation.header` avec des entrées `/buyer-guides` se transformait en `/shop/:siteId/buyer-guides` via `rewriteHref()` (StorefrontLayout.jsx:230), tombait dans le fallback `<Navigate to="/" replace />` (App.js:663) et affichait **la landing Altiaro** au lieu du storefront Altea — d'où le symptôme « le menu redirige vers le thème de base ».
+- **Fix** : 17 routes ajoutées dans `PlatformApp` (App.js), parité complète avec `CustomDomainApp` pour `/shop/:siteId/*`.
+
+### Qualité
+- Lint Python : ✅ 0 issue sur les 4 nouveaux modules backend.
+- Lint JS : ✅ 0 issue sur les 8 fichiers frontend modifiés/créés.
+- OpenAPI : 404 → **416 paths / 450 operations** (+12 paths, +9 endpoints magic + 2 wordmark + 1 admin reset).
+- Crédits LLM consommés en dev : **0** (chantier C utilise Pillow, chantiers A réel sont dry-run uniquement).
+
+
 ## 2026-05-04 · Phase 3.1.1b — Hotfix `SiteForecast.jsx`
 
 - Bug 4 résolu : `ReferenceError: isValidated is not defined` (+ `validateStep` + `validating`). Les 2 states, le `useEffect` étendu (`GET /sites/{id}` pour lire `journey_validated`) et le handler `validateStep` (`POST /sites/{id}/journey/validate-step`) avaient été perdus lors du wrap `StepLayout` Phase 3.1. Restaurés à l'identique du commit `d725e2a` + ajout `window.dispatchEvent("cf_steps_changed")` après validation pour cohérence avec `useCockpitJourney`. Lint OK.

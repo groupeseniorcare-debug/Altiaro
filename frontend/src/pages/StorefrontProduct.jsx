@@ -39,6 +39,7 @@ import ProductGallery from "../components/storefront/ProductGallery";
 import { ProductColorProvider } from "../lib/ProductColorContext";
 import ProductReviews from "../components/storefront/ProductReviews";
 import CrossSellProducts from "../components/storefront/CrossSellProducts";
+import StorefrontAccessories from "../components/storefront/StorefrontAccessories";
 import DeliveryPaymentInfo from "../components/storefront/DeliveryPaymentInfo";
 import MobileStickyBuy from "../components/storefront/MobileStickyBuy";
 import VariantPicker from "../components/storefront/VariantPicker";
@@ -665,6 +666,19 @@ export function StorefrontProduct() {
               Phase 2.6 Tâche E : enrichis via `design.testimonials_premium`
               et `product.review_photos` (Nano Banana, scènes domestiques). */}
           <ProductReviews product={p} design={design} lang={lang} />
+
+          {/* Phase 3.2 chantier D — bloc "Compléter votre achat" : remet les
+              upsells sur la fiche produit. La suppression UX du 2026-04-28
+              (ProductBundle + UpsellsRecommendations) a été annulée côté
+              storefront le 2026-05-04 sur décision user, via un composant
+              dédié qui appelle /api/public/sites/{id}/upsells. */}
+          <StorefrontAccessories
+            lang={lang}
+            design={design}
+            currentProductId={p.id}
+            title="Compléter votre achat"
+            subtitle="Les accessoires les plus souvent choisis avec cette sélection."
+          />
 
           {/* §9 — "Dans la même collection" (cross-sell, design Home unifié) */}
           <CrossSellProducts currentProduct={p} lang={lang} design={design} />
