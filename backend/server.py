@@ -108,6 +108,7 @@ from routes import automation as automation_routes  # Refonte UX — toggles aut
 from routes import well_known as well_known_routes  # Google Site Verification (altiaro.com)
 from routes import google_master as google_master_routes  # Master OAuth + auto-provisioning
 from routes import public_legal as public_legal_routes  # Fallback HTML SSR /legal/* (altiaro.com prod)
+from routes import bing_verification as bing_verification_routes  # /BingSiteAuth.xml (Bing Webmaster)
 from routes import admin_reset as admin_reset_routes  # Reset site → étape 5 + launch instructions
 from routes import seo_content as seo_content_routes  # Sprint 2 & 3 — buyer guides, glossary, compare, top lists, team
 from routes import relink as relink_routes  # Sprint 4 — backfill maillage interne blog (Jaccard)
@@ -243,6 +244,7 @@ api.include_router(admin_sprint3_routes.router)
 # où FastAPI sert aussi le frontend statique), elles assurent un HTML 200
 # valide pour Google Merchant Center MCA même si le bundle JS est figé.
 app.include_router(public_legal_routes.router)
+app.include_router(bing_verification_routes.router)  # GET /BingSiteAuth.xml (sans /api)
 
 
 @app.on_event("startup")
