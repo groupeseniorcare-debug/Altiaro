@@ -10,6 +10,7 @@ import useMasterGoogleStatus from "../hooks/useMasterGoogleStatus";
 import GSCConnectCard from "../components/GSCConnectCard";
 import { StepValidateCTA } from "../components/StepPageHeader";
 import { buildOnValidate } from "../lib/journeySteps";
+import MarketingOffPagePanel from "../components/MarketingOffPagePanel";
 
 const scoreColor = (s) => {
   if (s == null) return { ring: "#a3a3a3", label: "À calculer", text: "text-neutral-500" };
@@ -284,6 +285,9 @@ export default function SiteSEO() {
             l'interface admin
           </Link>.
         </div>
+
+        {/* Marketing Off-Page (Sprint 2026-05) — Pinterest / Annuaires / HARO */}
+        <MarketingOffPagePanel />
       </div>
     </div>
   );

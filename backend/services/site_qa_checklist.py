@@ -7,12 +7,13 @@ from deps import db
 CHECKS_DEF = [
     "branding_complete", "products_min", "all_products_have_images",
     "translations_min", "json_ld_valid", "sitemap_published",
-    # ⚠️ HARD-FAIL si absent — étape 6 peut être skippée mais à l'étape 10
-    # le go-live exige un vrai domaine vérifié.
     "domain_configured",
     "domain_dns_ok", "ssl_ok", "mollie_active", "legal_pages",
     "blog_min_3", "landing_pages_min", "gsc_connected",
-    # NEW — Sprint Onboarding One-Click
+    # GMC — HARD-FAIL avant go-live (sub-account créé + champs poussés +
+    # domaine vérifié côté Google + feed actif)
+    "gmc_subaccount_created", "gmc_business_info_filled",
+    "gmc_domain_verified", "gmc_feed_active",
     "merchant_connected", "merchant_fields_filled",
     "indexnow_recent", "perf_ok",
     "seo_pages_min_50", "schema_valid", "pinterest_optional",
@@ -109,6 +110,19 @@ async def compute(site_id: str) -> dict:
         "gsc_connected": (
             "ok" if gsc_doc else "warn",
             "OAuth Google Search Console" + (" ✓" if gsc_doc else " — non connecté")),
+        # GMC HARD-FAIL checks (4) — bloquent ready si pas tous OK
+        "gmc_subaccount_created": (
+            "ok" if merchant_site.get("sub_account_id") else "fail",
+            "Sub-account GMC : " + (merchant_site.get("sub_account_id") or "non créé — relance onboarding")),
+        "gmc_business_info_filled": (
+            "ok" if merchant_site.get("business_info_pushed") else "fail",
+            "Business info pushé : " + ("✓" if merchant_site.get("business_info_pushed") else "✗ — relance onboarding")),
+        "gmc_domain_verified": (
+            "ok" if site.get("gmc_domain_verified") else "fail",
+            "Domaine vérifié côté Google : " + ("✓" if site.get("gmc_domain_verified") else "✗ — POST /merchant/verify-domain")),
+        "gmc_feed_active": (
+            "ok" if merchant_site.get("feed_url") else "fail",
+            "Feed produit : " + (merchant_site.get("feed_url") or "non set — relance onboarding")),
         # NEW
         "merchant_connected": (
             "ok" if (gmc.get("connected") or merchant_site.get("sub_account_id")) else "warn",

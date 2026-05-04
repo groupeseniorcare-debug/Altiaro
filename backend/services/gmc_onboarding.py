@@ -91,25 +91,25 @@ async def _gather_context(site_id: str) -> Dict[str, Any]:
     domain = domain.replace("https://", "").replace("http://", "").rstrip("/")
     brand = (site.get("design") or {}).get("brand") or {}
 
-    # Address fallback ladder : billing_profile.address -> Altiaro plateform legal address
-    addr = {
-        "street": bp.get("address_street") or "",
-        "postalCode": bp.get("address_postal_code") or "",
-        "locality": bp.get("address_city") or "",
-        "country": (bp.get("address_country") or bp.get("iban_country") or "FR")[:2].upper(),
-    }
-    if not addr["street"]:
-        addr = _parse_address(PLATFORM_LEGAL_INFO.get("adresse", ""))
-        addr["_fallback"] = "altiaro_platform"
-
-    phone = bp.get("phone") or op.get("phone") or PLATFORM_LEGAL_INFO.get("platform_telephone", "")
-    email = op.get("email") or PLATFORM_LEGAL_INFO.get("platform_email", "")
+    # ⚠️ DECISION PRODUIT 2026-05 : Altiaro = commerçant légal pour TOUS
+    # les sites (KBIS/TVA/adresse Altiaro). Le concepteur n'apparaît PAS
+    # comme entité légale auprès de Google. Donc business_name/address/
+    # phone/email = identité Altiaro. Seul le custom_domain reste celui
+    # du site du concepteur (la vitrine).
+    addr = _parse_address(PLATFORM_LEGAL_INFO.get("adresse", ""))
+    addr["_source"] = "altiaro_legal"
+    phone = PLATFORM_LEGAL_INFO.get("platform_telephone", "")
+    email = PLATFORM_LEGAL_INFO.get("platform_email", "")
+    altiaro_legal_name = PLATFORM_LEGAL_INFO.get("platform_nom", "Altiaro")
 
     return {
         "site": site, "operator": op, "billing_profile": bp,
         "domain": domain, "brand": brand,
         "address": addr, "phone": phone, "email": email,
-        "business_name": brand.get("name") or site.get("name") or domain,
+        # Business name = entité légale Altiaro (le commerçant officiel
+        # pour Google). Le brand UI du site reste séparé via brand_name_dba.
+        "business_name": altiaro_legal_name,
+        "brand_name_dba": brand.get("name") or site.get("name") or domain,
     }
 
 
@@ -277,6 +277,7 @@ async def auto_onboard(site_id: str, *, force: bool = False) -> Dict[str, Any]:
             ).execute,
         )
         out["shipping_settings"] = {"ok": True, "services": len(ship_body["services"])}
+        await db.sites.update_one({"id": site_id}, {"$set": {"merchant.shipping_settings_ok": True}})
     except Exception as e:
         out["shipping_settings"] = {"ok": False, "error": str(e)[:250]}
 
@@ -289,6 +290,7 @@ async def auto_onboard(site_id: str, *, force: bool = False) -> Dict[str, Any]:
             ).execute,
         )
         out["tax"] = {"ok": True}
+        await db.sites.update_one({"id": site_id}, {"$set": {"merchant.tax_ok": True}})
     except Exception as e:
         out["tax"] = {"ok": False, "error": str(e)[:250]}
 
@@ -301,6 +303,7 @@ async def auto_onboard(site_id: str, *, force: bool = False) -> Dict[str, Any]:
             ).execute,
         )
         out["return_policy"] = {"ok": True, "days": 30}
+        await db.sites.update_one({"id": site_id}, {"$set": {"merchant.return_policy_ok": True}})
     except Exception as e:
         out["return_policy"] = {"ok": False, "error": str(e)[:250]}
 
