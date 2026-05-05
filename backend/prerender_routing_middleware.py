@@ -123,7 +123,15 @@ async def prerender_routing(request, call_next):
         # Mode B : custom domain (host résout vers un site Altiaro)
         if not is_indexable_path(path):
             return await call_next(request)
-        forwarded = (headers.get("x-forwarded-host") or headers.get("x-original-host") or "").strip().lower()
+        # Priorité 1 : Apx-Incoming-Host (Approximated, source de vérité)
+        # Priorité 2 : X-Forwarded-Host / X-Original-Host (chaîne de proxies)
+        # Priorité 3 : Host header (souvent réécrit par l'ingress Emergent)
+        forwarded = (
+            headers.get("apx-incoming-host")
+            or headers.get("x-forwarded-host")
+            or headers.get("x-original-host")
+            or ""
+        ).strip().lower()
         raw_host = (headers.get("host") or "").strip().lower()
         host = (forwarded or raw_host).split(":")[0]
         if not host or _host_is_platform(host):

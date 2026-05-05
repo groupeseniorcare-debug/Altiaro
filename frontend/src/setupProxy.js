@@ -67,6 +67,23 @@ function isPassthrough(url) {
   return PASSTHROUGH_PATHS.some((re) => re.test(url));
 }
 
+// Hosts plateforme (servis par le frontend Altiaro lui-même, jamais des storefronts).
+// Pour ces hosts, on NE PROXY PAS vers backend prerender — le frontend doit servir
+// le HTML CRA normal (que ce soit pour humain ou bot, le contenu est le même).
+const PLATFORM_HOST_SUFFIXES = [
+  /(^|\.)altiaro\.com$/i,
+  /\.preview\.emergentagent\.com$/i,
+  /\.emergent\.sh$/i,
+  /\.emergent\.host$/i,
+  /^localhost$/i,
+];
+
+function isPlatformHost(host) {
+  if (!host) return false;
+  const h = host.split(":")[0].toLowerCase();
+  return PLATFORM_HOST_SUFFIXES.some((re) => re.test(h));
+}
+
 function looksLikeBot(req) {
   const ua = req.headers["user-agent"] || "";
   return BOT_UA_REGEX.test(ua);
@@ -79,6 +96,20 @@ module.exports = function (app) {
       const url = req.url.split("?")[0];
       if (isPassthrough(url)) return next();
       if (!looksLikeBot(req)) return next();
+
+      // Host plateforme (altiaro.com, preview, etc.) : passthrough vers CRA
+      // SPA — pas de SSR à servir, le contenu plateforme est statique +
+      // hydraté par React. Le `prerender_routing_middleware` backend skip
+      // déjà ces hosts via `_host_is_platform()`.
+      const incomingHostEarly =
+        req.headers["apx-incoming-host"] ||
+        req.headers["x-forwarded-host"] ||
+        req.headers["host"] ||
+        "";
+      if (isPlatformHost(incomingHostEarly)) {
+        console.log(`[seo-proxy] BOT on platform host (${incomingHostEarly}) → passthrough CRA`);
+        return next();
+      }
 
       // On laisse les paths /api/seo/prerender/* passer en direct si déjà préfixés
       if (url.startsWith("/api/")) return next();

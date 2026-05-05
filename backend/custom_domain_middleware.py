@@ -168,9 +168,14 @@ async def custom_domain_rewrite(request, call_next):
     """
     scope = request.scope
     headers = request.headers
-    # Phase 4 — priorité au X-Forwarded-Host (proxy Caddy/Traefik), fallback Host.
+    # Priorité 1 : Apx-Incoming-Host (Approximated source de vérité ultime,
+    # cf incident 2026-05-04 : l'ingress Emergent réécrit X-Forwarded-Host
+    # avec son hostname interne, masquant le vrai custom domain).
+    # Priorité 2 : X-Forwarded-Host / X-Original-Host (autres proxies).
+    # Priorité 3 : Host header (souvent réécrit par les ingress).
     forwarded_host = (
-        headers.get("x-forwarded-host")
+        headers.get("apx-incoming-host")
+        or headers.get("x-forwarded-host")
         or headers.get("x-original-host")
         or ""
     ).strip().lower()

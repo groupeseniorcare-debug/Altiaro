@@ -2568,3 +2568,77 @@ En prod build CRA static, il faudra un middleware équivalent (Caddy/Nginx)
 ou la même logique côté Approximated/Cloudflare Worker. La config actuelle
 est : Approximated → preview.emergentagent.com → ingress dispatch → CRA
 dev server avec setupProxy.js → backend pour bots, CRA pour humains.
+
+## 2026-05-04 — Migration DNS altiaro.com → Approximated/Emergent (commit pending)
+
+### Context
+altiaro.com pointait vers un déploiement Cloudflare Pages obsolète daté du
+22 avril 2026 (bundle main.b83d175b.js). Les redéploiements Emergent
+n'arrivaient pas en prod plateforme. L'utilisateur ne pouvait plus pousser
+ses changements.
+
+### Snapshot DNS OVH (avant)
+```
+A    @ → 162.159.142.117  (Cloudflare Pages, OBSOLÈTE)  id=5410939191 ❌
+A    @ → 172.66.2.113     (Cloudflare Pages, OBSOLÈTE)  id=5410939192 ❌
+CNAME www → altiaro.com.  (apex follow)                 id=5410939757 ❌
+A    sites → 104.18.11.243 (subdomain custom)          id=5411414550 ✓ kept
++ MX/SPF/DKIM Resend, TXT DMARC, TXT google-site-verification, NS OVH,
+  CNAME Bing 2d9e5873f36ab7c35a5caffef1de0f43 → tous PRÉSERVÉS
+```
+
+### Approximated provisioning
+- POST /api/vhosts altiaro.com → id=1299052, target=commerce-builder-21.preview.emergentagent.com:443
+- POST /api/vhosts www.altiaro.com → id=1299053, target identique
+- Status après 60s : `ACTIVE_SSL` sur les 2 (Let's Encrypt auto-provisioned)
+
+### Snapshot DNS OVH (après)
+```
+A    @ → 213.188.213.253  (Approximated cluster IP)    NEW ✓
+A    www → 213.188.213.253                             NEW ✓
+A    sites → 104.18.11.243                             unchanged
++ tous les MX/TXT/CNAME préservés
+```
+
+### Backend hostname resolution (3 fichiers patchés)
+Lecture du Apx-Incoming-Host EN PRIORITÉ dans :
+- `prerender_routing_middleware.py` — pour servir le SSR sur le bon site_id
+- `custom_domain_middleware.py` — pour rewrite path vers `/shop/{site_id}/...`
+- `frontend/src/setupProxy.js` — pour proxy bots vers le backend avec le bon host
+
+Raison : l'ingress Emergent réécrit X-Forwarded-Host avec son hostname
+interne (`commerce-builder-21.preview.emergentagent.com`), masquant le vrai
+custom domain. Approximated met le bon hostname dans `Apx-Incoming-Host`,
+d'où priorité Apx > X-Forwarded > Host.
+
+### Whitelist plateforme (déjà OK, aucune modif requise)
+`custom_domain_middleware.PLATFORM_HOSTS_SUFFIX` contenait déjà `altiaro.com`
+→ `altiaro.com`, `www.altiaro.com`, `app.altiaro.com` etc. sont traités
+comme la plateforme (pas comme storefront).
+
+`setupProxy.js` ajouté : `isPlatformHost(host)` qui passthrough les bots
+sur les hosts plateforme (pas de SSR, juste le CRA SPA Altiaro normal).
+
+### Validation finale
+| URL | UA | HTTP | Détails |
+|-----|----|----|---|
+| altiaro.com/ | Mozilla | 200 | CRA SPA + msvalidate.01 + title Altiaro à jour ✓ |
+| altiaro.com/ | Googlebot | 200 | passthrough CRA + msvalidate.01 ✓ |
+| altiaro.com/api/health | curl | 200 | `{"status":"ok"}` ✓ |
+| www.altiaro.com/ | curl | 200 | served by Emergent ✓ |
+| altea-home.com/blog/X | Googlebot | 200 | 21kb + 6 hreflang + 3 JSON-LD ✓ (regression-free) |
+
+### Rollback procedure (si jamais)
+```python
+# Restore via OVH API depuis /tmp/altiaro_dns_snapshot.json
+# 1. Delete current A records (ids retournés par GET /domain/zone/altiaro.com/record)
+# 2. Re-create from snapshot :
+#    - A @ → 162.159.142.117  ttl=3600
+#    - A @ → 172.66.2.113     ttl=3600
+#    - CNAME www → altiaro.com.  ttl=3600
+# 3. POST /domain/zone/altiaro.com/refresh
+# 4. Optional : delete Approximated vhosts via DELETE /api/vhosts/{id}
+```
+
+Le snapshot complet (16 records) est sauvegardé dans `/tmp/altiaro_dns_snapshot.json`
+pour rollback exact si nécessaire.
