@@ -407,7 +407,7 @@ export function StorefrontBlogPost() {
         {post.image && (
           <div className="max-w-4xl mx-auto px-6 md:px-10 -mt-8 md:-mt-12">
             <div className="aspect-[16/9] rounded-3xl overflow-hidden shadow-xl">
-              <img src={post.image} alt={title} className="w-full h-full object-cover" />
+              <img src={post.image} alt={title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
             </div>
           </div>
         )}

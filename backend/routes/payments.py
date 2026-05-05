@@ -320,6 +320,32 @@ async def mollie_webhook(request: Request):
                             await send_admin_new_order(refreshed, site)
                 except Exception:
                     logger.exception("Failed to send confirmation emails")
+                # Admin notification entry (dashboard toast — TÂCHE 1 fix)
+                try:
+                    import uuid as _uuid
+                    refreshed_n = await db.orders.find_one({"id": order["id"]}, {"_id": 0})
+                    if refreshed_n:
+                        await db.admin_notifications.insert_one({
+                            "id": str(_uuid.uuid4()),
+                            "type": "new_order",
+                            "site_id": refreshed_n.get("site_id"),
+                            "site_name": refreshed_n.get("site_name"),
+                            "order_id": refreshed_n.get("id"),
+                            "order_number": refreshed_n.get("order_number"),
+                            "total": float(refreshed_n.get("total") or 0),
+                            "currency": refreshed_n.get("currency", "EUR"),
+                            "customer_email": ((refreshed_n.get("customer") or {}).get("email")),
+                            "customer_lang": ((refreshed_n.get("customer") or {}).get("lang"))
+                                            or (refreshed_n.get("language")),
+                            "title": f"Nouvelle commande #{refreshed_n.get('order_number')}",
+                            "message": f"{refreshed_n.get('site_name','Site')} · "
+                                       f"{float(refreshed_n.get('total') or 0):.2f} "
+                                       f"{refreshed_n.get('currency','EUR')}",
+                            "read": False,
+                            "created_at": now_iso,
+                        })
+                except Exception:
+                    logger.exception("Failed to insert admin_notifications entry")
                 # Auto-forward to AliExpress for any line item sourced from them
                 try:
                     from routes.aliexpress import auto_place_aliexpress_order

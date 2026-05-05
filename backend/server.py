@@ -237,6 +237,30 @@ api.include_router(brand_wordmark_routes.router)  # Phase 3.2 — wordmark + pub
 from routes import admin_sprint3 as admin_sprint3_routes  # noqa: E402
 api.include_router(admin_sprint3_routes.router)
 
+# Admin QA — simulate Mollie webhook for end-to-end smoke tests
+from routes import admin_qa as admin_qa_routes  # noqa: E402
+api.include_router(admin_qa_routes.router)
+
+# Sprint 5 SEO — internal linking dense (TÂCHE 3.3)
+from routes import seo_internal_links as seo_internal_links_routes  # noqa: E402
+api.include_router(seo_internal_links_routes.router)
+
+# Sprint 5 SEO — programmatic landings (TÂCHE 3.1)
+from routes import seo_programmatic as seo_programmatic_routes  # noqa: E402
+api.include_router(seo_programmatic_routes.router)
+
+# Sprint 5 SEO — sitemap segmented (TÂCHE 3.10)
+from routes import sitemap_segmented as sitemap_segmented_routes  # noqa: E402
+api.include_router(sitemap_segmented_routes.router)
+
+# Sprint 5 SEO — collections enrichies (TÂCHE 3.4)
+from routes import seo_collections_routes as seo_collections_routes_mod  # noqa: E402
+api.include_router(seo_collections_routes_mod.router)
+
+# Sprint 5 SEO — E-E-A-T refresh + trending topics (TÂCHES 3.6 + 3.7)
+from routes import seo_eeat_trending as seo_eeat_trending_routes  # noqa: E402
+api.include_router(seo_eeat_trending_routes.router)
+
 # IMPORTANT — Routes /legal/* HTML server-side : montées DIRECTEMENT sur `app`
 # (pas sur le router /api). Sur le preview Kubernetes l'ingress route /legal/*
 # au frontend port 3000, donc ces routes ne sont jamais appelées côté preview ;

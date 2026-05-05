@@ -59,7 +59,7 @@ export default function StorefrontCart() {
                 >
                   <div className="w-20 h-20 rounded-lg bg-[#F5F2EB] overflow-hidden flex-shrink-0">
                     {it.image ? (
-                      <img src={it.image} alt={it.name} className="w-full h-full object-cover" />
+                      <img src={it.image} alt={it.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-[#D6D3D1]">
                         <ShoppingBagOpen size={28} weight="thin" />

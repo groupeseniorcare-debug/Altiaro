@@ -257,3 +257,135 @@ def detect_order_lang(order: Dict[str, Any], site: Dict[str, Any]) -> str:
         if candidate:
             return normalize_lang(candidate)
     return "fr"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Brand voice inference (TÂCHE 2 — emails personnalisés)
+# ─────────────────────────────────────────────────────────────────────
+
+# Niches qui suggèrent un ton formel / respectueux
+_FORMAL_NICHE_HINTS = (
+    "senior", "âge", "age", "elder", "retrai", "fauteuil releveur",
+    "santé", "health", "medical", "médical", "luxe", "luxury",
+    "premium", "haute", "joaillerie", "horlogerie", "art ",
+    "culture", "patrimoine", "boutique", "atelier",
+)
+
+# Niches qui suggèrent un ton plus décontracté / jeune
+_CASUAL_NICHE_HINTS = (
+    "tech", "gaming", "fashion", "mode", "street", "fitness", "sport",
+    "outdoor", "voyage", "travel", "lifestyle", "casual", "fun",
+    "kids", "teen", "déco", "deco", "geek", "crypto",
+)
+
+
+def infer_brand_tone(site: Dict[str, Any]) -> str:
+    """Détermine le ton brand pour les emails : 'formal' | 'casual'.
+
+    Priorité :
+        1. site.design.brand.voice_characteristics (si rempli)
+        2. site.design.brand.tone (si rempli)
+        3. inférence par niche (fauteuil releveur → formal, gaming → casual)
+        4. fallback 'formal' (sécurisé pour la majorité des e-commerce premium)
+    """
+    design = (site or {}).get("design") or {}
+    brand = design.get("brand") or {}
+
+    voice = (brand.get("voice_characteristics") or "").lower()
+    if voice:
+        if any(w in voice for w in ("formal", "respect", "élégant", "elegant",
+                                     "raffiné", "courtois", "professionnel")):
+            return "formal"
+        if any(w in voice for w in ("casual", "jeune", "fun", "décontract",
+                                     "amical", "playful", "friendly")):
+            return "casual"
+
+    tone = (brand.get("tone") or "").lower()
+    if tone in ("formal", "elegant", "premium", "respectful"):
+        return "formal"
+    if tone in ("casual", "playful", "friendly", "young"):
+        return "casual"
+
+    niche = (site.get("niche") or "").lower()
+    if any(h in niche for h in _CASUAL_NICHE_HINTS):
+        return "casual"
+    if any(h in niche for h in _FORMAL_NICHE_HINTS):
+        return "formal"
+
+    return "formal"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Tone-adjusted strings (formal vs casual)
+# Used for the small set of strings where tone really matters.
+# ─────────────────────────────────────────────────────────────────────
+
+TONE_STRINGS: Dict[str, Dict[str, Dict[str, str]]] = {
+    "order_confirmation.title_with_name": {
+        "formal": {
+            "fr": "Merci pour votre commande, {customer_name}",
+            "en": "Thank you for your order, {customer_name}",
+            "de": "Vielen Dank für Ihre Bestellung, {customer_name}",
+            "nl": "Bedankt voor uw bestelling, {customer_name}",
+            "it": "Grazie per il tuo ordine, {customer_name}",
+            "es": "Gracias por su pedido, {customer_name}",
+        },
+        "casual": {
+            "fr": "Merci {customer_name} ! 🎉",
+            "en": "Thanks {customer_name}! 🎉",
+            "de": "Danke {customer_name}! 🎉",
+            "nl": "Bedankt {customer_name}! 🎉",
+            "it": "Grazie {customer_name}! 🎉",
+            "es": "¡Gracias {customer_name}! 🎉",
+        },
+    },
+    "order_confirmation.confirmed_text": {
+        "formal": {
+            "fr": "Nous avons bien reçu votre commande #{order_number}. Nous nous occupons immédiatement de sa préparation et reviendrons vers vous dès l'expédition.",
+            "en": "We have received your order #{order_number}. We will prepare it carefully and will contact you as soon as it ships.",
+            "de": "Wir haben Ihre Bestellung #{order_number} erhalten. Wir bereiten sie sorgfältig vor und melden uns, sobald sie versendet wurde.",
+            "nl": "Wij hebben uw bestelling #{order_number} goed ontvangen. Wij verzorgen de voorbereiding en nemen contact met u op zodra de zending vertrekt.",
+            "it": "Abbiamo ricevuto il tuo ordine #{order_number}. Lo prepareremo con cura e ti scriveremo non appena verrà spedito.",
+            "es": "Hemos recibido su pedido #{order_number}. Lo prepararemos con esmero y nos pondremos en contacto cuando esté en camino.",
+        },
+        "casual": {
+            "fr": "Top, ta commande #{order_number} est dans les tuyaux 🚀 On te tient au courant dès qu'elle part.",
+            "en": "Awesome — your order #{order_number} is in the works 🚀 We'll let you know as soon as it ships.",
+            "de": "Super! Deine Bestellung #{order_number} ist in Arbeit 🚀 Wir melden uns, sobald sie unterwegs ist.",
+            "nl": "Top! Je bestelling #{order_number} is in voorbereiding 🚀 We laten het weten zodra ze de deur uitgaat.",
+            "it": "Fantastico! Il tuo ordine #{order_number} è in lavorazione 🚀 Ti avvisiamo non appena sarà spedito.",
+            "es": "¡Genial! Tu pedido #{order_number} está en marcha 🚀 Te avisamos en cuanto se envíe.",
+        },
+    },
+    "shell.signature": {
+        "formal": {
+            "fr": "Bien à vous,<br>L'équipe {brand}",
+            "en": "Warm regards,<br>The {brand} team",
+            "de": "Mit besten Grüßen,<br>Das {brand}-Team",
+            "nl": "Met vriendelijke groet,<br>Het team van {brand}",
+            "it": "Cordiali saluti,<br>Il team di {brand}",
+            "es": "Un cordial saludo,<br>El equipo de {brand}",
+        },
+        "casual": {
+            "fr": "À très vite,<br>L'équipe {brand} ✨",
+            "en": "See you soon,<br>The {brand} team ✨",
+            "de": "Bis bald,<br>Das {brand}-Team ✨",
+            "nl": "Tot snel,<br>Het {brand}-team ✨",
+            "it": "A presto,<br>Il team {brand} ✨",
+            "es": "Hasta pronto,<br>El equipo {brand} ✨",
+        },
+    },
+}
+
+
+def t_tone(key: str, *, tone: str = "formal", lang: str = "fr", **kwargs: Any) -> str:
+    """Translate a tone-aware string. Falls back to formal if tone unknown."""
+    lang = normalize_lang(lang)
+    tone = "casual" if tone == "casual" else "formal"
+    row = TONE_STRINGS.get(key) or {}
+    inner = row.get(tone) or row.get("formal") or {}
+    tpl = inner.get(lang) or inner.get("fr") or t(key, lang=lang, **kwargs)
+    try:
+        return tpl.format(**kwargs)
+    except Exception:
+        return tpl

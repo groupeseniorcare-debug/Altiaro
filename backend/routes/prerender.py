@@ -350,17 +350,14 @@ async def _render_pdp(site: dict, slug: str) -> Optional[str]:
     price = p.get("price") or p.get("selling_price") or 0
     currency = p.get("currency") or "EUR"
     brand = _site_brand_name(site)
-    jsonld = {
-        "@context": "https://schema.org",
-        "@type": "Product",
-        "name": name,
-        "description": desc,
-        "image": images,
-        "sku": p.get("sku") or p.get("id"),
-        "brand": {"@type": "Brand", "name": brand},
-        "offers": {"@type": "Offer", "price": price, "priceCurrency": currency,
-                   "url": canonical, "availability": "https://schema.org/InStock"},
-    }
+
+    # TÂCHE 3.2 — Schema markup riche : Product + AggregateRating + Reviews +
+    # FAQPage + BreadcrumbList
+    from services.product_seo_schema import build_product_jsonld
+    jsonld = build_product_jsonld(
+        p, site, lang=lang, canonical_url=canonical, images=images,
+    )
+
     usps_html = ""
     usps = p.get("usps") or []
     if usps:
@@ -368,6 +365,51 @@ async def _render_pdp(site: dict, slug: str) -> Optional[str]:
             f"<li>{_h(_pick_lang(u, lang) if isinstance(u, dict) else u)}</li>"
             for u in usps[:6]
         ) + "</ul>"
+
+    # FAQ block (visible HTML — boost accessibilité + reviews snippet)
+    faq_block = ""
+    faq_src = p.get("faq_product") or []
+    if not faq_src:
+        # Fallback : on prend la FAQ générique pour le HTML aussi (cohérence
+        # avec FAQPage schema).
+        from services.product_seo_schema import _generic_faq
+        faq_src = [{"question": q["q"], "answer": q["a"]}
+                   for q in _generic_faq(p, lang=lang, brand_name=brand)]
+    if faq_src:
+        items = []
+        for f in faq_src[:6]:
+            q = f.get("question") or f.get("q") or ""
+            a = f.get("answer") or f.get("a") or ""
+            if isinstance(q, dict):
+                q = q.get(lang) or q.get("fr") or ""
+            if isinstance(a, dict):
+                a = a.get(lang) or a.get("fr") or ""
+            if q and a:
+                items.append(
+                    f"<details><summary>{_h(q)}</summary><p>{_h(a)}</p></details>"
+                )
+        if items:
+            faq_block = "<section><h2>Questions fréquentes</h2>" + "".join(items) + "</section>"
+
+    # TÂCHE 3.3 — Internal linking dense : articles connexes + landings
+    related_blog = p.get("related_blog_posts") or []
+    related_landings = p.get("related_landings") or []
+    related_block = ""
+    if related_blog:
+        items = "".join(
+            f"<li><a href='/blog/{_h(b.get('slug',''))}'>{_h(b.get('title',''))}</a></li>"
+            for b in related_blog[:5] if b.get("slug")
+        )
+        if items:
+            related_block += f"<section><h2>Articles liés</h2><ul>{items}</ul></section>"
+    if related_landings:
+        items = "".join(
+            f"<li><a href='/longtail/{_h(ld.get('slug',''))}'>{_h(ld.get('title',''))}</a></li>"
+            for ld in related_landings[:3] if ld.get("slug")
+        )
+        if items:
+            related_block += f"<section><h2>Pour aller plus loin</h2><ul>{items}</ul></section>"
+
     head = _render_head(
         lang=lang, title=f"{name} — {brand}", description=desc,
         canonical=canonical, og_type="product",
@@ -380,6 +422,8 @@ async def _render_pdp(site: dict, slug: str) -> Optional[str]:
         + f"<p><strong>Prix : {_h(price)} {_h(currency)}</strong></p>"
         + usps_html
         + "".join(f"<img src='{_h(u)}' alt='{_h(name)}' loading='lazy'/>" for u in images[:3])
+        + faq_block
+        + related_block
         + f"</main><footer><a href='{_h(canonical)}'>Voir la fiche complète</a></footer>"
         "</body></html>"
     )

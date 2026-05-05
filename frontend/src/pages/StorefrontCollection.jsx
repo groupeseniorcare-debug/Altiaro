@@ -59,7 +59,7 @@ export function StorefrontCollections() {
             >
               <div className="aspect-[4/5] bg-neutral-100 relative overflow-hidden">
                 {c.image && (
-                  <img src={c.image} alt={c.title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                  <img src={c.image} alt={c.title} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                 <div className="absolute bottom-5 left-5 right-5 text-white">

@@ -25,7 +25,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
 
 from deps import db, get_current_user
-from services.email_i18n import t as i18n_t, detect_order_lang, normalize_lang
+from services.email_i18n import t as i18n_t, detect_order_lang, normalize_lang, infer_brand_tone, t_tone
 
 logger = logging.getLogger("conceptfactory.emails")
 router = APIRouter()
@@ -40,6 +40,122 @@ if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
 
 
+# ============== ASSET URL HELPERS (TÂCHE 2 — emails personnalisés) ============== #
+def _absolute_url(url: str, public_origin: str) -> str:
+    """Convert relative URL to absolute, using site public URL.
+
+    Examples
+    --------
+        '/api/uploads/logos/foo.png' + 'https://altea-home.com'
+            → 'https://altea-home.com/api/uploads/logos/foo.png'
+        'https://other.cdn/img.png' → unchanged
+        '' → ''
+    """
+    if not url:
+        return ""
+    u = str(url).strip()
+    if u.startswith("http://") or u.startswith("https://") or u.startswith("data:"):
+        return u
+    if u.startswith("//"):
+        return "https:" + u
+    base = (public_origin or "").rstrip("/")
+    if not base:
+        base = (os.environ.get("PUBLIC_FRONTEND_URL") or
+                os.environ.get("FRONTEND_URL") or "").rstrip("/")
+    if not u.startswith("/"):
+        u = "/" + u
+    return f"{base}{u}"
+
+
+def _resolve_brand_assets(site: dict, public_origin: str) -> dict:
+    """Extract brand visuals usable in an email.
+
+    Returns dict with:
+        brand_name      : str
+        logo_url        : str (absolute)
+        primary         : str (hex, fallback #B84B31)
+        accent          : str (hex)
+        contact_url     : str (absolute)
+    """
+    design = (site or {}).get("design") or {}
+    brand = design.get("brand") or {}
+    palette = design.get("color_palette") or {}
+
+    brand_name = (site.get("name") or brand.get("name") or "Boutique")
+
+    # Prefer wordmark over icon-only logo for emails (more recognizable in inbox)
+    raw_logo = (
+        brand.get("logo_wordmark_url")
+        or brand.get("logo_url")
+        or design.get("logo_wordmark_url")
+        or design.get("logo_url")
+        or ""
+    )
+    logo_url = _absolute_url(raw_logo, public_origin)
+
+    primary = (
+        brand.get("primary_color")
+        or palette.get("primary")
+        or design.get("primary_color")
+        or "#B84B31"
+    )
+    accent = (
+        brand.get("accent_color")
+        or palette.get("accent")
+        or design.get("accent_color")
+        or primary
+    )
+    contact_url = f"{(public_origin or '').rstrip('/')}/contact"
+
+    return {
+        "brand_name": brand_name,
+        "logo_url": logo_url,
+        "primary": primary,
+        "accent": accent,
+        "contact_url": contact_url,
+    }
+
+
+def _resolve_legal_footer(site: dict, lang: str = "fr") -> str:
+    """Build the legal HTML footer for emails.
+
+    Strategy :
+        1. If site.design.legal_info has SIREN/SIRET/company_name → use it
+        2. Else fallback on Altiaro centralized legal info (via altiaro_legal)
+    """
+    legal_info = ((site or {}).get("design") or {}).get("legal_info") or {}
+    company = (legal_info.get("company_name")
+               or legal_info.get("legal_name")
+               or "")
+    siren = legal_info.get("siren") or ""
+    siret = legal_info.get("siret") or ""
+    address = legal_info.get("address") or ""
+
+    if company and (siren or siret):
+        bits = [company]
+        if siren:
+            bits.append(f"SIREN {siren}")
+        if siret and siret != siren:
+            bits.append(f"SIRET {siret}")
+        if address:
+            bits.append(address)
+        return " · ".join(bits)
+
+    # Fallback Altiaro centralized
+    try:
+        from altiaro_legal import get_platform_legal_info
+        info = get_platform_legal_info()
+        bits = [info.get("legal_name") or "Altiaro SAS"]
+        if info.get("siren"):
+            bits.append(f"SIREN {info['siren']}")
+        addr = info.get("address_line") or info.get("address") or ""
+        if addr:
+            bits.append(addr)
+        return " · ".join(bits)
+    except Exception:
+        return "Altiaro SAS · France"
+
+
 # ============== SITE URL RESOLUTION ============== #
 async def get_site_public_url(site: dict) -> str:
     """Retourne l'URL publique d'un site : domaine custom si validé, sinon fallback."""
@@ -51,43 +167,62 @@ async def get_site_public_url(site: dict) -> str:
     return f"{frontend}/shop/{site.get('id')}"
 
 
-async def get_site_from_email(site: dict) -> str:
-    """Retourne l'adresse 'from' à utiliser pour ce site.
+async def get_site_from_email(site: dict) -> tuple:
+    """Retourne (from_addr, reply_to, dkim_verified) pour ce site.
 
-    Si le site a un domaine custom ET que ce domaine est vérifié dans Resend,
-    on utilise `commandes@{domain}`. Sinon on fallback sur DEFAULT_FROM.
+    Stratégie :
+        1. Si le domaine custom du site est vérifié dans Resend (DKIM ok),
+           on peut envoyer DEPUIS `noreply@{domain}` → Reply-To `contact@{domain}`.
+        2. Sinon, fallback DEFAULT_FROM (Altiaro/Resend) avec Reply-To
+           `contact@{domain}` pour rediriger les réponses vers la boutique.
     """
-    domain = (site.get("domain") or "").replace("https://", "").replace("http://", "").rstrip("/")
+    raw = (site.get("custom_domain") or site.get("domain") or "")
+    domain = raw.replace("https://", "").replace("http://", "").rstrip("/")
+    brand = site.get("name") or "Boutique"
     if not domain:
-        return DEFAULT_FROM
+        return DEFAULT_FROM, None, False
+    reply_to = f"contact@{domain}"
     try:
         domains_resp = await asyncio.to_thread(resend.Domains.list)
         verified_names = {d.get("name") for d in (domains_resp.get("data") or [])
                           if d.get("status") == "verified"}
         for name in verified_names:
             if name and (domain == name or domain.endswith(f".{name}")):
-                brand = site.get("name") or "Boutique"
-                # Escape + simple display name
-                return f"{brand} <commandes@{name}>"
+                # DKIM verified for this domain → send from custom address
+                return f"{brand} <noreply@{name}>", reply_to, True
     except Exception as e:
         logger.warning(f"Resend domain check failed: {e}")
-    return DEFAULT_FROM
+    # Fallback : send via Altiaro DEFAULT_FROM but Reply-To set on shop contact
+    return DEFAULT_FROM, reply_to, False
 
 
 # ============== TEMPLATE SHELL (inline CSS, table-based) ============== #
 def _email_shell(brand_name: str, logo_url: str, primary: str,
                  site_url: str, inner_html: str, preheader: str = "",
-                 lang: str = "fr") -> str:
+                 lang: str = "fr",
+                 signature_html: str = "",
+                 legal_footer: str = "",
+                 accent: str = "") -> str:
     lang = normalize_lang(lang)
     contact_html = i18n_t("shell.contact_us_html", lang=lang,
                           contact_url=f"{site_url}/contact", primary=primary)
     logo_block = (
         f'<img src="{logo_url}" alt="{brand_name}" '
-        f'style="max-width:180px;height:auto;display:block;">'
+        f'style="max-width:200px;max-height:60px;height:auto;display:block;">'
         if logo_url else
         f'<div style="font-family:Georgia,serif;font-size:28px;font-weight:600;color:{primary};">'
         f'{brand_name}</div>'
     )
+    sig_block = (
+        f'<p style="color:#57534E;font-size:14px;line-height:1.6;margin:24px 0 8px 0;font-style:italic;">'
+        f'{signature_html}</p>'
+        if signature_html else ""
+    )
+    legal_block = (
+        f'<p style="margin:8px 0 0 0;font-size:10px;color:#A8A29E;line-height:1.5;">{legal_footer}</p>'
+        if legal_footer else ""
+    )
+    accent_bar = accent or primary
     return f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head>
@@ -102,6 +237,9 @@ def _email_shell(brand_name: str, logo_url: str, primary: str,
     <td align="center">
       <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
         <tr>
+          <td style="height:4px;background:{accent_bar};font-size:0;line-height:0;">&nbsp;</td>
+        </tr>
+        <tr>
           <td style="padding:32px 32px 16px 32px;border-bottom:1px solid #E7E5E4;" align="left">
             <a href="{site_url}" style="text-decoration:none;">{logo_block}</a>
           </td>
@@ -109,6 +247,7 @@ def _email_shell(brand_name: str, logo_url: str, primary: str,
         <tr>
           <td style="padding:32px;">
             {inner_html}
+            {sig_block}
           </td>
         </tr>
         <tr>
@@ -119,6 +258,7 @@ def _email_shell(brand_name: str, logo_url: str, primary: str,
             <p style="margin:0;font-size:11px;color:#A8A29E;">
               © {datetime.now(timezone.utc).year} {brand_name} · <a href="{site_url}" style="color:#A8A29E;text-decoration:none;">{site_url.replace('https://', '').replace('http://', '')}</a>
             </p>
+            {legal_block}
           </td>
         </tr>
       </table>
@@ -140,19 +280,24 @@ async def send_email_via_resend(to: str, subject: str, html: str,
         logger.warning("RESEND_API_KEY missing — email skipped")
         return {"sent": False, "reason": "no_api_key"}
 
-    from_addr = await get_site_from_email(site) if site else DEFAULT_FROM
+    if site:
+        from_addr, reply_to, dkim_ok = await get_site_from_email(site)
+    else:
+        from_addr, reply_to, dkim_ok = DEFAULT_FROM, None, False
     params = {
         "from": from_addr,
         "to": [to],
         "subject": subject,
         "html": html,
     }
+    if reply_to:
+        params["reply_to"] = [reply_to]
     if tags:
         # Resend tags: only ASCII letters, numbers, underscores, or dashes allowed
         import re as _re
         clean_tags = []
-        for t in tags:
-            cleaned = _re.sub(r"[^A-Za-z0-9_\-]", "_", str(t))[:60]
+        for tg in tags:
+            cleaned = _re.sub(r"[^A-Za-z0-9_\-]", "_", str(tg))[:60]
             if cleaned:
                 clean_tags.append({"name": cleaned, "value": "1"})
         if clean_tags:
@@ -164,6 +309,8 @@ async def send_email_via_resend(to: str, subject: str, html: str,
         await db.email_log.insert_one({
             "to": to,
             "from": from_addr,
+            "reply_to": reply_to,
+            "dkim_verified": dkim_ok,
             "subject": subject,
             "tags": tags or [],
             "site_id": (site or {}).get("id"),
@@ -172,12 +319,14 @@ async def send_email_via_resend(to: str, subject: str, html: str,
             "created_at": datetime.now(timezone.utc).isoformat(),
         })
         logger.info(f"[email] sent to {to}: {subject} (id={email_id})")
-        return {"sent": True, "email_id": email_id}
+        return {"sent": True, "email_id": email_id, "from": from_addr,
+                "reply_to": reply_to, "dkim_verified": dkim_ok}
     except Exception as e:
         logger.exception("Resend send failed")
         await db.email_log.insert_one({
             "to": to,
             "from": from_addr,
+            "reply_to": reply_to,
             "subject": subject,
             "tags": tags or [],
             "site_id": (site or {}).get("id"),
@@ -216,23 +365,28 @@ def _order_rows_html(order: dict, lang: str = "fr") -> str:
 
 
 async def build_order_confirmation_html(order: dict, site: dict) -> str:
-    brand = site.get("name") or "Boutique"
     lang = detect_order_lang(order, site)
-    design = site.get("design") or {}
-    logo = (design.get("brand") or {}).get("logo_url") or ""
-    primary = (design.get("brand") or {}).get("primary_color") or "#B84B31"
+    tone = infer_brand_tone(site)
     site_url = await get_site_public_url(site)
+    assets = _resolve_brand_assets(site, site_url)
+    brand = assets["brand_name"]
+    logo = assets["logo_url"]
+    primary = assets["primary"]
+    accent = assets["accent"]
+
     customer_name = ((order.get("customer") or {}).get("name")
                      or i18n_t("shell.greeting_fallback", lang=lang))
     order_number = order.get("order_number") or order.get("id", "")[:8].upper()
     subtotal = float(order.get("subtotal") or 0)
-    shipping = float(order.get("shipping_total") or 0)
-    tax = float(order.get("tax_total") or 0)
+    shipping = float(order.get("shipping_total") or order.get("shipping_fee") or 0)
+    tax = float(order.get("tax_total") or order.get("tax") or 0)
     total = float(order.get("total") or 0)
     order_url = f"{site_url}/account/orders/{order.get('id')}"
 
-    title = i18n_t("order_confirmation.title_with_name", lang=lang, customer_name=customer_name)
-    confirmed_text = i18n_t("order_confirmation.confirmed_text", lang=lang, order_number=order_number)
+    title = t_tone("order_confirmation.title_with_name", tone=tone, lang=lang,
+                    customer_name=customer_name)
+    confirmed_text = t_tone("order_confirmation.confirmed_text", tone=tone, lang=lang,
+                             order_number=order_number)
     your_order = i18n_t("order_confirmation.your_order", lang=lang)
     sub_label = i18n_t("order_confirmation.subtotal", lang=lang)
     ship_label = i18n_t("order_confirmation.shipping", lang=lang)
@@ -242,6 +396,8 @@ async def build_order_confirmation_html(order: dict, site: dict) -> str:
     legal_notice = i18n_t("order_confirmation.legal_notice", lang=lang, brand=brand)
     security_notice = i18n_t("order_confirmation.security_notice", lang=lang)
     preheader = i18n_t("order_confirmation.preheader", lang=lang, order_number=order_number)
+    signature = t_tone("shell.signature", tone=tone, lang=lang, brand=brand)
+    legal_footer = _resolve_legal_footer(site, lang=lang)
 
     inner = f"""
 <h1 style="font-family:Georgia,serif;font-size:26px;font-weight:600;color:#1C1917;margin:0 0 8px 0;line-height:1.2;">{title}</h1>
@@ -249,7 +405,7 @@ async def build_order_confirmation_html(order: dict, site: dict) -> str:
   {confirmed_text}
 </p>
 
-<div style="background:#FAF7F2;border-radius:12px;padding:20px 20px 8px 20px;margin:24px 0;">
+<div style="background:#FAF7F2;border-radius:12px;padding:20px 20px 8px 20px;margin:24px 0;border-left:3px solid {primary};">
   <h2 style="font-family:Georgia,serif;font-size:16px;margin:0 0 12px 0;color:#1C1917;">{your_order}</h2>
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
     {_order_rows_html(order, lang=lang)}
@@ -272,17 +428,23 @@ async def build_order_confirmation_html(order: dict, site: dict) -> str:
 </p>
 """
     return _email_shell(brand, logo, primary, site_url, inner,
-                        preheader=preheader, lang=lang)
+                        preheader=preheader, lang=lang,
+                        signature_html=signature,
+                        legal_footer=legal_footer,
+                        accent=accent)
 
 
 async def build_shipping_update_html(order: dict, site: dict,
                                      tracking_number: str, carrier: str = "") -> str:
-    brand = site.get("name") or "Boutique"
     lang = detect_order_lang(order, site)
-    design = site.get("design") or {}
-    logo = (design.get("brand") or {}).get("logo_url") or ""
-    primary = (design.get("brand") or {}).get("primary_color") or "#B84B31"
+    tone = infer_brand_tone(site)
     site_url = await get_site_public_url(site)
+    assets = _resolve_brand_assets(site, site_url)
+    brand = assets["brand_name"]
+    logo = assets["logo_url"]
+    primary = assets["primary"]
+    accent = assets["accent"]
+
     customer_name = ((order.get("customer") or {}).get("name")
                      or i18n_t("shell.greeting_fallback", lang=lang))
     order_number = order.get("order_number") or order.get("id", "")[:8].upper()
@@ -295,6 +457,8 @@ async def build_shipping_update_html(order: dict, site: dict,
     help_text = i18n_t("shipping_update.help_text", lang=lang)
     preheader = i18n_t("shipping_update.preheader", lang=lang,
                        order_number=order_number, tracking=tracking_number)
+    signature = t_tone("shell.signature", tone=tone, lang=lang, brand=brand)
+    legal_footer = _resolve_legal_footer(site, lang=lang)
 
     inner = f"""
 <h1 style="font-family:Georgia,serif;font-size:26px;font-weight:600;color:#1C1917;margin:0 0 8px 0;line-height:1.2;">{title}</h1>
@@ -302,7 +466,7 @@ async def build_shipping_update_html(order: dict, site: dict,
   {body_text}
 </p>
 
-<div style="background:#FAF7F2;border-radius:12px;padding:24px;margin:24px 0;text-align:center;">
+<div style="background:#FAF7F2;border-radius:12px;padding:24px;margin:24px 0;text-align:center;border-left:3px solid {primary};">
   <div style="font-size:12px;color:#78716C;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">{tracking_label}</div>
   <div style="font-family:monospace;font-size:20px;font-weight:600;color:#1C1917;letter-spacing:1px;">{tracking_number}</div>
 </div>
@@ -312,7 +476,10 @@ async def build_shipping_update_html(order: dict, site: dict,
 </p>
 """
     return _email_shell(brand, logo, primary, site_url, inner,
-                        preheader=preheader, lang=lang)
+                        preheader=preheader, lang=lang,
+                        signature_html=signature,
+                        legal_footer=legal_footer,
+                        accent=accent)
 
 
 async def build_admin_new_order_html(order: dict, site: dict) -> str:
